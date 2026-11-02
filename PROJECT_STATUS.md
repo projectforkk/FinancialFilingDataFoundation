@@ -16,6 +16,10 @@
 
 `task/p0-native-pdf-feasibility`
 
+当前独立验收执行指令：
+
+`acceptance/03-p0-acceptance-run-instruction.md`
+
 ## Design baseline
 
 当前设计基线由以下文件共同组成：
