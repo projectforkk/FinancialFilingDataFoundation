@@ -889,7 +889,8 @@ P2 runner 提供无网络：
 - source pin descriptor；
 - CN downloader symbol import；
 - HK downloader symbol import；
-- 禁止 workflow symbol 未被 runner 主动引用；
+- runner 源码/业务调用路径不主动引用或调用 high-level workflow / Docling conversion；
+- package initializer transitively load 这些模块本身不构成失败证据；
 - runner process cwd 不是 Dayu source checkout；
 - imported Dayu module origin 位于 dedicated acquisition runtime `site-packages`。
 

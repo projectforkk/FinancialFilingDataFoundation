@@ -111,7 +111,8 @@ BLOCKED 或 FAIL，按 freeze 定义，不得自动修复。
 - explicit safe cwd；
 - Dayu module origin 位于 dedicated runtime site-packages；
 - doctor initial timeout 允许 60 秒；
-- no high-level workflow invocation。
+- package initializer 可 transitively load high-level/Docling modules；
+- runner 源码/业务调用路径不得主动 import/call high-level workflow 或 Docling conversion。
 
 ---
 

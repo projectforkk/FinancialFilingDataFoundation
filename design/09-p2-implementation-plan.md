@@ -506,6 +506,18 @@ Verdict：
 
 ## 20. P2 Issue Log
 
+### P2-ISSUE-003 — Dayu initializer 会 transitively load 高层 workflow/Docling 模块
+
+P2-E doctor 实测发现：仅 import CN/HK downloader 后，`sys.modules` 中已经出现 `cn_download_filing_workflow`、`cn_download_workflow`、`docling_export`。根因不是 runner 主动调用，而是 Dayu package initializer/import graph 自动加载。
+
+批准解决方案：
+
+1. 不把 `sys.modules` 是否出现这些模块作为失败条件；
+2. doctor 改为报告 `transitively_loaded_modules`；
+3. 强制验证 runner 源码/业务调用路径不主动 import/call high-level workflow / `convert_pdf_to_docling_json`；
+4. live/mock 验收继续要求没有 Docling conversion output / Docling JSON artifact；
+5. 不修改 upstream initializer 来规避加载。
+
 ### P2-ISSUE-002 — JSON request encoding 在手工 doctor harness 中产生 BOM
 
 首次 P2-E doctor 手工请求由 PowerShell `Set-Content -Encoding UTF8` 生成，在当前宿主环境写入 UTF-8 BOM。Runner 按 `encoding="utf-8"` 严格读取并返回 `RUNNER_PROTOCOL_INVALID`，因此该次 doctor 未进入 Dayu import。
