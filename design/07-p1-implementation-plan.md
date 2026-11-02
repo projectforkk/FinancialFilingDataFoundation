@@ -97,11 +97,13 @@ Gate D：registration tests PASS。
 
 - register parsed record
 - list slot parse records
+- explicit `PlannerReusePolicy`
 - compatibility checks
 - validation/blocking checks
-- schema policy
-- parser defect invalidation
+- accepted schema policy
+- parser-version defect invalidation
 - material-change check
+- multiple reusable document SHA ambiguity handling
 
 要求：
 
@@ -151,6 +153,7 @@ No reusable + one local → PARSE_LOCAL
 No reusable + no local → DOWNLOAD_AND_PARSE
 Parsed SHA != current local SHA → PARSE_LOCAL
 Multiple distinct local SHA → REVIEW_REQUIRED
+Multiple reusable parsed SHA without unique local evidence → REVIEW_REQUIRED
 Conflict binding → non-guessing result
 ```
 

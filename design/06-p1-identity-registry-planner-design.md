@@ -332,7 +332,19 @@ Registry 不删除旧 run 来制造“当前唯一状态”。
 4. `compatibility_status == COMPATIBLE`；
 5. schema version 被当前 policy 接受；
 6. 未命中 parser defect invalidation rule；
-7. 未发现 source document material change。
+7. 未发现 source document material change；
+8. 对当前 slot 能确定唯一可复用 `document_sha256`。
+
+### 9.0 PlannerReusePolicy
+
+P1 不允许把 schema/defect 规则隐含在代码常量中。`build_plan` 必须接收或持有显式 reuse policy，至少包含：
+
+- `accepted_schema_versions: frozenset[str]`
+- `invalidated_parser_versions: frozenset[str]`
+
+P1 首期 defect invalidation 先按 parser version 精确匹配；更细粒度 defect rule 可在后续设计扩展。
+
+若 `accepted_schema_versions` 为空，表示没有任何 schema 可复用，而不是“全部接受”。
 
 ### 9.1 parser_version
 
@@ -353,6 +365,16 @@ P1 可确认的 material change：
 `REVIEW_REQUIRED`
 
 不得猜最新版本。
+
+### 9.3 多个可复用 Parsed SHA
+
+若同一 slot 同时存在多个满足 PASS / 0 blocking / COMPATIBLE / accepted schema / not-invalidated 的 parsed records，并且这些 records 对应**多个 distinct `document_sha256`**：
+
+- 当前 local document 若唯一 resolved，则只允许评估与该 local SHA 相同的 parsed records；
+- 当前没有唯一 local document 可作为 active-source 证据时，planner 必须输出 `REVIEW_REQUIRED`；
+- 不得按 `created_at`、`parse_run_id`、parser_version、文件名或任意排序规则猜测哪个 SHA 是当前有效版本。
+
+同一 `document_sha256` 下若存在多个可复用 parse runs，可按 `parse_run_id` Unicode 升序选择第一条，选择只影响引用的 parse_run_id，不改变 source identity。
 
 ---
 
@@ -474,6 +496,7 @@ P1 至少：
 
 ```text
 VALIDATED_COMPATIBLE_PARSED_DATA
+MULTIPLE_REUSABLE_DOCUMENTS_AMBIGUOUS
 LOCAL_RAW_AVAILABLE
 NO_REUSABLE_DATA_OR_LOCAL_RAW
 PARSED_VALIDATION_NOT_PASS

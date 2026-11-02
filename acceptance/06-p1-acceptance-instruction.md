@@ -39,11 +39,13 @@
 14. parsed SHA 与 current local SHA 不同 → 阻止错误 reuse。
 15. multiple distinct local SHA → REVIEW_REQUIRED，禁止猜测。
 16. parser_version change alone 不触发 reparse。
-17. source files unchanged。
-18. no network。
-19. no Dayu。
-20. no Docling/Torch/OCR/external AI。
-21. repeated build_plan deterministic。
+17. accepted schema / invalidated parser versions 由显式 `PlannerReusePolicy` 决定。
+18. 多个 distinct reusable parsed SHA 且无唯一 local active-source 证据 → REVIEW_REQUIRED。
+19. source files unchanged。
+20. no network。
+21. no Dayu。
+22. no Docling/Torch/OCR/external AI。
+23. repeated build_plan deterministic。
 
 ## PASS
 
