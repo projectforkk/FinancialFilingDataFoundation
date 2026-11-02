@@ -31,6 +31,8 @@ Independent Acceptance 必须在独立 Git worktree 中执行，并固定到 acc
 
 若不一致，该组结果无效，必须停止并重新建立隔离 worktree；不得继续使用共享开发工作树的结果。
 
+在执行 pytest 前必须显式创建该 isolated worktree 内的 ignored `workspace/` 父目录，再将 `--basetemp` 指向其子目录。isolated worktree 不得假设共享工作树中的 ignored 目录已经存在。
+
 ## 必验
 
 1. P0 regression tests PASS。

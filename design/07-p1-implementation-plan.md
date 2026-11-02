@@ -337,6 +337,22 @@ Code Review 前发现：
 
 当前实现已采用该异常语义；需在验收中明确验证。
 
+### P1-ISSUE-007 — Isolated worktree pytest basetemp parent missing
+
+第一次在 isolated review worktree 重跑 P1-H 时，candidate HEAD 前后均正确固定，但 `--basetemp` 指向的 `workspace/pytest-review` 其父目录 `workspace/` 尚不存在，pytest 在 fixture setup 前产生 `FileNotFoundError`；该组测试结果作废，不作为产品 FAIL。
+
+根因：隔离 worktree 不继承原工作树中的 ignored `workspace/` 目录，而 review 命令假设父目录已存在。
+
+批准解决方案：
+
+1. Review / Acceptance 测试前显式创建 candidate worktree 内的 ignored `workspace/` 父目录；
+2. 仅创建目录，不修改 tracked production/tests/design/config；
+3. 创建后重新从头执行该 Gate 的 tests；
+4. HEAD 前后仍必须等于 frozen candidate；
+5. 若目录创建失败才视为 execution environment blocker。
+
+该问题只影响 Review 执行准备，不改变 production semantics，因此无需重跑 P1-B~G；P1-H 必须重新执行。
+
 ### P1-ISSUE-006 — Registered local content drift
 
 Code Review 前发现：Registry 已记录 `path -> document_sha256`，但 local resolution 原实现只检查 path 是否存在；若文件在注册后被原地替换而未重新 register，planner 可能把旧 SHA 当成当前 local document，进而错误 `REUSE_DATA`。
