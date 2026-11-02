@@ -18,6 +18,7 @@ PROTOCOL_VERSION = "ffdf-dayu-acquisition-v1"
 DAYU_REPOSITORY = "https://github.com/noho/dayu-agent"
 DAYU_PINNED_COMMIT = "2115c86d5a9027bb51cbbc8a4d0175080732e4e6"
 EXPECTED_DAYU_VERSION = "0.1.4"
+RUNNER_VERSION = "p2-dayu-runner-v1"
 
 _REASON_PROTOCOL_INVALID = "RUNNER_PROTOCOL_INVALID"
 _REASON_SOURCE_MISMATCH = "DAYU_SOURCE_COMMIT_MISMATCH"
@@ -244,6 +245,7 @@ def _doctor(request: dict[str, Any]) -> dict[str, Any]:
         "operation": "doctor",
         "request_id": request_id,
         "status": "OK",
+        "runner_version": RUNNER_VERSION,
         "dayu_repository": DAYU_REPOSITORY,
         "dayu_pinned_commit": DAYU_PINNED_COMMIT,
         "dayu_source_head": source_head,
@@ -353,6 +355,7 @@ def _discover(request: dict[str, Any]) -> dict[str, Any]:
         "operation": "discover",
         "request_id": request_id,
         "status": "OK",
+        "runner_version": RUNNER_VERSION,
         "profile": {
             "provider": str(profile.provider),
             "company_id": str(profile.company_id),
@@ -512,6 +515,7 @@ def _download(request: dict[str, Any]) -> dict[str, Any]:
             "operation": "download",
             "request_id": request_id,
             "status": "OK",
+            "runner_version": RUNNER_VERSION,
             "candidate": candidate_payload,
             "dayu_temp_sha256": str(asset.sha256).lower(),
             "dayu_content_length": int(asset.content_length),

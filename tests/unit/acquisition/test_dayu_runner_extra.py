@@ -175,6 +175,7 @@ def test_discover_contract_with_injected_narrow_client(
     assert response["candidates"][0]["provider"] == provider
     assert response["candidates"][0]["fiscal_year"] == 2024
     assert response["candidates"][0]["fiscal_period"] == "FY"
+    assert response["runner_version"] == "p2-dayu-runner-v1"
     assert response["docling_conversion_used"] is False
 
 
@@ -234,4 +235,5 @@ def test_download_contract_copies_pdf_and_removes_dayu_temp(
     assert response["candidate"] == candidate
     assert staging.read_bytes() == b"%PDF-fake-runner"
     assert not dayu_temp.exists()
+    assert response["runner_version"] == "p2-dayu-runner-v1"
     assert response["docling_conversion_used"] is False

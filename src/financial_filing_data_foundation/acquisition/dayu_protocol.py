@@ -112,4 +112,6 @@ def downloaded_asset_from_response(payload: dict[str, Any]) -> RunnerDownloadedA
         sha256=str(payload["dayu_temp_sha256"]).lower(),
         content_length=int(payload["dayu_content_length"]),
         downloaded_at=str(payload["downloaded_at"]),
+        request_id=str(payload["request_id"]),
+        runner_version=str(payload["runner_version"]),
     )

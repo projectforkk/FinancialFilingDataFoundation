@@ -147,6 +147,8 @@ class FakeProvider:
             sha256=("0" * 64 if self.bad_sha else actual_sha),
             content_length=staging_path.stat().st_size,
             downloaded_at="2026-11-03T00:00:00+00:00",
+            request_id="fake-download-request",
+            runner_version="fake-runner-v1",
         )
 
     def source_metadata(
@@ -292,6 +294,8 @@ def test_service_cn_success_registers_raw_provenance_and_receipt(
 
     receipt = json.loads(result.receipt_path.read_text(encoding="utf-8"))
     assert receipt["docling_conversion_used"] is False
+    assert receipt["request_id"] == "fake-download-request"
+    assert receipt["runner_version"] == "fake-runner-v1"
     assert receipt["ffdf_recomputed_sha256"] == result.document_sha256
     assert receipt["registry_result"]["document_sha256"] == result.document_sha256
 
@@ -368,6 +372,63 @@ def test_service_ambiguous_candidates_require_review(tmp_path: Path) -> None:
     assert (
         result.reason_code
         == AcquisitionReason.ACQUISITION_CANDIDATE_AMBIGUOUS.value
+    )
+    assert provider.download_calls == 0
+
+
+def test_service_identical_duplicate_source_is_deduplicated(
+    tmp_path: Path,
+) -> None:
+    request = _request()
+    candidate = _candidate()
+    provider = FakeProvider(request, (candidate, candidate))
+
+    result = acquire_slot(
+        request,
+        provider,
+        RawDocumentStore(tmp_path / "raw"),
+        SQLiteRegistry(tmp_path / "registry.sqlite"),
+    )
+
+    assert result.status == AcquisitionStatus.DOWNLOADED
+    assert provider.download_calls == 1
+
+
+def test_service_duplicate_source_metadata_conflict_requires_review(
+    tmp_path: Path,
+) -> None:
+    request = _request()
+    original = _candidate()
+    conflicting = AcquisitionCandidate(
+        provider=original.provider,
+        provider_company_id=original.provider_company_id,
+        provider_company_name=original.provider_company_name,
+        ticker=original.ticker,
+        source_id=original.source_id,
+        source_url=original.source_url,
+        source_title="conflicting title",
+        language=original.language,
+        filing_date=original.filing_date,
+        fiscal_year=original.fiscal_year,
+        fiscal_period=original.fiscal_period,
+        amended=original.amended,
+        remote_content_length=original.remote_content_length,
+        etag=original.etag,
+        last_modified=original.last_modified,
+    )
+    provider = FakeProvider(request, (original, conflicting))
+
+    result = acquire_slot(
+        request,
+        provider,
+        RawDocumentStore(tmp_path / "raw"),
+        SQLiteRegistry(tmp_path / "registry.sqlite"),
+    )
+
+    assert result.status == AcquisitionStatus.REVIEW_REQUIRED
+    assert (
+        result.reason_code
+        == AcquisitionReason.ACQUISITION_CANDIDATE_METADATA_CONFLICT.value
     )
     assert provider.download_calls == 0
 

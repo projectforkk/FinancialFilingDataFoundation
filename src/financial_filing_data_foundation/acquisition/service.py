@@ -66,10 +66,25 @@ def _validate_source_url(market: str, source_url: str) -> None:
         )
 
 
+def _candidate_critical_metadata(candidate: AcquisitionCandidate) -> tuple[object, ...]:
+    return (
+        candidate.provider_company_id,
+        candidate.source_title,
+        candidate.language,
+        candidate.filing_date,
+        candidate.fiscal_year,
+        candidate.fiscal_period,
+        candidate.amended,
+        candidate.remote_content_length,
+        candidate.etag,
+        candidate.last_modified,
+    )
+
+
 def _exact_candidates(
     request: AcquisitionRequest,
     candidates: tuple[AcquisitionCandidate, ...],
-) -> tuple[AcquisitionCandidate, ...]:
+) -> tuple[tuple[AcquisitionCandidate, ...], bool]:
     expected_provider = _EXPECTED_PROVIDER[request.slot.market]
     matches: list[AcquisitionCandidate] = []
     for candidate in candidates:
@@ -84,13 +99,29 @@ def _exact_candidates(
         _validate_source_url(request.slot.market, candidate.source_url)
         matches.append(candidate)
 
-    by_identity: dict[tuple[str, str], AcquisitionCandidate] = {}
+    by_identity: dict[tuple[str, str], list[AcquisitionCandidate]] = {}
     for candidate in matches:
-        by_identity[(candidate.source_id, candidate.source_url)] = candidate
-    return tuple(
-        by_identity[key]
-        for key in sorted(by_identity, key=lambda item: (item[0], item[1]))
-    )
+        by_identity.setdefault(
+            (candidate.source_id, candidate.source_url), []
+        ).append(candidate)
+
+    deduplicated: list[AcquisitionCandidate] = []
+    for key in sorted(by_identity, key=lambda item: (item[0], item[1])):
+        group = by_identity[key]
+        signatures = {_candidate_critical_metadata(candidate) for candidate in group}
+        if len(signatures) > 1:
+            return (), True
+        deduplicated.append(
+            sorted(
+                group,
+                key=lambda candidate: (
+                    candidate.provider_company_name,
+                    candidate.source_title,
+                    candidate.language,
+                ),
+            )[0]
+        )
+    return tuple(deduplicated), False
 
 
 def acquire_slot(
@@ -140,7 +171,18 @@ def acquire_slot(
             f"provider profile ticker mismatch: {discovery.profile.ticker}",
         )
 
-    candidates = _exact_candidates(request, discovery.candidates)
+    candidates, metadata_conflict = _exact_candidates(
+        request, discovery.candidates
+    )
+    if metadata_conflict:
+        return AcquisitionResult(
+            status=AcquisitionStatus.REVIEW_REQUIRED,
+            reason_code=(
+                AcquisitionReason.ACQUISITION_CANDIDATE_METADATA_CONFLICT.value
+            ),
+            slot=request.slot,
+            provider=expected_provider,
+        )
     if not candidates:
         return AcquisitionResult(
             status=AcquisitionStatus.NOT_FOUND,
@@ -242,6 +284,8 @@ def acquire_slot(
             else DAYU_PACKAGE_VERSION
         ),
         "dayu_runtime": runtime_payload,
+        "runner_version": asset.runner_version,
+        "request_id": asset.request_id,
         "dayu_reported_sha256": asset.sha256,
         "document_sha256": stored.document_sha256,
         "ffdf_recomputed_sha256": ffdf_sha,

@@ -18,6 +18,7 @@ def test_protocol_constants_are_pinned() -> None:
         == "2115c86d5a9027bb51cbbc8a4d0175080732e4e6"
     )
     assert dayu_runner.EXPECTED_DAYU_VERSION == "0.1.4"
+    assert dayu_runner.RUNNER_VERSION == "p2-dayu-runner-v1"
 
 
 def test_request_json_is_strict_utf8_without_bom(tmp_path: Path) -> None:
