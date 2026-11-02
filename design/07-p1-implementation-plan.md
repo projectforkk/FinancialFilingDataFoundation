@@ -239,12 +239,38 @@ Final verdict：
 
 - acceptance evidence 入库；
 - PROJECT_STATUS → P1_DONE；
-- merge P1 branch → main；
+- 正常情况下 merge P1 branch → main；
+- 若命中 P1-ISSUE-003 且 main 已包含 accepted commits，则验证最终 accepted candidate/closeout commits 均可从 main 追溯，不制造重复 merge；
+- 更新 `accepted_baseline_sha` 到 P1 closeout commit；
 - 才允许开始 P2 design。
 
 ---
 
 ## 12. 问题处置
+
+### P1-ISSUE-003 — Pre-acceptance P1 commits entered main
+
+Code Review 前发现：
+
+- `444f341` P1 production commit；
+- `182bc42` P1 development evidence commit；
+
+已经因并发/设计 baseline 同步操作进入 `main`，早于 P1 Independent Acceptance。
+
+这违反本计划原定“P1-K PASS 后 merge P1 branch → main”的正常时序，但未改变 production 文件内容，也未丢失 Git 可追踪性。
+
+批准解决方案：
+
+1. 不 reset、不 force push、不改写 Git 历史；
+2. 当前 accepted baseline 继续固定为 P0 closeout `edff06b2b1138b50d742e92ce8b8df628c6d2c61`；
+3. `main HEAD` 中的 P1 commits 在 P1 PASS 前明确视为 **UNACCEPTED**；
+4. P1 正式 candidate 仍使用 `task/p1-identity-registry-planner`；
+5. P1-H / I / J 正常执行，不因为误入 main 降低任何验收要求；
+6. 若 P1 PASS，P1-K closeout 更新 `accepted_baseline_sha` 到最终 closeout commit；若 main 已包含所有 accepted commits，则不制造重复 merge；
+7. 若 P1 FAIL / ABORT，则在 main 以显式 revert commit 撤销未验收 P1 implementation/evidence；
+8. P2 恢复 acceptance PASS 后才进入 main 的正常流程。
+
+该 incident 不授权提前开始 P2。
 
 ### P1-ISSUE-001 — Registry public export omission
 

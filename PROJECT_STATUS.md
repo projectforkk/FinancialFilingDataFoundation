@@ -22,7 +22,14 @@
 
 当前 P1 design baseline：
 
-以包含本次 P1 设计文件并推送到 `main` 的最新 HEAD 为准；P1 开发分支必须从该 HEAD 创建。
+以 P1 task branch 中最新已提交的 design baseline 为准；所有设计修正必须先提交并进入 GitHub。
+
+当前已验收 baseline：
+
+- phase: `P0_DONE`
+- accepted_baseline_sha: `edff06b2b1138b50d742e92ce8b8df628c6d2c61`
+
+治理异常 `P1-ISSUE-003`：`main` 已提前包含部分尚未完成 Independent Acceptance 的 P1 commits；在 P1 PASS 前，**不得把 main HEAD 视为 accepted baseline**。正式 P1 candidate 仍以 `task/p1-identity-registry-planner` 的 acceptance freeze 为准。
 
 P0 acceptance freeze/result 已保留为历史证据，不再作为当前 P1 验收入口。
 
