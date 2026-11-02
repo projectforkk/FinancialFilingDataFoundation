@@ -113,6 +113,25 @@ Text block：
 
 P3 不丢弃原始 block/line/span identity。
 
+### 5.1 Native text extraction flags
+
+P3 的 `DICT` 只用于 text block / line / span layout，**不得保留 image binary payload**。
+
+PyMuPDF extraction 必须使用等价于：
+
+```python
+text_flags = pymupdf.TEXTFLAGS_DICT & ~pymupdf.TEXT_PRESERVE_IMAGES
+text_page = page.get_textpage(flags=text_flags)
+page.get_text("words", textpage=text_page, sort=False)
+page.get_text("dict", textpage=text_page, sort=False)
+```
+
+image metadata/count 继续由 `page.get_images(full=True)` 单独获取。
+
+`drawing_count` 只需要 count，不需要完整 Python drawing object contract；优先使用 compact `page.get_cdrawings()`，避免不必要对象构造。
+
+image-only page 在 text-only DICT 中没有 text block 是正确语义，必须表现为 `native_text_available=false / PAGE_TEXT_EMPTY`，不能把 image payload 当 native text。
+
 ## 6. BBox
 
 所有 bbox：

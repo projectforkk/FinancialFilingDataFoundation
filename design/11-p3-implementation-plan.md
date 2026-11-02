@@ -57,6 +57,26 @@ PASS only → merge main → verify src/tests equal frozen candidate → full re
 
 ## P3 Issue Log
 
+### P3-ISSUE-002 — PyMuPDF DICT 默认 image payload 导致 HK native path 病理性变慢
+
+P3-G 首次 HK live parse 超过 30s 且长期无 CPU-visible progress。逐页 A/B 确认：
+
+- HK page 1 default DICT ≈ 1231.69 ms；text-only DICT ≈ 2.09 ms；
+- page 20 default ≈ 466.96 ms；text-only ≈ 1.41 ms；
+- page 32 default ≈ 392.13 ms；text-only ≈ 1.45 ms；
+- page 34 default ≈ 425.28 ms；text-only ≈ 1.32 ms。
+
+根因：`get_text("dict")` 默认包含 image payload，而 P3 仅需要 text span layout。另测 `get_cdrawings()` 代表页约 2.88–54.11 ms，可用于 drawing count。
+
+批准解决方案：
+1. P3 text layout 使用 `TEXTFLAGS_DICT & ~TEXT_PRESERVE_IMAGES`；
+2. 同页构造一次 TextPage 并复用给 words/dict；
+3. image count 独立 `get_images(full=True)`；
+4. drawing count 使用 compact `get_cdrawings()`；
+5. image-only page 继续明确 PAGE_TEXT_EMPTY；
+6. 作废首轮 HK live performance 证据，修复后 fresh artifact root 重跑 P3-F/G；
+7. 该修正不改变 parser version，因为原实现本来就丢弃 type!=0 image block，属于语义等价的性能修正。
+
 ### P3-ISSUE-001 — JSONL Unicode line separators break record boundaries
 
 首次 CN live artifact 已成功抽取，但 evidence harness 用 `splitlines()` 读取 `pages.jsonl` 时遇到 `JSONDecodeError`。根因是原文含 Unicode line separator，`ensure_ascii=False` 原样保留，而 `splitlines()` 将其视为新行。
