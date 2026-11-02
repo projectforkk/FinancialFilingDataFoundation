@@ -924,10 +924,12 @@ P0 已完成并收口为 `P0_DONE`。
 
 P1 已完成 Independent Acceptance 并收口为 `P1_DONE`。
 
+P2 已完成 Independent Acceptance 并收口为 `P2_DONE`。
+
 当前批准进入：
 
-**P2 — Acquisition Provider**
+**P3 — Native Page / Section / FTS**
 
-P2 只实现 CN/HK 官方 raw-document acquisition、Dayu narrow runner、raw store、receipt 与 P1 Registry integration；P2 未 PASS 前不批准实现 P3 parser、完整 table parser、MCP 或 Skill。
+P3 只实现 native page geometry、words/blocks/lines/spans/bbox、deterministic reading order、section tree 与 SQLite FTS5；P3 未 PASS 前不批准实现 P4 table candidate/reconstruction、MCP 或 Skill。
 
-US SEC provider 仍属于 P11，不得提前进入 P2。
+US SEC provider 仍属于 P11，不得提前进入 P3。

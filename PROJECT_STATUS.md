@@ -6,11 +6,11 @@
 
 ## Current state
 
-**P2_DONE**
+**P3_DESIGN_READY**
 
 ## Approved phase
 
-**P3 — Native Page / Section Extraction（DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED）**
+**P3 — Native Page / Section / FTS（DESIGN READY / DEVELOPMENT NOT STARTED）**
 
 P1 completed branch：
 
@@ -108,14 +108,18 @@ P0 独立验收结果：
 - `design/07-p1-implementation-plan.md`
 - `design/08-p2-acquisition-provider-design.md`
 - `design/09-p2-implementation-plan.md`
+- `design/10-p3-native-page-section-design.md`
+- `design/11-p3-implementation-plan.md`
 - `development/01-development-roadmap.md`
 - `development/02-p0-development-instruction.md`
 - `development/07-p1-development-instruction.md`
 - `development/14-p2-development-instruction.md`
+- `development/22-p3-development-instruction.md`
 - `acceptance/01-acceptance-strategy.md`
 - `acceptance/02-p0-acceptance-instruction.md`
 - `acceptance/06-p1-acceptance-instruction.md`
 - `acceptance/09-p2-acceptance-instruction.md`
+- `acceptance/12-p3-acceptance-instruction.md`
 
 P0 closeout：
 
