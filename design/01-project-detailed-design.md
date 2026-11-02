@@ -898,6 +898,22 @@ deterministic gate、accounting consistency、document completeness。
 6. 若该阶段 FAIL / ABORT，必须通过可追踪的 revert commit 撤销未验收 implementation，不得改写历史；
 7. 后续阶段恢复“acceptance PASS 后再进入 main”的正常规则。
 
+### 21.2 Candidate Worktree 隔离规则
+
+Code Review / Independent Acceptance 的证据必须绑定到固定 candidate SHA，不得依赖可能被其他进程切换分支的共享开发工作树。
+
+当存在并发开发、自动同步或多个会话同时操作同一仓库时，必须：
+
+1. 创建独立 Git worktree；
+2. worktree 使用 detached HEAD 或专用 review branch，并固定到 frozen candidate SHA；
+3. 每组关键 review/acceptance 命令执行前后都记录 `git rev-parse HEAD`；
+4. 若 HEAD 与 frozen candidate 不一致，该组结果立即作废；
+5. review/acceptance 过程中不得通过共享主工作树的当前 branch 推断 candidate；
+6. 生成的临时 DB、pytest basetemp、machine-readable acceptance artifacts 仅写入 ignored workspace；
+7. production/tests/design 若需修改，必须退出 acceptance，回到 design-first / development 流程并重新 freeze。
+
+此规则只用于隔离执行环境，不改变 candidate 的 Git 内容。
+
 ---
 
 ## 22. 当前批准结论
