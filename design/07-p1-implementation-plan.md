@@ -245,6 +245,26 @@ Final verdict：
 
 ## 12. 问题处置
 
+### P1-ISSUE-001 — Registry public export omission
+
+首次 P1-G test collection 发现：
+
+- `ValidationStatus` 已在 `registry.models` 定义；
+- `registry.__init__` 未公开导出；
+- planner/tests 按稳定 package surface 导入时产生 `ImportError`；
+- 测试尚未进入业务断言。
+
+根因：P1 package public surface 未在原设计中明确列出全部跨模块稳定类型。
+
+批准解决方案：
+
+1. 在 `design/06` 明确 registry public exports；
+2. 仅补充缺失的 public re-export，不改变 domain/schema/planner semantics；
+3. 重新执行受影响的 P1-G full focused/regression suite；
+4. 如果继续发现新问题，重复 design-first 流程。
+
+受影响 Gate：P1-B / P1-G；P1-C SQLite schema 不受影响。
+
 任何 Gate 发现问题且找到解决办法：
 
 ```text

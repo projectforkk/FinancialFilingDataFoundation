@@ -571,6 +571,24 @@ src/financial_filing_data_foundation/
 
 P1 可以按实现简洁性调整文件拆分，但不得改变职责边界。
 
+### 16.1 Public package surface
+
+子包公开入口必须显式导出本阶段需要跨模块使用的稳定类型，禁止调用方依赖内部文件路径。
+
+`financial_filing_data_foundation.registry` 至少公开：
+
+- `BindingStatus`
+- `CompatibilityStatus`
+- `ValidationStatus`
+- `LocalDocumentStatus`
+- `LocalDocumentState`
+- `ParsedDataRecord`
+- `RegisteredDocument`
+- `SQLiteRegistry`
+- `RegistrySchemaUnsupported`
+
+`planner` 与 tests 必须通过上述公开入口引用 registry 类型；若新增跨模块稳定类型，必须同步更新公开出口和测试。
+
 ---
 
 ## 17. P1 测试要求
