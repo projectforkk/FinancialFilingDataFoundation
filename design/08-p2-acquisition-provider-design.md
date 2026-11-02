@@ -917,6 +917,8 @@ FFDF main runtime：
 - receipt
 - registry integration
 
+Raw identity fixtures 必须遵守：same-SHA 场景复制同一份原始 bytes；不得通过分别重新生成“语义相同”的 PDF 来假设 SHA 相同。
+
 全部 no-network。
 
 ### 26.2 Runner Contract Test
