@@ -64,11 +64,13 @@ HEAD 漂移则该组证据作废。
 
 ## 4. Runtime Isolation
 
-FFDF main runtime：
+FFDF main runtime（从 FFDF repo / neutral cwd 核验）：
 
 - dayu absent；
 - docling absent；
 - torch absent。
+
+不得从 Dayu source checkout cwd 执行 main-runtime module absence 检查，因为 cwd 会进入 Python `sys.path`。
 
 Dayu acquisition runtime：
 
@@ -106,6 +108,9 @@ BLOCKED 或 FAIL，按 freeze 定义，不得自动修复。
 - CN downloader import；
 - HK downloader import；
 - runtime descriptor；
+- explicit safe cwd；
+- Dayu module origin 位于 dedicated runtime site-packages；
+- doctor initial timeout 允许 60 秒；
 - no high-level workflow invocation。
 
 ---

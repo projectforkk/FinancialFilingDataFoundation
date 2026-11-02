@@ -21,7 +21,7 @@
 - CN/HK acquisition domain models；
 - AcquisitionProvider contract；
 - pinned Dayu dependency/runtime descriptor；
-- subprocess JSON protocol；
+- subprocess JSON protocol（`shell=False` + explicit safe cwd）；
 - Dayu narrow runner；
 - FFDF Dayu adapter；
 - raw document store；
