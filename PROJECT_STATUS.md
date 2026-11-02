@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P1_IN_REVIEW**
+**P1_READY_FOR_ACCEPTANCE**
 
 ## Approved phase
 
@@ -19,6 +19,12 @@
 当前 P1 独立验收设计基线：
 
 `acceptance/06-p1-acceptance-instruction.md`
+
+P1 Code Review：
+
+- verdict: `PASS`
+- evidence: `development/10-p1-code-review.md`
+- reviewed production candidate: `03fe9adb691f5d43401fef9ac672bea39f35d26b`
 
 当前 P1 design baseline：
 
