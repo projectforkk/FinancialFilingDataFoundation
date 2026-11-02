@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P0_READY_FOR_DEVELOPMENT**
+**P0_IN_DEVELOPMENT**
 
 ## Approved phase
 
