@@ -1,0 +1,565 @@
+from __future__ import annotations
+
+import hashlib
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Iterator
+
+import pymupdf
+
+from financial_filing_data_foundation.identity import (
+    FilingIdentity,
+    FilingSlotKey,
+    SourceMetadata,
+)
+from financial_filing_data_foundation.registry.models import (
+    BindingStatus,
+    CompatibilityStatus,
+    LocalDocumentState,
+    LocalDocumentStatus,
+    ParsedDataRecord,
+    RegisteredDocument,
+    ValidationStatus,
+)
+
+
+REGISTRY_SCHEMA_VERSION = 1
+
+
+class RegistrySchemaUnsupported(RuntimeError):
+    pass
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _binding_id(document_sha256: str, identity: FilingIdentity) -> str:
+    amended = "UNKNOWN" if identity.amended is None else ("1" if identity.amended else "0")
+    raw = f"{document_sha256}|{identity.slot.serialize()}|{amended}".encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+class SQLiteRegistry:
+    def __init__(self, db_path: str | Path) -> None:
+        self.db_path = Path(db_path).expanduser().resolve()
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._initialize()
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    def _initialize(self) -> None:
+        with self._connect() as conn:
+            version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+            if version > REGISTRY_SCHEMA_VERSION:
+                raise RegistrySchemaUnsupported(
+                    f"registry schema version {version} is newer than supported "
+                    f"{REGISTRY_SCHEMA_VERSION}"
+                )
+            if version == 0:
+                self._create_schema(conn)
+                conn.execute(f"PRAGMA user_version = {REGISTRY_SCHEMA_VERSION}")
+                conn.commit()
+            elif version != REGISTRY_SCHEMA_VERSION:
+                raise RegistrySchemaUnsupported(
+                    f"unsupported registry schema version: {version}"
+                )
+
+    @staticmethod
+    def _create_schema(conn: sqlite3.Connection) -> None:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS documents (
+                document_sha256 TEXT PRIMARY KEY,
+                file_size INTEGER NOT NULL,
+                page_count INTEGER,
+                first_seen_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS document_locations (
+                path TEXT PRIMARY KEY,
+                document_sha256 TEXT NOT NULL,
+                mtime_ns INTEGER NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                exists_flag INTEGER NOT NULL CHECK (exists_flag IN (0, 1)),
+                FOREIGN KEY(document_sha256) REFERENCES documents(document_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_locations_sha
+            ON document_locations(document_sha256);
+
+            CREATE TABLE IF NOT EXISTS filing_bindings (
+                binding_id TEXT PRIMARY KEY,
+                document_sha256 TEXT NOT NULL,
+                market TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                filing_type TEXT NOT NULL,
+                fiscal_year INTEGER NOT NULL,
+                raw_fiscal_period TEXT NOT NULL,
+                amended INTEGER,
+                binding_status TEXT NOT NULL,
+                source_provider TEXT,
+                source_id TEXT,
+                source_url TEXT,
+                source_title TEXT,
+                filing_date TEXT,
+                report_date TEXT,
+                provider_company_id TEXT,
+                acquired_at TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(document_sha256) REFERENCES documents(document_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_bindings_slot
+            ON filing_bindings(
+                market, company_id, filing_type, fiscal_year, raw_fiscal_period
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_bindings_sha
+            ON filing_bindings(document_sha256);
+
+            CREATE TABLE IF NOT EXISTS parsed_data (
+                parse_run_id TEXT PRIMARY KEY,
+                market TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                filing_type TEXT NOT NULL,
+                fiscal_year INTEGER NOT NULL,
+                raw_fiscal_period TEXT NOT NULL,
+                document_sha256 TEXT NOT NULL,
+                parser_version TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                validation_status TEXT NOT NULL,
+                blocking_issue_count INTEGER NOT NULL,
+                compatibility_status TEXT NOT NULL,
+                artifact_path TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_parsed_slot
+            ON parsed_data(
+                market, company_id, filing_type, fiscal_year, raw_fiscal_period
+            );
+            """
+        )
+
+    def schema_version(self) -> int:
+        with self._connect() as conn:
+            return int(conn.execute("PRAGMA user_version").fetchone()[0])
+
+    def register_document(
+        self,
+        path: str | Path,
+        source: SourceMetadata | None = None,
+        expected_identity: FilingIdentity | None = None,
+    ) -> RegisteredDocument:
+        file_path = Path(path).expanduser().resolve()
+        if not file_path.is_file():
+            raise FileNotFoundError(file_path)
+
+        before = file_path.stat()
+        sha_before = _sha256_file(file_path)
+
+        page_count: int | None = None
+        if file_path.suffix.lower() == ".pdf":
+            with pymupdf.open(file_path) as document:
+                if document.needs_pass:
+                    raise ValueError("password-protected PDF cannot be registered in P1")
+                page_count = document.page_count
+
+        after = file_path.stat()
+        sha_after = _sha256_file(file_path)
+        if (
+            before.st_size != after.st_size
+            or before.st_mtime_ns != after.st_mtime_ns
+            or sha_before != sha_after
+        ):
+            raise RuntimeError("source file changed during registration")
+
+        now = _utc_now()
+        binding_status: BindingStatus | None = None
+
+        with self._connect() as conn:
+            conn.execute("BEGIN")
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO documents(
+                    document_sha256, file_size, page_count, first_seen_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (sha_before, before.st_size, page_count, now),
+            )
+            existing_document = conn.execute(
+                """
+                SELECT file_size, page_count FROM documents
+                WHERE document_sha256 = ?
+                """,
+                (sha_before,),
+            ).fetchone()
+            if existing_document is None:
+                raise RuntimeError("document insert invariant failed")
+            if int(existing_document["file_size"]) != before.st_size:
+                raise RuntimeError("document SHA invariant violated by file size mismatch")
+
+            conn.execute(
+                """
+                INSERT INTO document_locations(
+                    path, document_sha256, mtime_ns, last_seen_at, exists_flag
+                ) VALUES (?, ?, ?, ?, 1)
+                ON CONFLICT(path) DO UPDATE SET
+                    document_sha256 = excluded.document_sha256,
+                    mtime_ns = excluded.mtime_ns,
+                    last_seen_at = excluded.last_seen_at,
+                    exists_flag = 1
+                """,
+                (str(file_path), sha_before, after.st_mtime_ns, now),
+            )
+
+            if expected_identity is not None:
+                different_slots = conn.execute(
+                    """
+                    SELECT binding_id, market, company_id, filing_type,
+                           fiscal_year, raw_fiscal_period
+                    FROM filing_bindings
+                    WHERE document_sha256 = ? AND binding_status != ?
+                    """,
+                    (sha_before, BindingStatus.CONFLICT.value),
+                ).fetchall()
+                has_different_slot = any(
+                    (
+                        row["market"],
+                        row["company_id"],
+                        row["filing_type"],
+                        int(row["fiscal_year"]),
+                        row["raw_fiscal_period"],
+                    )
+                    != (
+                        expected_identity.slot.market,
+                        expected_identity.slot.company_id,
+                        expected_identity.slot.filing_type,
+                        expected_identity.slot.fiscal_year,
+                        expected_identity.slot.raw_fiscal_period,
+                    )
+                    for row in different_slots
+                )
+
+                if has_different_slot:
+                    conn.execute(
+                        """
+                        UPDATE filing_bindings
+                        SET binding_status = ?
+                        WHERE document_sha256 = ?
+                        """,
+                        (BindingStatus.CONFLICT.value, sha_before),
+                    )
+                    binding_status = BindingStatus.CONFLICT
+                else:
+                    binding_status = (
+                        BindingStatus.SOURCE_CONFIRMED
+                        if source is not None
+                        else BindingStatus.DECLARED
+                    )
+
+                amended_db = (
+                    None
+                    if expected_identity.amended is None
+                    else int(expected_identity.amended)
+                )
+                source_values = (
+                    source.provider if source else None,
+                    source.source_id if source else None,
+                    source.source_url if source else None,
+                    source.source_title if source else None,
+                    source.filing_date if source else None,
+                    source.report_date if source else None,
+                    source.provider_company_id if source else None,
+                    source.acquired_at if source else None,
+                )
+                bid = _binding_id(sha_before, expected_identity)
+                conn.execute(
+                    """
+                    INSERT INTO filing_bindings(
+                        binding_id, document_sha256, market, company_id,
+                        filing_type, fiscal_year, raw_fiscal_period, amended,
+                        binding_status, source_provider, source_id, source_url,
+                        source_title, filing_date, report_date,
+                        provider_company_id, acquired_at, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(binding_id) DO UPDATE SET
+                        binding_status = excluded.binding_status,
+                        source_provider = COALESCE(excluded.source_provider, source_provider),
+                        source_id = COALESCE(excluded.source_id, source_id),
+                        source_url = COALESCE(excluded.source_url, source_url),
+                        source_title = COALESCE(excluded.source_title, source_title),
+                        filing_date = COALESCE(excluded.filing_date, filing_date),
+                        report_date = COALESCE(excluded.report_date, report_date),
+                        provider_company_id = COALESCE(
+                            excluded.provider_company_id, provider_company_id
+                        ),
+                        acquired_at = COALESCE(excluded.acquired_at, acquired_at)
+                    """,
+                    (
+                        bid,
+                        sha_before,
+                        expected_identity.slot.market,
+                        expected_identity.slot.company_id,
+                        expected_identity.slot.filing_type,
+                        expected_identity.slot.fiscal_year,
+                        expected_identity.slot.raw_fiscal_period,
+                        amended_db,
+                        binding_status.value,
+                        *source_values,
+                        now,
+                    ),
+                )
+
+            conn.commit()
+
+        return RegisteredDocument(
+            document_sha256=sha_before,
+            path=file_path,
+            file_size=before.st_size,
+            mtime_ns=after.st_mtime_ns,
+            page_count=page_count,
+            identity=expected_identity,
+            binding_status=binding_status,
+        )
+
+    def register_parsed_data(self, record: ParsedDataRecord) -> None:
+        now = _utc_now()
+        values = (
+            record.parse_run_id,
+            record.slot.market,
+            record.slot.company_id,
+            record.slot.filing_type,
+            record.slot.fiscal_year,
+            record.slot.raw_fiscal_period,
+            record.document_sha256,
+            record.parser_version,
+            record.schema_version,
+            record.validation_status.value,
+            record.blocking_issue_count,
+            record.compatibility_status.value,
+            record.artifact_path,
+        )
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT * FROM parsed_data WHERE parse_run_id = ?",
+                (record.parse_run_id,),
+            ).fetchone()
+            if existing is not None:
+                existing_values = (
+                    existing["parse_run_id"],
+                    existing["market"],
+                    existing["company_id"],
+                    existing["filing_type"],
+                    int(existing["fiscal_year"]),
+                    existing["raw_fiscal_period"],
+                    existing["document_sha256"],
+                    existing["parser_version"],
+                    existing["schema_version"],
+                    existing["validation_status"],
+                    int(existing["blocking_issue_count"]),
+                    existing["compatibility_status"],
+                    existing["artifact_path"],
+                )
+                expected = (
+                    record.parse_run_id,
+                    record.slot.market,
+                    record.slot.company_id,
+                    record.slot.filing_type,
+                    record.slot.fiscal_year,
+                    record.slot.raw_fiscal_period,
+                    record.document_sha256,
+                    record.parser_version,
+                    record.schema_version,
+                    record.validation_status.value,
+                    record.blocking_issue_count,
+                    record.compatibility_status.value,
+                    record.artifact_path,
+                )
+                if existing_values != expected:
+                    raise ValueError(
+                        f"parse_run_id already exists with different content: "
+                        f"{record.parse_run_id}"
+                    )
+                return
+
+            conn.execute(
+                """
+                INSERT INTO parsed_data(
+                    parse_run_id, market, company_id, filing_type, fiscal_year,
+                    raw_fiscal_period, document_sha256, parser_version,
+                    schema_version, validation_status, blocking_issue_count,
+                    compatibility_status, artifact_path, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (*values, now),
+            )
+            conn.commit()
+
+    def list_parsed_data(self, slot: FilingSlotKey) -> tuple[ParsedDataRecord, ...]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM parsed_data
+                WHERE market = ? AND company_id = ? AND filing_type = ?
+                  AND fiscal_year = ? AND raw_fiscal_period = ?
+                ORDER BY document_sha256 ASC, parse_run_id ASC
+                """,
+                (
+                    slot.market,
+                    slot.company_id,
+                    slot.filing_type,
+                    slot.fiscal_year,
+                    slot.raw_fiscal_period,
+                ),
+            ).fetchall()
+        return tuple(
+            ParsedDataRecord(
+                parse_run_id=row["parse_run_id"],
+                slot=slot,
+                document_sha256=row["document_sha256"],
+                parser_version=row["parser_version"],
+                schema_version=row["schema_version"],
+                validation_status=ValidationStatus(row["validation_status"]),
+                blocking_issue_count=int(row["blocking_issue_count"]),
+                compatibility_status=CompatibilityStatus(
+                    row["compatibility_status"]
+                ),
+                artifact_path=row["artifact_path"],
+            )
+            for row in rows
+        )
+
+    def resolve_local_document(self, slot: FilingSlotKey) -> LocalDocumentState:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT b.document_sha256, b.binding_status, l.path,
+                       l.exists_flag
+                FROM filing_bindings AS b
+                LEFT JOIN document_locations AS l
+                  ON l.document_sha256 = b.document_sha256
+                WHERE b.market = ? AND b.company_id = ? AND b.filing_type = ?
+                  AND b.fiscal_year = ? AND b.raw_fiscal_period = ?
+                ORDER BY b.document_sha256 ASC, l.path ASC
+                """,
+                (
+                    slot.market,
+                    slot.company_id,
+                    slot.filing_type,
+                    slot.fiscal_year,
+                    slot.raw_fiscal_period,
+                ),
+            ).fetchall()
+
+            live: list[tuple[str, BindingStatus, str]] = []
+            for row in rows:
+                if not row["path"] or not int(row["exists_flag"] or 0):
+                    continue
+                path = Path(row["path"])
+                if not path.is_file():
+                    conn.execute(
+                        """
+                        UPDATE document_locations
+                        SET exists_flag = 0, last_seen_at = ?
+                        WHERE path = ?
+                        """,
+                        (_utc_now(), str(path)),
+                    )
+                    continue
+                live.append(
+                    (
+                        row["document_sha256"],
+                        BindingStatus(row["binding_status"]),
+                        str(path),
+                    )
+                )
+            conn.commit()
+
+        if not live:
+            return LocalDocumentState(
+                status=LocalDocumentStatus.NONE,
+                slot=slot,
+            )
+
+        statuses = tuple(sorted({item[1] for item in live}, key=lambda x: x.value))
+        conflict_live = [item for item in live if item[1] == BindingStatus.CONFLICT]
+        if conflict_live:
+            return LocalDocumentState(
+                status=LocalDocumentStatus.CONFLICT,
+                slot=slot,
+                location_count=len({item[2] for item in live}),
+                distinct_sha_count=len({item[0] for item in live}),
+                binding_statuses=statuses,
+            )
+
+        by_sha: dict[str, list[str]] = {}
+        for sha, _, path in live:
+            by_sha.setdefault(sha, []).append(path)
+
+        if len(by_sha) > 1:
+            return LocalDocumentState(
+                status=LocalDocumentStatus.AMBIGUOUS,
+                slot=slot,
+                location_count=len({item[2] for item in live}),
+                distinct_sha_count=len(by_sha),
+                binding_statuses=statuses,
+            )
+
+        sha = next(iter(by_sha))
+        paths = sorted(set(by_sha[sha]))
+        return LocalDocumentState(
+            status=LocalDocumentStatus.RESOLVED,
+            slot=slot,
+            document_sha256=sha,
+            canonical_path=Path(paths[0]),
+            location_count=len(paths),
+            distinct_sha_count=1,
+            binding_statuses=statuses,
+        )
+
+    def count_documents(self) -> int:
+        with self._connect() as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0])
+
+    def count_locations(self) -> int:
+        with self._connect() as conn:
+            return int(
+                conn.execute("SELECT COUNT(*) FROM document_locations").fetchone()[0]
+            )
+
+    def count_bindings(self) -> int:
+        with self._connect() as conn:
+            return int(
+                conn.execute("SELECT COUNT(*) FROM filing_bindings").fetchone()[0]
+            )
+
+    def location_sha(self, path: str | Path) -> str | None:
+        resolved = str(Path(path).expanduser().resolve())
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT document_sha256 FROM document_locations WHERE path = ?
+                """,
+                (resolved,),
+            ).fetchone()
+        return None if row is None else str(row["document_sha256"])
