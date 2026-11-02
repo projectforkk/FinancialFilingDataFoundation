@@ -506,6 +506,18 @@ Verdict：
 
 ## 20. P2 Issue Log
 
+### P2-ISSUE-002 — JSON request encoding 在手工 doctor harness 中产生 BOM
+
+首次 P2-E doctor 手工请求由 PowerShell `Set-Content -Encoding UTF8` 生成，在当前宿主环境写入 UTF-8 BOM。Runner 按 `encoding="utf-8"` 严格读取并返回 `RUNNER_PROTOCOL_INVALID`，因此该次 doctor 未进入 Dayu import。
+
+批准解决方案：
+
+1. P2 JSON protocol 明确为 `UTF-8 without BOM`；
+2. 正式 adapter/runner 使用 Python 写入 request/response；
+3. manual/live acceptance harness 也必须使用 no-BOM writer；
+4. runner 对 BOM/非法 UTF-8 保持结构化 protocol error，不猜编码；
+5. 首次 BOM doctor 结果作废，设计提交后重新执行 P2-E。
+
 ### P2-ISSUE-001 — cwd 可把 upstream source 暴露给 FFDF main interpreter
 
 P2-E no-network import doctor 中，检查流程在 `cd D:\Codex\dependencies\dayu-agent` 后直接使用 FFDF main `.venv` 执行 `find_spec('dayu')`，结果能够发现 Dayu source。重新从 FFDF repo cwd 执行时：
