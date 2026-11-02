@@ -5,7 +5,10 @@
 设计基线：
 - `design/01-project-detailed-design.md`
 - `design/04-pdf-quality-gate-design.md`
+- `design/05-p0-implementation-plan.md`
 - `development/01-development-roadmap.md`
+
+执行顺序必须遵守 `design/05-p0-implementation-plan.md` 中定义的 P0-A → P0-M Gate；禁止跨 Gate 推进。
 
 ## 开发者角色
 

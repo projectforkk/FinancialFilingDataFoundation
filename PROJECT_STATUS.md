@@ -25,6 +25,7 @@
 - `design/02-incremental-and-acquisition-design.md`
 - `design/03-parsed-financial-document-contract.md`
 - `design/04-pdf-quality-gate-design.md`
+- `design/05-p0-implementation-plan.md`
 - `development/01-development-roadmap.md`
 - `development/02-p0-development-instruction.md`
 - `acceptance/01-acceptance-strategy.md`
