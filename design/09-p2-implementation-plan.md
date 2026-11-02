@@ -506,6 +506,17 @@ Verdict：
 
 ## 20. P2 Issue Log
 
+### P2-ISSUE-004 — same-SHA 测试 fixture 不得通过重复生成 PDF 构造
+
+P2-J 首轮 raw-store dedup test 发现：用 PyMuPDF 分别生成两份“文本内容相同”的 PDF，字节结构/SHA256 不保证一致，因此不能作为 same-SHA fixture。
+
+批准解决方案：
+
+1. same-SHA / multi-path / dedup 测试必须复制同一份已生成 PDF bytes；
+2. 不用“相同可见文本”推断 raw document identity；
+3. 这与项目 content-addressed identity 原则一致：只有字节 SHA 相同才是同一 raw document；
+4. 首轮失败作废，修正 fixture 后重跑 P2-F/J tests。
+
 ### P2-ISSUE-003 — Dayu initializer 会 transitively load 高层 workflow/Docling 模块
 
 P2-E doctor 实测发现：仅 import CN/HK downloader 后，`sys.modules` 中已经出现 `cn_download_filing_workflow`、`cn_download_workflow`、`docling_export`。根因不是 runner 主动调用，而是 Dayu package initializer/import graph 自动加载。
