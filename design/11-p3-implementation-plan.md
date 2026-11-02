@@ -57,6 +57,21 @@ PASS only → merge main → verify src/tests equal frozen candidate → full re
 
 ## P3 Issue Log
 
+### P3-ISSUE-003 — page FTS implementation 未使用设计规定的 external-content contract
+
+Pre-Code-Review 对照 `design/10` 发现：设计要求 `page_content(page_no,text)` 作为 canonical page text table，并由 `page_fts` 使用 `content='page_content', content_rowid='page_no'`；初版实现却创建独立 `page_fts(page_no UNINDEXED,text)` 并重复保存正文。
+
+虽然现有 page search tests 能通过，但这违反已批准 contract，并造成重复 page text storage。
+
+批准解决方案：
+1. `page_content` 保持 canonical page text；
+2. `page_fts = fts5(text, content='page_content', content_rowid='page_no')`；
+3. 索引写入使用 `rowid=page_no`；
+4. 搜索通过 `page_fts.rowid -> page_content.page_no` join 返回正文；
+5. 保持 query 参数化与 deterministic ordering；
+6. 增加 DB reopen / external-content schema test；
+7. 重新执行 P3-E/F/G/H。
+
 ### P3-ISSUE-002 — PyMuPDF DICT 默认 image payload 导致 HK native path 病理性变慢
 
 P3-G 首次 HK live parse 超过 30s 且长期无 CPU-visible progress。逐页 A/B 确认：
