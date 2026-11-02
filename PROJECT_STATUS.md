@@ -18,7 +18,13 @@
 
 当前独立验收执行指令：
 
-`acceptance/03-p0-acceptance-run-instruction.md`
+`acceptance/04-p0-acceptance-refreeze.md`
+
+当前 design baseline commit：
+
+`8c5f6d3f203bfd15cfa452a976b23dc8a6f81461`
+
+`acceptance/03-p0-acceptance-run-instruction.md` 已因后续设计变更失效并被 refreeze 取代。
 
 ## Design baseline
 
