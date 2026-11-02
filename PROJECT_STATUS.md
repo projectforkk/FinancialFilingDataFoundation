@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P0_READY_FOR_ACCEPTANCE**
+**P0_DONE**
 
 ## Approved phase
 
@@ -25,6 +25,12 @@
 `8c5f6d3f203bfd15cfa452a976b23dc8a6f81461`
 
 `acceptance/03-p0-acceptance-run-instruction.md` 已因后续设计变更失效并被 refreeze 取代。
+
+P0 独立验收结果：
+
+- verdict: `PASS`
+- evidence: `acceptance/05-p0-acceptance-result.md`
+- accepted candidate: `63547b5cfd3112a7c0598a32139b9b191c356c69`
 
 ## Design baseline
 
@@ -79,9 +85,11 @@ Dayu 参考基线：
 
 ## P0 exit condition
 
-只有 P0 独立验收 PASS 后，才允许进入 P1 Identity / Registry / Incremental Planner。
+P0 Independent Acceptance 已于当前候选完成并得到 `PASS`。
 
-P0 不允许提前实现：
+P0 已收口为 `DONE`；现在允许进入 P1 Identity / Registry / Incremental Planner，但 **P1 尚未开始**。
+
+P0 阶段未实现：
 - 完整 table reconstruction；
 - MCP；
 - Skill；
