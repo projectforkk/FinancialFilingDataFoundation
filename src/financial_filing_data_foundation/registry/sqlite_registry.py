@@ -29,7 +29,7 @@ REGISTRY_SCHEMA_VERSION = 1
 
 
 class RegistrySchemaUnsupported(RuntimeError):
-    pass
+    reason_code = "REGISTRY_SCHEMA_UNSUPPORTED"
 
 
 def _utc_now() -> str:

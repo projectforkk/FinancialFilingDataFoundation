@@ -50,8 +50,10 @@ def test_newer_registry_schema_is_rejected(tmp_path: Path) -> None:
     conn.execute("PRAGMA user_version = 2")
     conn.close()
 
-    with pytest.raises(RegistrySchemaUnsupported):
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
         SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
 
 
 def test_register_same_file_is_idempotent(tmp_path: Path) -> None:
