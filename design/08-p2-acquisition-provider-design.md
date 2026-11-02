@@ -196,10 +196,12 @@ P1 Registry
 
 必须保持：
 
-- Dayu absent；
-- Docling absent；
-- Torch absent；
+- Dayu 不安装在该 venv；
+- Docling 不安装在该 venv；
+- Torch 不安装在该 venv；
 - acquisition adapter 本身不得直接 import Dayu。
+
+**Module-visibility 检查必须从 FFDF repo / neutral workspace cwd 执行。** Python 会把当前工作目录放入 `sys.path`；如果进程 cwd 恰好位于 Dayu source checkout，即使主 venv 没安装 Dayu，也可能通过源码目录发现 `dayu`。因此 `find_spec('dayu') != None` 只有在安全 cwd 下才可作为主 runtime 污染证据。
 
 ### 5.2 Dayu Acquisition Runtime
 
@@ -507,9 +509,17 @@ Protocol version：
 
 FFDF main runtime 通过：
 
-`subprocess.run(..., shell=False)`
+`subprocess.run(..., shell=False, cwd=<explicit_safe_cwd>)`
 
 调用 Dayu runtime。
+
+`cwd` 必须显式设置为 FFDF-controlled neutral workspace，不得：
+
+- 继承未知调用者 cwd；
+- 使用 Dayu source checkout 作为 cwd；
+- 依赖 cwd 把 Dayu source 注入 `sys.path`。
+
+Dayu runner 必须从 dedicated runtime 已安装的 `site-packages` 解析 Dayu。
 
 禁止：
 
@@ -871,7 +881,11 @@ P2 runner 提供无网络：
 - source pin descriptor；
 - CN downloader symbol import；
 - HK downloader symbol import；
-- 禁止 workflow symbol 未被 runner 主动引用。
+- 禁止 workflow symbol 未被 runner 主动引用；
+- runner process cwd 不是 Dayu source checkout；
+- imported Dayu module origin 位于 dedicated acquisition runtime `site-packages`。
+
+实测 pinned Dayu 在 dedicated Python 3.12 AMD64 runtime 中首次导入 CN downloader 约 10.3 秒，因为 package initializer 会加载较大的 import graph。因此 doctor timeout 不能使用过短的 2–5 秒阈值；P2 初始 doctor timeout 设为 **60 秒**，后续可依据实测收紧。
 
 Doctor 不下载文件，不访问官方站点。
 

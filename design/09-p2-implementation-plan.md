@@ -127,8 +127,11 @@ Gate D：
 - CN downloader symbols import；
 - HK downloader symbols import；
 - runtime process boundary；
+- explicit safe cwd；
+- Dayu module origin == dedicated runtime site-packages；
+- doctor timeout = 60s initial gate；
 - response JSON atomic write；
-- no FFDF main-runtime Dayu import。
+- FFDF main runtime 在 FFDF/neutral cwd 下无 Dayu installation/import。
 
 若 import graph / runtime 不可用：
 
@@ -501,7 +504,33 @@ Verdict：
 
 ---
 
-## 20. Issue Rule
+## 20. P2 Issue Log
+
+### P2-ISSUE-001 — cwd 可把 upstream source 暴露给 FFDF main interpreter
+
+P2-E no-network import doctor 中，检查流程在 `cd D:\Codex\dependencies\dayu-agent` 后直接使用 FFDF main `.venv` 执行 `find_spec('dayu')`，结果能够发现 Dayu source。重新从 FFDF repo cwd 执行时：
+
+- `dayu_spec=None`
+- `docling_spec=None`
+- `torch_spec=None`
+- `pip show dayu-agent` not found
+
+根因：Python 将当前工作目录放入 `sys.path`，并非 FFDF main venv 被安装/污染。
+
+批准解决方案：
+
+1. adapter subprocess 必须显式设置 neutral `cwd`；
+2. 禁止把 Dayu source checkout 作为 runner/main cwd；
+3. runner 应从 dedicated runtime `site-packages` 加载 Dayu；
+4. doctor 验证 Dayu module origin；
+5. FFDF main-runtime pollution check 必须从 FFDF/neutral cwd 执行；
+6. pinned Dayu 首次 CN downloader import 实测约 10.3s，因此 doctor timeout 初始设为 60s。
+
+该问题不改变 runtime 隔离架构，但会影响 doctor/adapter implementation 与 acceptance checks。
+
+---
+
+## 21. Issue Rule
 
 任一 Gate：
 
