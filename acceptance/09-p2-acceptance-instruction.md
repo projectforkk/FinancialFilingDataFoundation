@@ -122,6 +122,7 @@ BLOCKED 或 FAIL，按 freeze 定义，不得自动修复。
 - `shell=False`；
 - args list；
 - timeout；
+- request/response JSON = UTF-8 without BOM；
 - response JSON file；
 - stdout/stderr 不是业务唯一真源；
 - path containment；

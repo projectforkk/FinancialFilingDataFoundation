@@ -575,11 +575,19 @@ staging_path
 
 Runner 必须把 Dayu temp PDF copy 到 FFDF staging path 后删除自己的 Dayu temp file。
 
-### 15.5 Response transport
+### 15.5 Response transport / Encoding
+
+Request / response JSON wire encoding 固定为：
+
+`UTF-8 without BOM`
+
+正式 FFDF adapter / runner 必须使用 Python `encoding="utf-8"` 写入，不得依赖 PowerShell `Set-Content -Encoding UTF8` 等可能写 BOM 的平台命令生成业务 request。
 
 业务 response 使用 JSON file / atomic write。
 
 stdout / stderr 只作为 diagnostic log，不能作为唯一机器契约。
+
+若 request 含 BOM 或不是合法 UTF-8 JSON，runner 返回 `RUNNER_PROTOCOL_INVALID`；不进行宽松猜编码。
 
 ---
 
