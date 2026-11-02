@@ -952,6 +952,8 @@ Dayu isolated runtime：
 
 Live sample 在 P2 development environment audit 中确认并冻结到 acceptance instruction。
 
+Live discovery/download 的完整证据必须写为 UTF-8 without BOM JSON；Windows console 只输出 ASCII-safe 摘要，避免本地 code page 影响 Gate。
+
 Live 不用于替代 deterministic tests。
 
 ---

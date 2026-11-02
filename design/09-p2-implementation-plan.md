@@ -506,6 +506,18 @@ Verdict：
 
 ## 20. P2 Issue Log
 
+### P2-ISSUE-005 — Windows console encoding 不得影响 live evidence
+
+P2-L 首次 CN live discovery 已进入 provider，但测试 harness 直接 `print()` 含中文公司名的 dataclass，Windows 控制台 CP932 无法编码字符，导致证据脚本中断。
+
+批准解决方案：
+
+1. live discovery/download 的完整机器证据写入 UTF-8 no-BOM JSON 文件；
+2. console 只输出 ASCII-safe status / counts / file path；
+3. provider/company/title 原文必须保留在 UTF-8 JSON，不做丢失性转码；
+4. console encoding failure 不作为 provider 产品失败，但该次 Gate 证据作废并重跑；
+5. Acceptance 采用 JSON evidence，而不是控制台可显示性作为真值。
+
 ### P2-ISSUE-004 — same-SHA 测试 fixture 不得通过重复生成 PDF 构造
 
 P2-J 首轮 raw-store dedup test 发现：用 PyMuPDF 分别生成两份“文本内容相同”的 PDF，字节结构/SHA256 不保证一致，因此不能作为 same-SHA fixture。
