@@ -349,6 +349,47 @@ Gate L：
 
 `LIVE_SAMPLES_FROZEN`
 
+### P2-L Frozen Live Samples — 2026-11-03
+
+CN sample：
+
+- market: `CN`
+- ticker: `600519`
+- company slot id: `CN:600519`
+- fiscal year / period: `2024 / FY`
+- discovery window: `2025-01-01 .. 2025-06-30`
+- provider: `cninfo`
+- provider company id: `CNINFO:gssh0600519`
+- source id: `1222993920`
+- filing date: `2025-04-02`
+- source title: `贵州茅台2024年年度报告`
+- source URL: `http://static.cninfo.com.cn/finalpage/2025-04-03/1222993920.PDF`
+- remote content length: `3,626,217`
+- exact candidate count after provider discovery: `1`
+
+HK sample：
+
+- market: `HK`
+- ticker: `00700`
+- company slot id: `HK:00700`
+- fiscal year / period: `2024 / FY`
+- discovery window: `2025-03-01 .. 2025-06-30`
+- provider: `hkexnews`
+- provider company id: `HKEX:7609`
+- source id: `11618398`
+- filing date: `2025-04-08`
+- source title: `2024 年報`
+- source URL: `https://www1.hkexnews.hk/listedco/listconews/sehk/2025/0408/2025040800668_c.pdf`
+- remote content length: `5,241,364`
+- exact candidate count after provider discovery: `1`
+
+Evidence files are UTF-8 no-BOM JSON under ignored workspace:
+
+- `workspace/p2-live-discovery/cn-600519-fy2024-discovery.json`
+- `workspace/p2-live-discovery/hk-00700-fy2024-discovery.json`
+
+Any change to these sample identities before live Gate execution requires design update/refreeze.
+
 ---
 
 ## 13. P2-M — Live CN Acquisition
