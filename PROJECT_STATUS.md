@@ -6,15 +6,19 @@
 
 ## Current state
 
-**P1_IN_ACCEPTANCE**
+**P1_DONE**
 
 ## Approved phase
 
-**P1 — Identity / Registry / Incremental Planner**
+**P2 — Acquisition Provider（DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED）**
 
-正式开发分支：
+P1 completed branch：
 
 `task/p1-identity-registry-planner`
+
+P2 development branch：
+
+`NOT_CREATED`
 
 当前 P1 独立验收执行指令：
 
@@ -34,16 +38,29 @@ P1 Code Review：
 - tests: `54 passed`
 - previous evidence `development/10-p1-code-review.md` remains historical and was invalidated by `P1-ISSUE-008`.
 
+P1 Independent Acceptance：
+
+- verdict: `PASS`
+- evidence: `acceptance/08-p1-acceptance-result.md`
+- frozen candidate: `3b382f4091a96a2dff40144253da42bf8de1fcc2`
+- full suite: `54 passed in 2.05s`
+- blocker: `NONE`
+
 当前 P1 design baseline：
 
 以 P1 task branch 中最新已提交的 design baseline 为准；所有设计修正必须先提交并进入 GitHub。
 
 当前已验收 baseline：
 
-- phase: `P0_DONE`
-- accepted_baseline_sha: `edff06b2b1138b50d742e92ce8b8df628c6d2c61`
+- phase: `P1_DONE`
+- accepted candidate: `3b382f4091a96a2dff40144253da42bf8de1fcc2`
+- acceptance verdict: `PASS`
+- acceptance evidence: `acceptance/08-p1-acceptance-result.md`
+- accepted merge commit: `1cb6e88be318c0a1424d74ee601c336075361cd6`
+- accepted_baseline_sha: `1cb6e88be318c0a1424d74ee601c336075361cd6`
+- closeout main verification: `54 passed`
 
-治理异常 `P1-ISSUE-004`：`main` 已提前包含部分尚未完成 Independent Acceptance 的 P1 commits；在 P1 PASS 前，**不得把 main HEAD 视为 accepted baseline**。正式 P1 candidate 仍以 `task/p1-identity-registry-planner` 的 acceptance freeze 为准。
+治理异常 `P1-ISSUE-004` 已在 P1-K 以非破坏方式收口：未改写历史；最终 `main` 的 `src/tests` 与 frozen acceptance candidate 零差异，并通过 54 项 closeout 回归。P1 现已成为新的 accepted baseline。
 
 P0 acceptance freeze/result 已保留为历史证据，不再作为当前 P1 验收入口。
 
