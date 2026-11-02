@@ -248,7 +248,13 @@ Dayu package initializer 可能 transitively import `SecDownloader`，但 FFDF P
 
 ## 16. Live CN
 
-必须从 acceptance freeze 指定 official sample。
+当前开发阶段已确认候选样本：
+
+- CN / `600519` / FY2024
+- CNINFO source id `1222993920`
+- URL host `static.cninfo.com.cn`
+
+最终仍必须由 acceptance freeze 固定 exact candidate/source metadata。
 
 验证：
 
@@ -264,9 +270,15 @@ Dayu package initializer 可能 transitively import `SecDownloader`，但 FFDF P
 
 ## 17. Live HK
 
-同 CN。
+当前开发阶段已确认候选样本：
 
-样本必须由开发阶段通过 HKEX 官方 discovery 确认并冻结，不得凭记忆指定 source id。
+- HK / `00700` / FY2024
+- HKEX source id `11618398`
+- URL host `www1.hkexnews.hk`
+
+最终仍必须由 acceptance freeze 固定 exact candidate/source metadata。
+
+样本已由 HKEX provider discovery 实际确认，不是凭记忆指定 source id。
 
 Live evidence 以 UTF-8 no-BOM JSON 文件为机器真值；console 只需 ASCII-safe 摘要，不要求本地 code page 能显示中文原文。
 
