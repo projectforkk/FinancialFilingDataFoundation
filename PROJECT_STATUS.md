@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P1_READY_FOR_ACCEPTANCE**
+**P1_IN_REVIEW**
 
 ## Approved phase
 
@@ -22,9 +22,10 @@
 
 P1 Code Review：
 
-- verdict: `PASS`
-- evidence: `development/10-p1-code-review.md`
-- reviewed production candidate: `03fe9adb691f5d43401fef9ac672bea39f35d26b`
+- previous verdict: `INVALIDATED_BY_P1_ISSUE_008`
+- previous evidence: `development/10-p1-code-review.md`
+- previous reviewed candidate: `03fe9adb691f5d43401fef9ac672bea39f35d26b`
+- reason: schema-v1 completeness defect discovered after that review; a new isolated Code Review is required after the fix.
 
 当前 P1 design baseline：
 
