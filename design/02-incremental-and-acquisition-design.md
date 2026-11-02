@@ -130,6 +130,32 @@ Adapter 只允许复用窄能力：
 Adapter 输出 PDF 后必须停止；不得隐式调用：
 `convert_pdf_to_docling_json`。
 
+### 7.1 Dayu 源码获取与版本锁定
+
+FFDF **不得假设目标 PC 已经预装 Dayu**。
+
+P2 实施时必须从 Git 获取 Dayu 上游源码，并固定到已批准 commit：
+
+- repository: `noho/dayu-agent`
+- baseline commit: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
+
+推荐方式：
+
+1. 将 Dayu checkout 放在 FFDF 仓库之外的 dependency/workspace 目录；
+2. checkout 到固定 commit；
+3. 上游 checkout 视为只读依赖，不直接手工修改；
+4. FFDF 自己实现 Dayu Acquisition Adapter；
+5. Adapter 只调用 downloader/discovery 窄能力；
+6. 不把 Dayu 高层 processing workflow 作为 acquisition API；
+7. 不因为需要 downloader 就把 Docling 默认 parser path 引入 FFDF native parser runtime。
+
+若 Dayu downloader 存在缺陷：
+
+- 优先在 FFDF Adapter 层做兼容；
+- 若必须修改 Dayu，上游修改必须先形成设计变更，再通过受控 fork / 新 commit 管理；
+- FFDF 随后显式更新 pin 到经过 review/acceptance 的新 commit；
+- 禁止在本机 dependency checkout 中直接手改而不留下 Git 可追踪版本。
+
 ## 8. Download 去重
 
 下载后必须：
