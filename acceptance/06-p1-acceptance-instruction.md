@@ -43,12 +43,14 @@
 18. parser_version change alone 不触发 reparse。
 19. accepted schema / invalidated parser versions 由显式 `PlannerReusePolicy` 决定；accepted set 为空表示无 schema 可复用。
 20. 多个 distinct reusable parsed SHA 且无唯一 local active-source 证据 → REVIEW_REQUIRED。
-21. registry schema version > supported → structured plan-level BLOCKED，不得 downgrade。
-22. source files unchanged。
-23. no network。
-24. no Dayu。
-25. no Docling/Torch/OCR/external AI。
-26. repeated build_plan deterministic。
+21. registered bound path 原地改写且未重新 register → `LOCAL_CONTENT_DRIFT` / BLOCKED，禁止错误 reuse。
+22. same-SHA duplicate locations 中一个 drift、另一个 verified 时仍可使用 verified location。
+23. registry schema version > supported → structured plan-level BLOCKED，不得 downgrade。
+24. source files unchanged。
+25. no network。
+26. no Dayu。
+27. no Docling/Torch/OCR/external AI。
+28. repeated build_plan deterministic。
 
 ## PASS
 

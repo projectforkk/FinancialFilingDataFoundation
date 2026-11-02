@@ -442,6 +442,26 @@ P1 可确认的 material change：
 
 P1 不实现“按标题猜修订版”或“按 mtime 猜最新”。
 
+### 10.5 Registered location content drift
+
+Local Registry 中的 `path -> document_sha256` 不能只靠“path 仍存在”判定有效。
+
+`resolve_local_document()` 对绑定且存在的候选路径必须重新计算当前 SHA256，并与 registry 中记录的 `document_sha256` 对比：
+
+- SHA 相同：该 location 可作为 verified live candidate；
+- SHA 不同：该 location 标记为本次 resolution 的 drifted location，不得继续代表旧 document SHA；
+- 不允许 planner 自动把新 SHA 绑定到原 filing slot；必须由显式 `register_document()` 重新登记。
+
+若某 slot 至少有一个 verified live location，可忽略其它 drifted duplicate location，并只从 verified locations 解析 canonical path。
+
+若该 slot 没有 verified live location、但存在 drifted bound location：
+
+- `LocalDocumentStatus = DRIFTED`
+- planner action = `BLOCKED`
+- reason = `LOCAL_CONTENT_DRIFT`
+
+这样可阻止“本地文件原地替换后仍错误 REUSE 旧 parsed data”。
+
 ---
 
 ## 11. Incremental Planner
@@ -535,6 +555,7 @@ PARSED_COMPATIBILITY_UNKNOWN
 PARSER_DEFECT_INVALIDATED
 SOURCE_MATERIAL_CHANGE
 LOCAL_DOCUMENT_AMBIGUOUS
+LOCAL_CONTENT_DRIFT
 LOCAL_BINDING_CONFLICT
 REGISTRY_SCHEMA_UNSUPPORTED
 ```
@@ -649,9 +670,11 @@ P1 可以按实现简洁性调整文件拆分，但不得改变职责边界。
 23. binding conflict → BLOCKED；
 24. repeated build_plan deterministic；
 25. DB close/reopen plan deterministic；
-26. source file immutable；
-27. registry schema version > supported → structured plan-level blocker；
-28. no network / no Dayu invocation。
+26. registered local path 原地改写且未重新 register → LOCAL_CONTENT_DRIFT / BLOCKED；
+27. same SHA multi-path 中一个 location drift、另一个仍 verified → 使用 verified location，不错误阻断；
+28. source file immutable；
+29. registry schema version > supported → structured plan-level blocker；
+30. no network / no Dayu invocation。
 
 ---
 
