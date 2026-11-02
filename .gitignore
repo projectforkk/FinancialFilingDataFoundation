@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Runtime data
+workspace/
+data/
+cache/
+*.sqlite
+*.sqlite3
+
+# Financial source documents / rendered pages
+*.pdf
+*.png
+*.jpg
+*.jpeg
+
+# Secrets
+.env
+.env.*
+!.env.example
