@@ -106,6 +106,24 @@ class SQLiteRegistry:
             CREATE INDEX IF NOT EXISTS idx_locations_sha
             ON document_locations(document_sha256);
 
+            CREATE TABLE IF NOT EXISTS document_sources (
+                document_sha256 TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                source_url TEXT NOT NULL,
+                source_title TEXT NOT NULL,
+                filing_date TEXT,
+                report_date TEXT,
+                provider_company_id TEXT,
+                acquired_at TEXT,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY(document_sha256, provider, source_id),
+                FOREIGN KEY(document_sha256) REFERENCES documents(document_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_document_sources_sha
+            ON document_sources(document_sha256);
+
             CREATE TABLE IF NOT EXISTS filing_bindings (
                 binding_id TEXT PRIMARY KEY,
                 document_sha256 TEXT NOT NULL,
@@ -231,6 +249,38 @@ class SQLiteRegistry:
                 """,
                 (str(file_path), sha_before, after.st_mtime_ns, now),
             )
+
+            if source is not None:
+                conn.execute(
+                    """
+                    INSERT INTO document_sources(
+                        document_sha256, provider, source_id, source_url,
+                        source_title, filing_date, report_date,
+                        provider_company_id, acquired_at, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(document_sha256, provider, source_id) DO UPDATE SET
+                        source_url = excluded.source_url,
+                        source_title = excluded.source_title,
+                        filing_date = COALESCE(excluded.filing_date, filing_date),
+                        report_date = COALESCE(excluded.report_date, report_date),
+                        provider_company_id = COALESCE(
+                            excluded.provider_company_id, provider_company_id
+                        ),
+                        acquired_at = COALESCE(excluded.acquired_at, acquired_at)
+                    """,
+                    (
+                        sha_before,
+                        source.provider,
+                        source.source_id,
+                        source.source_url,
+                        source.source_title,
+                        source.filing_date,
+                        source.report_date,
+                        source.provider_company_id,
+                        source.acquired_at,
+                        now,
+                    ),
+                )
 
             if expected_identity is not None:
                 different_slots = conn.execute(
@@ -552,6 +602,40 @@ class SQLiteRegistry:
             return int(
                 conn.execute("SELECT COUNT(*) FROM filing_bindings").fetchone()[0]
             )
+
+    def count_sources(self) -> int:
+        with self._connect() as conn:
+            return int(
+                conn.execute("SELECT COUNT(*) FROM document_sources").fetchone()[0]
+            )
+
+    def list_document_sources(
+        self, document_sha256: str
+    ) -> tuple[SourceMetadata, ...]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT provider, source_id, source_url, source_title,
+                       filing_date, report_date, provider_company_id, acquired_at
+                FROM document_sources
+                WHERE document_sha256 = ?
+                ORDER BY provider ASC, source_id ASC
+                """,
+                (document_sha256,),
+            ).fetchall()
+        return tuple(
+            SourceMetadata(
+                provider=row["provider"],
+                source_id=row["source_id"],
+                source_url=row["source_url"],
+                source_title=row["source_title"],
+                filing_date=row["filing_date"],
+                report_date=row["report_date"],
+                provider_company_id=row["provider_company_id"],
+                acquired_at=row["acquired_at"],
+            )
+            for row in rows
+        )
 
     def location_sha(self, path: str | Path) -> str | None:
         resolved = str(Path(path).expanduser().resolve())

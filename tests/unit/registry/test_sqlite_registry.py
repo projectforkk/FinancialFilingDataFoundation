@@ -121,6 +121,51 @@ def test_unbound_document_is_not_local_candidate(tmp_path: Path) -> None:
     assert registry.resolve_local_document(_slot()).status == LocalDocumentStatus.NONE
 
 
+
+def test_source_metadata_without_identity_is_persisted(tmp_path: Path) -> None:
+    pdf = tmp_path / "source-only.pdf"
+    _make_pdf(pdf, "source-only")
+    registry = SQLiteRegistry(tmp_path / "registry.sqlite")
+    source = SourceMetadata(
+        provider="cninfo",
+        source_id="source-1",
+        source_url="https://example.com/source-only.pdf",
+        source_title="source only annual report",
+        filing_date="2025-03-01",
+        report_date="2024-12-31",
+        provider_company_id="org-1",
+        acquired_at="2026-11-02T00:00:00+00:00",
+    )
+
+    registered = registry.register_document(pdf, source=source)
+
+    assert registered.identity is None
+    assert registered.binding_status is None
+    assert registry.count_bindings() == 0
+    assert registry.count_sources() == 1
+    assert registry.list_document_sources(registered.document_sha256) == (source,)
+    assert registry.resolve_local_document(_slot()).status == LocalDocumentStatus.NONE
+
+
+def test_repeated_same_source_provenance_is_idempotent(tmp_path: Path) -> None:
+    pdf = tmp_path / "source-repeat.pdf"
+    _make_pdf(pdf, "source-repeat")
+    registry = SQLiteRegistry(tmp_path / "registry.sqlite")
+    source = SourceMetadata(
+        provider="cninfo",
+        source_id="source-1",
+        source_url="https://example.com/source-repeat.pdf",
+        source_title="source repeat annual report",
+    )
+
+    first = registry.register_document(pdf, source=source)
+    second = registry.register_document(pdf, source=source)
+
+    assert first.document_sha256 == second.document_sha256
+    assert registry.count_sources() == 1
+    assert registry.list_document_sources(first.document_sha256) == (source,)
+
+
 def test_source_metadata_marks_binding_source_confirmed(tmp_path: Path) -> None:
     pdf = tmp_path / "source.pdf"
     _make_pdf(pdf, "source")
