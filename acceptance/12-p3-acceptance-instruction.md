@@ -10,7 +10,7 @@ Verify:
 3. no OCR/Docling/Torch/Dayu dependency in P3
 4. source PDF unchanged
 5. all pages enumerated exactly once, 1-based
-6. words/blocks/spans/bbox available
+6. words/blocks/spans/bbox available；native DICT path 不保留 image binary payload；image-only page 仍明确 PAGE_TEXT_EMPTY
 7. deterministic reading order
 8. repeated headers/footers not section headings
 9. section hierarchy/page ranges valid
