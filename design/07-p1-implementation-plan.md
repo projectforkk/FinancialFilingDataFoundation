@@ -50,6 +50,7 @@ Gate B：domain tests PASS。
 
 - DB initialization
 - PRAGMA user_version=1
+- final-v1 required table/column completeness validation
 - documents
 - document_locations
 - filing_bindings
@@ -336,6 +337,23 @@ Code Review 前发现：
 - 禁止 silent downgrade / destructive rewrite。
 
 当前实现已采用该异常语义；需在验收中明确验证。
+
+### P1-ISSUE-008 — Incomplete schema-v1 compatibility check
+
+P1-H isolated Code Review 发现：P1 开发期间在 `PRAGMA user_version=1` 下增加了 `document_sources`。原 `SQLiteRegistry._initialize()` 仅验证 user_version，因此一个由较早 P1 开发代码创建、同样标记 version=1 但缺少新表/字段的 DB 会被错误视为兼容，直到业务 SQL 才出现 `no such table/column`。
+
+根因：schema version number 与 schema structure completeness 没有同时验证。
+
+批准解决方案：
+
+1. 最终 P1 schema 仍为 `user_version=1`，因为 P1 尚未完成首次 Independent Acceptance；
+2. 只有 `user_version=0` 且无用户表的真正新 DB 才初始化最终完整 v1 schema；version=0 非空 DB 必须阻断；
+3. 打开已有 version=1 DB 时必须验证 required tables + required columns；
+4. 不完整 v1 DB 直接抛 `RegistrySchemaUnsupported`，reason code 保持 `REGISTRY_SCHEMA_UNSUPPORTED`；
+5. 不自动补表、不 silent migration、不 destructive rewrite；
+6. P1 PASS 前的旧 registry DB 视为 development artifact，需要显式重建；
+7. P1 PASS 后任何 schema 结构变化必须提升 schema version 并先设计 migration；
+8. 增加 version=0 non-empty 与 incomplete-v1 table/column tests，并重新执行 P1-C / G / H。
 
 ### P1-ISSUE-007 — Isolated worktree pytest basetemp parent missing
 
