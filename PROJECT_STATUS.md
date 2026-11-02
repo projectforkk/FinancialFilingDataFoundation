@@ -6,25 +6,25 @@
 
 ## Current state
 
-**P0_DONE**
+**P1_DESIGN_READY**
 
 ## Approved phase
 
-**P0 — Native PDF Parsing Feasibility Probe**
+**P1 — Identity / Registry / Incremental Planner**
 
 正式开发分支：
 
-`task/p0-native-pdf-feasibility`
+`task/p1-identity-registry-planner`
 
-当前独立验收执行指令：
+当前 P1 独立验收设计基线：
 
-`acceptance/04-p0-acceptance-refreeze.md`
+`acceptance/06-p1-acceptance-instruction.md`
 
-当前 design baseline commit：
+当前 P1 design baseline：
 
-`8c5f6d3f203bfd15cfa452a976b23dc8a6f81461`
+以包含本次 P1 设计文件并推送到 `main` 的最新 HEAD 为准；P1 开发分支必须从该 HEAD 创建。
 
-`acceptance/03-p0-acceptance-run-instruction.md` 已因后续设计变更失效并被 refreeze 取代。
+P0 acceptance freeze/result 已保留为历史证据，不再作为当前 P1 验收入口。
 
 P0 独立验收结果：
 
@@ -42,16 +42,20 @@ P0 独立验收结果：
 - `design/03-parsed-financial-document-contract.md`
 - `design/04-pdf-quality-gate-design.md`
 - `design/05-p0-implementation-plan.md`
+- `design/06-p1-identity-registry-planner-design.md`
+- `design/07-p1-implementation-plan.md`
 - `development/01-development-roadmap.md`
 - `development/02-p0-development-instruction.md`
+- `development/07-p1-development-instruction.md`
 - `acceptance/01-acceptance-strategy.md`
 - `acceptance/02-p0-acceptance-instruction.md`
+- `acceptance/06-p1-acceptance-instruction.md`
 
-设计准备完成时 main head：
+P0 已完成并合入 main：
 
-`fe97cdd2abda5c956c2b508630ad05779f305901`
+`edff06b2b1138b50d742e92ce8b8df628c6d2c61`
 
-本文件更新后，以更新后的 main head 作为 P0 分支起点。
+本次 P1 设计提交完成后，以该 main head 作为 `task/p1-identity-registry-planner` 分支起点。
 
 ## Current scope
 

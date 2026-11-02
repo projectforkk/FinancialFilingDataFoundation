@@ -439,13 +439,17 @@ export_document(document_id: str) -> ExportManifest
 
 ## 8. 数据字段与版本参与
 
-### 8.1 DocumentKey
+### 8.1 FilingSlotKey / DocumentKey
 
-业务 identity：
+Planner 的 required filing 业务槽位：
 
 ```text
 market + company_id + filing_type + fiscal_year + raw_fiscal_period
 ```
+
+P1 起正式命名为 `FilingSlotKey`；现有 `DocumentKey` 语义与其一致。
+
+`amended` 不进入 required slot 主键，而是具体 filing document variant 的元数据。原版/修订版属于同一 required slot，但可以对应不同 `document_sha256`。
 
 具体文件 identity：
 
@@ -453,7 +457,7 @@ market + company_id + filing_type + fiscal_year + raw_fiscal_period
 document_sha256
 ```
 
-不得将 filename 当稳定 identity。
+不得将 filename 当稳定 identity，也不得把 amended 版本自动当成额外 required filing。
 
 ### 8.2 Parse Key
 
@@ -882,8 +886,10 @@ deterministic gate、accounting consistency、document completeness。
 
 ## 22. 当前批准结论
 
-当前只批准进入：
+P0 已完成 Independent Acceptance 并收口为 `P0_DONE`。
 
-**P0 — Native PDF Parsing Feasibility Probe**
+当前批准进入：
 
-在 P0 得到真实 PC 性能与解析可行性数据前，不批准实现完整 table parser、MCP 或 Skill。
+**P1 — Identity / Registry / Incremental Planner**
+
+P1 仅实现 identity、registry 与 deterministic planner；P1 未 PASS 前不批准实现 P2 Dayu Acquisition Provider、完整 table parser、MCP 或 Skill。

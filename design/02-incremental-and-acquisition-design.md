@@ -47,16 +47,28 @@ US 后续：
 - 10-Q
 - 20-F / 6-K 等由 provider policy 决定。
 
-## 3. FilingIdentity
+## 3. FilingSlotKey 与 FilingIdentity
+
+Required filing / planner 的稳定业务槽位使用：
 
 ```text
+FilingSlotKey =
 market
 company_id
 filing_type
 fiscal_year
 raw_fiscal_period
-amended
 ```
+
+具体 filing 文档身份为：
+
+```text
+FilingIdentity = FilingSlotKey + amended(bool | None)
+```
+
+`amended` 是 document variant 元数据，不改变 required slot；具体字节对象仍由 `document_sha256` 标识。
+
+同一 slot 若存在多个不同 SHA 且无法依据 registry/source metadata 唯一确定 active document，planner 必须 `REVIEW_REQUIRED`，不得猜测。
 
 业务主键不得依赖文件名。
 
