@@ -6,11 +6,11 @@
 
 ## Current state
 
-**P2_READY_FOR_ACCEPTANCE**
+**P2_IN_ACCEPTANCE**
 
 ## Approved phase
 
-**P2 — Acquisition Provider（CODE REVIEW PASS / READY FOR ACCEPTANCE）**
+**P2 — Acquisition Provider（IN INDEPENDENT ACCEPTANCE）**
 
 P1 completed branch：
 
@@ -33,6 +33,13 @@ P2 Code Review：
 - live CN/HK: `PASS`
 - Dayu pin: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
 - blocker: `NONE`
+
+P2 Independent Acceptance：
+
+- instruction: `acceptance/10-p2-acceptance-run-instruction.md`
+- frozen candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
+- status: `IN_PROGRESS`
+- accepted baseline remains P1 until P2 verdict PASS
 
 当前 P1 独立验收执行指令：
 
