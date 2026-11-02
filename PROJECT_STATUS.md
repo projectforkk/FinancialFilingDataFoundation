@@ -6,11 +6,11 @@
 
 ## Current state
 
-**P2_IN_DEVELOPMENT**
+**P2_READY_FOR_ACCEPTANCE**
 
 ## Approved phase
 
-**P2 — Acquisition Provider（IN DEVELOPMENT）**
+**P2 — Acquisition Provider（CODE REVIEW PASS / READY FOR ACCEPTANCE）**
 
 P1 completed branch：
 
@@ -23,6 +23,16 @@ P2 development branch：
 Branch start design baseline：
 
 `e53eca8c384f93382945cd2fc529e194a400d066`
+
+P2 Code Review：
+
+- verdict: `PASS`
+- evidence: `development/21-p2-code-review.md`
+- reviewed candidate: `881c80be1938a128448ea3ed0b4e2cb962f46018`
+- deterministic suite: `87 passed`
+- live CN/HK: `PASS`
+- Dayu pin: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
+- blocker: `NONE`
 
 当前 P1 独立验收执行指令：
 
