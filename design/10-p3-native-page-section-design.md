@@ -239,7 +239,10 @@ FTS query 必须参数化；不得字符串拼 SQL。
 JSON：
 - UTF-8 no BOM
 - stable key order
-- one JSON object per line for jsonl
+- JSONL record separator **只能是 ASCII LF (`0x0A`)**
+- one JSON object per LF-delimited record
+- 字符串中的 Unicode line-separator code points（至少 U+0085 / U+2028 / U+2029）必须序列化为 `\\u0085` / `\\u2028` / `\\u2029` 转义序列，禁止原样写入造成 record boundary ambiguity
+- reader 以 LF record boundary 读取；不能依赖 Python `str.splitlines()` 对所有 Unicode line separators 的扩展语义
 
 ## 14. Parser version
 
