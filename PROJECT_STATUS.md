@@ -6,23 +6,27 @@
 
 ## Current state
 
-**P3_DESIGN_READY**
+**P3_IN_ACCEPTANCE**
 
 ## Approved phase
 
-**P3 — Native Page / Section / FTS（DESIGN READY / DEVELOPMENT NOT STARTED）**
+**P3 — Native Page / Section / FTS（CODE REVIEW PASS / READY FOR ACCEPTANCE）**
 
 P1 completed branch：
 
 `task/p1-identity-registry-planner`
 
-P2 development branch：
+P2 completed branch：
 
 `task/p2-acquisition-provider`
 
-Branch start design baseline：
+P3 development branch：
 
-`e53eca8c384f93382945cd2fc529e194a400d066`
+`task/p3-native-page-section`
+
+P3 branch start design baseline：
+
+`2140cc009805260ce2fe63b13e78d9e049d73e2d`
 
 P2 Code Review：
 
@@ -33,6 +37,22 @@ P2 Code Review：
 - live CN/HK: `PASS`
 - Dayu pin: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
 - blocker: `NONE`
+
+P3 Code Review：
+
+- verdict: `PASS`
+- evidence: `development/25-p3-code-review.md`
+- reviewed candidate: `3c3536db0bdfdfbc5300004731b04d992930904f`
+- full suite: `104 passed`
+- live CN/HK: `PASS`
+- blocker: `NONE`
+
+P3 Independent Acceptance：
+
+- instruction: `acceptance/13-p3-acceptance-run-instruction.md`
+- frozen candidate: `7b81c97e73448389e38cf9936a8af7dfe074d1e1`
+- status: `IN_PROGRESS`
+- accepted baseline remains P2 until P3 verdict PASS
 
 P2 Independent Acceptance：
 
