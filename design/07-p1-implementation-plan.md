@@ -155,6 +155,8 @@ No reusable + no local → DOWNLOAD_AND_PARSE
 Parsed SHA != current local SHA → PARSE_LOCAL
 Multiple distinct local SHA → REVIEW_REQUIRED
 Multiple reusable parsed SHA without unique local evidence → REVIEW_REQUIRED
+Registered bound path content drift → BLOCKED / LOCAL_CONTENT_DRIFT
+Same-SHA duplicate locations with one valid copy → use verified copy
 Conflict binding → non-guessing result
 ```
 
@@ -334,6 +336,22 @@ Code Review 前发现：
 - 禁止 silent downgrade / destructive rewrite。
 
 当前实现已采用该异常语义；需在验收中明确验证。
+
+### P1-ISSUE-006 — Registered local content drift
+
+Code Review 前发现：Registry 已记录 `path -> document_sha256`，但 local resolution 原实现只检查 path 是否存在；若文件在注册后被原地替换而未重新 register，planner 可能把旧 SHA 当成当前 local document，进而错误 `REUSE_DATA`。
+
+根因：location liveness 与 content identity 验证被混为一体，只验证“存在”，没有重新验证“内容仍是同一个 SHA”。
+
+批准解决方案：
+
+1. local resolution 对存在的 bound path 重新计算 SHA256；
+2. 只有 current SHA == registered SHA 才属于 verified live location；
+3. drifted location 不自动重绑定、不根据文件名/mtime 猜 identity；
+4. 若没有 verified live copy 且存在 drifted bound location，返回 `LocalDocumentStatus.DRIFTED`；
+5. planner 对 DRIFTED 输出 `BLOCKED / LOCAL_CONTENT_DRIFT`；
+6. same-SHA 多路径若至少一个 copy 仍 verified，则允许使用 verified copy，不因另一个 drifted duplicate 错误阻断；
+7. 增加对应 tests，并重新执行 P1-C / D / F / G / H。
 
 任何 Gate 发现问题且找到解决办法：
 
