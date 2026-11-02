@@ -211,7 +211,33 @@ exists_flag
 
 不得因为 filename 相同判为同一文档。
 
-### 6.3 filing_bindings
+### 6.3 document_sources
+
+Source provenance 必须独立于 filing binding 持久化，因为调用者可能知道官方 source，但尚不能可靠确认 filing identity。
+
+```text
+document_sha256
+provider
+source_id
+source_url
+source_title
+filing_date nullable
+report_date nullable
+provider_company_id nullable
+acquired_at nullable
+created_at
+PRIMARY KEY(document_sha256, provider, source_id)
+```
+
+规则：
+
+- `source` 存在时，无论 `expected_identity` 是否存在，都必须 upsert `document_sources`；
+- 同一 content SHA 可以有多个 provider/source provenance；
+- 同一 `(SHA, provider, source_id)` 重复注册必须幂等；
+- source provenance 不自动推断 filing slot；
+- `filing_bindings` 可保留 source 字段作为 binding 时的快照，但 `document_sources` 是无 identity 情况下 provenance 不丢失的保证。
+
+### 6.4 filing_bindings
 
 文档到 filing slot 的绑定：
 
@@ -268,9 +294,9 @@ P1 行为：
 5. PDF 时用轻量 open 检查 page count；不执行 P0 全量 probe；
 6. 写/复用 `documents`；
 7. upsert `document_locations`；
-8. 若有 expected identity，写/复用 binding；
-9. source metadata 存在时持久化 provenance；
-10. 再次注册同一 path / same hash 必须幂等；
+8. source metadata 存在时，无条件 upsert `document_sources` provenance；
+9. 若有 expected identity，再写/复用 filing binding；
+10. 再次注册同一 path / same hash / same source 必须幂等；
 11. 源文件不得修改。
 
 若 path 原来指向 SHA-A，之后内容变为 SHA-B：
@@ -452,13 +478,16 @@ Planner 只读 Registry，不执行 action。
 
 这保持“reuse → local → download”的业务优先级，同时允许 local registry 提供 material-change 证据来阻止错误 reuse。
 
-### 11.2 BLOCKED
+### 11.2 BLOCKED / Registry 前置阻断
 
-P1 item 级 `BLOCKED` 仅用于确定性结构阻断，例如：
+P1 item 级 `BLOCKED` 用于已经能够打开 registry 后的确定性 slot 阻断，例如：
 
 - registry 数据违反 invariant；
-- slot binding 明确标记 `CONFLICT` 且无法归一；
-- 数据库 schema/version 不受支持。
+- slot binding 明确标记 `CONFLICT` 且无法归一。
+
+若数据库 `PRAGMA user_version` 高于当前支持版本，Registry 在 planner 运行前即不可安全打开，因此必须抛出结构化 `RegistrySchemaUnsupported`，其 reason code 为 `REGISTRY_SCHEMA_UNSUPPORTED`。这是 **plan-level blocker**，不是伪造某个 filing item 的 `BLOCKED`。
+
+调用/验收层必须把该异常判定为 P1 execution `BLOCKED`；不得静默 downgrade 或自动改写 DB version。
 
 普通“没有数据/没有本地文件”不是 BLOCKED，应输出 `DOWNLOAD_AND_PARSE`。
 
@@ -602,22 +631,27 @@ P1 可以按实现简洁性调整文件拆分，但不得改变职责边界。
 5. register same file idempotent；
 6. same SHA multi-path；
 7. changed path content updates location SHA without deleting history；
-8. unbound document 不被 planner 当 local candidate；
-9. reusable parsed data → REUSE_DATA；
-10. validation non-PASS → 不 reuse；
-11. blocking_issue_count > 0 → 不 reuse；
-12. schema incompatible → 不 reuse；
-13. parser defect invalidation → 不 reuse；
-14. same SHA local + reusable parse → REUSE_DATA；
-15. different local SHA vs parsed SHA → PARSE_LOCAL；
-16. one local doc + no reusable data → PARSE_LOCAL；
-17. no parsed + no local → DOWNLOAD_AND_PARSE；
-18. multiple distinct local SHA → REVIEW_REQUIRED；
-19. binding conflict → BLOCKED / REVIEW_REQUIRED according to invariant；
-20. repeated build_plan deterministic；
-21. DB close/reopen plan deterministic；
-22. source file immutable；
-23. no network / no Dayu invocation。
+8. source metadata without expected identity 仍持久化；
+9. repeated same source provenance idempotent；
+10. unbound document 不被 planner 当 local candidate；
+11. reusable parsed data → REUSE_DATA；
+12. validation non-PASS → 不 reuse；
+13. blocking_issue_count > 0 → 不 reuse；
+14. schema incompatible / empty accepted schema set → 不 reuse；
+15. parser defect invalidation → 不 reuse；
+16. parser_version change alone → 仍可 reuse；
+17. same SHA local + reusable parse → REUSE_DATA；
+18. different local SHA vs parsed SHA → PARSE_LOCAL；
+19. one local doc + no reusable data → PARSE_LOCAL；
+20. no parsed + no local → DOWNLOAD_AND_PARSE；
+21. multiple distinct local SHA → REVIEW_REQUIRED；
+22. multiple distinct reusable parsed SHA without unique local evidence → REVIEW_REQUIRED；
+23. binding conflict → BLOCKED；
+24. repeated build_plan deterministic；
+25. DB close/reopen plan deterministic；
+26. source file immutable；
+27. registry schema version > supported → structured plan-level blocker；
+28. no network / no Dayu invocation。
 
 ---
 

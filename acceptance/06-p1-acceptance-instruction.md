@@ -31,21 +31,24 @@
 6. SQLite create/close/reopen 后 plan 不变。
 7. same file registration idempotent。
 8. same SHA multi-path 不重复 content record。
-9. unbound document 不作为 local candidate。
-10. reusable parsed → REUSE_DATA。
-11. non-PASS/blocking/incompatible/defect invalidated → 不 reuse。
-12. one local raw → PARSE_LOCAL。
-13. no parsed/no local → DOWNLOAD_AND_PARSE。
-14. parsed SHA 与 current local SHA 不同 → 阻止错误 reuse。
-15. multiple distinct local SHA → REVIEW_REQUIRED，禁止猜测。
-16. parser_version change alone 不触发 reparse。
-17. accepted schema / invalidated parser versions 由显式 `PlannerReusePolicy` 决定。
-18. 多个 distinct reusable parsed SHA 且无唯一 local active-source 证据 → REVIEW_REQUIRED。
-19. source files unchanged。
-20. no network。
-21. no Dayu。
-22. no Docling/Torch/OCR/external AI。
-23. repeated build_plan deterministic。
+9. source metadata 在没有 expected identity 时仍持久化，不丢 provenance。
+10. repeated same source provenance idempotent。
+11. unbound document 不作为 local candidate。
+12. reusable parsed → REUSE_DATA。
+13. non-PASS/blocking/incompatible/defect invalidated → 不 reuse。
+14. one local raw → PARSE_LOCAL。
+15. no parsed/no local → DOWNLOAD_AND_PARSE。
+16. parsed SHA 与 current local SHA 不同 → 阻止错误 reuse。
+17. multiple distinct local SHA → REVIEW_REQUIRED，禁止猜测。
+18. parser_version change alone 不触发 reparse。
+19. accepted schema / invalidated parser versions 由显式 `PlannerReusePolicy` 决定；accepted set 为空表示无 schema 可复用。
+20. 多个 distinct reusable parsed SHA 且无唯一 local active-source 证据 → REVIEW_REQUIRED。
+21. registry schema version > supported → structured plan-level BLOCKED，不得 downgrade。
+22. source files unchanged。
+23. no network。
+24. no Dayu。
+25. no Docling/Torch/OCR/external AI。
+26. repeated build_plan deterministic。
 
 ## PASS
 

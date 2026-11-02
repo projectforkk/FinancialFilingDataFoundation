@@ -81,6 +81,7 @@ Gate C：schema/persistence tests PASS。
 - PDF lightweight open/page_count；
 - content-addressed documents；
 - multi-location same SHA；
+- source provenance independent of binding via `document_sources`；
 - optional binding；
 - provenance；
 - source immutable；
@@ -264,6 +265,33 @@ Final verdict：
 4. 如果继续发现新问题，重复 design-first 流程。
 
 受影响 Gate：P1-B / P1-G；P1-C SQLite schema 不受影响。
+
+### P1-ISSUE-002 — Source provenance tied too tightly to identity binding
+
+在开发后复核中发现：调用者可能已经知道官方 `SourceMetadata`，但暂时还没有足够证据提供 `expected_identity`。原实现只在创建 `filing_bindings` 时保存 source 字段，这会导致“有 provenance、无 identity”场景丢失来源信息。
+
+根因：source provenance 与 filing identity binding 被建模在同一持久化路径。
+
+批准解决方案：
+
+1. 新增 `document_sources` 表，以 `(document_sha256, provider, source_id)` 为主键；
+2. 只要 `source` 存在，无论是否有 `expected_identity`，都必须幂等保存 provenance；
+3. source 不自动推断 filing slot；
+4. `filing_bindings` 可保留 source snapshot，但不再承担唯一 provenance 存储职责；
+5. 增加无 identity + 有 source 的 persistence/idempotency 测试；
+6. 重新执行 P1-C / P1-D / P1-G，并重新 Code Review。
+
+### P1-ISSUE-003 — Unsupported registry schema is plan-level blocker
+
+设计复核确认：高于当前支持版本的 SQLite `user_version` 会导致 Registry 无法安全打开，因此不能生成某个 filing item 的伪 `BLOCKED` 结果。
+
+批准解决方案：
+
+- Registry 初始化直接抛结构化 `RegistrySchemaUnsupported`；
+- 调用/验收层将其判定为 execution `BLOCKED`；
+- 禁止 silent downgrade / destructive rewrite。
+
+当前实现已采用该异常语义；需在验收中明确验证。
 
 任何 Gate 发现问题且找到解决办法：
 
