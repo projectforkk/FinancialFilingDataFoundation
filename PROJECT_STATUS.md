@@ -6,7 +6,35 @@
 
 ## Current state
 
-**DESIGN_BASELINE_IN_PREPARATION**
+**P0_READY_FOR_DEVELOPMENT**
+
+## Approved phase
+
+**P0 — Native PDF Parsing Feasibility Probe**
+
+正式开发分支：
+
+`task/p0-native-pdf-feasibility`
+
+## Design baseline
+
+当前设计基线由以下文件共同组成：
+
+- `AGENTS.md`
+- `design/01-project-detailed-design.md`
+- `design/02-incremental-and-acquisition-design.md`
+- `design/03-parsed-financial-document-contract.md`
+- `design/04-pdf-quality-gate-design.md`
+- `development/01-development-roadmap.md`
+- `development/02-p0-development-instruction.md`
+- `acceptance/01-acceptance-strategy.md`
+- `acceptance/02-p0-acceptance-instruction.md`
+
+设计准备完成时 main head：
+
+`fe97cdd2abda5c956c2b508630ad05779f305901`
+
+本文件更新后，以更新后的 main head 作为 P0 分支起点。
 
 ## Current scope
 
@@ -18,26 +46,34 @@
 - Codex：只处理本机解析无法可靠完成的局部复核。
 - CRDE / 财报分析：下游，不属于首期 Extraction 实现范围。
 
-## Current design baseline facts
+## Verified Dayu reference baseline
 
-已确认的 Dayu 参考基线：`2115c86d5a9027bb51cbbc8a4d0175080732e4e6`。
+Dayu 参考基线：
 
-CN/HK Dayu 当前公开 `fins download` 工作流会在 PDF 下载后继续执行 Docling conversion；本项目若复用 Dayu，应复用 acquisition/downloader 能力，而不是强制沿用 Docling parsing。
+`2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
 
-贵州茅台 FY2024 代表样本：
+已核对：
+- CN/HK 高层 `fins download` 会在 PDF acquisition 后继续 Docling conversion；
+- FFDF 若复用 Dayu，应复用 acquisition/downloader 的窄能力，不以 Docling 为默认 parser。
+
+## Representative performance evidence
+
+贵州茅台 FY2024：
 - 143 pages；
 - 143/143 有 native text；
-- Dayu PDF → Docling JSON 约 1802.6s；
-- Docling JSON → snapshot 约 31.6s；
-- 因此本项目首要风险是 native PDF parser 的性能与准确性，而非 MCP transport。
+- PDF → Docling JSON 约 1802.6s；
+- Docling JSON → snapshot 约 31.6s。
 
-## Next development gate
+因此 P0 首先验证：目标 PC 上轻量 native PDF path 的真实性能与可读取性。
 
-**P0 — Native PDF Parsing Feasibility Probe**
+## P0 exit condition
 
-在任何完整 MCP / Skill 实现前，先验证目标 PC 对代表性 CN/HK born-digital PDF 的：
-- PDF open；
-- text / words / blocks；
-- bbox / drawings / images；
-- cheap table candidate detection；
-- 耗时、内存、异常页比例。
+只有 P0 独立验收 PASS 后，才允许进入 P1 Identity / Registry / Incremental Planner。
+
+P0 不允许提前实现：
+- 完整 table reconstruction；
+- MCP；
+- Skill；
+- OCR；
+- Docling parser path；
+- external AI API。
