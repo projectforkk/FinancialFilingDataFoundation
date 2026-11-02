@@ -240,7 +240,7 @@ Final verdict：
 - acceptance evidence 入库；
 - PROJECT_STATUS → P1_DONE；
 - 正常情况下 merge P1 branch → main；
-- 若命中 P1-ISSUE-003 且 main 已包含 accepted commits，则验证最终 accepted candidate/closeout commits 均可从 main 追溯，不制造重复 merge；
+- 若命中 P1-ISSUE-004 且 main 已包含 accepted commits，则验证最终 accepted candidate/closeout commits 均可从 main 追溯，不制造重复 merge；
 - 更新 `accepted_baseline_sha` 到 P1 closeout commit；
 - 才允许开始 P2 design。
 
@@ -248,7 +248,7 @@ Final verdict：
 
 ## 12. 问题处置
 
-### P1-ISSUE-003 — Pre-acceptance P1 commits entered main
+### P1-ISSUE-004 — Pre-acceptance P1 commits entered main
 
 Code Review 前发现：
 
