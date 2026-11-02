@@ -58,12 +58,13 @@ Independent Acceptance 必须在独立 Git worktree 中执行，并固定到 acc
 21. registered bound path 原地改写且未重新 register → `LOCAL_CONTENT_DRIFT` / BLOCKED，禁止错误 reuse。
 22. same-SHA duplicate locations 中一个 drift、另一个 verified 时仍可使用 verified location。
 23. registry schema version > supported → structured plan-level BLOCKED，不得 downgrade。
-24. `user_version=1` 但缺少最终 v1 required table/column → structured `REGISTRY_SCHEMA_UNSUPPORTED`，不得延迟成 SQLite `no such table/column`。
-25. source files unchanged。
-26. no network。
-27. no Dayu。
-28. no Docling/Torch/OCR/external AI。
-29. repeated build_plan deterministic。
+24. `user_version=0` 但已有用户表 → structured `REGISTRY_SCHEMA_UNSUPPORTED`，不得自动补表/升级。
+25. `user_version=1` 但缺少最终 v1 required table/column → structured `REGISTRY_SCHEMA_UNSUPPORTED`，不得延迟成 SQLite `no such table/column`。
+26. source files unchanged。
+27. no network。
+28. no Dayu。
+29. no Docling/Torch/OCR/external AI。
+30. repeated build_plan deterministic。
 
 ## PASS
 

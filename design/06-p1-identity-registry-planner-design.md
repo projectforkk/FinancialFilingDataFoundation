@@ -576,7 +576,8 @@ P1 schema version：
 
 要求：
 
-- 新 DB 可自动初始化为**完整的最终 P1 schema v1**；
+- 只有 `user_version=0` 且不存在任何非 `sqlite_%` 用户表时，才视为新 DB，并自动初始化为**完整的最终 P1 schema v1**；
+- `user_version=0` 但已经存在用户表时不得自动补表/升级，必须结构化 `REGISTRY_SCHEMA_UNSUPPORTED` 阻断，避免 silent migration；
 - `user_version=1` 不是唯一兼容条件：打开时必须校验 v1 required tables / required columns 完整性；
 - version=1 且 schema 完整才可打开；
 - version=1 但缺少 required table / column 必须以结构化 `RegistrySchemaUnsupported(reason_code=REGISTRY_SCHEMA_UNSUPPORTED)` 阻断，不得等到业务 SQL 才抛 `no such table/column`；
@@ -678,8 +679,9 @@ P1 可以按实现简洁性调整文件拆分，但不得改变职责边界。
 27. same SHA multi-path 中一个 location drift、另一个仍 verified → 使用 verified location，不错误阻断；
 28. source file immutable；
 29. registry schema version > supported → structured plan-level blocker；
-30. `user_version=1` 但缺少最终 v1 required table/column → structured plan-level blocker，而不是延迟 SQLite error；
-31. no network / no Dayu invocation。
+30. `user_version=0` 但已有用户表 → structured plan-level blocker，不得 silent migration；
+31. `user_version=1` 但缺少最终 v1 required table/column → structured plan-level blocker，而不是延迟 SQLite error；
+32. no network / no Dayu invocation。
 
 ---
 
