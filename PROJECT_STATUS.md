@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P3_READY_FOR_ACCEPTANCE**
+**P3_IN_ACCEPTANCE**
 
 ## Approved phase
 
@@ -46,6 +46,13 @@ P3 Code Review：
 - full suite: `104 passed`
 - live CN/HK: `PASS`
 - blocker: `NONE`
+
+P3 Independent Acceptance：
+
+- instruction: `acceptance/13-p3-acceptance-run-instruction.md`
+- frozen candidate: `7b81c97e73448389e38cf9936a8af7dfe074d1e1`
+- status: `IN_PROGRESS`
+- accepted baseline remains P2 until P3 verdict PASS
 
 P2 Independent Acceptance：
 
