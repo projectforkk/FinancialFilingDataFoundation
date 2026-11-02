@@ -254,25 +254,73 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def load_native_document(artifact_dir: str | Path) -> NativeDocumentArtifact:
+    import sqlite3
+
     directory = Path(artifact_dir).expanduser().resolve()
     manifest = directory / "document.json"
-    if not manifest.is_file():
-        raise NativeParseError("ARTIFACT_WRITE_FAILED", f"missing manifest: {manifest}")
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != SCHEMA_VERSION:
+    pages_path = directory / "pages.jsonl"
+    sections_path = directory / "sections.jsonl"
+    search_db_path = directory / "search.sqlite"
+    required = (manifest, pages_path, sections_path, search_db_path)
+    missing = [path.name for path in required if not path.is_file()]
+    if missing:
         raise NativeParseError(
-            "ARTIFACT_WRITE_FAILED",
-            f"unsupported native artifact schema: {payload.get('schema_version')}",
+            "ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "missing native artifact files: " + ", ".join(sorted(missing)),
         )
+
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise NativeParseError(
+            "ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            f"cannot read native manifest: {exc}",
+        ) from exc
+
+    document_sha256 = str(payload.get("document_sha256") or "")
+    parser_version = str(payload.get("parser_version") or "")
+    if (
+        payload.get("schema_version") != SCHEMA_VERSION
+        or parser_version != P3_PARSER_VERSION
+        or directory.name != document_sha256
+    ):
+        raise NativeParseError(
+            "ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "native artifact manifest identity/schema/parser mismatch",
+        )
+
+    try:
+        conn = sqlite3.connect(search_db_path)
+        rows = dict(conn.execute("SELECT key, value FROM metadata").fetchall())
+    except (sqlite3.Error, OSError) as exc:
+        raise NativeParseError(
+            "ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            f"cannot validate search metadata: {exc}",
+        ) from exc
+    finally:
+        try:
+            conn.close()
+        except UnboundLocalError:
+            pass
+
+    if (
+        rows.get("document_sha256") != document_sha256
+        or rows.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise NativeParseError(
+            "ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "search metadata does not match native artifact manifest",
+        )
+
     return NativeDocumentArtifact(
         artifact_dir=directory,
-        document_sha256=str(payload["document_sha256"]),
+        document_sha256=document_sha256,
         file_size=int(payload["file_size"]),
         page_count=int(payload["page_count"]),
-        parser_version=str(payload["parser_version"]),
-        pages_path=directory / "pages.jsonl",
-        sections_path=directory / "sections.jsonl",
-        search_db_path=directory / "search.sqlite",
+        parser_version=parser_version,
+        pages_path=pages_path,
+        sections_path=sections_path,
+        search_db_path=search_db_path,
         document_path=manifest,
         timings_ms=dict(payload.get("timings_ms") or {}),
         warnings=tuple(payload.get("warnings") or ()),

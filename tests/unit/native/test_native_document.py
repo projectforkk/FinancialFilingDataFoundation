@@ -6,8 +6,10 @@ import json
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from financial_filing_data_foundation.native import (
+    NativeParseError,
     P3_PARSER_VERSION,
     load_native_document,
     parse_native_document,
@@ -213,6 +215,34 @@ def test_fts_page_and_section_search(tmp_path: Path) -> None:
     assert section_hits[0]["page_start"] == 1
 
 
+def test_page_fts_uses_external_page_content_and_survives_reopen(
+    tmp_path: Path,
+) -> None:
+    import sqlite3
+
+    source = tmp_path / "fts-schema.pdf"
+    _make_pdf(source)
+    artifact = parse_native_document(source, tmp_path / "artifacts")
+
+    conn = sqlite3.connect(artifact.search_db_path)
+    sql = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE name='page_fts'"
+    ).fetchone()[0]
+    page_rows = conn.execute("SELECT COUNT(*) FROM page_content").fetchone()[0]
+    fts_rows = conn.execute("SELECT COUNT(*) FROM page_fts").fetchone()[0]
+    conn.close()
+
+    normalized = " ".join(sql.lower().split())
+    assert "content='page_content'" in normalized
+    assert "content_rowid='page_no'" in normalized
+    assert page_rows == 2
+    assert fts_rows == 2
+
+    reopened_hits = search_pages(artifact.search_db_path, "Revenue", 5)
+    assert reopened_hits
+    assert reopened_hits[0]["page_no"] == 1
+
+
 def test_artifact_json_has_no_bom(tmp_path: Path) -> None:
     source = tmp_path / "encoding.pdf"
     _make_pdf(source)
@@ -278,6 +308,45 @@ def test_jsonl_record_escapes_unicode_line_separators(tmp_path: Path) -> None:
         if line
     ]
     assert decoded == rows
+
+
+def test_existing_artifact_missing_core_file_is_rejected(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "missing-core.pdf"
+    _make_pdf(source)
+    root = tmp_path / "artifacts"
+    artifact = parse_native_document(source, root)
+    artifact.pages_path.unlink()
+
+    with pytest.raises(NativeParseError) as exc_info:
+        parse_native_document(source, root)
+
+    assert exc_info.value.reason_code == "ARTIFACT_INCOMPLETE_OR_CORRUPT"
+
+
+def test_existing_artifact_search_metadata_mismatch_is_rejected(
+    tmp_path: Path,
+) -> None:
+    import sqlite3
+
+    source = tmp_path / "bad-search-metadata.pdf"
+    _make_pdf(source)
+    root = tmp_path / "artifacts"
+    artifact = parse_native_document(source, root)
+
+    conn = sqlite3.connect(artifact.search_db_path)
+    conn.execute(
+        "UPDATE metadata SET value=? WHERE key='document_sha256'",
+        ("0" * 64,),
+    )
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(NativeParseError) as exc_info:
+        load_native_document(artifact.artifact_dir)
+
+    assert exc_info.value.reason_code == "ARTIFACT_INCOMPLETE_OR_CORRUPT"
 
 
 def test_p3_source_has_no_heavy_path_imports() -> None:

@@ -24,7 +24,13 @@ def build_search_db(
             "CREATE TABLE page_content(page_no INTEGER PRIMARY KEY, text TEXT NOT NULL)"
         )
         conn.execute(
-            "CREATE VIRTUAL TABLE page_fts USING fts5(page_no UNINDEXED, text)"
+            """
+            CREATE VIRTUAL TABLE page_fts USING fts5(
+                text,
+                content='page_content',
+                content_rowid='page_no'
+            )
+            """
         )
         conn.execute(
             """
@@ -54,7 +60,7 @@ def build_search_db(
                 (page_no, text),
             )
             conn.execute(
-                "INSERT INTO page_fts(page_no,text) VALUES(?,?)",
+                "INSERT INTO page_fts(rowid,text) VALUES(?,?)",
                 (page_no, text),
             )
         for section in sections:
@@ -94,10 +100,12 @@ def search_pages(
     try:
         rows = conn.execute(
             """
-            SELECT CAST(page_no AS INTEGER) AS page_no, text, bm25(page_fts) AS score
+            SELECT pc.page_no AS page_no, pc.text AS text,
+                   bm25(page_fts) AS score
             FROM page_fts
+            JOIN page_content pc ON pc.page_no = page_fts.rowid
             WHERE page_fts MATCH ?
-            ORDER BY score ASC, CAST(page_no AS INTEGER) ASC
+            ORDER BY score ASC, pc.page_no ASC
             LIMIT ?
             """,
             (query, int(limit)),
