@@ -15,7 +15,7 @@ Verify:
 8. repeated headers/footers not section headings
 9. section hierarchy/page ranges valid
 10. section IDs deterministic
-11. pages/sections JSONL UTF-8 no BOM
+11. pages/sections JSONL UTF-8 no BOM；record separator 仅 ASCII LF；U+0085/U+2028/U+2029 必须在 string 内转义，不得形成伪记录边界
 12. FTS5 page/section search PASS
 13. repeated parse semantic artifacts deterministic excluding timings/paths as frozen
 14. CN 600519 FY2024 live PASS <=30s

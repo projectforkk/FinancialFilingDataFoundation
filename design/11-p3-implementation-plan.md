@@ -55,5 +55,18 @@ Verdict PASS/FAIL/BLOCKED.
 ## P3-K Closeout
 PASS only → merge main → verify src/tests equal frozen candidate → full regression → P3_DONE.
 
+## P3 Issue Log
+
+### P3-ISSUE-001 — JSONL Unicode line separators break record boundaries
+
+首次 CN live artifact 已成功抽取，但 evidence harness 用 `splitlines()` 读取 `pages.jsonl` 时遇到 `JSONDecodeError`。根因是原文含 Unicode line separator，`ensure_ascii=False` 原样保留，而 `splitlines()` 将其视为新行。
+
+批准解决方案：
+1. JSONL record separator 固定为 ASCII LF；
+2. U+0085/U+2028/U+2029 在 JSON string 内强制 `\\uXXXX` escape；
+3. 增加 line-safe JSONL unit test；
+4. 作废首次 P3 live artifact，修复后 fresh root 重跑 P3-F/G；
+5. 不改动源 PDF。
+
 ## Issue rule
 Problem found → STOP → update design first → commit → fix → rerun.
