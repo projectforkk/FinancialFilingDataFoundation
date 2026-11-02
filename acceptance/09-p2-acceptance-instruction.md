@@ -268,6 +268,8 @@ Dayu package initializer 可能 transitively import `SecDownloader`，但 FFDF P
 
 样本必须由开发阶段通过 HKEX 官方 discovery 确认并冻结，不得凭记忆指定 source id。
 
+Live evidence 以 UTF-8 no-BOM JSON 文件为机器真值；console 只需 ASCII-safe 摘要，不要求本地 code page 能显示中文原文。
+
 ---
 
 ## 18. Upstream Immutability
