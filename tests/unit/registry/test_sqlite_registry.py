@@ -56,6 +56,53 @@ def test_newer_registry_schema_is_rejected(tmp_path: Path) -> None:
     assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
 
 
+def test_version_one_missing_required_table_is_rejected(tmp_path: Path) -> None:
+    db = tmp_path / "incomplete-table.sqlite"
+    SQLiteRegistry(db)
+
+    conn = sqlite3.connect(db)
+    conn.execute("DROP TABLE document_sources")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
+        SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
+    assert "document_sources" in str(exc_info.value)
+
+
+def test_version_one_missing_required_column_is_rejected(tmp_path: Path) -> None:
+    db = tmp_path / "incomplete-column.sqlite"
+    SQLiteRegistry(db)
+
+    conn = sqlite3.connect(db)
+    conn.execute("ALTER TABLE document_sources RENAME TO document_sources_old")
+    conn.execute(
+        """
+        CREATE TABLE document_sources (
+            document_sha256 TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            source_url TEXT NOT NULL,
+            filing_date TEXT,
+            report_date TEXT,
+            provider_company_id TEXT,
+            acquired_at TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
+        SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
+    assert "source_title" in str(exc_info.value)
+
+
 def test_register_same_file_is_idempotent(tmp_path: Path) -> None:
     pdf = tmp_path / "a.pdf"
     _make_pdf(pdf, "same")

@@ -27,6 +27,69 @@ from financial_filing_data_foundation.registry.models import (
 
 REGISTRY_SCHEMA_VERSION = 1
 
+_REQUIRED_SCHEMA_V1_COLUMNS: dict[str, frozenset[str]] = {
+    "documents": frozenset(
+        {"document_sha256", "file_size", "page_count", "first_seen_at"}
+    ),
+    "document_locations": frozenset(
+        {"path", "document_sha256", "mtime_ns", "last_seen_at", "exists_flag"}
+    ),
+    "document_sources": frozenset(
+        {
+            "document_sha256",
+            "provider",
+            "source_id",
+            "source_url",
+            "source_title",
+            "filing_date",
+            "report_date",
+            "provider_company_id",
+            "acquired_at",
+            "created_at",
+        }
+    ),
+    "filing_bindings": frozenset(
+        {
+            "binding_id",
+            "document_sha256",
+            "market",
+            "company_id",
+            "filing_type",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "amended",
+            "binding_status",
+            "source_provider",
+            "source_id",
+            "source_url",
+            "source_title",
+            "filing_date",
+            "report_date",
+            "provider_company_id",
+            "acquired_at",
+            "created_at",
+        }
+    ),
+    "parsed_data": frozenset(
+        {
+            "parse_run_id",
+            "market",
+            "company_id",
+            "filing_type",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "document_sha256",
+            "parser_version",
+            "schema_version",
+            "validation_status",
+            "blocking_issue_count",
+            "compatibility_status",
+            "artifact_path",
+            "created_at",
+        }
+    ),
+}
+
 
 class RegistrySchemaUnsupported(RuntimeError):
     reason_code = "REGISTRY_SCHEMA_UNSUPPORTED"
@@ -77,11 +140,60 @@ class SQLiteRegistry:
             if version == 0:
                 self._create_schema(conn)
                 conn.execute(f"PRAGMA user_version = {REGISTRY_SCHEMA_VERSION}")
+                self._validate_schema_v1(conn)
                 conn.commit()
-            elif version != REGISTRY_SCHEMA_VERSION:
+            elif version == REGISTRY_SCHEMA_VERSION:
+                self._validate_schema_v1(conn)
+            else:
                 raise RegistrySchemaUnsupported(
                     f"unsupported registry schema version: {version}"
                 )
+
+    @staticmethod
+    def _validate_schema_v1(conn: sqlite3.Connection) -> None:
+        table_rows = conn.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+            """
+        ).fetchall()
+        present_tables = {str(row["name"]) for row in table_rows}
+
+        missing_tables = sorted(
+            set(_REQUIRED_SCHEMA_V1_COLUMNS) - present_tables
+        )
+        missing_columns: dict[str, list[str]] = {}
+
+        for table, required_columns in _REQUIRED_SCHEMA_V1_COLUMNS.items():
+            if table not in present_tables:
+                continue
+            columns = {
+                str(row["name"])
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
+            missing = sorted(required_columns - columns)
+            if missing:
+                missing_columns[table] = missing
+
+        if missing_tables or missing_columns:
+            details: list[str] = []
+            if missing_tables:
+                details.append(
+                    "missing tables: " + ", ".join(missing_tables)
+                )
+            if missing_columns:
+                details.append(
+                    "missing columns: "
+                    + "; ".join(
+                        f"{table}=[{', '.join(columns)}]"
+                        for table, columns in sorted(missing_columns.items())
+                    )
+                )
+            raise RegistrySchemaUnsupported(
+                "registry schema version 1 is structurally incomplete: "
+                + " | ".join(details)
+            )
 
     @staticmethod
     def _create_schema(conn: sqlite3.Connection) -> None:
