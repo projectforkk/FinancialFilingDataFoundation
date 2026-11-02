@@ -57,6 +57,19 @@ PASS only → merge main → verify src/tests equal frozen candidate → full re
 
 ## P3 Issue Log
 
+### P3-ISSUE-004 — 已发布 artifact reuse 缺少 completeness/corruption 校验
+
+Pre-Code-Review 可恢复性审查发现：`load_native_document()` 初版只验证 `document.json`，如果外部删除 `pages.jsonl` / `sections.jsonl` / `search.sqlite`，同 SHA 下一次 parse 会直接返回一个不可用 artifact。
+
+批准解决方案：
+1. load/reuse 必须验证四个核心 artifact 文件都存在；
+2. manifest schema/parser/source SHA 必须与目录/调用期望一致；
+3. search.sqlite `metadata(document_sha256,schema_version)` 必须与 manifest 匹配；
+4. 缺失/冲突统一抛 `ARTIFACT_INCOMPLETE_OR_CORRUPT`；
+5. 不自动删除或覆盖损坏 final artifact，以保留审计现场；
+6. 增加 missing-file / search-metadata mismatch tests；
+7. 重新执行 P3-B/E/F/G/H。
+
 ### P3-ISSUE-003 — page FTS implementation 未使用设计规定的 external-content contract
 
 Pre-Code-Review 对照 `design/10` 发现：设计要求 `page_content(page_no,text)` 作为 canonical page text table，并由 `page_fts` 使用 `content='page_content', content_rowid='page_no'`；初版实现却创建独立 `page_fts(page_no UNINDEXED,text)` 并重复保存正文。

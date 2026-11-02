@@ -68,6 +68,13 @@ artifact layout：
 
 写入必须 staging + atomic replace；不得半成品冒充成功 artifact。
 
+已存在 artifact 的 reuse 也必须先验证 completeness：
+- `document.json`
+- `pages.jsonl`
+- `sections.jsonl`
+- `search.sqlite`
+均必须存在；manifest 的 schema/parser/source SHA 必须匹配；`search.sqlite` metadata 中的 document SHA/schema 必须匹配 manifest。任何缺失/冲突 → `ARTIFACT_INCOMPLETE_OR_CORRUPT`，不得返回成功 artifact。
+
 ## 5. Page contract
 
 每页至少：
