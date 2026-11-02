@@ -250,6 +250,22 @@ Final verdict：
 
 ## 12. 问题处置
 
+### P1-ISSUE-005 — Shared worktree branch race contaminated review evidence
+
+Code Review 执行时发现，共享项目目录被并发进程切换到 `main`，导致一组 review 命令实际针对旧 main candidate 执行；该组结果立即作废。
+
+根因：Review 依赖共享工作树的当前 branch，而该 branch 可被其他会话/自动同步改变。
+
+批准解决方案：
+
+1. 创建独立 detached Git worktree；
+2. 固定到 P1 frozen candidate SHA；
+3. 所有 Code Review / Acceptance 命令只在该 worktree 执行；
+4. 每组关键命令前后记录 HEAD；
+5. HEAD 不匹配 frozen candidate 时结果无效；
+6. 共享主工作树不再作为 P1 review/acceptance evidence 来源；
+7. 该修订只改变执行隔离方式，不改变 production semantics，因此无需重跑 P1-B~G，但 P1-H 必须从头在隔离 worktree 重做。
+
 ### P1-ISSUE-004 — Pre-acceptance P1 commits entered main
 
 Code Review 前发现：

@@ -21,6 +21,16 @@
 - acceptance/01-acceptance-strategy.md
 - 本文件
 
+## Candidate Isolation
+
+Independent Acceptance 必须在独立 Git worktree 中执行，并固定到 acceptance freeze 指定的 candidate SHA。
+
+每组关键命令执行前后都必须验证：
+
+`git rev-parse HEAD == frozen_candidate_sha`
+
+若不一致，该组结果无效，必须停止并重新建立隔离 worktree；不得继续使用共享开发工作树的结果。
+
 ## 必验
 
 1. P0 regression tests PASS。
