@@ -30,6 +30,7 @@ class LocalDocumentStatus(StrEnum):
     NONE = "NONE"
     RESOLVED = "RESOLVED"
     AMBIGUOUS = "AMBIGUOUS"
+    DRIFTED = "DRIFTED"
     CONFLICT = "CONFLICT"
 
 
@@ -69,4 +70,5 @@ class LocalDocumentState:
     canonical_path: Path | None = None
     location_count: int = 0
     distinct_sha_count: int = 0
+    drifted_location_count: int = 0
     binding_statuses: tuple[BindingStatus, ...] = ()

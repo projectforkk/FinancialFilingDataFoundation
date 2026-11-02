@@ -522,6 +522,7 @@ class SQLiteRegistry:
             ).fetchall()
 
             live: list[tuple[str, BindingStatus, str]] = []
+            drifted: list[tuple[str, BindingStatus, str]] = []
             for row in rows:
                 if not row["path"] or not int(row["exists_flag"] or 0):
                     continue
@@ -536,22 +537,40 @@ class SQLiteRegistry:
                         (_utc_now(), str(path)),
                     )
                     continue
-                live.append(
-                    (
-                        row["document_sha256"],
-                        BindingStatus(row["binding_status"]),
-                        str(path),
-                    )
+
+                registered_sha = str(row["document_sha256"])
+                current_sha = _sha256_file(path)
+                item = (
+                    registered_sha,
+                    BindingStatus(row["binding_status"]),
+                    str(path),
                 )
+                if current_sha != registered_sha:
+                    drifted.append(item)
+                    continue
+                live.append(item)
             conn.commit()
 
         if not live:
+            if drifted:
+                statuses = tuple(
+                    sorted({item[1] for item in drifted}, key=lambda x: x.value)
+                )
+                return LocalDocumentState(
+                    status=LocalDocumentStatus.DRIFTED,
+                    slot=slot,
+                    location_count=0,
+                    distinct_sha_count=0,
+                    drifted_location_count=len({item[2] for item in drifted}),
+                    binding_statuses=statuses,
+                )
             return LocalDocumentState(
                 status=LocalDocumentStatus.NONE,
                 slot=slot,
             )
 
         statuses = tuple(sorted({item[1] for item in live}, key=lambda x: x.value))
+        drifted_count = len({item[2] for item in drifted})
         conflict_live = [item for item in live if item[1] == BindingStatus.CONFLICT]
         if conflict_live:
             return LocalDocumentState(
@@ -559,6 +578,7 @@ class SQLiteRegistry:
                 slot=slot,
                 location_count=len({item[2] for item in live}),
                 distinct_sha_count=len({item[0] for item in live}),
+                drifted_location_count=drifted_count,
                 binding_statuses=statuses,
             )
 
@@ -572,6 +592,7 @@ class SQLiteRegistry:
                 slot=slot,
                 location_count=len({item[2] for item in live}),
                 distinct_sha_count=len(by_sha),
+                drifted_location_count=drifted_count,
                 binding_statuses=statuses,
             )
 
@@ -584,6 +605,7 @@ class SQLiteRegistry:
             canonical_path=Path(paths[0]),
             location_count=len(paths),
             distinct_sha_count=1,
+            drifted_location_count=drifted_count,
             binding_statuses=statuses,
         )
 

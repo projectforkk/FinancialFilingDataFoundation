@@ -291,6 +291,52 @@ def test_multiple_reusable_runs_same_sha_select_lowest_parse_run_id(
     assert item.parse_run_id == "run-a"
 
 
+def test_verified_duplicate_copy_is_used_when_other_location_drifts(
+    tmp_path: Path,
+) -> None:
+    registry = SQLiteRegistry(tmp_path / "registry.sqlite")
+    first = tmp_path / "a.pdf"
+    second = tmp_path / "b.pdf"
+    replacement = tmp_path / "replacement.pdf"
+    _make_pdf(first, "same source")
+    second.write_bytes(first.read_bytes())
+    identity = FilingIdentity(_slot())
+    registered = registry.register_document(first, expected_identity=identity)
+    registry.register_document(second, expected_identity=identity)
+
+    _make_pdf(replacement, "changed in place")
+    first.write_bytes(replacement.read_bytes())
+
+    item = _only_item(_planner(registry))
+
+    assert item.action == PlannerAction.PARSE_LOCAL
+    assert item.reason_code == ReasonCode.LOCAL_RAW_AVAILABLE
+    assert item.document_sha256 == registered.document_sha256
+    assert item.local_path == second.resolve()
+
+
+def test_changed_bound_path_without_reregister_is_blocked(tmp_path: Path) -> None:
+    registry = SQLiteRegistry(tmp_path / "registry.sqlite")
+    pdf = tmp_path / "drift.pdf"
+    replacement = tmp_path / "replacement.pdf"
+    _make_pdf(pdf, "original")
+    registered = registry.register_document(
+        pdf, expected_identity=FilingIdentity(_slot())
+    )
+    registry.register_parsed_data(
+        _record(document_sha256=registered.document_sha256)
+    )
+
+    _make_pdf(replacement, "changed in place")
+    pdf.write_bytes(replacement.read_bytes())
+
+    item = _only_item(_planner(registry))
+
+    assert item.action == PlannerAction.BLOCKED
+    assert item.reason_code == ReasonCode.LOCAL_CONTENT_DRIFT
+    assert item.blocking_reasons == (ReasonCode.LOCAL_CONTENT_DRIFT,)
+
+
 def test_conflicting_binding_is_blocked(tmp_path: Path) -> None:
     registry = SQLiteRegistry(tmp_path / "registry.sqlite")
     pdf = tmp_path / "conflict.pdf"

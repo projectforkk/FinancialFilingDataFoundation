@@ -201,6 +201,48 @@ def test_same_sha_bound_to_different_slots_becomes_conflict(tmp_path: Path) -> N
     assert registry.resolve_local_document(_slot(2023)).status == LocalDocumentStatus.CONFLICT
 
 
+def test_changed_bound_path_without_reregister_is_drifted(tmp_path: Path) -> None:
+    pdf = tmp_path / "drift.pdf"
+    replacement = tmp_path / "replacement.pdf"
+    _make_pdf(pdf, "original")
+    registry = SQLiteRegistry(tmp_path / "registry.sqlite")
+    registry.register_document(pdf, expected_identity=FilingIdentity(_slot()))
+
+    _make_pdf(replacement, "changed in place")
+    pdf.write_bytes(replacement.read_bytes())
+
+    state = registry.resolve_local_document(_slot())
+
+    assert state.status == LocalDocumentStatus.DRIFTED
+    assert state.location_count == 0
+    assert state.drifted_location_count == 1
+
+
+def test_one_drifted_duplicate_does_not_hide_verified_same_sha_copy(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "a.pdf"
+    second = tmp_path / "b.pdf"
+    replacement = tmp_path / "replacement.pdf"
+    _make_pdf(first, "same source")
+    second.write_bytes(first.read_bytes())
+    registry = SQLiteRegistry(tmp_path / "registry.sqlite")
+    identity = FilingIdentity(_slot())
+    registered = registry.register_document(first, expected_identity=identity)
+    registry.register_document(second, expected_identity=identity)
+
+    _make_pdf(replacement, "different source")
+    first.write_bytes(replacement.read_bytes())
+
+    state = registry.resolve_local_document(_slot())
+
+    assert state.status == LocalDocumentStatus.RESOLVED
+    assert state.document_sha256 == registered.document_sha256
+    assert state.canonical_path == second.resolve()
+    assert state.location_count == 1
+    assert state.drifted_location_count == 1
+
+
 def test_missing_location_is_not_treated_as_live_local_candidate(tmp_path: Path) -> None:
     pdf = tmp_path / "gone.pdf"
     _make_pdf(pdf, "gone")
