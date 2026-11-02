@@ -56,6 +56,62 @@ def test_newer_registry_schema_is_rejected(tmp_path: Path) -> None:
     assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
 
 
+def test_version_zero_nonempty_registry_is_rejected(tmp_path: Path) -> None:
+    db = tmp_path / "legacy-zero.sqlite"
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE legacy_table(value TEXT)")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
+        SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
+    assert "version 0 is non-empty" in str(exc_info.value)
+
+
+def test_incomplete_version_one_missing_table_is_rejected(tmp_path: Path) -> None:
+    db = tmp_path / "incomplete-v1-table.sqlite"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """
+        CREATE TABLE documents(
+            document_sha256 TEXT PRIMARY KEY,
+            file_size INTEGER NOT NULL,
+            page_count INTEGER,
+            first_seen_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("PRAGMA user_version = 1")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
+        SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
+    assert "missing tables" in str(exc_info.value)
+    assert "document_sources" in str(exc_info.value)
+
+
+def test_incomplete_version_one_missing_column_is_rejected(tmp_path: Path) -> None:
+    db = tmp_path / "incomplete-v1-column.sqlite"
+    SQLiteRegistry(db)
+
+    conn = sqlite3.connect(db)
+    conn.execute("ALTER TABLE document_sources DROP COLUMN source_title")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
+        SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
+    assert "missing columns" in str(exc_info.value)
+    assert "document_sources.source_title" in str(exc_info.value)
+
+
 def test_register_same_file_is_idempotent(tmp_path: Path) -> None:
     pdf = tmp_path / "a.pdf"
     _make_pdf(pdf, "same")

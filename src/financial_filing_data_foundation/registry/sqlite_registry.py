@@ -27,6 +27,69 @@ from financial_filing_data_foundation.registry.models import (
 
 REGISTRY_SCHEMA_VERSION = 1
 
+_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    "documents": frozenset(
+        {"document_sha256", "file_size", "page_count", "first_seen_at"}
+    ),
+    "document_locations": frozenset(
+        {"path", "document_sha256", "mtime_ns", "last_seen_at", "exists_flag"}
+    ),
+    "document_sources": frozenset(
+        {
+            "document_sha256",
+            "provider",
+            "source_id",
+            "source_url",
+            "source_title",
+            "filing_date",
+            "report_date",
+            "provider_company_id",
+            "acquired_at",
+            "created_at",
+        }
+    ),
+    "filing_bindings": frozenset(
+        {
+            "binding_id",
+            "document_sha256",
+            "market",
+            "company_id",
+            "filing_type",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "amended",
+            "binding_status",
+            "source_provider",
+            "source_id",
+            "source_url",
+            "source_title",
+            "filing_date",
+            "report_date",
+            "provider_company_id",
+            "acquired_at",
+            "created_at",
+        }
+    ),
+    "parsed_data": frozenset(
+        {
+            "parse_run_id",
+            "market",
+            "company_id",
+            "filing_type",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "document_sha256",
+            "parser_version",
+            "schema_version",
+            "validation_status",
+            "blocking_issue_count",
+            "compatibility_status",
+            "artifact_path",
+            "created_at",
+        }
+    ),
+}
+
 
 class RegistrySchemaUnsupported(RuntimeError):
     reason_code = "REGISTRY_SCHEMA_UNSUPPORTED"
@@ -75,6 +138,20 @@ class SQLiteRegistry:
                     f"{REGISTRY_SCHEMA_VERSION}"
                 )
             if version == 0:
+                existing_user_tables = {
+                    str(row["name"])
+                    for row in conn.execute(
+                        """
+                        SELECT name FROM sqlite_master
+                        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+                        """
+                    ).fetchall()
+                }
+                if existing_user_tables:
+                    raise RegistrySchemaUnsupported(
+                        "registry schema version 0 is non-empty; user tables: "
+                        + ", ".join(sorted(existing_user_tables))
+                    )
                 self._create_schema(conn)
                 conn.execute(f"PRAGMA user_version = {REGISTRY_SCHEMA_VERSION}")
                 conn.commit()
@@ -82,6 +159,39 @@ class SQLiteRegistry:
                 raise RegistrySchemaUnsupported(
                     f"unsupported registry schema version: {version}"
                 )
+
+            self._validate_schema_v1(conn)
+
+    @staticmethod
+    def _validate_schema_v1(conn: sqlite3.Connection) -> None:
+        rows = conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            """
+        ).fetchall()
+        existing_tables = {str(row["name"]) for row in rows}
+        missing_tables = sorted(set(_REQUIRED_SCHEMA_COLUMNS) - existing_tables)
+        if missing_tables:
+            raise RegistrySchemaUnsupported(
+                "registry schema version 1 is incomplete; missing tables: "
+                + ", ".join(missing_tables)
+            )
+
+        missing_columns: list[str] = []
+        for table, required_columns in _REQUIRED_SCHEMA_COLUMNS.items():
+            columns = {
+                str(row["name"])
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
+            for column in sorted(required_columns - columns):
+                missing_columns.append(f"{table}.{column}")
+
+        if missing_columns:
+            raise RegistrySchemaUnsupported(
+                "registry schema version 1 is incomplete; missing columns: "
+                + ", ".join(missing_columns)
+            )
 
     @staticmethod
     def _create_schema(conn: sqlite3.Connection) -> None:
