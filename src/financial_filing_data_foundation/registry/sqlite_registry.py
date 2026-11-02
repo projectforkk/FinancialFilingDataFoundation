@@ -27,9 +27,72 @@ from financial_filing_data_foundation.registry.models import (
 
 REGISTRY_SCHEMA_VERSION = 1
 
+_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    "documents": frozenset(
+        {"document_sha256", "file_size", "page_count", "first_seen_at"}
+    ),
+    "document_locations": frozenset(
+        {"path", "document_sha256", "mtime_ns", "last_seen_at", "exists_flag"}
+    ),
+    "document_sources": frozenset(
+        {
+            "document_sha256",
+            "provider",
+            "source_id",
+            "source_url",
+            "source_title",
+            "filing_date",
+            "report_date",
+            "provider_company_id",
+            "acquired_at",
+            "created_at",
+        }
+    ),
+    "filing_bindings": frozenset(
+        {
+            "binding_id",
+            "document_sha256",
+            "market",
+            "company_id",
+            "filing_type",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "amended",
+            "binding_status",
+            "source_provider",
+            "source_id",
+            "source_url",
+            "source_title",
+            "filing_date",
+            "report_date",
+            "provider_company_id",
+            "acquired_at",
+            "created_at",
+        }
+    ),
+    "parsed_data": frozenset(
+        {
+            "parse_run_id",
+            "market",
+            "company_id",
+            "filing_type",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "document_sha256",
+            "parser_version",
+            "schema_version",
+            "validation_status",
+            "blocking_issue_count",
+            "compatibility_status",
+            "artifact_path",
+            "created_at",
+        }
+    ),
+}
+
 
 class RegistrySchemaUnsupported(RuntimeError):
-    pass
+    reason_code = "REGISTRY_SCHEMA_UNSUPPORTED"
 
 
 def _utc_now() -> str:
@@ -75,6 +138,20 @@ class SQLiteRegistry:
                     f"{REGISTRY_SCHEMA_VERSION}"
                 )
             if version == 0:
+                existing_user_tables = {
+                    str(row["name"])
+                    for row in conn.execute(
+                        """
+                        SELECT name FROM sqlite_master
+                        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+                        """
+                    ).fetchall()
+                }
+                if existing_user_tables:
+                    raise RegistrySchemaUnsupported(
+                        "registry schema version 0 is non-empty; user tables: "
+                        + ", ".join(sorted(existing_user_tables))
+                    )
                 self._create_schema(conn)
                 conn.execute(f"PRAGMA user_version = {REGISTRY_SCHEMA_VERSION}")
                 conn.commit()
@@ -82,6 +159,39 @@ class SQLiteRegistry:
                 raise RegistrySchemaUnsupported(
                     f"unsupported registry schema version: {version}"
                 )
+
+            self._validate_schema_v1(conn)
+
+    @staticmethod
+    def _validate_schema_v1(conn: sqlite3.Connection) -> None:
+        rows = conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            """
+        ).fetchall()
+        existing_tables = {str(row["name"]) for row in rows}
+        missing_tables = sorted(set(_REQUIRED_SCHEMA_COLUMNS) - existing_tables)
+        if missing_tables:
+            raise RegistrySchemaUnsupported(
+                "registry schema version 1 is incomplete; missing tables: "
+                + ", ".join(missing_tables)
+            )
+
+        missing_columns: list[str] = []
+        for table, required_columns in _REQUIRED_SCHEMA_COLUMNS.items():
+            columns = {
+                str(row["name"])
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
+            for column in sorted(required_columns - columns):
+                missing_columns.append(f"{table}.{column}")
+
+        if missing_columns:
+            raise RegistrySchemaUnsupported(
+                "registry schema version 1 is incomplete; missing columns: "
+                + ", ".join(missing_columns)
+            )
 
     @staticmethod
     def _create_schema(conn: sqlite3.Connection) -> None:
@@ -105,6 +215,24 @@ class SQLiteRegistry:
 
             CREATE INDEX IF NOT EXISTS idx_locations_sha
             ON document_locations(document_sha256);
+
+            CREATE TABLE IF NOT EXISTS document_sources (
+                document_sha256 TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                source_url TEXT NOT NULL,
+                source_title TEXT NOT NULL,
+                filing_date TEXT,
+                report_date TEXT,
+                provider_company_id TEXT,
+                acquired_at TEXT,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY(document_sha256, provider, source_id),
+                FOREIGN KEY(document_sha256) REFERENCES documents(document_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_document_sources_sha
+            ON document_sources(document_sha256);
 
             CREATE TABLE IF NOT EXISTS filing_bindings (
                 binding_id TEXT PRIMARY KEY,
@@ -231,6 +359,38 @@ class SQLiteRegistry:
                 """,
                 (str(file_path), sha_before, after.st_mtime_ns, now),
             )
+
+            if source is not None:
+                conn.execute(
+                    """
+                    INSERT INTO document_sources(
+                        document_sha256, provider, source_id, source_url,
+                        source_title, filing_date, report_date,
+                        provider_company_id, acquired_at, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(document_sha256, provider, source_id) DO UPDATE SET
+                        source_url = excluded.source_url,
+                        source_title = excluded.source_title,
+                        filing_date = COALESCE(excluded.filing_date, filing_date),
+                        report_date = COALESCE(excluded.report_date, report_date),
+                        provider_company_id = COALESCE(
+                            excluded.provider_company_id, provider_company_id
+                        ),
+                        acquired_at = COALESCE(excluded.acquired_at, acquired_at)
+                    """,
+                    (
+                        sha_before,
+                        source.provider,
+                        source.source_id,
+                        source.source_url,
+                        source.source_title,
+                        source.filing_date,
+                        source.report_date,
+                        source.provider_company_id,
+                        source.acquired_at,
+                        now,
+                    ),
+                )
 
             if expected_identity is not None:
                 different_slots = conn.execute(
@@ -472,6 +632,7 @@ class SQLiteRegistry:
             ).fetchall()
 
             live: list[tuple[str, BindingStatus, str]] = []
+            drifted: list[tuple[str, BindingStatus, str]] = []
             for row in rows:
                 if not row["path"] or not int(row["exists_flag"] or 0):
                     continue
@@ -486,22 +647,40 @@ class SQLiteRegistry:
                         (_utc_now(), str(path)),
                     )
                     continue
-                live.append(
-                    (
-                        row["document_sha256"],
-                        BindingStatus(row["binding_status"]),
-                        str(path),
-                    )
+
+                registered_sha = str(row["document_sha256"])
+                current_sha = _sha256_file(path)
+                item = (
+                    registered_sha,
+                    BindingStatus(row["binding_status"]),
+                    str(path),
                 )
+                if current_sha != registered_sha:
+                    drifted.append(item)
+                    continue
+                live.append(item)
             conn.commit()
 
         if not live:
+            if drifted:
+                statuses = tuple(
+                    sorted({item[1] for item in drifted}, key=lambda x: x.value)
+                )
+                return LocalDocumentState(
+                    status=LocalDocumentStatus.DRIFTED,
+                    slot=slot,
+                    location_count=0,
+                    distinct_sha_count=0,
+                    drifted_location_count=len({item[2] for item in drifted}),
+                    binding_statuses=statuses,
+                )
             return LocalDocumentState(
                 status=LocalDocumentStatus.NONE,
                 slot=slot,
             )
 
         statuses = tuple(sorted({item[1] for item in live}, key=lambda x: x.value))
+        drifted_count = len({item[2] for item in drifted})
         conflict_live = [item for item in live if item[1] == BindingStatus.CONFLICT]
         if conflict_live:
             return LocalDocumentState(
@@ -509,6 +688,7 @@ class SQLiteRegistry:
                 slot=slot,
                 location_count=len({item[2] for item in live}),
                 distinct_sha_count=len({item[0] for item in live}),
+                drifted_location_count=drifted_count,
                 binding_statuses=statuses,
             )
 
@@ -522,6 +702,7 @@ class SQLiteRegistry:
                 slot=slot,
                 location_count=len({item[2] for item in live}),
                 distinct_sha_count=len(by_sha),
+                drifted_location_count=drifted_count,
                 binding_statuses=statuses,
             )
 
@@ -534,6 +715,7 @@ class SQLiteRegistry:
             canonical_path=Path(paths[0]),
             location_count=len(paths),
             distinct_sha_count=1,
+            drifted_location_count=drifted_count,
             binding_statuses=statuses,
         )
 
@@ -552,6 +734,40 @@ class SQLiteRegistry:
             return int(
                 conn.execute("SELECT COUNT(*) FROM filing_bindings").fetchone()[0]
             )
+
+    def count_sources(self) -> int:
+        with self._connect() as conn:
+            return int(
+                conn.execute("SELECT COUNT(*) FROM document_sources").fetchone()[0]
+            )
+
+    def list_document_sources(
+        self, document_sha256: str
+    ) -> tuple[SourceMetadata, ...]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT provider, source_id, source_url, source_title,
+                       filing_date, report_date, provider_company_id, acquired_at
+                FROM document_sources
+                WHERE document_sha256 = ?
+                ORDER BY provider ASC, source_id ASC
+                """,
+                (document_sha256,),
+            ).fetchall()
+        return tuple(
+            SourceMetadata(
+                provider=row["provider"],
+                source_id=row["source_id"],
+                source_url=row["source_url"],
+                source_title=row["source_title"],
+                filing_date=row["filing_date"],
+                report_date=row["report_date"],
+                provider_company_id=row["provider_company_id"],
+                acquired_at=row["acquired_at"],
+            )
+            for row in rows
+        )
 
     def location_sha(self, path: str | Path) -> str | None:
         resolved = str(Path(path).expanduser().resolve())

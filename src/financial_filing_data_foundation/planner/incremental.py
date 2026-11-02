@@ -86,6 +86,15 @@ class IncrementalPlanner:
         local = self.registry.resolve_local_document(slot)
         parsed = self.registry.list_parsed_data(slot)
 
+        if local.status == LocalDocumentStatus.DRIFTED:
+            return PlannerItem(
+                slot=slot,
+                ticker=company.ticker,
+                action=PlannerAction.BLOCKED,
+                reason_code=ReasonCode.LOCAL_CONTENT_DRIFT,
+                blocking_reasons=(ReasonCode.LOCAL_CONTENT_DRIFT,),
+            )
+
         if local.status == LocalDocumentStatus.CONFLICT:
             return PlannerItem(
                 slot=slot,
