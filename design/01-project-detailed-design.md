@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — READY FOR P0 FEASIBILITY PROBE**
+状态：**DESIGN BASELINE — P1 DONE / P2 DESIGN READY**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -253,6 +253,8 @@ class AcquisitionProvider(Protocol):
 - US：后续 SEC Provider。
 
 Dayu CN/HK 当前高层 `fins download` 会在 PDF 下载后继续 Docling conversion，因此本项目不得把该高层 workflow 当作“纯下载”接口；应通过窄 adapter 复用 discovery/downloader 能力，输出 PDF + provenance 后结束。
+
+P2 已确认 Dayu 正式 package dependency / initializer import graph 会扩大运行时依赖面，因此 FFDF main runtime 不直接安装/import Dayu；采用独立 Dayu acquisition runtime + subprocess JSON boundary。详细见 `design/08-p2-acquisition-provider-design.md`。
 
 ### 5.5 Native PDF Parser
 
@@ -918,10 +920,14 @@ Code Review / Independent Acceptance 的证据必须绑定到固定 candidate SH
 
 ## 22. 当前批准结论
 
-P0 已完成 Independent Acceptance 并收口为 `P0_DONE`。
+P0 已完成并收口为 `P0_DONE`。
+
+P1 已完成 Independent Acceptance 并收口为 `P1_DONE`。
 
 当前批准进入：
 
-**P1 — Identity / Registry / Incremental Planner**
+**P2 — Acquisition Provider**
 
-P1 仅实现 identity、registry 与 deterministic planner；P1 未 PASS 前不批准实现 P2 Dayu Acquisition Provider、完整 table parser、MCP 或 Skill。
+P2 只实现 CN/HK 官方 raw-document acquisition、Dayu narrow runner、raw store、receipt 与 P1 Registry integration；P2 未 PASS 前不批准实现 P3 parser、完整 table parser、MCP 或 Skill。
+
+US SEC provider 仍属于 P11，不得提前进入 P2。

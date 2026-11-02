@@ -168,6 +168,43 @@ P2 实施时必须从 Git 获取 Dayu 上游源码，并固定到已批准 commi
 - FFDF 随后显式更新 pin 到经过 review/acceptance 的新 commit；
 - 禁止在本机 dependency checkout 中直接手改而不留下 Git 可追踪版本。
 
+### 7.2 Dayu Runtime 隔离
+
+已核对 pinned Dayu `pyproject.toml`：正式 package dependencies 包含 Docling / Docling Core 等重依赖。
+
+同时已核对 Python package initializer：
+
+- `dayu.fins.__init__` 会导入 `tools`；
+- `dayu.fins.downloaders.__init__` 会同时导入 CN / HK / SEC downloader；
+- `dayu.fins.pipelines.__init__` 会导入 CN / SEC pipeline。
+
+因此不能把“只 import `cninfo_downloader.py` / `hkexnews_downloader.py`”等同于一个可靠的轻量依赖环境，也不得通过修改 upstream `__init__.py` 或自定义 source-loader 绕过正常 package 语义。
+
+P2 正式采用：
+
+```text
+FFDF main runtime
+  NO Dayu / NO Docling
+      |
+      | subprocess JSON protocol
+      v
+Dedicated Dayu acquisition runtime
+  pinned upstream package
+  CNINFO / HKEX narrow runner
+      |
+      v
+raw PDF only
+```
+
+Dayu acquisition runtime 中 Docling package **可能因 upstream dependency 存在或被 import graph 加载**，但 P2 runner 禁止调用 Docling conversion / high-level workflow，且不得产生 Docling JSON artifact。
+
+FFDF main runtime 必须继续保持 Dayu / Docling absent。
+
+详细 contract 见：
+
+- `design/08-p2-acquisition-provider-design.md`
+- `design/09-p2-implementation-plan.md`
+
 ## 8. Download 去重
 
 下载后必须：

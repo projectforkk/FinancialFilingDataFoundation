@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：P1 DONE / P2 DESIGN AUTHORIZED
+状态：P1 DONE / P2 DESIGN READY
 
 ## 总原则
 

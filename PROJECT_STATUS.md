@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P1_DONE**
+**P2_DESIGN_READY**
 
 ## Approved phase
 
@@ -16,9 +16,11 @@ P1 completed branch：
 
 `task/p1-identity-registry-planner`
 
-P2 development branch：
+P2 planned development branch：
 
-`NOT_CREATED`
+`task/p2-acquisition-provider`
+
+该分支必须从本次 P2 design baseline commit 创建；设计提交完成前不创建。
 
 当前 P1 独立验收执行指令：
 
@@ -82,18 +84,30 @@ P0 独立验收结果：
 - `design/05-p0-implementation-plan.md`
 - `design/06-p1-identity-registry-planner-design.md`
 - `design/07-p1-implementation-plan.md`
+- `design/08-p2-acquisition-provider-design.md`
+- `design/09-p2-implementation-plan.md`
 - `development/01-development-roadmap.md`
 - `development/02-p0-development-instruction.md`
 - `development/07-p1-development-instruction.md`
+- `development/14-p2-development-instruction.md`
 - `acceptance/01-acceptance-strategy.md`
 - `acceptance/02-p0-acceptance-instruction.md`
 - `acceptance/06-p1-acceptance-instruction.md`
+- `acceptance/09-p2-acceptance-instruction.md`
 
-P0 已完成并合入 main：
+P0 closeout：
 
 `edff06b2b1138b50d742e92ce8b8df628c6d2c61`
 
-本次 P1 设计提交完成后，以该 main head 作为 `task/p1-identity-registry-planner` 分支起点。
+P1 accepted baseline：
+
+`1cb6e88be318c0a1424d74ee601c336075361cd6`
+
+P1 closeout/status main HEAD：
+
+`6d7fda466fb83997da88d6d3586a8ed877f31810`
+
+本次 P2 design baseline 提交完成后，以该 main HEAD 创建 `task/p2-acquisition-provider`。
 
 ## Current scope
 
@@ -113,7 +127,11 @@ Dayu 参考基线：
 
 已核对：
 - CN/HK 高层 `fins download` 会在 PDF acquisition 后继续 Docling conversion；
-- FFDF 若复用 Dayu，应复用 acquisition/downloader 的窄能力，不以 Docling 为默认 parser。
+- FFDF 若复用 Dayu，应复用 acquisition/downloader 的窄能力，不以 Docling 为默认 parser；
+- Dayu 正式 package dependencies 包含 Docling / Docling Core；
+- `dayu.fins` / `dayu.fins.downloaders` / `dayu.fins.pipelines` initializer 会扩大 import surface；
+- P2 因此采用 pinned read-only checkout + dedicated Dayu acquisition runtime + subprocess JSON boundary；
+- FFDF main runtime 继续保持 Dayu / Docling absent。
 
 ## Representative performance evidence
 
@@ -125,16 +143,13 @@ Dayu 参考基线：
 
 因此 P0 首先验证：目标 PC 上轻量 native PDF path 的真实性能与可读取性。
 
-## P0 exit condition
+## Phase status
 
-P0 Independent Acceptance 已于当前候选完成并得到 `PASS`。
+- P0 Native PDF Parsing Feasibility Probe: `DONE / PASS`
+- P1 Identity / Registry / Incremental Planner: `DONE / PASS`
+- P2 Acquisition Provider: `DESIGN_READY / DEVELOPMENT_NOT_STARTED`
+- P3+：未开始
 
-P0 已收口为 `DONE`；现在允许进入 P1 Identity / Registry / Incremental Planner，但 **P1 尚未开始**。
+P2 当前只批准 CN/HK official raw-document acquisition；US SEC 仍属于 P11。
 
-P0 阶段未实现：
-- 完整 table reconstruction；
-- MCP；
-- Skill；
-- OCR；
-- Docling parser path；
-- external AI API。
+P2 未通过 Independent Acceptance 前，不允许开始 P3 implementation。
