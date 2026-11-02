@@ -882,6 +882,22 @@ deterministic gate、accounting consistency、document completeness。
 - 若解决方案会改变外部依赖版本、运行时、数据契约或验收标准，必须重新执行相应 Gate；
 - 若确认问题只影响文档/治理且不影响 production candidate，也必须形成新的设计 baseline，并在验收冻结中明确记录该结论。
 
+### 21.1 Accepted baseline 与 main HEAD
+
+正常规则：阶段 implementation 通过 Independent Acceptance 后才进入 `main`。
+
+`main HEAD` 与“当前已验收 baseline”必须在 `PROJECT_STATUS.md` 中分别可识别；正常情况下二者一致。
+
+若发生误将未验收阶段提交推入 `main` 的治理异常：
+
+1. 禁止通过 `reset --hard`、force push 或历史重写隐藏问题；
+2. 立即停止后续 Gate，并记录 incident、涉及 commit、根因和影响范围；
+3. `PROJECT_STATUS.md` 必须显式固定 `accepted_baseline_sha`，此时不得把 `main HEAD` 当作 accepted baseline；
+4. 正式开发/验收仍以阶段 task branch 的冻结 candidate 为准；
+5. 若该阶段最终 PASS，closeout 将新的 accepted baseline 更新到验收通过后的 phase closeout commit；若 phase commits 已经是 main 的祖先，则无需为了形式再制造重复 merge；
+6. 若该阶段 FAIL / ABORT，必须通过可追踪的 revert commit 撤销未验收 implementation，不得改写历史；
+7. 后续阶段恢复“acceptance PASS 后再进入 main”的正常规则。
+
 ---
 
 ## 22. 当前批准结论
