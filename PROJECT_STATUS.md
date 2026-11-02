@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P1_READY_FOR_ACCEPTANCE**
+**P1_IN_ACCEPTANCE**
 
 ## Approved phase
 
@@ -16,9 +16,15 @@
 
 `task/p1-identity-registry-planner`
 
-当前 P1 独立验收设计基线：
+当前 P1 独立验收执行指令：
 
-`acceptance/06-p1-acceptance-instruction.md`
+`acceptance/07-p1-acceptance-run-instruction.md`
+
+Frozen acceptance candidate：
+
+`3b382f4091a96a2dff40144253da42bf8de1fcc2`
+
+该 candidate 已冻结；后续 branch HEAD 的状态/验收证据提交不改变验收输入。
 
 P1 Code Review：
 
