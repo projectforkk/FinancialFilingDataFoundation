@@ -6,11 +6,11 @@
 
 ## Current state
 
-**P2_IN_ACCEPTANCE**
+**P2_DONE**
 
 ## Approved phase
 
-**P2 — Acquisition Provider（IN INDEPENDENT ACCEPTANCE）**
+**P3 — Native Page / Section Extraction（DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED）**
 
 P1 completed branch：
 
@@ -36,10 +36,13 @@ P2 Code Review：
 
 P2 Independent Acceptance：
 
+- verdict: `PASS`
 - instruction: `acceptance/10-p2-acceptance-run-instruction.md`
+- evidence: `acceptance/11-p2-acceptance-result.md`
 - frozen candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
-- status: `IN_PROGRESS`
-- accepted baseline remains P1 until P2 verdict PASS
+- deterministic suite: `87 passed`
+- live CN/HK: `PASS`
+- blocker: `NONE`
 
 当前 P1 独立验收执行指令：
 
@@ -73,13 +76,13 @@ P1 Independent Acceptance：
 
 当前已验收 baseline：
 
-- phase: `P1_DONE`
-- accepted candidate: `3b382f4091a96a2dff40144253da42bf8de1fcc2`
+- phase: `P2_DONE`
+- accepted candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/08-p1-acceptance-result.md`
-- accepted merge commit: `1cb6e88be318c0a1424d74ee601c336075361cd6`
-- accepted_baseline_sha: `1cb6e88be318c0a1424d74ee601c336075361cd6`
-- closeout main verification: `54 passed`
+- acceptance evidence: `acceptance/11-p2-acceptance-result.md`
+- accepted merge commit: `4add9fff36b61e2521e9c8d749cee829adb4ab6f`
+- accepted_baseline_sha: `4add9fff36b61e2521e9c8d749cee829adb4ab6f`
+- closeout main verification: `87 passed`
 
 治理异常 `P1-ISSUE-004` 已在 P1-K 以非破坏方式收口：未改写历史；最终 `main` 的 `src/tests` 与 frozen acceptance candidate 零差异，并通过 54 项 closeout 回归。P1 现已成为新的 accepted baseline。
 
@@ -166,9 +169,10 @@ Dayu 参考基线：
 
 - P0 Native PDF Parsing Feasibility Probe: `DONE / PASS`
 - P1 Identity / Registry / Incremental Planner: `DONE / PASS`
-- P2 Acquisition Provider: `DESIGN_READY / DEVELOPMENT_NOT_STARTED`
-- P3+：未开始
+- P2 Acquisition Provider: `DONE / PASS`
+- P3 Native Page / Section Extraction: `DESIGN_AUTHORIZED / DEVELOPMENT_NOT_STARTED`
+- P4+：未开始
 
-P2 当前只批准 CN/HK official raw-document acquisition；US SEC 仍属于 P11。
+P2 已通过 Independent Acceptance；CN/HK official raw-document acquisition 已成为 accepted baseline。US SEC 仍属于 P11。
 
-P2 未通过 Independent Acceptance 前，不允许开始 P3 implementation。
+现在允许进入 P3 详细设计；P3 设计提交完成前不开始 production implementation。
