@@ -6,21 +6,40 @@
 
 ## Current state
 
-**P2_DESIGN_READY**
+**P2_IN_ACCEPTANCE**
 
 ## Approved phase
 
-**P2 — Acquisition Provider（DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED）**
+**P2 — Acquisition Provider（IN INDEPENDENT ACCEPTANCE）**
 
 P1 completed branch：
 
 `task/p1-identity-registry-planner`
 
-P2 planned development branch：
+P2 development branch：
 
 `task/p2-acquisition-provider`
 
-该分支必须从本次 P2 design baseline commit 创建；设计提交完成前不创建。
+Branch start design baseline：
+
+`e53eca8c384f93382945cd2fc529e194a400d066`
+
+P2 Code Review：
+
+- verdict: `PASS`
+- evidence: `development/21-p2-code-review.md`
+- reviewed candidate: `881c80be1938a128448ea3ed0b4e2cb962f46018`
+- deterministic suite: `87 passed`
+- live CN/HK: `PASS`
+- Dayu pin: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
+- blocker: `NONE`
+
+P2 Independent Acceptance：
+
+- instruction: `acceptance/10-p2-acceptance-run-instruction.md`
+- frozen candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
+- status: `IN_PROGRESS`
+- accepted baseline remains P1 until P2 verdict PASS
 
 当前 P1 独立验收执行指令：
 

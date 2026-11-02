@@ -547,6 +547,30 @@ Verdict：
 
 ## 20. P2 Issue Log
 
+### P2-ISSUE-007 — duplicate source identity 的 candidate metadata 冲突不得 last-wins
+
+Pre-Code-Review 自检发现：exact-candidate 去重当前以 `(source_id, source_url)` dict last-wins 实现；若同一 source identity 出现冲突 metadata，会隐式选择最后一条。
+
+批准解决方案：
+
+1. 同 source identity 重复记录先做关键 metadata 等价性比较；
+2. 完全一致才 dedup；
+3. 任一关键 metadata 冲突 → `REVIEW_REQUIRED / ACQUISITION_CANDIDATE_METADATA_CONFLICT`；
+4. 增加 order-independent duplicate/conflict tests。
+
+### P2-ISSUE-006 — receipt 缺少 download request_id / runner_version
+
+Pre-Code-Review 对照 `design/08` receipt contract 发现，当前 receipt 已包含 Dayu runtime/SHA/provenance，但未写实际 download runner `request_id` 与 `runner_version`。
+
+批准解决方案：
+
+1. runner 定义稳定 `RUNNER_VERSION`；
+2. download response 返回 `request_id` 与 `runner_version`；
+3. `RunnerDownloadedAsset` 保留两字段；
+4. service receipt 写入两字段；
+5. mocked/live evidence 与 acceptance 验证这两字段；
+6. 不改变 receipt_id 公式。
+
 ### P2-ISSUE-005 — Windows console encoding 不得影响 live evidence
 
 P2-L 首次 CN live discovery 已进入 provider，但测试 harness 直接 `print()` 含中文公司名的 dataclass，Windows 控制台 CP932 无法编码字符，导致证据脚本中断。

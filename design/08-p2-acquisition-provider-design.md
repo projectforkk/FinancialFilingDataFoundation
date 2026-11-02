@@ -440,6 +440,12 @@ FFDF 仍必须二次校验：
 - 1 个 → 可下载
 - >1 个 distinct source → `REVIEW_REQUIRED / ACQUISITION_CANDIDATE_AMBIGUOUS`
 
+若 provider 对同一 `(provider, source_id, source_url)` 返回重复记录：
+
+- 关键元数据完全一致 → 可折叠为同一 candidate；
+- `fiscal_year / fiscal_period / amended / filing_date / title / language / content_length / etag / last_modified / provider_company_id` 任一冲突 → `REVIEW_REQUIRED / ACQUISITION_CANDIDATE_METADATA_CONFLICT`；
+- 禁止用列表顺序做 last-wins/first-wins。
+
 不得按列表第一条猜。
 
 ---
@@ -605,6 +611,7 @@ DISCOVERY_FAILED
 COMPANY_NOT_FOUND
 NO_CANDIDATE
 ACQUISITION_CANDIDATE_AMBIGUOUS
+ACQUISITION_CANDIDATE_METADATA_CONFLICT
 SOURCE_HOST_NOT_ALLOWED
 DOWNLOAD_FAILED
 STAGING_WRITE_FAILED
@@ -753,6 +760,7 @@ SHA256(
 - Dayu package version
 - Dayu runtime Python
 - runner version
+- request_id（使用实际 download runner request_id）
 - Dayu-reported SHA
 - FFDF-recomputed SHA
 - final file size

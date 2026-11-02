@@ -141,6 +141,7 @@ BLOCKED 或 FAIL，按 freeze 定义，不得自动修复。
 - source host allowlist；
 - 0 candidate → NOT_FOUND；
 - >1 exact candidate → REVIEW_REQUIRED；
+- duplicate same-source metadata conflict → REVIEW_REQUIRED / ACQUISITION_CANDIDATE_METADATA_CONFLICT；
 - 不猜 candidate。
 
 ---
