@@ -29,7 +29,7 @@
 - phase: `P0_DONE`
 - accepted_baseline_sha: `edff06b2b1138b50d742e92ce8b8df628c6d2c61`
 
-治理异常 `P1-ISSUE-003`：`main` 已提前包含部分尚未完成 Independent Acceptance 的 P1 commits；在 P1 PASS 前，**不得把 main HEAD 视为 accepted baseline**。正式 P1 candidate 仍以 `task/p1-identity-registry-planner` 的 acceptance freeze 为准。
+治理异常 `P1-ISSUE-004`：`main` 已提前包含部分尚未完成 Independent Acceptance 的 P1 commits；在 P1 PASS 前，**不得把 main HEAD 视为 accepted baseline**。正式 P1 candidate 仍以 `task/p1-identity-registry-planner` 的 acceptance freeze 为准。
 
 P0 acceptance freeze/result 已保留为历史证据，不再作为当前 P1 验收入口。
 
