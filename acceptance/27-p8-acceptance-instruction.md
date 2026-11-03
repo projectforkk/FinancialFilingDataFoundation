@@ -10,8 +10,8 @@ Mandatory:
 2. P0–P7 regression PASS
 3. prior accepted source/tests zero unintended diff
 4. main venv仍无 mcp package
-5. dedicated runtime exact mcp==2.3.0
-6. dedicated runtime lock reproducible
+5. dedicated runtime = Python 3.12.14 AMD64 + exact mcp==2.3.0
+6. dedicated runtime lock `mcp-2.3.0-py312-win-amd64.lock.txt` reproducible
 7. official SDK stdio server starts
 8. protocol negotiation succeeds
 9. exact 11 tool names

@@ -16,7 +16,7 @@
 ## P8-B — Environment / SDK Audit
 - main venv MCP absent
 - exact `mcp==2.3.0`
-- base Python 3.14.9 ARM64
+- base Python 3.12.14 AMD64 (approved by P8-ISSUE-001)
 - create dedicated project-local runtime
 - install mcp + PyMuPDF exact
 - freeze tracked runtime lock
