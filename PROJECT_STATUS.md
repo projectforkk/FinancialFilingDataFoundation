@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P4_READY_FOR_ACCEPTANCE**
+**P4_IN_ACCEPTANCE**
 
 ## Accepted baseline
 
@@ -78,6 +78,13 @@ P4 Code Review:
 - full suite: `133 passed`
 - live CN/HK: `PASS`
 - blocker: `NONE`
+
+P4 Independent Acceptance:
+
+- instruction: `acceptance/16-p4-acceptance-run-instruction.md`
+- frozen candidate: `647d6179bdde9e370185fea1d389f0087370faae`
+- status: `IN_PROGRESS`
+- accepted baseline remains P3 until PASS
 
 ## Current runtime boundaries
 
