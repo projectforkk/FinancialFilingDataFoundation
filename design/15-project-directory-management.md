@@ -106,6 +106,7 @@ P0–P5 已完成阶段：
 - Git commit/history 是正式真源；
 - ignored workspace/live evidence 若仅存在本地，迁移到 `workspace\archive\<phase-or-worktree>`；
 - clean、无独有本地 evidence 的 historical worktree 可安全退役；
+- **dirty historical worktree 不得删除、reset、clean 或自动提交；允许使用 `git worktree move` 原样迁移到 `worktrees\archive\dirty\<name>`，前提是先记录 dirty file list，移动后再次验证 dirty status 完全一致**；
 - 不使用 `git reset --hard` / `git clean`；
 - worktree 退役前必须检查 tracked status 和 ignored evidence。
 
@@ -211,7 +212,7 @@ FFDF design 只记录 executable path，不复制这些系统工具。
 任何 dirty worktree：
 `BLOCKED_DIRECTORY_MIGRATION_DIRTY_WORKTREE`
 
-不得自动覆盖。
+含义：禁止删除/清理/覆盖/自动提交。若是历史 worktree 且仅执行 Git-aware relocation，可在记录 dirty manifest 后原样移动到 `worktrees\\archive\\dirty`；移动前后 status 必须一致，否则立即停止。
 
 ## 14. Git-aware Move
 
@@ -243,7 +244,31 @@ Linked worktree 优先：
 11. no source/history loss
 12. PROJECT_STATUS records migration result
 
-## 16. P6–P11 Rule
+## 16. Directory Migration Issue Log
+
+### DIR-ISSUE-001 — Historical P1 worktrees remain dirty
+
+Migration audit found four historical P1 worktrees with tracked/untracked local changes:
+
+- P1FinalReview2
+- P1Freeze
+- P1Review
+- P1SchemaReview
+
+These are historical local states, not accepted Git truth. Approved handling:
+
+1. do not commit them into current main;
+2. do not reset/clean/delete them;
+3. record pre-move `git status --porcelain`;
+4. relocate intact with `git worktree move` to `worktrees/archive/dirty/`;
+5. verify post-move status byte-for-byte equivalent;
+6. keep them until user explicitly authorizes retirement.
+
+Clean historical worktrees can move to `worktrees/archive/clean/`.
+
+---
+
+## 17. P6–P11 Rule
 
 从 P6 起：
 - development/review/acceptance worktree/checkout path 必须位于 project root
