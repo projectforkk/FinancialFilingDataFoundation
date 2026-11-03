@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P4 DONE / P5 DESIGN READY**
+状态：**P5 DONE / P6 DESIGN AUTHORIZED**
 
 ## 总原则
 
@@ -75,14 +75,14 @@ US SEC 不在 P2，保留给 P11。
 
 ## P5 — Table Reconstruction / Cross-page
 
-状态：`NOT STARTED`
+状态：`DONE / PASS`
 
 目标：
 从 P4 candidates 重建 rows/columns/cells，并处理跨页表格连续性。
 
 ## P6 — Raw Facts / Evidence
 
-状态：`NOT STARTED`
+状态：`DESIGN AUTHORIZED`
 
 目标：
 从 reconstructed tables 生成 raw facts 与 first-class evidence links。

@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P1 DONE / P2 DESIGN READY**
+状态：**DESIGN BASELINE — P5 DONE / P6 DESIGN AUTHORIZED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -945,12 +945,14 @@ P3 已完成 Independent Acceptance 并收口为 `P3_DONE`。
 
 P4 已完成 Independent Acceptance 并收口为 `P4_DONE`。
 
+P5 已完成 Independent Acceptance 并收口为 `P5_DONE`。
+
 当前批准进入：
 
-**P5 — Table Reconstruction / Cross-page**
+**P6 — Raw Facts / Evidence**
 
-P5 只从已验收 P4 candidates 与 P3 geometry 重建 deterministic table rows/columns/cells，并处理明确可验证的跨页连续性；不得提前生成 P6 raw facts/evidence，也不得使用 OCR、Docling 或 external AI。
+P6 只从已验收 P5 reconstructed tables 生成 raw financial facts 与 first-class evidence links；不得提前实现 P7 quality/validation policy、canonical metric mapping、analysis 或 remote AI。
 
-P5 未 PASS 前不批准实现 P6 Raw Facts / Evidence。
+P6 未 PASS 前不批准实现 P7 Quality Gate / Validation。
 
-US SEC provider 仍属于 P11，不得提前进入 P5。
+US SEC provider 仍属于 P11，不得提前进入 P6。

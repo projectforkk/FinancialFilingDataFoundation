@@ -6,18 +6,18 @@
 
 ## Current state
 
-**P4_DONE / P5_DESIGN_READY**
+**P5_DONE / P6_DESIGN_AUTHORIZED**
 
 ## Accepted baseline
 
-- phase: `P4_DONE`
-- frozen acceptance candidate: `647d6179bdde9e370185fea1d389f0087370faae`
-- reviewed production candidate: `ea78b2f9adbf0ad6564146ba166da85d1085bf81`
+- phase: `P5_DONE`
+- frozen acceptance candidate: `44ddd73d736f1da64bab38641091a8c6d55c9990`
+- reviewed production candidate: `2c4bafd36b59defd4ff47eeb16713cbee64e739e`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/17-p4-acceptance-result.md`
-- accepted merge commit: `97f2de24861347c97bf875e7b72899eb11ab56c2`
-- accepted_baseline_sha: `97f2de24861347c97bf875e7b72899eb11ab56c2`
-- full regression: `133 passed`
+- acceptance evidence: `acceptance/20-p5-acceptance-result.md`
+- accepted merge commit: `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
+- accepted_baseline_sha: `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
+- full regression: `156 passed`
 
 ## Phase history
 
@@ -66,37 +66,38 @@
 - live CN / HK: `PASS`
 - accepted merge: `97f2de24861347c97bf875e7b72899eb11ab56c2`
 
+### P5 — Table Reconstruction / Cross-page
+
+- status: `DONE / PASS`
+- acceptance evidence: `acceptance/20-p5-acceptance-result.md`
+- frozen candidate: `44ddd73d736f1da64bab38641091a8c6d55c9990`
+- reviewed production candidate: `2c4bafd36b59defd4ff47eeb16713cbee64e739e`
+- full suite: `156 passed`
+- live CN / HK: `PASS`
+- accepted merge: `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
+
 ## Approved next phase
 
-**P5 — Table Reconstruction / Cross-page**
+**P6 — Raw Facts / Evidence**
 
 Status:
 
-`CODE REVIEW PASS / READY FOR ACCEPTANCE`
+`DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED`
 
 Planned branch:
 
-`task/p5-table-reconstruction`
+`task/p6-raw-facts-evidence`
 
-P4 Independent Acceptance:
-
-- verdict: `PASS`
-- evidence: `acceptance/17-p4-acceptance-result.md`
-- frozen candidate: `647d6179bdde9e370185fea1d389f0087370faae`
-- full suite: `133 passed`
-- live CN/HK: `PASS`
-- blocker: `NONE`
-
-P5 Code Review:
+P5 Independent Acceptance:
 
 - verdict: `PASS`
-- evidence: `development/33-p5-code-review.md`
-- reviewed candidate: `2c4bafd36b59defd4ff47eeb16713cbee64e739e`
+- evidence: `acceptance/20-p5-acceptance-result.md`
+- frozen candidate: `44ddd73d736f1da64bab38641091a8c6d55c9990`
 - full suite: `156 passed`
 - live CN/HK: `PASS`
 - blocker: `NONE`
 
-Next: P5 Independent Acceptance.
+P6 must not start production implementation until its detailed design and execution plan are committed.
 
 ## Current runtime boundaries
 
