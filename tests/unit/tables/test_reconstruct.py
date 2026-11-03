@@ -462,6 +462,98 @@ def test_tampered_nested_identity_is_blocked(
         load_reconstructed_tables(artifact.artifact_dir)
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        "anchors",
+        "cell_text",
+        "cell_bbox",
+        "cell_numeric",
+        "quality_signals",
+    ],
+)
+def test_tampered_derived_table_fields_are_blocked(
+    field: str,
+    tmp_path: Path,
+) -> None:
+    p3, p4 = _build_inputs(tmp_path, [_page(1)])
+    artifact = reconstruct_tables(p3, p4, tmp_path / "p5")
+    tables = _read_rows(artifact.tables_path)
+    table = next(row for row in tables if row["value_column_anchors"])
+
+    if field == "anchors":
+        table["value_column_anchors"][0] += 1.0
+    elif field == "cell_text":
+        table["rows"][0]["cells"][0]["text"] += " tampered"
+    elif field == "cell_bbox":
+        table["rows"][0]["cells"][0]["bbox"][0] += 1.0
+    elif field == "cell_numeric":
+        table["rows"][0]["cells"][1]["numeric"] = not table["rows"][0]["cells"][1]["numeric"]
+    else:
+        table["quality_signals"] = sorted(
+            set(table["quality_signals"]) | {"TAMPERED"}
+        )
+
+    artifact.tables_path.write_text(
+        "".join(
+            json.dumps(
+                row,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
+            for row in tables
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(TableReconstructionError) as exc_info:
+        load_reconstructed_tables(artifact.artifact_dir)
+
+    assert exc_info.value.reason_code == "P5_ARTIFACT_INCOMPLETE_OR_CORRUPT"
+
+
+@pytest.mark.parametrize("field", ["score", "signals"])
+def test_tampered_derived_group_fields_are_blocked(
+    field: str,
+    tmp_path: Path,
+) -> None:
+    p3, p4 = _build_inputs(
+        tmp_path,
+        [_page(1, y_start=600), _page(2, y_start=100)],
+    )
+    artifact = reconstruct_tables(p3, p4, tmp_path / "p5")
+    groups = _read_rows(artifact.groups_path)
+    assert groups
+
+    if field == "score":
+        groups[0]["score"] += 0.5
+    else:
+        groups[0]["continuation_signals"] = sorted(
+            set(groups[0]["continuation_signals"]) | {"TAMPERED"}
+        )
+
+    artifact.groups_path.write_text(
+        "".join(
+            json.dumps(
+                row,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
+            for row in groups
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(TableReconstructionError) as exc_info:
+        load_reconstructed_tables(artifact.artifact_dir)
+
+    assert exc_info.value.reason_code == "P5_ARTIFACT_INCOMPLETE_OR_CORRUPT"
+
+
 def test_tampered_group_member_is_blocked(tmp_path: Path) -> None:
     p3, p4 = _build_inputs(
         tmp_path,

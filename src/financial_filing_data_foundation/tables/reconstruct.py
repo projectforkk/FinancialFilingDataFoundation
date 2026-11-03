@@ -957,6 +957,35 @@ def load_reconstructed_tables(
             )
         seen_group_ids.add(group_id)
 
+    expected_tables = [
+        _reconstruct_candidate(
+            document_sha256,
+            page_by_no[int(candidate["page_no"])],
+            candidate,
+        )
+        for candidate in candidates
+    ]
+    expected_tables.sort(
+        key=lambda table: (
+            int(table["page_no"]),
+            float(table["bbox"][1]),
+            float(table["bbox"][0]),
+            str(table["table_id"]),
+        )
+    )
+    if tables != expected_tables:
+        raise TableReconstructionError(
+            "P5_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "persisted tables differ from deterministic reconstruction",
+        )
+
+    expected_groups = _build_groups(document_sha256, expected_tables)
+    if groups != expected_groups:
+        raise TableReconstructionError(
+            "P5_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "persisted groups differ from deterministic reconstruction",
+        )
+
     return ReconstructedTableArtifact(
         artifact_dir=directory,
         document_sha256=document_sha256,
