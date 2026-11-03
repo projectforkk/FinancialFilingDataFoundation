@@ -149,8 +149,8 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P4 | 10-p4 | 11-p4 | acceptance/17 | DONE |
 | P5 | 12 | 13 | acceptance/20 | DONE |
 | P6 | 16 | 17 | acceptance/23 | DONE |
-| P7 | 18 | 19 | acceptance/24 (baseline) | DESIGN READY |
-| P8 | 20 | 21 | TBD | NOT STARTED |
+| P7 | 18 | 19 | acceptance/26 | DONE |
+| P8 | 20 | 21 | TBD | DESIGN AUTHORIZED |
 | P9 | 22 | 23 | TBD | NOT STARTED |
 | P10 | 24 | 25 | TBD | NOT STARTED |
 | P11 | 26 | 27 | TBD | NOT STARTED |
@@ -284,10 +284,10 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P6_DONE / P7_DESIGN_READY`
+`P7_DONE / P8_DESIGN_AUTHORIZED`
 
 下一步：
-1. commit P7 design baseline；
-2. create `task/p7-quality-validation`；
-3. execute P7-A → P7-M；
-4. Independent Acceptance PASS 后才进入 P8。
+1. P8 detailed design 20；
+2. P8 implementation plan 21；
+3. commit design baseline；
+4. only then start P8 production code。

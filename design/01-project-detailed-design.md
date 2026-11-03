@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P6 DONE / P7 DESIGN AUTHORIZED**
+状态：**DESIGN BASELINE — P7 DONE / P8 DESIGN AUTHORIZED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -961,12 +961,14 @@ P5 已完成 Independent Acceptance 并收口为 `P5_DONE`。
 
 P6 已完成 Independent Acceptance 并收口为 `P6_DONE`。
 
+P7 已完成 Independent Acceptance 并收口为 `P7_DONE`。
+
 当前批准进入：
 
-**P7 — Quality Gate / Validation**
+**P8 — Local MCP**
 
-P7 只实现 deterministic validation、blocking issues、quality status 与 reuse eligibility；不得提前实现 P8 Local MCP、P9 Review Overlay、canonical metric mapping 或 remote AI。
+P8 只把已验收的 deterministic local capabilities 暴露为稳定 MCP tool surface；MCP_AI_API_CALLS 继续严格 FORBIDDEN，不得在 MCP 内调用外部模型、执行 P9 Review Overlay 或提前实现 P10 Skill。
 
-P7 未 PASS 前不批准实现 P8 Local MCP。
+P8 未 PASS 前不批准实现 P9 Codex Review Overlay。
 
-US SEC provider 仍属于 P11，不得提前进入 P7。
+US SEC provider 仍属于 P11，不得提前进入 P8。
