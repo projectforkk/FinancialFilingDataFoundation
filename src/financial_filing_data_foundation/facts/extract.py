@@ -59,11 +59,24 @@ _UNIT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 _SCOPE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("CONSOLIDATED", re.compile(r"合并|\bconsolidated\b", re.IGNORECASE)),
+    (
+        "CONSOLIDATED",
+        re.compile(
+            r"合并(?:财务)?报表|合并|\bconsolidated(?:\s+financial\s+statements)?\b",
+            re.IGNORECASE,
+        ),
+    ),
     (
         "PARENT",
         re.compile(
-            r"母公司|\bparent\s+company\b|\bseparate\s+financial\s+statements\b",
+            r"母公司(?:财务报表)?|\bparent\s+company\b|\bseparate\s+financial\s+statements\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "COMPANY_ONLY",
+        re.compile(
+            r"公司财务报表|公司口径|\bcompany\s+only\b|\bcompany\s+financial\s+statements\b",
             re.IGNORECASE,
         ),
     ),
@@ -316,6 +329,116 @@ def _detect_unique_pattern(
     return first[1], False
 
 
+def _detect_unique_unit(texts: list[str]) -> tuple[str | None, bool]:
+    matches: list[tuple[str, str, int, int, int, int]] = []
+    for text_index, text in enumerate(texts):
+        candidates: list[tuple[int, int, int, str, str]] = []
+        for pattern_index, (key, pattern) in enumerate(_UNIT_PATTERNS):
+            for match in pattern.finditer(text):
+                candidates.append(
+                    (
+                        match.start(),
+                        match.end(),
+                        pattern_index,
+                        key,
+                        match.group(0),
+                    )
+                )
+
+        accepted: list[tuple[int, int, int, str, str]] = []
+        for candidate in sorted(
+            candidates,
+            key=lambda item: (
+                -(item[1] - item[0]),
+                item[2],
+                item[0],
+                item[1],
+                item[4],
+            ),
+        ):
+            start, end = candidate[0], candidate[1]
+            if any(
+                start < selected[1] and selected[0] < end
+                for selected in accepted
+            ):
+                continue
+            accepted.append(candidate)
+
+        for start, end, pattern_index, key, raw in sorted(
+            accepted,
+            key=lambda item: (item[0], item[1], item[2], item[4]),
+        ):
+            matches.append(
+                (key, raw, text_index, start, end, pattern_index)
+            )
+
+    if not matches:
+        return None, False
+    keys = {item[0] for item in matches}
+    if len(keys) > 1:
+        return None, True
+    first = min(
+        matches,
+        key=lambda item: (item[2], item[3], item[4], item[5], item[1]),
+    )
+    return first[1], False
+
+
+def _detect_unique_scope(texts: list[str]) -> tuple[str | None, bool]:
+    matches: list[tuple[str, str, int, int, int, int]] = []
+    for text_index, text in enumerate(texts):
+        candidates: list[tuple[int, int, int, str, str]] = []
+        for pattern_index, (key, pattern) in enumerate(_SCOPE_PATTERNS):
+            for match in pattern.finditer(text):
+                candidates.append(
+                    (
+                        match.start(),
+                        match.end(),
+                        pattern_index,
+                        key,
+                        match.group(0),
+                    )
+                )
+
+        accepted: list[tuple[int, int, int, str, str]] = []
+        for candidate in sorted(
+            candidates,
+            key=lambda item: (
+                -(item[1] - item[0]),
+                item[2],
+                item[0],
+                item[1],
+                item[4],
+            ),
+        ):
+            start, end = candidate[0], candidate[1]
+            if any(
+                start < selected[1] and selected[0] < end
+                for selected in accepted
+            ):
+                continue
+            accepted.append(candidate)
+
+        for start, end, pattern_index, key, raw in sorted(
+            accepted,
+            key=lambda item: (item[0], item[1], item[2], item[4]),
+        ):
+            matches.append(
+                (key, raw, text_index, start, end, pattern_index)
+            )
+
+    if not matches:
+        return None, False
+    keys = {item[0] for item in matches}
+    if len(keys) > 1:
+        return None, True
+    first = min(
+        matches,
+        key=lambda item: (item[2], item[3], item[4], item[5], item[1]),
+    )
+    return first[1], False
+
+
 def _table_scope_texts(table: dict[str, Any]) -> list[str]:
     values = [str(value) for value in table.get("candidate_keywords") or ()]
     for row in list(table.get("rows") or ())[:6]:
@@ -487,14 +610,14 @@ def _extract_records(
     for table in tables:
         table_id = str(table["table_id"])
         page_no = int(table["page_no"])
-        unit, unit_ambiguous = _detect_unique_pattern(
-            _table_texts(table), _UNIT_PATTERNS
+        unit, unit_ambiguous = _detect_unique_unit(
+            _table_texts(table)
         )
         if unit_ambiguous:
             warning_counts["AMBIGUOUS_RAW_UNIT"] += 1
 
-        scope, scope_ambiguous = _detect_unique_pattern(
-            _table_scope_texts(table), _SCOPE_PATTERNS
+        scope, scope_ambiguous = _detect_unique_scope(
+            _table_scope_texts(table)
         )
         if scope_ambiguous:
             warning_counts["AMBIGUOUS_RAW_SCOPE"] += 1

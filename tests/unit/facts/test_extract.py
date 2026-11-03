@@ -214,6 +214,47 @@ def test_conflicting_units_become_null_warning() -> None:
     }["AMBIGUOUS_RAW_UNIT"] == 1
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("单位：百万元", "百万元"),
+        ("单位：人民币百万元", "人民币百万元"),
+        ("单位：千港元", "千港元"),
+    ],
+)
+def test_specific_units_do_not_self_conflict(
+    text: str,
+    expected: str,
+) -> None:
+    unit, ambiguous = extract._detect_unique_unit([text])
+    assert unit == expected
+    assert ambiguous is False
+
+
+def test_bare_company_name_is_not_scope_evidence() -> None:
+    scope, ambiguous = extract._detect_unique_scope(
+        ["腾讯公司", "Tencent Company"]
+    )
+    assert scope is None
+    assert ambiguous is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "母公司财务报表",
+        "公司财务报表",
+        "company only",
+        "company financial statements",
+        "separate financial statements",
+    ],
+)
+def test_explicit_company_scope_phrases_are_recognized(text: str) -> None:
+    scope, ambiguous = extract._detect_unique_scope([text])
+    assert scope is not None
+    assert ambiguous is False
+
+
 def test_missing_label_numeric_row_is_skipped_with_warning() -> None:
     pages, tables, groups = _synthetic_records()
     row = tables[0]["rows"][2]
