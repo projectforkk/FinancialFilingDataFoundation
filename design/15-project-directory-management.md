@@ -141,12 +141,16 @@ Windows Python venv **不得直接文件搬迁作为正式迁移方式**，因�
 
 迁移必须：
 1. 保留旧 runtime；
-2. 在新路径从 approved base Python 重建 venv；
-3. 从新 Dayu checkout 安装 pinned package；
-4. doctor/import tests；
-5. live/no-network smoke；
-6. FFDF main runtime isolation check；
-7. 新 runtime PASS 后旧 runtime 才可退役。
+2. 从已验收旧 runtime 导出完整 package freeze；
+3. 生成 tracked runtime lock：`runtime-locks/dayu-2115c86-py312-win-amd64.lock.txt`；
+4. 在新路径从 approved base Python 重建 venv；
+5. 先按 runtime lock 安装全部第三方依赖；
+6. 再以 `--no-deps` 从新 Dayu checkout 安装 pinned Dayu source，避免 resolver 漂移；
+7. 新旧 package snapshot 除 source path 外必须一致；
+8. doctor/import tests；
+9. live/no-network smoke；
+10. FFDF main runtime isolation check；
+11. 新 runtime PASS 后旧 runtime 才可退役。
 
 ## 9. External Tools Exception
 
@@ -265,6 +269,29 @@ These are historical local states, not accepted Git truth. Approved handling:
 6. keep them until user explicitly authorizes retirement.
 
 Clean historical worktrees can move to `worktrees/archive/clean/`.
+
+### DIR-ISSUE-002 — Rebuilding Dayu runtime without a lock changed transitive dependencies
+
+After relocating the pinned Dayu source checkout, an initial rebuild of the dedicated runtime from the same Dayu commit resolved newer transitive packages:
+
+- `docling 2.145.0 -> 2.146.0`
+- `docling-slim 2.145.0 -> 2.146.0`
+- `filelock 4.2.6 -> 4.2.7`
+
+Other checked core packages remained unchanged. Root cause: Dayu source commit was pinned, but the accepted runtime's transitive dependency set was not locked.
+
+Approved solution:
+
+1. old accepted runtime remains authoritative until migration completes;
+2. export the old runtime's complete package freeze;
+3. create tracked `runtime-locks/dayu-2115c86-py312-win-amd64.lock.txt` excluding the local `dayu-agent @ file://...` line;
+4. rebuild the new runtime strictly from this lock;
+5. install pinned Dayu from the new project-local checkout with `--no-deps`;
+6. compare old/new package snapshots and require exact equality except the local Dayu source path;
+7. rerun Dayu doctor and FFDF runtime-isolation checks;
+8. only then retire the old runtime.
+
+The first resolver-drifted runtime build is not accepted as the migrated runtime.
 
 ---
 

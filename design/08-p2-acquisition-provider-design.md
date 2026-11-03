@@ -215,7 +215,9 @@ P2 单独创建。
 - 在目标 Windows ARM64 主机上若 native ARM64 dependency tree 不可用，可使用独立 AMD64 Python 3.12 runtime；
 - 不修改 system Python / PATH；
 - runtime 路径必须显式配置；
-- Dayu upstream checkout 与 runtime 都不得位于 FFDF Git tracked tree。
+- Dayu upstream checkout 与 runtime 位于 project-root ignored operational directories；
+- accepted runtime dependency set 由 `runtime-locks/dayu-2115c86-py312-win-amd64.lock.txt` 固定；
+- rebuild 时先按 lock 安装第三方依赖，再以 `--no-deps` 安装 pinned Dayu source，禁止 resolver 静默升级 transitive dependencies。
 
 ### 5.3 Docling 在 acquisition runtime 中的语义
 
