@@ -102,7 +102,7 @@
 
 Status:
 
-`CODE REVIEW PASS / READY FOR ACCEPTANCE`
+`CODE REVIEW PASS / READY FOR ACCEPTANCE REFREEZE`
 
 Planned branch:
 
@@ -117,12 +117,12 @@ P7 Independent Acceptance:
 - live CN/HK validation: `PASS`
 - blocker: `NONE`
 
-P8 final Code Review:
+P8 latest Code Review after P8-ISSUE-006:
 
-- final verdict: `PASS`
-- final evidence: `development/46-p8-final-code-review.md`
-- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
-- full regression: `231 passed`
+- verdict: `PASS`
+- evidence: `development/48-p8-issue006-code-review.md`
+- reviewed candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
+- full regression: `235 passed`
 - runtime package lock: `MATCH`
 - runtime lock blob/worktree SHA: `MATCH`
 - lock SHA256: `8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
@@ -131,15 +131,19 @@ P8 final Code Review:
 - live CN/HK: `PASS`
 - blocker: `NONE`
 
+Earlier final Review `development/46-p8-final-code-review.md` remains historical because P8-ISSUE-006 changed the test-execution contract after its acceptance path.
+
 Historical review `development/45-p8-code-review.md` and freeze `acceptance/28-p8-acceptance-run-instruction.md` were invalidated by `P8-ISSUE-005`.
 
-P8 final Independent Acceptance freeze:
+P8 prior Independent Acceptance:
 
 - instruction: `acceptance/30-p8-final-acceptance-freeze.md`
+- result: `acceptance/31-p8-acceptance-result.md`
+- verdict: `PASS`
 - frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
-- prior freezes `acceptance/28` and `acceptance/29`: historical / invalidated
+- status: `HISTORICAL / INVALIDATED FOR FINAL CLOSEOUT BY P8-ISSUE-006`
 
-Current gate: `P8-K Independent Acceptance`.
+Current gate: `P8-J Acceptance Refreeze after P8-ISSUE-006`.
 
 ## Project directory consolidation
 
