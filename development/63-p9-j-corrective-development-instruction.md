@@ -15,6 +15,12 @@ Authoritative amended contracts:
 
 ## 1. Scope
 
+Operational root constraint:
+
+- all FFDF project work, including development, tests, temporary test directories, detached review worktrees, and generated review evidence, must remain inside `D:\\Codex\\FinancialFilingDataFoundation`；
+- do not use external temporary roots such as `D:\\Codex\\FFDF-t`；
+- ignored project-local locations such as `runtimes/` and `worktrees/` may be used for ephemeral execution state。
+
 Only remediate:
 - P9-J-F1 payload security invariant；
 - P9-J-F2 parser-level CLI JSON diagnostic invariant；
