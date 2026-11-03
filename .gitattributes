@@ -1,0 +1,2 @@
+# Deterministic tracked runtime locks across Windows worktrees
+runtime-locks/*.txt text eol=lf

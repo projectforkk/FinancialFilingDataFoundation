@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P7_DONE / P8_DESIGN_READY**
+**P7_DONE / P8_IN_ACCEPTANCE**
 
 ## Accepted baseline
 
@@ -102,7 +102,7 @@
 
 Status:
 
-`DESIGN READY / DEVELOPMENT NOT STARTED`
+`CODE REVIEW PASS / READY FOR ACCEPTANCE`
 
 Planned branch:
 
@@ -117,7 +117,29 @@ P7 Independent Acceptance:
 - live CN/HK validation: `PASS`
 - blocker: `NONE`
 
-P8 must not start production implementation until its detailed design and execution plan are committed.
+P8 final Code Review:
+
+- final verdict: `PASS`
+- final evidence: `development/46-p8-final-code-review.md`
+- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
+- full regression: `231 passed`
+- runtime package lock: `MATCH`
+- runtime lock blob/worktree SHA: `MATCH`
+- lock SHA256: `8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
+- official SDK protocol: `2026-07-28`
+- exact tools: `11 / 11 PASS`
+- live CN/HK: `PASS`
+- blocker: `NONE`
+
+Historical review `development/45-p8-code-review.md` and freeze `acceptance/28-p8-acceptance-run-instruction.md` were invalidated by `P8-ISSUE-005`.
+
+P8 final Independent Acceptance freeze:
+
+- instruction: `acceptance/30-p8-final-acceptance-freeze.md`
+- frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
+- prior freezes `acceptance/28` and `acceptance/29`: historical / invalidated
+
+Current gate: `P8-K Independent Acceptance`.
 
 ## Project directory consolidation
 
