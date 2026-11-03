@@ -461,6 +461,8 @@ P9 不将 warning“升级”为 review，也不静默删除。
   },
   "reviewed_at": "2026-11-03T21:00:00+09:00",
   "justification": "...",
+  "base_active_resolution_ids": [],
+  "base_overlay_set_hash_before": "...",
   "supersedes_resolution_id": null,
   "supporting_resolution_ids": []
 }
@@ -510,9 +512,13 @@ resolution_id =
 SHA256(canonical_resolution_payload)
 ```
 
+其中 persisted payload 还包含 P9 自动计算的 `base_active_resolution_ids` 与 `base_overlay_set_hash_before`。
+
 因此：
 
-同 payload → same ID / idempotent。
+- same caller submission + same explicit prior overlay state → same ID / idempotent；
+- 若 prior active overlay state已变化，即使 caller字段相同，也会形成新的可审计 resolution identity；
+- caller不得直接指定/覆盖这两个 base-state 字段。
 
 ---
 
@@ -798,11 +804,47 @@ P9从 validated evidence refs自动派生：
 
 ---
 
-## 24. Before / after
+## 24. Before / after and explicit prior overlay state
 
 caller不提供 authoritative `before`。
 
-P9自动计算：
+### 24.1 base_active_resolution_ids
+
+提交时 P9 store必须先读取/验证当前 immutable resolution set，计算当前 active terminal resolution IDs：
+
+- sorted
+- unique
+- caller不可传入 authoritative value
+
+persist到：
+
+`base_active_resolution_ids`
+
+### 24.2 base_overlay_set_hash_before
+
+```text
+SHA256(
+ document_sha256
+ + "\0" + base_validation_report_sha256
+ + "\0" + P9_POLICY_VERSION
+ + "\0" + "\0".join(base_active_resolution_ids)
+)
+```
+
+persist到：
+
+`base_overlay_set_hash_before`
+
+该 hash明确绑定“本 resolution 提交前 reviewer看到的 overlay state”。
+
+### 24.3 before
+
+P9自动从：
+
+- immutable base raw facts；
+- `base_active_resolution_ids` 指定的 prior overlay state；
+
+重新计算：
 
 ### before
 - target identity
@@ -817,7 +859,22 @@ P9自动计算：
 
 resolution文件持久化 computed before/after。
 
-这样 reviewer不能伪造 prior state。
+这样 reviewer不能伪造 prior state，也不需要用 `reviewed_at` 推断执行顺序。
+
+### 24.4 Historical state validation
+
+loader必须验证：
+
+- every `base_active_resolution_id` exists（除初始空集）；
+- resolution自身不在 prior set；
+- prior set内部不存在一个 resolution supersede另一个仍被同时声明 active；
+-若当前 resolution声明 `supersedes_resolution_id`，该 parent必须存在于 prior active set；
+- attestation每个 supporting_resolution_id必须存在于 prior active set；
+- resolution dependency graph（base-state refs + supersedes refs）不得形成 cycle；
+- `base_overlay_set_hash_before` 可重算一致；
+- `before` 可用指定 prior set重算一致。
+
+未来新增/后续 supersede不会改变历史 resolution的 prior-state contract。
 
 ---
 
@@ -1191,6 +1248,9 @@ P9不提前编排。
 ### resolution
 
 - schema
+- base_active_resolution_ids / base_overlay_set_hash_before recompute
+- historical prior-state dependency DAG / cycle validation
+- before state recompute from explicit prior set
 - ID recompute
 - task exists
 - issue/reason match
@@ -1598,6 +1658,27 @@ Approved solution:
 This preserves both caller-boundary safety and the invariant that every persisted resolution has an auditable evidence chain.
 
 Affected gates: P9-C / P9-D / P9-F / acceptance.
+
+### P9-ISSUE-003 — Immutable resolution before-state was not reconstructible from timestamp/supersession alone
+
+Resolution design requires persisted `before` state and later semantic recomputation. During store implementation preparation it became clear that wall-clock `reviewed_at` is audit metadata, not a safe execution-order primitive, and independent/concurrent resolutions may not have a total order in the supersession graph.
+
+Without an explicit prior overlay set, a later loader cannot prove which active overlays existed when a resolution was submitted, so `before` could not be deterministically recomputed.
+
+Approved solution:
+1. store computes current active terminal set before validating/persisting a new resolution；
+2. persist sorted `base_active_resolution_ids`；
+3. persist deterministic `base_overlay_set_hash_before` over document/base-report/policy/prior IDs；
+4. caller cannot override these fields；
+5. compute `before` from base raw + explicit prior set, never from timestamp ordering；
+6. superseded parent must be in the prior set；
+7. attestation supporting resolutions must be in the prior set；
+8. loader validates prior-set membership, supersession consistency, dependency DAG/cycles, hash and recomputed before；
+9. same caller submission is idempotent only when submitted against the same prior overlay state。
+
+No P9 resolution-store production code existed before this amendment.
+
+Affected gates: P9-D / P9-E / P9-F / P9-J / P9-L.
 
 发现问题必须：
 
