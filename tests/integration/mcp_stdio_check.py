@@ -225,6 +225,126 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         if not invalid.is_error:
             raise AssertionError("invalid document should return is_error=True")
 
+        perf: dict[str, float] = {}
+
+        started = time.perf_counter()
+        _structured(await client.call_tool("ffdf_list_documents"))
+        perf["list_documents_ms"] = round(
+            (time.perf_counter() - started) * 1000.0, 3
+        )
+
+        started = time.perf_counter()
+        _structured(
+            await client.call_tool(
+                "ffdf_get_document",
+                {"document_sha256": cn["document_sha256"]},
+            )
+        )
+        perf["warm_get_document_ms"] = round(
+            (time.perf_counter() - started) * 1000.0, 3
+        )
+
+        started = time.perf_counter()
+        _structured(
+            await client.call_tool(
+                "ffdf_search_document",
+                {
+                    "document_sha256": cn["document_sha256"],
+                    "query": "营业收入",
+                    "limit": 5,
+                },
+            )
+        )
+        perf["warm_search_ms"] = round(
+            (time.perf_counter() - started) * 1000.0, 3
+        )
+
+        started = time.perf_counter()
+        _structured(
+            await client.call_tool(
+                "ffdf_read_pages",
+                {
+                    "document_sha256": cn["document_sha256"],
+                    "page_nos": [1],
+                },
+            )
+        )
+        perf["warm_read_pages_ms"] = round(
+            (time.perf_counter() - started) * 1000.0, 3
+        )
+
+        started = time.perf_counter()
+        _structured(
+            await client.call_tool(
+                "ffdf_get_table",
+                {
+                    "document_sha256": cn["document_sha256"],
+                    "table_id": table_id,
+                    "max_rows": 20,
+                },
+            )
+        )
+        perf["warm_get_table_ms"] = round(
+            (time.perf_counter() - started) * 1000.0, 3
+        )
+
+        started = time.perf_counter()
+        _structured(
+            await client.call_tool(
+                "ffdf_get_fact",
+                {
+                    "document_sha256": cn["document_sha256"],
+                    "raw_fact_id": first_fact["raw_fact_id"],
+                },
+            )
+        )
+        _structured(
+            await client.call_tool(
+                "ffdf_get_evidence",
+                {
+                    "document_sha256": cn["document_sha256"],
+                    "evidence_id": first_fact["evidence_id"],
+                },
+            )
+        )
+        perf["warm_fact_evidence_ms"] = round(
+            (time.perf_counter() - started) * 1000.0, 3
+        )
+
+        started = time.perf_counter()
+        _structured(
+            await client.call_tool(
+                "ffdf_get_validation",
+                {
+                    "document_sha256": cn["document_sha256"],
+                    "include_issues": True,
+                    "offset": 0,
+                    "limit": 100,
+                },
+            )
+        )
+        perf["warm_validation_ms"] = round(
+            (time.perf_counter() - started) * 1000.0, 3
+        )
+
+        limits = {
+            "cold_connect_ms": (connected_ms, 15000.0),
+            "cn_first_bundle_ms": (cn_first_bundle_ms, 20000.0),
+            "hk_first_bundle_ms": (hk_first_bundle_ms, 20000.0),
+            "list_documents_ms": (perf["list_documents_ms"], 2000.0),
+            "warm_get_document_ms": (perf["warm_get_document_ms"], 2000.0),
+            "warm_search_ms": (perf["warm_search_ms"], 2000.0),
+            "warm_read_pages_ms": (perf["warm_read_pages_ms"], 2000.0),
+            "warm_get_table_ms": (perf["warm_get_table_ms"], 5000.0),
+            "warm_fact_evidence_ms": (perf["warm_fact_evidence_ms"], 5000.0),
+            "warm_validation_ms": (perf["warm_validation_ms"], 5000.0),
+        }
+        for name, (observed, maximum) in limits.items():
+            if observed > maximum:
+                raise AssertionError(
+                    f"performance gate failed: {name}={observed}ms > {maximum}ms"
+                )
+
         return {
             "protocol_version": protocol_version,
             "cold_connect_ms": connected_ms,
@@ -262,6 +382,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 ),
             },
             "invalid_document_is_error": bool(invalid.is_error),
+            "performance_ms": perf,
         }
 
 
