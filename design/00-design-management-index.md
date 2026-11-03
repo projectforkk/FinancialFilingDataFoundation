@@ -144,8 +144,8 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P3 | 10-p3 | 11-p3 | acceptance/14 | DONE |
 | P4 | 10-p4 | 11-p4 | acceptance/17 | DONE |
 | P5 | 12 | 13 | acceptance/20 | DONE |
-| P6 | 16 | 17 | acceptance/21 (baseline) | DESIGN READY |
-| P7 | 18 | 19 | TBD | NOT STARTED |
+| P6 | 16 | 17 | acceptance/23 | DONE |
+| P7 | 18 | 19 | TBD | DESIGN AUTHORIZED |
 | P8 | 20 | 21 | TBD | NOT STARTED |
 | P9 | 22 | 23 | TBD | NOT STARTED |
 | P10 | 24 | 25 | TBD | NOT STARTED |
@@ -280,10 +280,10 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P5_DONE / P6_DESIGN_AUTHORIZED`
+`P6_DONE / P7_DESIGN_AUTHORIZED`
 
-先完成：
-1. project-directory migration under design/15；
-2. P6 detailed design 16；
-3. P6 implementation plan 17；
-4. only then start P6 production code。
+下一步：
+1. P7 detailed design 18；
+2. P7 implementation plan 19；
+3. commit design baseline；
+4. only then start P7 production code。

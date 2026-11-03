@@ -6,18 +6,18 @@
 
 ## Current state
 
-**P5_DONE / P6_READY_FOR_ACCEPTANCE**
+**P6_DONE / P7_DESIGN_AUTHORIZED**
 
 ## Accepted baseline
 
-- phase: `P5_DONE`
-- frozen acceptance candidate: `44ddd73d736f1da64bab38641091a8c6d55c9990`
-- reviewed production candidate: `2c4bafd36b59defd4ff47eeb16713cbee64e739e`
+- phase: `P6_DONE`
+- frozen acceptance candidate: `07cb4258e1f2083b7c930686b637acdd89b03d0a`
+- reviewed production candidate: `bb31515b4fc6ac09aea0aed0cf14262555a7398e`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/20-p5-acceptance-result.md`
-- accepted merge commit: `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
-- accepted_baseline_sha: `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
-- full regression: `156 passed`
+- acceptance evidence: `acceptance/23-p6-acceptance-result.md`
+- accepted merge commit: `d13b62778d123ba109c5f8ab2329d121d81b186b`
+- accepted_baseline_sha: `d13b62778d123ba109c5f8ab2329d121d81b186b`
+- full regression: `189 passed`
 
 ## Phase history
 
@@ -76,28 +76,38 @@
 - live CN / HK: `PASS`
 - accepted merge: `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
 
+### P6 — Raw Facts / Evidence
+
+- status: `DONE / PASS`
+- acceptance evidence: `acceptance/23-p6-acceptance-result.md`
+- frozen candidate: `07cb4258e1f2083b7c930686b637acdd89b03d0a`
+- reviewed candidate: `bb31515b4fc6ac09aea0aed0cf14262555a7398e`
+- full suite: `189 passed`
+- live CN/HK: `PASS`
+- accepted merge: `d13b62778d123ba109c5f8ab2329d121d81b186b`
+
 ## Approved next phase
 
-**P6 — Raw Facts / Evidence**
+**P7 — Quality Gate / Validation**
 
 Status:
 
-`CODE REVIEW PASS / READY FOR ACCEPTANCE`
+`DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED`
 
 Planned branch:
 
-`task/p6-raw-facts-evidence`
+`task/p7-quality-validation`
 
-P5 Independent Acceptance:
+P6 Independent Acceptance:
 
 - verdict: `PASS`
-- evidence: `acceptance/20-p5-acceptance-result.md`
-- frozen candidate: `44ddd73d736f1da64bab38641091a8c6d55c9990`
-- full suite: `156 passed`
+- evidence: `acceptance/23-p6-acceptance-result.md`
+- frozen candidate: `07cb4258e1f2083b7c930686b637acdd89b03d0a`
+- full suite: `189 passed`
 - live CN/HK: `PASS`
 - blocker: `NONE`
 
-P6 must not start production implementation until its detailed design and execution plan are committed.
+P7 must not start production implementation until its detailed design and execution plan are committed.
 
 ## Project directory consolidation
 
@@ -168,7 +178,7 @@ The P2 Dayu runtime is isolated from the FFDF main runtime.
 6. MCP AI API calls are forbidden.
 7. Tracked Markdown / JSON governance artifacts use `UTF-8 without BOM`.
 8. Phase code enters the accepted baseline only after Independent Acceptance PASS.
-9. P6 may implement only Raw Facts / Evidence; P7 quality/validation remains separate.
+9. P7 may implement only deterministic Quality Gate / Validation; P8 Local MCP remains separate.
 10. Design index: `design/00-design-management-index.md`.
 11. Directory governance: `design/15-project-directory-management.md`.
 12. All FFDF-owned dependencies/runtimes/worktrees/workspace/data are managed under `D:\Codex\FinancialFilingDataFoundation`.
@@ -181,8 +191,8 @@ The P2 Dayu runtime is isolated from the FFDF main runtime.
 - P3 — Native Page / Section / FTS: `DONE`
 - P4 — Table Candidate Detection: `DONE`
 - P5 — Table Reconstruction / Cross-page: `DONE`
-- P6 — Raw Facts / Evidence: `DESIGN AUTHORIZED`
-- P7 — Quality Gate / Validation: `NOT STARTED`
+- P6 — Raw Facts / Evidence: `DONE`
+- P7 — Quality Gate / Validation: `DESIGN AUTHORIZED`
 - P8 — Local MCP: `NOT STARTED`
 - P9 — Codex Review Overlay: `NOT STARTED`
 - P10 — Codex Skill: `NOT STARTED`

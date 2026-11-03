@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P5 DONE / P6 DESIGN AUTHORIZED**
+状态：**P6 DONE / P7 DESIGN AUTHORIZED**
 
 ## 总原则
 
@@ -82,14 +82,14 @@ US SEC 不在 P2，保留给 P11。
 
 ## P6 — Raw Facts / Evidence
 
-状态：`DESIGN AUTHORIZED`
+状态：`DONE / PASS`
 
 目标：
 从 reconstructed tables 生成 raw facts 与 first-class evidence links。
 
 ## P7 — Quality Gate / Validation
 
-状态：`NOT STARTED`
+状态：`DESIGN AUTHORIZED`
 
 目标：
 deterministic validation、blocking issues、quality gates、reuse eligibility。
