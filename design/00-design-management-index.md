@@ -295,9 +295,9 @@ Implementation plan 至少覆盖：
 
 当前正式 phase：
 
-`P8_DONE / P9-J FORMAL REVIEW AUTHORIZED`
+`P8_DONE / P9-J FAIL — CHANGES REQUIRED`
 
-P9 继续严格按 `task/p9-review-overlay` 的 frozen-candidate 流程执行；本次 28/29 设计不得改变正在审查的 P9 v1 candidate。
+P9-J detached formal review 已记录 `FAIL / CHANGES REQUIRED`（`development/62-p9-j-formal-code-review-result.md`）。P9 必须先按 Design-First 流程处理该 review finding；本次 28/29 设计不得被用于绕过或修改 P9 v1 correction flow。
 
 并行设计工作：
 
