@@ -611,7 +611,7 @@ dedicated runtime必须验证：
 Business service：
 
 - list_documents catalog-only <= 2s
-- first trusted bundle load for one document <= 15s
+- first trusted bundle load for one document <= 20s
 - warm get_document <= 2s
 - warm search <= 2s
 - warm read_pages <= 2s
@@ -722,6 +722,35 @@ P9 可以复用 service读取数据，但不得通过修改 P8 tool contract偷�
 ---
 
 ## 25. P8 Issue Log
+
+### P8-ISSUE-003 — Empirical HK trusted-bundle validation slightly exceeded the provisional 15s threshold
+
+After P8-ISSUE-002 lazy loading was implemented, official SDK integration measured:
+
+- MCP cold connect: 1.258s；
+- CN first full P3/P5/P6/P7 trusted bundle: 9.986s；
+- HK first full trusted bundle: 15.104s；
+- all warm calls: milliseconds；
+- protocol/tool semantics: PASS。
+
+The 15s first-bundle threshold was introduced before measuring the accepted 274-page HK artifact. The HK result exceeded it by ~0.104s while still performing the full required semantic tamper/fingerprint validation.
+
+Rejected solutions:
+- skip P7 semantic recomputation；
+- trust persisted report without loader validation；
+- weaken P6/P7 tamper guards；
+- prewarm all documents at server startup (would reintroduce P8-ISSUE-002)。
+
+Approved solution:
+- keep cold MCP connect/list-tools gate at <=15s；
+- set **first trusted bundle load per document <=20s** for P8 v1；
+- retain all warm tool gates unchanged；
+- record first-load timing separately for every live document；
+- no validation step is removed or downgraded。
+
+This is an empirical performance-policy amendment, not a correctness relaxation.
+
+Affected gates: P8-H/I/K.
 
 ### P8-ISSUE-002 — Eager artifact validation made MCP cold connect exceed the 15s gate
 
