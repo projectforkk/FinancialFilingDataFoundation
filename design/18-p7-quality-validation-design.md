@@ -491,25 +491,25 @@ abs(begin + increase - end) <= max(1, abs(end)*0.0005)
 
 ## 16. Duplicate / Conflict Check
 
-相同：
+P7 **不得**仅因为不同 row 具有相同 raw metric name / period / unit / scope / column 就判定冲突。财报中同一名称可合法重复出现在不同主体、类别、交易关系、分部或重复 panel 中。
+
+P7 v1 只对**同一 P5 source lineage**做 defensive duplicate/conflict 检查：
 
 ```text
-normalized raw_metric_name
-+ raw_period_label
-+ raw_unit
-+ raw_scope
-+ table_id
+table_id
++ row_id
++ value_cell_id
 + column_index
 ```
 
-若出现多个不同 `parsed_numeric_value`：
+若同一 source lineage 出现多个 P6 facts：
 
-`CONFLICTING_FACT_VALUES / REVIEW`
+- parsed_numeric_value 不同 → `CONFLICTING_FACT_VALUES / REVIEW`
+- parsed_numeric_value 相同 → `DUPLICATE_FACT_VALUES / WARNING`
 
-不自动选一个。
+不同 `row_id` 的同名 raw metric 永远不因名称重复而产生 conflict issue。
 
-完全相同 duplicate：
-WARNING。
+正常情况下 P6 deterministic ID/tamper guard 已应阻止同一 value cell重复；P7 此规则只是 defensive validation，不做跨 row semantic canonicalization。
 
 ---
 
@@ -808,6 +808,26 @@ Independent Acceptance PASS后：
 ---
 
 ## 33. P7 Issue Log
+
+### P7-ISSUE-002 — Cross-row repeated metric names were falsely treated as conflicting facts
+
+First live P7 run produced 110 CN and 384 HK `CONFLICTING_FACT_VALUES` issues. Sampling showed legitimate repeated rows, for example the same company/entity/metric label appearing in different rows with different values.
+
+Root cause:
+- original duplicate key omitted P5 row/value-cell identity；
+- it grouped distinct facts by metric/period/unit/scope/table/column；
+- repeated labels across separate rows were therefore incorrectly merged into one conflict set。
+
+Approved solution:
+- duplicate/conflict identity is the exact P5 source lineage: `table_id + row_id + value_cell_id + column_index`；
+- different `row_id` never conflicts solely because raw metric text matches；
+- same lineage + different value remains REVIEW；
+- same lineage + same value remains WARNING；
+- add regression showing repeated metric text across distinct rows produces no issue。
+
+The first live P7 issue counts are invalidated and must be rerun after this amendment.
+
+Affected gates: P7-D/H/I/J/L.
 
 ### P7-ISSUE-001 — P7 metrics originally required candidate_count without P4 as an input
 

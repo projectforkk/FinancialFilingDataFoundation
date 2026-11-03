@@ -36,6 +36,7 @@ Gate: blocking/failure tests PASS.
 - tables_without_facts / reconstructed-table structural metrics
 - no implicit P4 reopen or candidate_count inference
 - core statement signal
+- duplicate/conflict check uses exact P5 source lineage; repeated metric names across different rows are not conflicts
 
 Gate: threshold boundary tests PASS.
 
