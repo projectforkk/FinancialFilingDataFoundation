@@ -6,18 +6,18 @@
 
 ## Current state
 
-**P4_IN_ACCEPTANCE**
+**P4_DONE / P5_DESIGN_AUTHORIZED**
 
 ## Accepted baseline
 
-- phase: `P3_DONE`
-- frozen acceptance candidate: `7b81c97e73448389e38cf9936a8af7dfe074d1e1`
-- reviewed production candidate: `3c3536db0bdfdfbc5300004731b04d992930904f`
+- phase: `P4_DONE`
+- frozen acceptance candidate: `647d6179bdde9e370185fea1d389f0087370faae`
+- reviewed production candidate: `ea78b2f9adbf0ad6564146ba166da85d1085bf81`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/14-p3-acceptance-result.md`
-- accepted merge commit: `24cb4571a9d9f97b4b963d6339970c931d979c4d`
-- accepted_baseline_sha: `24cb4571a9d9f97b4b963d6339970c931d979c4d`
-- full regression: `104 passed`
+- acceptance evidence: `acceptance/17-p4-acceptance-result.md`
+- accepted merge commit: `97f2de24861347c97bf875e7b72899eb11ab56c2`
+- accepted_baseline_sha: `97f2de24861347c97bf875e7b72899eb11ab56c2`
+- full regression: `133 passed`
 
 ## Phase history
 
@@ -56,35 +56,38 @@
 - HK fresh dual-root: `PASS`
 - accepted merge: `24cb4571a9d9f97b4b963d6339970c931d979c4d`
 
+### P4 — Table Candidate Detection
+
+- status: `DONE / PASS`
+- acceptance evidence: `acceptance/17-p4-acceptance-result.md`
+- frozen candidate: `647d6179bdde9e370185fea1d389f0087370faae`
+- reviewed production candidate: `ea78b2f9adbf0ad6564146ba166da85d1085bf81`
+- full suite: `133 passed`
+- live CN / HK: `PASS`
+- accepted merge: `97f2de24861347c97bf875e7b72899eb11ab56c2`
+
 ## Approved next phase
 
-**P4 — Table Candidate Detection**
+**P5 — Table Reconstruction / Cross-page**
 
 Status:
 
-`CODE REVIEW PASS / READY FOR ACCEPTANCE`
+`DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED`
 
-Development branch:
+Planned branch:
 
-`task/p4-table-candidate-detection`
+`task/p5-table-reconstruction`
 
-P4 implementation and final Code Review are complete; Independent Acceptance has not yet started.
-
-P4 Code Review:
+P4 Independent Acceptance:
 
 - verdict: `PASS`
-- evidence: `development/29-p4-code-review.md`
-- reviewed candidate: `ea78b2f9adbf0ad6564146ba166da85d1085bf81`
+- evidence: `acceptance/17-p4-acceptance-result.md`
+- frozen candidate: `647d6179bdde9e370185fea1d389f0087370faae`
 - full suite: `133 passed`
 - live CN/HK: `PASS`
 - blocker: `NONE`
 
-P4 Independent Acceptance:
-
-- instruction: `acceptance/16-p4-acceptance-run-instruction.md`
-- frozen candidate: `647d6179bdde9e370185fea1d389f0087370faae`
-- status: `IN_PROGRESS`
-- accepted baseline remains P3 until PASS
+P5 must not start production implementation until its detailed design and execution plan are committed.
 
 ## Current runtime boundaries
 

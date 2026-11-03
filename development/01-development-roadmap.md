@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P3 DONE / P4 DESIGN READY**
+状态：**P4 DONE / P5 DESIGN AUTHORIZED**
 
 ## 总原则
 
@@ -63,7 +63,7 @@ US SEC 不在 P2，保留给 P11。
 
 ## P4 — Table Candidate Detection
 
-状态：`DESIGN READY`
+状态：`DONE / PASS`
 
 目标：
 基于 P3 artifact 检测 table-like page/region candidate。

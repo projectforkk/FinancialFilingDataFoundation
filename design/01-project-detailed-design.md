@@ -943,12 +943,14 @@ P2 已完成 Independent Acceptance 并收口为 `P2_DONE`。
 
 P3 已完成 Independent Acceptance 并收口为 `P3_DONE`。
 
+P4 已完成 Independent Acceptance 并收口为 `P4_DONE`。
+
 当前批准进入：
 
-**P4 — Table Candidate Detection**
+**P5 — Table Reconstruction / Cross-page**
 
-P4 只基于 P3 artifacts 检测 deterministic table-like page/region candidates、signals 与 score；P4 不允许 cell/row/column reconstruction、cross-page stitching、fact extraction、OCR、Docling 或 AI。
+P5 只从已验收 P4 candidates 与 P3 geometry 重建 deterministic table rows/columns/cells，并处理明确可验证的跨页连续性；不得提前生成 P6 raw facts/evidence，也不得使用 OCR、Docling 或 external AI。
 
-P4 未 PASS 前不批准实现 P5 Table Reconstruction / Cross-page。
+P5 未 PASS 前不批准实现 P6 Raw Facts / Evidence。
 
-US SEC provider 仍属于 P11，不得提前进入 P4。
+US SEC provider 仍属于 P11，不得提前进入 P5。
