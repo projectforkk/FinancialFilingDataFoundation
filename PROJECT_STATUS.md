@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P8_DONE / P9_J_AUTHORIZED**
+**P8_DONE / P9_J_FAIL_CHANGES_REQUIRED**
 
 ## Accepted baseline
 
@@ -120,7 +120,7 @@
 
 Status:
 
-`P9-G / P9-H / P9-I PASS — P9-J FORMAL REVIEW AUTHORIZED`
+`P9-G / P9-H / P9-I PASS — P9-J FAIL / CHANGES REQUIRED`
 
 Planned branch:
 
@@ -177,11 +177,17 @@ GitHub corrective re-review is recorded in `development/57-p9-g-corrective-githu
 
 P9-I live evidence is recorded in `development/59-p9-i-live-evidence.md`; GitHub live-evidence review in `development/60-p9-i-github-live-review.md` records verdict `PASS`. CN/HK exact queues, honest resolved states, dual-root determinism, performance gates, and catalog/P3/P5/P6/P7 immutability all passed.
 
-Current instruction: `development/61-p9-j-formal-code-review-instruction.md`.
+Formal P9-J result: `development/62-p9-j-formal-code-review-result.md`.
 
-Current gate: `P9-J — Formal Detached Code Review`.
+Verdict: `FAIL / CHANGES REQUIRED`.
 
-P9-K/L/M, main merge, P10 and P11 remain closed until the formal detached review result is pushed and reviewed.
+Open findings:
+- `P9-J-F1` — MAJOR security payload boundary defect；
+- `P9-J-F2` — MAJOR parser-level CLI JSON diagnostic defect。
+
+Current gate: `P9-J correction must return to Design-First governance before implementation`.
+
+P9-K/L/M, main merge, P10 and P11 remain closed.
 
 ## Future research-consumption design track
 
@@ -313,7 +319,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P6 — Raw Facts / Evidence: `DONE`
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
-- P9 — Codex Review Overlay: `P9-G PASS / P9-H PASS / P9-I PASS / P9-J AUTHORIZED`
+- P9 — Codex Review Overlay: `P9-G PASS / P9-H PASS / P9-I PASS / P9-J FAIL — CHANGES REQUIRED`
 - P10 — Codex Dynamic Research Integration: `NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`
 - Cross-phase Research MCP Visual/Resolved Query: `DESIGN PROPOSED (design/29)`
