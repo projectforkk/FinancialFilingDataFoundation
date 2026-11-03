@@ -87,8 +87,9 @@ The following areas were independently inspected against `design/22`,
 
 - Severity: **MAJOR**
 - Category: **SECURITY / IMPLEMENTATION DEFECT**
-- Affected acceptance item: `acceptance/32` item 49; also affects the
-  security/scope requirements in `development/61`.
+- Affected contract: `design/22` section 49 and the security adversarial
+  review requirement in `development/61`; this is not the separately numbered
+  `acceptance/32` item 49 (which covers no network/AI/Codex API).
 - Status: **OPEN**
 
 `design/22` section 49 explicitly states that a P9 resolution payload must
@@ -246,7 +247,8 @@ gap rather than claiming it was tested.
 The direct P7-PASS empty-queue fixture is not present in the candidate unit
 file; implementation and accepted evidence were statically reviewed. This is
 not the current FAIL cause. The current FAIL cause is the two open findings
-above, especially item 49 and the incomplete item 53 contract.
+above, especially the design Section 49 security contract and the incomplete
+item 53 CLI contract.
 
 ## 7. Final verdict and stop boundary
 
