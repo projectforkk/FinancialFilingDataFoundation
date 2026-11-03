@@ -1004,7 +1004,7 @@ P9 设计保证：
 - overlay 必须绑定 base parse/validation identity、target、reason、evidence 与 before/after；
 - resolution 与 raw extraction 分层存储；
 - re-validation 必须能判断 overlay 是否解决原 issue；
-- 不得在 P9 内提前实现 P10 Codex Skill；
+- 不得在 P9 内提前实现 P10 Codex Dynamic Research Integration；
 - 不得在 P9 内提前接入 P11 US SEC provider。
 
 P9 production implementation 必须绑定本次 committed design baseline；任何后续设计问题继续执行 design-first amendment。
