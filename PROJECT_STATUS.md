@@ -119,17 +119,21 @@ P7 Independent Acceptance:
 
 P8 final Code Review:
 
-- verdict: `PASS`
-- evidence: `development/45-p8-code-review.md`
-- reviewed candidate: `599db48a62622cb18de2c61d7100e8186a7ca936`
+- final verdict: `PASS`
+- final evidence: `development/46-p8-final-code-review.md`
+- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
 - full regression: `231 passed`
-- runtime lock: `MATCH`
+- runtime package lock: `MATCH`
+- runtime lock blob/worktree SHA: `MATCH`
+- lock SHA256: `8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
 - official SDK protocol: `2026-07-28`
 - exact tools: `11 / 11 PASS`
 - live CN/HK: `PASS`
 - blocker: `NONE`
 
-Next gate: `P8-J Acceptance Freeze`.
+Historical review `development/45-p8-code-review.md` and freeze `acceptance/28-p8-acceptance-run-instruction.md` were invalidated by `P8-ISSUE-005`.
+
+Next gate: `P8-J Acceptance Re-freeze`.
 
 ## Project directory consolidation
 
