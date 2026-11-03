@@ -10,8 +10,8 @@ PASS / FAIL / BLOCKED
 1. exact frozen candidate / stable HEAD
 2. P0–P6 regression PASS
 3. prior accepted source/tests zero unintended diff
-4. P3/P5/P6 identity validation
-5. page sequence gate
+4. P3/P5/P6 preflight failure returns P7_INPUT_ARTIFACT_INVALID and does not fabricate BLOCKED artifact
+5. trusted-input identity/page sequence gate
 6. fact/evidence 1:1 gate
 7. evidence reference validation
 8. no-facts deterministic failure

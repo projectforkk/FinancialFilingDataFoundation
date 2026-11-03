@@ -124,11 +124,32 @@ FAIL 不自动修改事实。
 
 ### BLOCKED
 
-无法可靠执行 validation：
-- 上游 artifact缺失/损坏；
-- document SHA mismatch；
-- evidence链无法建立；
-- required input unreadable。
+`BLOCKED` 只用于 **P7 已经成功加载可信 P3/P5/P6 inputs、已建立 document identity 后**发现的 deterministic blocking condition，例如：
+- physical page sequence invalid；
+- 已加载 evidence record 的 page/bbox/source reference 不满足 P7 blocking rule；
+- 其它能够形成稳定 issue/evidence 的 document-level blocker。
+
+### 5.1 Preflight execution error 与 BLOCKED 的边界
+
+若在建立可信 validation context 之前，上游 loader 已拒绝输入，例如：
+- artifact files 缺失/损坏；
+- P3/P5/P6 manifest identity/version mismatch；
+- upstream semantic tamper guard失败；
+- P5 当前 P3/P4 fingerprints失效；
+- P6 当前 P3/P5 fingerprints失效；
+- document SHA 尚无法可信建立；
+
+P7 **不得伪造 BLOCKED validation artifact**，而是抛结构化执行错误：
+
+`P7_INPUT_ARTIFACT_INVALID`
+
+理由：此时无法证明一个 persisted validation report 的 document identity/input fingerprints 是可信的。
+
+因此调用方必须区分：
+- `ValidationArtifact(validation_status=BLOCKED)`：已有可信 document validation result；
+- `ValidationError(P7_INPUT_ARTIFACT_INVALID)`：validation result 根本未能建立。
+
+P8 MCP 必须保留这一区分。
 
 ---
 
@@ -148,7 +169,9 @@ P7 v1：
 
 ### INCOMPATIBLE
 
-- schema/version明确不受当前 P7支持。
+- schema/version在 **可加载且可识别的兼容层输入** 中明确不受当前 P7 policy支持。
+
+P7 v1 的 P3/P5/P6 loaders 对不支持的 schema/version会在 preflight 直接拒绝，因此当前 v1 常见结果是 `P7_INPUT_ARTIFACT_INVALID`，而不是生成 INCOMPATIBLE artifact。`CompatibilityStatus.INCOMPATIBLE` 保留给未来能安全读取但 policy 不支持的版本/adapter。
 
 ### UNKNOWN
 
@@ -808,6 +831,26 @@ Independent Acceptance PASS后：
 ---
 
 ## 33. P7 Issue Log
+
+### P7-ISSUE-003 — Preflight input failure must not be confused with BLOCKED validation status
+
+Code Review of upstream loaders confirmed P3/P5/P6 perform their own identity/version/fingerprint/semantic validation and may reject an input before P7 has a trustworthy `document_sha256` and input fingerprint set.
+
+Root cause:
+- initial P7 prose listed missing/corrupt upstream artifacts under `BLOCKED`；
+- implementation correctly raises `P7_INPUT_ARTIFACT_INVALID` when upstream loaders fail；
+- persisting a BLOCKED report before trusted identity exists would itself be unverifiable。
+
+Approved solution:
+- preflight loader/identity/version/tamper failure → structured `ValidationError(P7_INPUT_ARTIFACT_INVALID)` and **no validation artifact**；
+- `ValidationStatus.BLOCKED` is reserved for deterministic blocking issues discovered after trusted input loading/identity establishment；
+- current v1 unsupported upstream schema normally fails preflight rather than producing `CompatibilityStatus.INCOMPATIBLE`；
+- add regression for missing/corrupt upstream input；
+- P8 MCP must expose execution errors separately from document validation status。
+
+This is a design clarification; current production behavior already follows it.
+
+Affected gates: P7-C/F/J/L and P8 design.
 
 ### P7-ISSUE-002 — Cross-row repeated metric names were falsely treated as conflicting facts
 

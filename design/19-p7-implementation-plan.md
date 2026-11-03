@@ -21,7 +21,8 @@
 Gate: focused tests PASS.
 
 ## P7-C — Structural / Evidence Gates
-- identity
+- preflight loader/identity/version/tamper failure → P7_INPUT_ARTIFACT_INVALID (no artifact)
+- trusted-input identity
 - page sequence
 - fact/evidence coverage
 - evidence refs
