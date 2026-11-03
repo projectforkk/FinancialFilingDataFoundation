@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P5_DONE / P6_DESIGN_AUTHORIZED**
+**P5_DONE / P6_READY_FOR_ACCEPTANCE**
 
 ## Accepted baseline
 
@@ -82,7 +82,7 @@
 
 Status:
 
-`DESIGN READY / DEVELOPMENT NOT STARTED`
+`CODE REVIEW PASS / READY FOR ACCEPTANCE`
 
 Planned branch:
 
