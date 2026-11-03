@@ -106,6 +106,10 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 12-p5-table-reconstruction-design.md | P5 | ACCEPTED HISTORY |
 | 13-p5-implementation-plan.md | P5 | ACCEPTED HISTORY |
 | 15-project-directory-management.md | project directory/workspace | ACTIVE |
+| 16-p6-raw-facts-evidence-design.md | P6 | ACCEPTED HISTORY |
+| 17-p6-implementation-plan.md | P6 | ACCEPTED HISTORY |
+| 18-p7-quality-validation-design.md | P7 | ACTIVE DESIGN |
+| 19-p7-implementation-plan.md | P7 | ACTIVE PLAN |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -145,7 +149,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P4 | 10-p4 | 11-p4 | acceptance/17 | DONE |
 | P5 | 12 | 13 | acceptance/20 | DONE |
 | P6 | 16 | 17 | acceptance/23 | DONE |
-| P7 | 18 | 19 | TBD | DESIGN AUTHORIZED |
+| P7 | 18 | 19 | acceptance/24 (baseline) | DESIGN READY |
 | P8 | 20 | 21 | TBD | NOT STARTED |
 | P9 | 22 | 23 | TBD | NOT STARTED |
 | P10 | 24 | 25 | TBD | NOT STARTED |
@@ -280,10 +284,10 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P6_DONE / P7_DESIGN_AUTHORIZED`
+`P6_DONE / P7_DESIGN_READY`
 
 下一步：
-1. P7 detailed design 18；
-2. P7 implementation plan 19；
-3. commit design baseline；
-4. only then start P7 production code。
+1. commit P7 design baseline；
+2. create `task/p7-quality-validation`；
+3. execute P7-A → P7-M；
+4. Independent Acceptance PASS 后才进入 P8。
