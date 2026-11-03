@@ -915,7 +915,7 @@ deterministic gate、accounting consistency、document completeness。
 6. 若该阶段 FAIL / ABORT，必须通过可追踪的 revert commit 撤销未验收 implementation，不得改写历史；
 7. 后续阶段恢复“acceptance PASS 后再进入 main”的正常规则。
 
-### 21.2 Candidate Worktree 隔离规则
+### 21.3 Candidate Worktree 隔离规则
 
 Code Review / Independent Acceptance 的证据必须绑定到固定 candidate SHA，不得依赖可能被其他进程切换分支的共享开发工作树。
 
@@ -941,10 +941,14 @@ P1 已完成 Independent Acceptance 并收口为 `P1_DONE`。
 
 P2 已完成 Independent Acceptance 并收口为 `P2_DONE`。
 
+P3 已完成 Independent Acceptance 并收口为 `P3_DONE`。
+
 当前批准进入：
 
-**P3 — Native Page / Section / FTS**
+**P4 — Table Candidate Detection**
 
-P3 只实现 native page geometry、words/blocks/lines/spans/bbox、deterministic reading order、section tree 与 SQLite FTS5；P3 未 PASS 前不批准实现 P4 table candidate/reconstruction、MCP 或 Skill。
+P4 只基于 P3 artifacts 检测 deterministic table-like page/region candidates、signals 与 score；P4 不允许 cell/row/column reconstruction、cross-page stitching、fact extraction、OCR、Docling 或 AI。
 
-US SEC provider 仍属于 P11，不得提前进入 P3。
+P4 未 PASS 前不批准实现 P5 Table Reconstruction / Cross-page。
+
+US SEC provider 仍属于 P11，不得提前进入 P4。

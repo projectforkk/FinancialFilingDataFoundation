@@ -1,77 +1,143 @@
-# 01 窶・Development Roadmap
+# 01 — Development Roadmap
 
-迥ｶ諤・ｼ啀2 DONE / P3 DESIGN READY
+状态：**P3 DONE / P4 DESIGN READY**
 
-## 諤ｻ蜴溷・
+## 总原则
 
-豈丈ｸｪ Phase 迢ｬ遶具ｼ・
-DESIGN 竊・IMPLEMENT 竊・REVIEW 竊・ACCEPTANCE縲・
+每个 Phase 独立执行：
 
-荳榊ｾ嶺ｸ谺｡諤ｧ霍ｨ雜雁､壻ｸｪ譛ｪ鬪梧噺髦ｶ谿ｵ縲・
+`DESIGN → DEVELOPMENT → CODE REVIEW → INDEPENDENT ACCEPTANCE → DONE`
 
-## P0 窶・Native PDF Parsing Feasibility Probe
+不得跨越未验收阶段。
 
-逶ｮ譬・ｼ・
-鬪瑚ｯ∫岼譬・PC 譏ｯ蜷ｦ閭ｽ莉･霓ｻ驥・native path 蠢ｫ騾溯ｯｻ蜿紋ｻ｣陦ｨ諤ｧ CN/HK born-digital PDF縲・
+发现问题并确定解决方案时：
 
-螳樒鴫闌・峩・・
-- 邇ｯ蠅・ｮ｡隶｡・・
-- benchmark CLI / script・・
-- PDF open・・
-- SHA256・・
-- page count・・
-- text / words / blocks・・
-- bbox / drawings / images・・
-- cheap table-page candidate signals・・
-- per-stage timing・・
-- peak memory・郁凶蜿ｯ蜿ｯ髱蜿門ｾ暦ｼ会ｼ・
-- machine-readable result JSON縲・
+`STOP → update design → commit design baseline → rerun affected gates → continue`
 
-譏守｡ｮ荳榊★・・
-- 螳梧紛 table reconstruction・・
-- OCR・・
-- Docling・・
-- MCP・・
-- Skill・・
-- CRDE・・
-- 謚戊ｵ・・譫舌・
+不得 code-first / design-later。
 
-鬥紋ｸｪ譬ｷ譛ｬ・・
-600519 / 雍ｵ蟾櫁桁蜿ｰ FY2024・・43 pages縲・
+## P0 — Native PDF Parsing Feasibility Probe
 
-P0 諤ｧ閭ｽ Gate・・
-- born-digital 莉｣陦ｨ譬ｷ譛ｬ native probe > 120s 竊・FAIL / investigate・・
-- 闍･譏取仞菴惹ｺ・120s・檎ｻｧ扈ｭ譬ｹ謐ｮ螳樣刔扈捺棡謾ｶ邏ｧ蜷守ｻｭ譬・㊥・・
-- 荳榊・隶ｸ逕ｨ逅・ｮｺ騾溷ｺｦ莉｣譖ｿ螳樊ｵ九・
+状态：`DONE / PASS`
 
-## P1 窶・Identity / Registry / Incremental Planner
+目标：
+验证目标 PC 是否能以轻量 native path 快速读取代表性 CN/HK born-digital PDF。
 
-蟒ｺ遶具ｼ・
-- FilingIdentity
-- DocumentRegistry
-- ParsedDataRegistry
-- build_plan
+## P1 — Identity / Registry / Incremental Planner
+
+状态：`DONE / PASS`
+
+建立：
+- FilingSlotKey / FilingIdentity
+- Document Registry
+- Parsed Data Registry
+- deterministic build_plan
 - REUSE_DATA / PARSE_LOCAL / DOWNLOAD_AND_PARSE
 
-## P2 窶・Acquisition Provider
+## P2 — Acquisition Provider
 
-CN/HK Dayu narrow adapter縲・
-蠢・｡ｻ隸∵・荳崎ｿ帛・ Docling conversion縲・
+状态：`DONE / PASS`
 
-## P3 窶・Native Page / Section
+建立：
+- CN/HK Dayu narrow acquisition
+- dedicated Dayu runtime
+- raw content-addressed store
+- acquisition receipt
+- P1 Registry integration
+- no Docling conversion
 
-## P4 窶・Table Candidate Detection
+US SEC 不在 P2，保留给 P11。
 
-## P5 窶・Table Reconstruction / Cross-page
+## P3 — Native Page / Section / FTS
 
-## P6 窶・Raw Facts / Evidence
+状态：`DONE / PASS`
 
-## P7 窶・Quality Gate / Validation
+建立：
+- deterministic physical page extraction
+- words / blocks / spans / bbox
+- section detection
+- repeated header/footer marking
+- pages.jsonl / sections.jsonl
+- SQLite FTS5 page/section search
+- artifact corruption guard
 
-## P8 窶・Local MCP
+## P4 — Table Candidate Detection
 
-## P9 窶・Codex Review Overlay
+状态：`DESIGN READY`
 
-## P10 窶・Codex Skill
+目标：
+基于 P3 artifact 检测 table-like page/region candidate。
 
-## P11 窶・US SEC Provider
+禁止：
+- cell/row/column reconstruction
+- cross-page table stitching
+- OCR/Docling/AI
+
+## P5 — Table Reconstruction / Cross-page
+
+状态：`NOT STARTED`
+
+目标：
+从 P4 candidates 重建 rows/columns/cells，并处理跨页表格连续性。
+
+## P6 — Raw Facts / Evidence
+
+状态：`NOT STARTED`
+
+目标：
+从 reconstructed tables 生成 raw facts 与 first-class evidence links。
+
+## P7 — Quality Gate / Validation
+
+状态：`NOT STARTED`
+
+目标：
+deterministic validation、blocking issues、quality gates、reuse eligibility。
+
+## P8 — Local MCP
+
+状态：`NOT STARTED`
+
+目标：
+本地 deterministic MCP tools，只暴露已验证的数据能力；MCP AI API calls 继续禁止。
+
+## P9 — Codex Review Overlay
+
+状态：`NOT STARTED`
+
+目标：
+仅对 ambiguous local structured data 启用 Codex text review，输出 REVIEW_OVERLAY，不覆盖 RAW/LOCAL_EXTRACTED。
+
+## P10 — Codex Skill
+
+状态：`NOT STARTED`
+
+目标：
+把已验收 local data + review workflow 封装为 Codex Skill。
+
+## P11 — US SEC Provider
+
+状态：`NOT STARTED`
+
+目标：
+SEC HTML / iXBRL / XBRL first acquisition and extraction path。
+
+## 当前执行顺序
+
+```text
+P4 Table Candidate Detection
+↓
+P5 Table Reconstruction / Cross-page
+↓
+P6 Raw Facts / Evidence
+↓
+P7 Quality Gate / Validation
+↓
+P8 Local MCP
+↓
+P9 Codex Review Overlay
+↓
+P10 Codex Skill
+↓
+P11 US SEC Provider
+```
