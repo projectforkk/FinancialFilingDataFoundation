@@ -147,6 +147,18 @@ Extractor version：
 
 每个 eligible VALUE cell 生成一条 RawFact。
 
+### 6.1 Period-header Row Guard
+
+下列 row 视为 period/header evidence，不生成 RawFact：
+
+1. LABEL 归一化后属于明确 header marker：`项目`、`科目`、`项目 附注`、`item`、`items`、`particulars`、`item notes`；
+2. 该 row 所有非空 VALUE cell 都可识别为 period label（典型 `2024` / `2023`）；
+3. 不存在其它非 period numeric value。
+
+这些 VALUE cell 的 `column_index -> raw period label` 可直接作为后续 data rows 的 period evidence。
+
+不得因为值恰好是 2024/2023 就跳过普通 metric row；必须同时满足 header marker 条件。
+
 不生成 fact 的情况：
 
 - 无 LABEL；
@@ -737,7 +749,23 @@ load_raw_facts(
 
 ---
 
-## 31. Issue Rule
+## 31. P6 Issue Log
+
+### P6-ISSUE-001 — Numeric year header row could be misclassified as raw facts
+
+P5 structural table can represent `项目 | 2024 | 2023` as LABEL + numeric VALUE cells. A naive P6 eligibility rule would emit facts `项目=2024/2023`.
+
+Approved solution:
+- add period-header row guard defined in §6.1；
+- use its value columns as explicit period evidence；
+- do not emit facts for that row；
+- add unit tests for header suppression and ordinary metric value 2024 not being suppressed。
+
+Affected gates: P6-B/D/F and Acceptance period/fact eligibility checks.
+
+---
+
+## 32. Issue Rule
 
 ```text
 problem
