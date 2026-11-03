@@ -41,9 +41,10 @@ Mandatory:
 33. ffdf_list_documents is catalog-only and does not claim unvalidated P7 status
 
 Windows pytest execution rule:
-- use short external basetemp under `D:\Codex\_ffdf_p8_pytest\<acceptance-run>`；
+- use short project-root-local basetemp under `D:\Codex\FinancialFilingDataFoundation\workspace\t\p8\<acceptance-run>`；
 - do not place pytest basetemp beneath the detached review/acceptance worktree；
-- basetemp contents are disposable test execution state only.
+- do not create FFDF-owned sibling temp directories under `D:\Codex`；
+- basetemp contents are ignored disposable test execution state only.
 
 Acceptance must not modify:
 - production
