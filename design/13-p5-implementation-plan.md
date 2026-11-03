@@ -92,6 +92,17 @@ continuation tests PASS。
 
 ## P5-G — Artifact Persistence / Reuse
 
+### P5-ISSUE-001 — Derived reconstruction integrity
+
+P5-J Code Review tamper probe confirmed that changing persisted `value_column_anchors` while preserving IDs was accepted by the initial loader. Root cause: reuse validation checked IDs/source refs but did not recompute the full deterministic reconstruction.
+
+Approved fix:
+- on load/reuse, reconstruct all expected table fragments again from current P3/P4 inputs;
+- recompute continuation groups;
+- require exact semantic equality against persisted tables/groups;
+- add tamper tests for anchors, cell text/bbox/numeric and group score/signals;
+- rerun P5-G/H/I/J.
+
 实现：
 - tables.jsonl
 - table_groups.jsonl

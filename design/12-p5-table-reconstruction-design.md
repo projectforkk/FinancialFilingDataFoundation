@@ -340,6 +340,16 @@ load/reuse 验证：
 - source word refs belong to page/candidate block set
 - group member table IDs exist
 - group pages monotonic/adjacent
+- **完整 deterministic reconstruction semantic equality**：loader 必须从当前 P3/P4 输入重新执行 `_reconstruct_candidate` 与 continuation grouping，并要求重新计算得到的 tables/groups 与持久化 JSONL 逐记录完全一致；不得只依赖 IDs。
+
+完整 semantic equality 必须覆盖至少：
+- value_column_count / value_column_anchors
+- row_count / row bbox / structural signals
+- cell role/text/bbox/numeric/source_words
+- table quality_signals / source_block_nos / candidate signals
+- continuation member order / score / signals
+
+这样即使攻击者或损坏流程同步重算了某些 ID，也不能让被修改的 derived reconstruction 通过 reuse validation。
 
 任何失败：
 `P5_ARTIFACT_INCOMPLETE_OR_CORRUPT`
