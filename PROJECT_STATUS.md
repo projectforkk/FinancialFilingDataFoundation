@@ -72,7 +72,7 @@
 
 Status:
 
-`DESIGN READY / DEVELOPMENT NOT STARTED`
+`CODE REVIEW PASS / READY FOR ACCEPTANCE`
 
 Planned branch:
 
@@ -87,7 +87,16 @@ P4 Independent Acceptance:
 - live CN/HK: `PASS`
 - blocker: `NONE`
 
-P5 must not start production implementation until its detailed design and execution plan are committed.
+P5 Code Review:
+
+- verdict: `PASS`
+- evidence: `development/33-p5-code-review.md`
+- reviewed candidate: `2c4bafd36b59defd4ff47eeb16713cbee64e739e`
+- full suite: `156 passed`
+- live CN/HK: `PASS`
+- blocker: `NONE`
+
+Next: P5 Independent Acceptance.
 
 ## Current runtime boundaries
 
