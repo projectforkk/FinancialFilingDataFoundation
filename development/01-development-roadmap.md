@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P8 DONE / P9 DESIGN AUTHORIZED**
+状态：**P8 DONE / P9 DESIGN READY**
 
 ## 总原则
 
@@ -103,7 +103,7 @@ deterministic validation、blocking issues、quality gates、reuse eligibility�
 
 ## P9 — Codex Review Overlay
 
-状态：`DESIGN AUTHORIZED`
+状态：`DESIGN READY`
 
 目标：
 仅对 ambiguous local structured data 启用 Codex text review，输出 REVIEW_OVERLAY，不覆盖 RAW/LOCAL_EXTRACTED。

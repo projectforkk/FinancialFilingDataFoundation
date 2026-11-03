@@ -112,6 +112,8 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 19-p7-implementation-plan.md | P7 | ACCEPTED HISTORY |
 | 20-p8-local-mcp-design.md | P8 | ACCEPTED HISTORY |
 | 21-p8-implementation-plan.md | P8 | ACCEPTED HISTORY |
+| 22-p9-review-overlay-design.md | P9 | ACTIVE DESIGN |
+| 23-p9-implementation-plan.md | P9 | ACTIVE PLAN |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -153,7 +155,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P6 | 16 | 17 | acceptance/23 | DONE |
 | P7 | 18 | 19 | acceptance/26 | DONE |
 | P8 | 20 | 21 | acceptance/31 | DONE |
-| P9 | 22 | 23 | TBD | DESIGN AUTHORIZED |
+| P9 | 22 | 23 | acceptance/32 (baseline) | DESIGN READY |
 | P10 | 24 | 25 | TBD | NOT STARTED |
 | P11 | 26 | 27 | TBD | NOT STARTED |
 
@@ -286,11 +288,10 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P8_DONE / P9_DESIGN_AUTHORIZED`
+`P8_DONE / P9_DESIGN_READY`
 
 下一步：
-1. create `design/22-p9-review-overlay-design.md`；
-2. create `design/23-p9-implementation-plan.md`；
-3. create P9 development/acceptance baseline instructions；
-4. commit/push P9 design baseline；
-5. only then start P9 production code。
+1. commit/push P9 design baseline；
+2. create `task/p9-review-overlay` project-root worktree；
+3. execute P9-B queue/model implementation；
+4. continue ordered P9 gates only after each prior gate PASS。

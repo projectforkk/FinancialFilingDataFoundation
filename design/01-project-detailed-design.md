@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P8 DONE / P9 DESIGN AUTHORIZED**
+状态：**DESIGN BASELINE — P8 DONE / P9 DESIGN READY**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -977,11 +977,13 @@ P8 accepted capabilities：
 
 当前批准进入：
 
-**P9 — Codex Review Overlay（DESIGN AUTHORIZED）**
+**P9 — Codex Review Overlay（DESIGN READY）**
 
-P9 当前只批准详细设计与实施计划，不批准直接编码。
+P9 detailed design、implementation plan、development instruction 与 acceptance baseline 已完成。
 
-P9 设计必须保证：
+**只有在本次 P9 design baseline commit/push 成为 GitHub 真源后，才授权按照 design/23 的顺序进入 production development。**
+
+P9 设计保证：
 - `RAW` / `LOCAL_EXTRACTED` 永不被 review 结果覆盖；
 - review 只针对 deterministic pipeline 已明确标记的 unresolved / REVIEW_REQUIRED 语义；
 - overlay 必须绑定 base parse/validation identity、target、reason、evidence 与 before/after；
@@ -990,6 +992,6 @@ P9 设计必须保证：
 - 不得在 P9 内提前实现 P10 Codex Skill；
 - 不得在 P9 内提前接入 P11 US SEC provider。
 
-P9 detailed design 与 implementation plan 未提交前，不批准 P9 production implementation。
+P9 production implementation 必须绑定本次 committed design baseline；任何后续设计问题继续执行 design-first amendment。
 
 US SEC provider 仍属于 P11，不得提前进入 P9。

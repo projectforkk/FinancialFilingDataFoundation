@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P8_DONE / P9_DESIGN_AUTHORIZED**
+**P8_DONE / P9_DESIGN_READY**
 
 ## Accepted baseline
 
@@ -119,7 +119,7 @@
 
 Status:
 
-`DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED`
+`DESIGN READY / DEVELOPMENT NOT STARTED`
 
 Planned branch:
 
@@ -162,9 +162,11 @@ P8 final Independent Acceptance freeze:
 - frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
 - prior freezes `acceptance/28` and `acceptance/29`: historical / invalidated
 
-P9 must first complete `design/22-p9-review-overlay-design.md` and `design/23-p9-implementation-plan.md` and commit that design baseline.
+P9 detailed design, implementation plan, development instruction and acceptance baseline are complete.
 
-Current gate: `P9-A Design Baseline`.
+Production remains blocked until this P9 design baseline is committed/pushed and the formal P9 worktree is created.
+
+Current gate: `P9-A Design Baseline Commit / P9-B Development Preparation`.
 
 ## Project directory consolidation
 
