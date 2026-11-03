@@ -35,8 +35,10 @@ Mandatory:
 27. CN live tool calls PASS
 28. HK live tool calls PASS
 29. upstream artifacts/catalog unchanged
-30. cold startup <=15s
-31. representative business calls meet tool performance gates
+30. cold startup/connect/list-tools <=15s without document bundle load
+31. first trusted bundle load per document <=15s
+32. warm representative business calls meet tool performance gates
+33. ffdf_list_documents is catalog-only and does not claim unvalidated P7 status
 
 Acceptance must not modify:
 - production

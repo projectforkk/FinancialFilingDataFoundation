@@ -233,12 +233,20 @@ MCP tool arguments**不得提供 artifact path**。
 
 ## 8. Artifact Trust
 
-首次访问 document 时分别调用：
+### 8.1 Lazy trusted bundle
+
+Server/catalog 启动只验证 catalog schema/path/identity，**不得 eager 加载全部 document artifacts**。
+
+首次调用需要 artifact 内容的 document tool 时，按该 document 分别调用：
 
 - `load_native_document`
 - `load_reconstructed_tables`
 - `load_raw_facts`
 - `load_validation_result`
+
+完整验证成功后生成 immutable in-process bundle cache。后续同 document tool calls 复用该 bundle。
+
+`ffdf_list_documents` 是唯一 catalog-only tool，不触发 artifact bundle load，也不返回 P7 status。
 
 要求：
 - same document SHA
@@ -267,7 +275,16 @@ P8 v1 固定 11 个 tools。
 - ticker optional
 - fiscal_year optional
 
-返回 catalog metadata + P7 validation summary。
+返回 **catalog identity metadata only**：
+- document_sha256
+- market
+- ticker
+- fiscal_year
+- filing_type
+
+不返回未经当前进程完整 loader 验证的 P7 status。调用方需要 validation summary 时使用 `ffdf_get_document` 或 `ffdf_get_validation`。
+
+理由见 P8-ISSUE-002。
 
 ### 9.2 ffdf_get_document
 
@@ -591,18 +608,21 @@ dedicated runtime必须验证：
 
 ## 20. Performance
 
-Business service（不含首次 process startup）：
+Business service：
 
-- list_documents <= 2s
-- get_document <= 5s
-- search <= 2s
-- read_pages <= 2s
-- list/get table <= 5s
-- list/get facts/evidence <= 5s
-- validation <= 5s
+- list_documents catalog-only <= 2s
+- first trusted bundle load for one document <= 15s
+- warm get_document <= 2s
+- warm search <= 2s
+- warm read_pages <= 2s
+- warm list/get table <= 5s
+- warm list/get facts/evidence <= 5s
+- warm validation <= 5s
 
-MCP process cold startup/list tools：
+MCP process cold startup + protocol connect + list tools（不加载 document bundle）：
 <= 15s
+
+首次 artifact tool call 的 bundle validation 时间单独记录，不混入 server cold-start Gate。
 
 不把网络时间计入，因为 P8无网络。
 
@@ -702,6 +722,35 @@ P9 可以复用 service读取数据，但不得通过修改 P8 tool contract偷�
 ---
 
 ## 25. P8 Issue Log
+
+### P8-ISSUE-002 — Eager artifact validation made MCP cold connect exceed the 15s gate
+
+Official SDK stdio integration succeeded functionally and negotiated protocol `2026-07-28`, but initial implementation constructed `McpQueryService` by validating/loading every catalog document during server creation.
+
+Observed:
+- standalone two-document bundle preload: ~11.16s；
+- official SDK connect + eager preload: ~25.93s；
+- design cold startup/connect gate: <=15s；
+- protocol/tool calls themselves succeeded。
+
+Root cause:
+- implementation interpreted artifact trust as eager server-wide preflight；
+- design intent in §8 is first document access validation；
+- eager preload scales startup linearly with catalog size。
+
+Approved solution:
+1. `McpQueryService.__init__` stores catalog only and starts with empty bundle cache；
+2. `ffdf_list_documents` becomes catalog-only identity metadata and never claims P7 status；
+3. first artifact-dependent call for a document performs full P3/P5/P6/P7 loader validation and caches the immutable bundle；
+4. all later calls for that document use the validated cache；
+5. upstream corruption still raises `P8_UPSTREAM_ARTIFACT_INVALID` on first artifact access；
+6. add tests proving constructor/list_documents do not load/touch artifact contents；
+7. cold protocol connect/list-tools <=15s；
+8. record first-document trusted-load latency separately (<=15s)。
+
+The first integration run remains valid evidence for protocol/tool correctness but **fails the cold-start performance gate** and is invalidated for performance acceptance.
+
+Affected gates: P8-D/F/H/I/K.
 
 ### P8-ISSUE-001 — MCP SDK dependency has no usable CPython 3.14 ARM64 wheel path
 

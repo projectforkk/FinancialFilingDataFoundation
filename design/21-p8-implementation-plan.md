@@ -37,6 +37,12 @@ Gate: catalog tests PASS.
 Implement 11 read-only business methods.
 No MCP SDK import.
 
+Per P8-ISSUE-002:
+- constructor/catalog list are lazy and catalog-only；
+- first artifact-dependent access validates one document's full P3/P5/P6/P7 bundle；
+- validated bundle is cached for warm calls；
+- test constructor/list_documents do not open artifact files。
+
 Gate: focused service tests PASS.
 
 ## P8-E — MCP Adapter
