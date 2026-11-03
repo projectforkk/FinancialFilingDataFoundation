@@ -38,6 +38,12 @@ Main parse/test runtime:
 Dedicated MCP runtime:
 `D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-mcp-2.3.0\.venv`
 
+Approved base after P8-ISSUE-001:
+`C:\Users\guoyg\AppData\Roaming\uv\python\cpython-3.12.14-windows-x86_64-none\python.exe`
+
+- CPython 3.12.14 AMD64
+- Windows ARM64 x64 emulation
+
 All operational files remain under project root.
 
 ## Development Evidence Must Record

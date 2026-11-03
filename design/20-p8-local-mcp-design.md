@@ -109,8 +109,14 @@ FFDF main runtime 保持：
 
 `D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-mcp-2.3.0\.venv`
 
-base：
-current approved CPython 3.14.9 ARM64。
+approved base：
+`C:\Users\guoyg\AppData\Roaming\uv\python\cpython-3.12.14-windows-x86_64-none\python.exe`
+
+- CPython 3.12.14 AMD64 / x86_64
+- 运行于 Windows ARM64 的 x64 emulation
+- 已被 P2 Dayu runtime 实际验证可稳定使用
+
+P8 不使用 Python 3.14 ARM64 作为 MCP runtime base；原因见 P8-ISSUE-001。
 
 runtime 至少：
 - mcp==2.3.0
@@ -118,7 +124,7 @@ runtime 至少：
 - exact transitive lock
 
 tracked lock：
-`runtime-locks/mcp-2.3.0-py314-win-arm64.lock.txt`
+`runtime-locks/mcp-2.3.0-py312-win-amd64.lock.txt`
 
 安装过程：
 1. create isolated venv
@@ -550,7 +556,7 @@ Catalog位于：
 
 dedicated runtime必须验证：
 
-- Python 3.14.9 ARM64
+- Python 3.12.14 AMD64
 - mcp 2.3.0
 - PyMuPDF 1.28.2
 - server import
@@ -622,7 +628,7 @@ catalog本身视为 trusted local operator configuration，但仍执行 schema/p
 ## 22. Runtime Reproducibility
 
 P8 runtime lock：
-`runtime-locks/mcp-2.3.0-py314-win-arm64.lock.txt`
+`runtime-locks/mcp-2.3.0-py312-win-amd64.lock.txt`
 
 任何未来 rebuild：
 - exact lock
@@ -697,7 +703,36 @@ P9 可以复用 service读取数据，但不得通过修改 P8 tool contract偷�
 
 ## 25. P8 Issue Log
 
-初始：无。
+### P8-ISSUE-001 — MCP SDK dependency has no usable CPython 3.14 ARM64 wheel path
+
+Observed during P8-B environment audit:
+
+- target: CPython 3.14.9 ARM64；
+- exact root: `mcp==2.3.0` + `PyMuPDF==1.28.2`；
+- resolver selected `cryptography==50.0.2` via `mcp -> pyjwt[crypto]`；
+- no compatible prebuilt cryptography wheel was selected for cp314-win_arm64；
+- build fell back to Rust/MSVC；
+- Rust was available, but MSVC linker `link.exe` was not installed；
+- install failed before P8 production code began。
+
+Rejected solutions:
+- install full Visual Studio Build Tools merely for P8；
+- mutate system compiler/toolchain；
+- downgrade MCP SDK；
+- weaken exact SDK pin。
+
+Approved solution:
+- reuse already-installed uv-managed CPython 3.12.14 AMD64 under Windows ARM64 x64 emulation；
+- this base is already validated by P2 Dayu runtime；
+- create `runtimes/ffdf-mcp-2.3.0/.venv` from that interpreter；
+- exact runtime lock name becomes `mcp-2.3.0-py312-win-amd64.lock.txt`；
+- keep FFDF main Python 3.14 ARM64 unchanged and MCP-free；
+- delete/recreate only the failed, unaccepted P8 runtime directory after this design amendment is committed；
+- rerun SDK install/import/protocol doctor。
+
+Affected gates: P8-B/H/I/K.
+
+Initial failed runtime attempt is invalid evidence and must not be treated as an accepted P8 runtime.
 
 发现问题：
 必须追加 `P8-ISSUE-xxx` 后先提交 design amendment。
