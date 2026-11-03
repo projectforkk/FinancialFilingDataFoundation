@@ -2,92 +2,125 @@
 
 状态：**PASS — READY FOR ACCEPTANCE**
 
-Repository:
-`projectforkk/FinancialFilingDataFoundation`
-
 Phase:
 `P8 — Local MCP`
 
 Reviewed candidate:
-`599db48a62622cb18de2c61d7100e8186a7ca936`
+`d31a5851767f102082e2078cd09df2b023e84227`
 
 Accepted baseline before P8:
 `5f314bab9d88fb16b4b46c662e0a9f1b8f1a9b13`
 
-Core production commit:
-`9e026677eff177737202c43a5702ce2ec880573d`
+Core production commits:
+- `9e026677eff177737202c43a5702ce2ec880573d`
+- `45a01ad385d88e28ca178ff0d55ef7e79f0fa507`
 
-Final development evidence:
-`development/44-p8-final-development-amendment.md`
+Runtime / lock:
+- environment commit: `89b3cec9e72d76ee3624322328dcd36231434557`
+- EOL design amendment: `261c664a8ec39e194bb87a50bc01a9176a1365c1`
+- LF attribute commit: `e8ca4a9c670a7da6065b2fefa58c323ea5b30c86`
 
-Review worktree:
-`worktrees/review/p8-599db48`
+## Verdict
 
----
+# PASS
 
-## 1. Review Isolation
+## Review Isolation
 
-Detached HEAD was fixed at:
+Detached worktree:
 
-`599db48a62622cb18de2c61d7100e8186a7ca936`
+`D:\Codex\FinancialFilingDataFoundation\worktrees\review\p8-d31a585`
 
-HEAD before/after critical review groups was identical.
+HEAD before/after all checks:
 
-Tracked review worktree remained clean.
+`d31a5851767f102082e2078cd09df2b023e84227`
 
-Result: **PASS**
+Tracked status remained clean.
 
----
+## Full Regression
 
-## 2. Full Regression
+P0–P8 deterministic unit suite:
 
-Windows short project-root-local basetemp:
+`231 passed in 5.84s`
 
-`D:\Codex\FinancialFilingDataFoundation\workspace\t\p8\review-599db48`
+P0–P7 source/tests compared with accepted P7 baseline:
 
-Result:
+**zero diff**
 
-```text
-231 passed in 6.81s
-```
+Additional:
+- compileall: PASS
+- git diff --check: PASS
 
-This covers P0–P8 unit/regression tests.
+## Runtime Isolation
 
-Result: **PASS**
-
----
-
-## 3. Runtime Lock
+FFDF main runtime:
+- Python 3.14.9 ARM64
+- external `mcp` package: absent
 
 Dedicated MCP runtime:
+- Python 3.12.14 AMD64
+- mcp 2.3.0
+- mcp-types 2.3.0
+- PyMuPDF 1.28.2
 
-`D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-mcp-2.3.0\.venv`
+PASS.
 
-Tracked lock:
+## Runtime Lock Reproducibility
 
+Tracked:
 `runtime-locks/mcp-2.3.0-py312-win-amd64.lock.txt`
 
-Independent `uv pip freeze` comparison:
+Fresh detached Review checkout:
 
-`LOCK_MATCH`
+- Git blob SHA256:
+  `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
+- working-tree SHA256:
+  `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
+- bytes equal: PASS
+- CRLF present: false
+- `.gitattributes`: `runtime-locks/*.txt text eol=lf`
 
-Result: **PASS**
+P8-ISSUE-005:
+**CLOSED / PASS**
 
----
+## Static Scope / Security
 
-## 4. Official SDK Stdio Integration
+Catalog/service static review found no:
+- requests/httpx network client use
+- urllib/socket use
+- subprocess use
+- remote AI imports
+- arbitrary filesystem tool surface
+- sqlite_query
+- execute_python
+- run_command
+
+Server transport source:
+- only `server.run("stdio")`
+
+Exact domain tool names in server source:
+**11 / 11**
+
+No HTTP/SSE listener invocation.
+
+## Official SDK Stdio Integration
 
 Runtime:
-- official `mcp==2.3.0`
-- CPython 3.12.14 AMD64
-- stdio child server
+official `mcp==2.3.0`
+
+Client:
+`Client(StdioServerParameters(...), mode="auto")`
 
 Negotiated protocol:
 
-`2026-07-28`
+**2026-07-28**
+
+Cold connect:
+`1054.748 ms`
+
+Gate <=15000 ms:
+PASS.
 
 Exact tool list:
-
 1. ffdf_list_documents
 2. ffdf_get_document
 3. ffdf_search_document
@@ -100,166 +133,103 @@ Exact tool list:
 10. ffdf_get_evidence
 11. ffdf_get_validation
 
-Tool list: **11 / 11 PASS**
+11/11 PASS.
 
-Live catalog:
-- CN 600519 FY2024
-- HK 00700 FY2024
+## Live CN — 600519 FY2024
 
-Representative calls:
-- list documents: PASS
-- CN/HK get_document: PASS
-- CN FTS search: PASS
-- read pages: PASS
-- sections: PASS
-- list/get table: PASS
-- list/get fact: PASS
-- get evidence: PASS
-- get validation: PASS
-- invalid document → `is_error=True`: PASS
+First trusted bundle:
+`10757.187 ms`
+
+Gate <=20000 ms:
+PASS.
+
+Returned:
+- page_count: 143
+- table_count: 97
+- raw_fact_count: 2177
+- validation_status: REVIEW_REQUIRED
+- search_returned: 5
+- read_pages_returned: 1
+- sections_returned: 1000
+- tables_total: 97
+- table detail identity: PASS
 - fact/evidence relation: PASS
+- validation issues: 3
 
-Result: **PASS**
+## Live HK — 00700 FY2024
 
----
+First trusted bundle:
+`16670.849 ms`
 
-## 5. Review Performance
+Gate <=20000 ms:
+PASS.
 
-Observed:
+Returned:
+- page_count: 274
+- table_count: 97
+- raw_fact_count: 2989
+- validation_status: REVIEW_REQUIRED
+- validation issues: 6
 
-- cold connect: `1121.027 ms`
-- CN first trusted bundle: `10623.358 ms`
-- HK first trusted bundle: `15797.703 ms`
+## Warm Protocol Calls
 
-Gates:
-- cold connect <=15000 ms: PASS
-- first trusted bundle per document <=20000 ms: PASS
+- list_documents: 2.719 ms
+- get_document: 3.342 ms
+- search: 7.648 ms
+- read_pages: 3.390 ms
+- get_table: 3.547 ms
+- fact + evidence: 5.971 ms
+- validation: 2.919 ms
 
-Warm protocol calls:
-- list_documents: 2.420 ms
-- get_document: 2.928 ms
-- search: 7.045 ms
-- read_pages: 3.417 ms
-- get_table: 2.957 ms
-- fact + evidence: 5.187 ms
-- validation: 3.826 ms
+All warm gates PASS.
 
-All warm gates: **PASS**
+## Error Boundary
 
----
+Invalid document SHA:
+- MCP tool response `is_error=True`
 
-## 6. Catalog Identity
+Valid P7 `REVIEW_REQUIRED`:
+- returned as document validation status
+- not converted to MCP execution error
 
-Canonical operational acceptance catalog:
+Upstream invalidity contract remains separate:
+`P8_UPSTREAM_ARTIFACT_INVALID`
 
-`workspace/mcp/p8-acceptance-catalog.json`
+PASS.
 
-SHA256:
+## Read-only Immutability
 
-`e493f2f6a951007c1e5ac932268796d35d33386760f4503d48ff0a7f7a148cdc`
-
-Contains exactly:
-- CN / 600519 / FY2024 / ANNUAL
-- HK / 00700 / FY2024 / ANNUAL
-
-Artifact paths are project-root-relative.
-
-Result: **PASS**
-
----
-
-## 7. Scope / Regression Boundary
-
-Compared against accepted P7 baseline:
-
-`5f314bab9d88fb16b4b46c662e0a9f1b8f1a9b13`
-
-No P0–P7 source file changed outside the new:
-
-`src/financial_filing_data_foundation/mcp/`
-
-P8 production scope is limited to:
+Snapshot includes:
 - catalog
-- query service
-- stdio MCP adapter
-- runtime lock
-- tests/integration evidence
+- referenced P3 artifact files
+- referenced P5 artifact files
+- referenced P6 artifact files
+- referenced P7 artifact files
 
-No P9/P10/P11 implementation is present.
+Files:
+`25`
 
-Result: **PASS**
+Before/after:
+- file count equal
+- SHA256 equal
+- size equal
+- mtime_ns equal
+- diff_count: 0
 
----
+Result:
+**UNCHANGED / PASS**
 
-## 8. Security / Read-only Boundary
+## Design Issues
 
-Verified:
-- stdio only
-- no HTTP/SSE listener
-- no arbitrary filesystem tool
-- no arbitrary SQL
-- no Python/shell execution tool
-- catalog path containment
-- no network import in business service
-- no subprocess import in business service
-- no OpenAI/Anthropic/remote AI import
-- no Dayu/Docling/Torch import in P8 business service
-- no Registry mutation
-- no artifact mutation
-- server import emits no stdout
-- main FFDF runtime remains external-MCP-free
-
-Main runtime:
-
-`importlib.util.find_spec("mcp") == None`
-
-Result: **PASS**
-
----
-
-## 9. Artifact Trust
-
-Design amendments are implemented:
-
-- P8-ISSUE-002: no eager server-wide artifact load
-- `ffdf_list_documents`: catalog identity only
-- first document/content tool: full P3/P5/P6/P7 loader/tamper validation
-- trusted bundle cache by document SHA
-- corruption remains `P8_UPSTREAM_ARTIFACT_INVALID`
-
-P8-ISSUE-003 first-bundle gate:
-<=20s, PASS.
-
-P8-ISSUE-004 Windows pytest basetemp:
-final rule uses project-root-local short path, PASS.
-
-Result: **PASS**
-
----
-
-## 10. Review Findings
+Verified closed:
+- P8-ISSUE-001 — MCP runtime base compatibility
+- P8-ISSUE-002 — eager validation / cold connect
+- P8-ISSUE-003 — trusted-bundle performance calibration
+- P8-ISSUE-004 — Windows pytest path length
+- P8-ISSUE-005 — runtime lock EOL portability
 
 Blocking findings:
-
 **NONE**
 
-Invalid review helper evidence:
-- an earlier runtime-lock helper used an incorrect absolute `uv.exe` path and produced unusable comparison output;
-- that helper result was discarded;
-- correct rerun using the installed `uv` command returned `LOCK_MATCH`.
-
-No PASS conclusion relies on the invalid helper attempt.
-
----
-
-## 11. Conclusion
-
-# P8-I CODE REVIEW = PASS
-
-Authorized transition:
-
-`P8_IN_REVIEW → P8_READY_FOR_ACCEPTANCE`
-
-Next:
-
-**P8-J — Acceptance Freeze**
+Authorized next:
+**P8 Independent Acceptance**
