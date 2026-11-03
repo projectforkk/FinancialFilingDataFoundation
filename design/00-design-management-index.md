@@ -73,6 +73,8 @@ STOP
 - `03-parsed-financial-document-contract.md`
 - `04-pdf-quality-gate-design.md`
 - `15-project-directory-management.md`
+- `28-ffdf-research-consumption-semantic-architecture.md`
+- `29-research-mcp-visual-resolved-query-detailed-design.md`
 
 ### B. Phase detailed design
 定义一个 Phase 的 scope、contract、algorithm、error model、performance、acceptance semantics。
@@ -114,6 +116,8 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 21-p8-implementation-plan.md | P8 | ACCEPTED HISTORY |
 | 22-p9-review-overlay-design.md | P9 | ACTIVE DESIGN |
 | 23-p9-implementation-plan.md | P9 | ACTIVE PLAN |
+| 28-ffdf-research-consumption-semantic-architecture.md | Cross-phase research consumption + deterministic semantic reconstruction | ACTIVE PROPOSED |
+| 29-research-mcp-visual-resolved-query-detailed-design.md | Research MCP visual fallback + resolved query | ACTIVE PROPOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -137,8 +141,10 @@ Phase DONE 后保留，不重写当时的执行事实。
 - `25-p10-implementation-plan.md`
 - `26-p11-sec-provider-design.md`
 - `27-p11-implementation-plan.md`
+- `28-ffdf-research-consumption-semantic-architecture.md`
+- `29-research-mcp-visual-resolved-query-detailed-design.md`
 
-若新增 cross-phase design，使用 28+，不得插入并重命名已接受文件。
+28/29 已用于新的 cross-phase research-consumption architecture。后续新增 design 从 30 起继续递增；不得插入并重命名已接受文件。
 
 ---
 
@@ -287,11 +293,29 @@ Implementation plan 至少覆盖：
 
 ## 13. Current Next Action
 
-当前：
-`P8_DONE / P9_DESIGN_READY`
+当前正式 phase：
 
-下一步：
-1. commit/push P9 design baseline；
-2. create `task/p9-review-overlay` project-root worktree；
-3. execute P9-B queue/model implementation；
-4. continue ordered P9 gates only after each prior gate PASS。
+`P8_DONE / P9-J FORMAL REVIEW AUTHORIZED`
+
+P9 继续严格按 `task/p9-review-overlay` 的 frozen-candidate 流程执行；本次 28/29 设计不得改变正在审查的 P9 v1 candidate。
+
+并行设计工作：
+
+`design/research-consumption-visual-semantic`
+
+已新增：
+
+1. `design/28`：长期 deterministic semantic reconstruction architecture；
+2. `design/29`：当前 Research MCP visual fallback + resolved query detailed design。
+
+实施顺序固定：
+
+```text
+P9 v1 closeout
+→ approve/freeze design/28 + design/29
+→ implement design/29 Research MCP fallback first
+→ collect recurring visual-review patterns
+→ implement design/28 deterministic semantic resolver
+```
+
+任何 production implementation 都必须在对应 design baseline 合并/授权后开始。
