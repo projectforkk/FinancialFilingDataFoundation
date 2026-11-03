@@ -389,6 +389,43 @@ def test_candidate_count_mismatch_is_rejected(tmp_path: Path) -> None:
         load_table_candidates(artifact.artifact_dir)
 
 
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("page_no", 999),
+        ("bbox", [41.0, 81.0, 441.0, 153.0]),
+        ("bbox", [10.0, 10.0, 5.0, 20.0]),
+        ("block_nos", [1, 0]),
+        ("block_nos", []),
+        ("candidate_id", "0" * 64),
+    ],
+)
+def test_tampered_candidate_identity_fields_are_rejected(
+    field: str,
+    value,
+    tmp_path: Path,
+) -> None:
+    p3 = _write_p3_artifact(tmp_path / "p3", [_table_page()])
+    artifact = detect_table_candidates(p3, tmp_path / "p4")
+    rows = [
+        json.loads(line)
+        for line in artifact.candidates_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(rows) == 1
+    rows[0][field] = value
+    artifact.candidates_path.write_text(
+        json.dumps(rows[0], ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(TableCandidateError) as exc_info:
+        load_table_candidates(artifact.artifact_dir)
+
+    assert exc_info.value.reason_code == "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT"
+
+
 def test_detection_does_not_open_pdf(monkeypatch, tmp_path: Path) -> None:
     p3 = _write_p3_artifact(tmp_path / "p3", [_table_page()])
 

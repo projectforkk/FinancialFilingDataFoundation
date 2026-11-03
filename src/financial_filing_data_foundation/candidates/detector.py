@@ -675,24 +675,89 @@ def load_table_candidates(artifact_dir: str | Path) -> TableCandidateArtifact:
             "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
             "candidate_count does not match candidates.jsonl",
         )
+    page_count = int(manifest.get("page_count", 0) or 0)
+    if page_count < 1:
+        raise TableCandidateError(
+            "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "manifest page_count is invalid",
+        )
+
     seen: set[str] = set()
     for row in candidates:
         candidate_id = str(row.get("candidate_id") or "")
+        try:
+            page_no = int(row.get("page_no", 0))
+        except (TypeError, ValueError) as exc:
+            raise TableCandidateError(
+                "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "invalid candidate page_no",
+            ) from exc
         if (
             not candidate_id
             or candidate_id in seen
             or row.get("document_sha256") != document_sha256
-            or int(row.get("page_no", 0)) < 1
+            or page_no < 1
+            or page_no > page_count
         ):
             raise TableCandidateError(
                 "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                "invalid candidate identity",
+                "invalid candidate identity/page range",
             )
+
         bbox = row.get("bbox")
         if not isinstance(bbox, list) or len(bbox) != 4:
             raise TableCandidateError(
                 "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
                 "invalid candidate bbox",
+            )
+        try:
+            bbox_values = [float(value) for value in bbox]
+        except (TypeError, ValueError) as exc:
+            raise TableCandidateError(
+                "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "candidate bbox contains non-numeric value",
+            ) from exc
+        if (
+            not all(math.isfinite(value) for value in bbox_values)
+            or bbox_values[2] < bbox_values[0]
+            or bbox_values[3] < bbox_values[1]
+        ):
+            raise TableCandidateError(
+                "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "candidate bbox is non-finite or unordered",
+            )
+        normalized_bbox = [round(value, 3) for value in bbox_values]
+        if normalized_bbox != bbox:
+            raise TableCandidateError(
+                "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "candidate bbox is not normalized",
+            )
+
+        block_nos = row.get("block_nos")
+        if (
+            not isinstance(block_nos, list)
+            or not block_nos
+            or any(
+                isinstance(value, bool) or not isinstance(value, int)
+                for value in block_nos
+            )
+            or block_nos != sorted(set(block_nos))
+        ):
+            raise TableCandidateError(
+                "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "candidate block_nos are invalid or non-canonical",
+            )
+
+        expected_id = _candidate_id(
+            document_sha256,
+            page_no,
+            normalized_bbox,
+            block_nos,
+        )
+        if candidate_id != expected_id:
+            raise TableCandidateError(
+                "P4_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "candidate_id does not match candidate identity fields",
             )
         seen.add(candidate_id)
 
