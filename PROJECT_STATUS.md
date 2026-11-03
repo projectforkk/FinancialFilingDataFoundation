@@ -6,18 +6,21 @@
 
 ## Current state
 
-**P7_DONE / P8_IN_ACCEPTANCE**
+**P8_DONE / P9_DESIGN_AUTHORIZED**
 
 ## Accepted baseline
 
-- phase: `P7_DONE`
-- frozen acceptance candidate: `8edb68a885ebcd80a0bdc31567e7adcd0aea19fd`
-- reviewed production candidate: `0b1ffcec4fa4416724a6c505a9706eb41999bead`
+- phase: `P8_DONE`
+- frozen acceptance candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
+- reviewed production candidate: `d31a5851767f102082e2078cd09df2b023e84227`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/26-p7-acceptance-result.md`
-- accepted merge commit: `5f314bab9d88fb16b4b46c662e0a9f1b8f1a9b13`
-- accepted_baseline_sha: `5f314bab9d88fb16b4b46c662e0a9f1b8f1a9b13`
-- full regression: `213 passed`
+- acceptance evidence: `acceptance/31-p8-acceptance-result.md`
+- accepted merge commit: `415d2ad82e890be855198d4d4c57bca8d1beb406`
+- accepted_baseline_sha: `415d2ad82e890be855198d4d4c57bca8d1beb406`
+- full regression: `231 passed`
+- official MCP protocol: `2026-07-28`
+- exact MCP tools: `11 / 11 PASS`
+- runtime lock SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
 
 ## Phase history
 
@@ -96,26 +99,46 @@
 - live CN/HK deterministic validation: `PASS`
 - accepted merge: `5f314bab9d88fb16b4b46c662e0a9f1b8f1a9b13`
 
+### P8 — Local MCP
+
+- status: `DONE / PASS`
+- acceptance evidence: `acceptance/31-p8-acceptance-result.md`
+- frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
+- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
+- full suite: `231 passed`
+- official MCP protocol: `2026-07-28`
+- exact tools: `11 / 11 PASS`
+- live CN/HK MCP queries: `PASS`
+- runtime package lock: `30 / 30 MATCH`
+- runtime lock byte reproducibility: `PASS`
+- accepted merge: `415d2ad82e890be855198d4d4c57bca8d1beb406`
+
 ## Approved next phase
 
-**P8 — Local MCP**
+**P9 — Codex Review Overlay**
 
 Status:
 
-`CODE REVIEW PASS / READY FOR ACCEPTANCE`
+`DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED`
 
 Planned branch:
 
-`task/p8-local-mcp`
+`task/p9-review-overlay`
 
-P7 Independent Acceptance:
+P8 Independent Acceptance:
 
 - verdict: `PASS`
-- evidence: `acceptance/26-p7-acceptance-result.md`
-- frozen candidate: `8edb68a885ebcd80a0bdc31567e7adcd0aea19fd`
-- full suite: `213 passed`
-- live CN/HK validation: `PASS`
+- evidence: `acceptance/31-p8-acceptance-result.md`
+- frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
+- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
+- full suite: `231 passed`
+- official SDK protocol: `2026-07-28`
+- exact tools: `11 / 11 PASS`
+- live CN/HK: `PASS`
+- runtime lock/package/byte reproducibility: `PASS`
+- read-only immutability: `25 / 25 files unchanged`
 - blocker: `NONE`
+- accepted merge: `415d2ad82e890be855198d4d4c57bca8d1beb406`
 
 P8 final Code Review:
 
@@ -139,7 +162,9 @@ P8 final Independent Acceptance freeze:
 - frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
 - prior freezes `acceptance/28` and `acceptance/29`: historical / invalidated
 
-Current gate: `P8-K Independent Acceptance`.
+P9 must first complete `design/22-p9-review-overlay-design.md` and `design/23-p9-implementation-plan.md` and commit that design baseline.
+
+Current gate: `P9-A Design Baseline`.
 
 ## Project directory consolidation
 
@@ -175,6 +200,22 @@ Current gate: `P8-K Independent Acceptance`.
 - pinned source commit: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
 
 The P2 Dayu runtime is isolated from the FFDF main runtime.
+
+### P8 MCP runtime
+
+`D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-mcp-2.3.0\.venv`
+
+- Python 3.12.14 AMD64
+- mcp 2.3.0
+- mcp-types 2.3.0
+- PyMuPDF 1.28.2
+- tracked lock: `runtime-locks/mcp-2.3.0-py312-win-amd64.lock.txt`
+- lock SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
+- `.gitattributes`: `runtime-locks/*.txt text eol=lf`
+- official protocol acceptance: `2026-07-28`
+- transport: `stdio only`
+
+The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls remain forbidden.
 
 ## Accepted live source identities
 
@@ -225,7 +266,7 @@ The P2 Dayu runtime is isolated from the FFDF main runtime.
 - P5 — Table Reconstruction / Cross-page: `DONE`
 - P6 — Raw Facts / Evidence: `DONE`
 - P7 — Quality Gate / Validation: `DONE`
-- P8 — Local MCP: `DESIGN AUTHORIZED`
-- P9 — Codex Review Overlay: `NOT STARTED`
+- P8 — Local MCP: `DONE`
+- P9 — Codex Review Overlay: `DESIGN AUTHORIZED`
 - P10 — Codex Skill: `NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`

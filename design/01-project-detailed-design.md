@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P7 DONE / P8 DESIGN AUTHORIZED**
+状态：**DESIGN BASELINE — P8 DONE / P9 DESIGN AUTHORIZED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -963,12 +963,33 @@ P6 已完成 Independent Acceptance 并收口为 `P6_DONE`。
 
 P7 已完成 Independent Acceptance 并收口为 `P7_DONE`。
 
+P8 已完成 Independent Acceptance 并收口为 `P8_DONE`。
+
+P8 accepted capabilities：
+- official MCP Python SDK 2.3.0；
+- protocol `2026-07-28`；
+- stdio-only local transport；
+- exact 11 read-only deterministic FFDF tools；
+- dedicated Python 3.12.14 AMD64 MCP runtime；
+- tracked reproducible runtime lock；
+- MCP AI API calls strictly FORBIDDEN；
+- no acquisition / parse / mutation / arbitrary filesystem / SQL / shell / remote AI surface。
+
 当前批准进入：
 
-**P8 — Local MCP**
+**P9 — Codex Review Overlay（DESIGN AUTHORIZED）**
 
-P8 只把已验收的 deterministic local capabilities 暴露为稳定 MCP tool surface；MCP_AI_API_CALLS 继续严格 FORBIDDEN，不得在 MCP 内调用外部模型、执行 P9 Review Overlay 或提前实现 P10 Skill。
+P9 当前只批准详细设计与实施计划，不批准直接编码。
 
-P8 未 PASS 前不批准实现 P9 Codex Review Overlay。
+P9 设计必须保证：
+- `RAW` / `LOCAL_EXTRACTED` 永不被 review 结果覆盖；
+- review 只针对 deterministic pipeline 已明确标记的 unresolved / REVIEW_REQUIRED 语义；
+- overlay 必须绑定 base parse/validation identity、target、reason、evidence 与 before/after；
+- resolution 与 raw extraction 分层存储；
+- re-validation 必须能判断 overlay 是否解决原 issue；
+- 不得在 P9 内提前实现 P10 Codex Skill；
+- 不得在 P9 内提前接入 P11 US SEC provider。
 
-US SEC provider 仍属于 P11，不得提前进入 P8。
+P9 detailed design 与 implementation plan 未提交前，不批准 P9 production implementation。
+
+US SEC provider 仍属于 P11，不得提前进入 P9。

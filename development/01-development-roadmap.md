@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P7 DONE / P8 DESIGN READY**
+状态：**P8 DONE / P9 DESIGN AUTHORIZED**
 
 ## 总原则
 
@@ -96,14 +96,14 @@ deterministic validation、blocking issues、quality gates、reuse eligibility�
 
 ## P8 — Local MCP
 
-状态：`DESIGN READY`
+状态：`DONE / PASS`
 
 目标：
 本地 deterministic MCP tools，只暴露已验证的数据能力；MCP AI API calls 继续禁止。
 
 ## P9 — Codex Review Overlay
 
-状态：`NOT STARTED`
+状态：`DESIGN AUTHORIZED`
 
 目标：
 仅对 ambiguous local structured data 启用 Codex text review，输出 REVIEW_OVERLAY，不覆盖 RAW/LOCAL_EXTRACTED。
