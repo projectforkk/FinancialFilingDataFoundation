@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P7_DONE / P8_READY_FOR_ACCEPTANCE**
+**P7_DONE / P8_IN_ACCEPTANCE**
 
 ## Accepted baseline
 
@@ -133,7 +133,13 @@ P8 final Code Review:
 
 Historical review `development/45-p8-code-review.md` and freeze `acceptance/28-p8-acceptance-run-instruction.md` were invalidated by `P8-ISSUE-005`.
 
-Next gate: `P8-J Acceptance Re-freeze`.
+P8 final Independent Acceptance freeze:
+
+- instruction: `acceptance/30-p8-final-acceptance-freeze.md`
+- frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
+- prior freezes `acceptance/28` and `acceptance/29`: historical / invalidated
+
+Current gate: `P8-K Independent Acceptance`.
 
 ## Project directory consolidation
 
