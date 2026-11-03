@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P8 DONE / P9 DESIGN READY**
+状态：**ACTIVE DESIGN — P8 DONE / P9 FORMAL REVIEW / RESEARCH CONSUMPTION ARCHITECTURE PROPOSED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -345,7 +345,9 @@ MCP 只调用本机代码 / 文件 / SQLite / acquisition adapter。
 
 ### 5.11 Codex Dynamic Research Integration
 
-P10 不实现固定业务语义的 Codex Skill。Codex 直接接收用户在每次 research run 提供的运行时研究规范文件，并基于这些文件当前内容动态选择 P8/P9 工具完成信息获取与 review。
+P10 不实现固定业务语义的 Codex Skill。Codex 直接接收用户在每次 research run 提供的运行时研究规范文件，并基于这些文件当前内容动态选择 P8 raw tools、P9 resolved state 与 Research MCP visual tools完成信息获取、解释与研究。
+
+长期职责边界以 `design/28-ffdf-research-consumption-semantic-architecture.md` 与 `design/29-research-mcp-visual-resolved-query-detailed-design.md` 为新 cross-phase 真源。
 
 P10 的固定职责仅包括：
 - 验证 Codex 可以发现并调用 P8 read-only MCP；
@@ -354,11 +356,76 @@ P10 的固定职责仅包括：
 - 允许使用薄层 AGENTS.md / integration instruction 告知 Codex FFDF 工具的能力、边界和禁止事项，但该薄层不得复制研究规则正文；
 - 每次 research run 开始时读取并冻结用户提供研究规范文件的内容哈希；同一 run 中不得静默切换到修改后的文件版本；
 - Codex 根据当前问题的信息需求动态选择 document / fact / table / evidence / validation 工具，不维护“问题编号 → 固定接口序列”的硬编码映射；
-- 当 P8 返回 REVIEW_REQUIRED 时，Codex 必须读取证据并通过 P9 resolution contract 处理；证据不足时保持 unresolved，不得猜测；
+- 当 P8 返回 REVIEW_REQUIRED 时，不得把它解释为“当前研究不可使用”；Codex 必须按 Visual Trigger Matrix 先检查已有 P9 resolved state、P8 structured evidence、table/page context，必要时调用 trusted PDF visual tools；
+- P9 不是所有 REVIEW_REQUIRED 的强制前置步骤。P9 只持久化已经确认且值得长期复用的 reviewed decision；当前 run 的 visual-only decision 可以用于本次研究，但不得自动成为 canonical reusable data；
+- 已有 P9 durable resolution 时，Codex 应优先通过 Resolved Query 获取 Raw + Effective + provenance，不应无理由重复截图；
+- 如果 visual evidence 证明 raw extraction 本身错误，必须进入 parser defect / Design-First 流程，不得用 P9 overlay 掩盖；
+- visual 仍无法唯一判断时保持 unresolved，不得猜测；
 - 本地 FFDF 无法提供且运行时研究规范要求补充的外部信息，由 Codex 按当次规范规定的来源边界获取；P10 不固化研究来源策略；
 - 对运行时规范提出但当前工具链不具备的能力，显式返回 incompatible / blocked，不得通过猜测或静默降级完成。
 
 P10 不承担 deterministic parsing，不生成或维护固定研究问题清单，也不成为研究业务规则真源。
+
+### 5.12 Research MCP Visual Evidence & Resolved Query
+
+Research MCP 是 P8 v1 之上的 additive extension，不修改 P8 已验收 11-tool raw contract。
+
+职责：
+
+- 查询 P9 review/resolved state；
+- 返回 RawFact + effective reviewed fields；
+- 通过 P3/P5/P6 定位 review context；
+- 当目标 fact 缺失时通过 P3 FTS/sections/P5 tables定位 evidence candidate；
+- 从 immutable source PDF deterministic render table/page/table-group image；
+- 支持 NORMAL / HIGH_DETAIL / deterministic tiling；
+- 不提供 arbitrary path / arbitrary bbox / shell / SQL / filesystem browse。
+
+视觉调用必须由 deterministic Visual Trigger Matrix 驱动，包括：
+- required semantic field unknown/ambiguous；
+- target-related validation issue；
+- conflicting structured evidence；
+- value role/header relation uncertain；
+- requested metric missing；
+- reconciliation inconsistency；
+- raw/table/page disagreement。
+
+完整 clean structured fact 不应默认进入 visual。
+
+### 5.13 Run-local Verified 与 Durable Review
+
+Codex visual interpretation 是 reviewer decision，不是 parser truth。
+
+Decision class 固定为：
+
+```text
+EXPLICIT_AND_ANCHORABLE
+EXPLICIT_VISUAL_ONLY
+RAW_EXTRACTION_DEFECT
+AMBIGUOUS
+```
+
+- `EXPLICIT_AND_ANCHORABLE`：当前研究可用；满足 P9 contract 时可 durable submit。
+- `EXPLICIT_VISUAL_ONLY`：只允许 `RUN_LOCAL_VERIFIED`；不得自动进入 Registry/canonical reuse。
+- `RAW_EXTRACTION_DEFECT`：回到 parser defect flow。
+- `AMBIGUOUS`：保持 unresolved。
+
+Run-local derived calculation 只有当所有 operands 满足 `DERIVED_USE_READY` 时允许。至少要求 numeric value、period、value role、required unit/dimension、required scope、source provenance 和 operation-specific compatibility 均已确认。
+
+### 5.14 Deterministic Semantic Reconstruction
+
+长期通过 design/28 增加独立 semantic layer：
+
+```text
+P6 Raw
+→ Header Graph / Statement / Value Role / Period / Unit / Scope
+→ Semantic Validation
+→ true ambiguity only
+→ durable review
+```
+
+Semantic resolver 的目标不是替代 Visual MCP，而是把高频、稳定的 visual-review pattern经过人工设计、Golden验证后固化为 deterministic rules，从而逐步减少视觉调用。
+
+Raw 永远 immutable；Codex visual decision 不得自动成为 parser rule。
 
 ---
 
@@ -839,9 +906,9 @@ deterministic gate、accounting consistency、document completeness。
 
 将已验证能力包装为小型稳定 tool surface。
 
-### P9 — Codex Review + Resolution Overlay
+### P9 — Durable Review + Resolution Overlay
 
-仅处理 REVIEW_REQUIRED。
+P9 保存 evidence-grounded reviewed decisions，不承担财务理解或投资分析，也不是所有 REVIEW_REQUIRED research 的强制必经层。Raw extraction 永远不被 overlay 覆盖。
 
 ### P10 — Codex Dynamic Research Integration
 
@@ -851,7 +918,7 @@ deterministic gate、accounting consistency、document completeness。
 - 用户每次直接提供当前版本的研究 Prompt / constraints / question list 或其他研究规范文件；
 - Codex 必须先完整读取当前运行时文件，再根据问题动态推导信息需求；
 - 财报结构化数据优先通过 P8 read-only MCP 获取；
-- REVIEW_REQUIRED 通过 P9受控 review contract 处理；
+- REVIEW_REQUIRED 先按 design/29 的 structured/resolved/visual fallback 处理；只有值得长期复用且满足 evidence contract 的 reviewed decision 才提交 P9；
 - 允许薄层 AGENTS.md / integration instruction 只描述 FFDF 工具能力与边界；
 - 对每次 research run 固定输入规范 SHA256，禁止运行中静默切换规则版本；
 - 验证不同版本研究规范无需修改 P10 production 即可改变研究任务、查询范围和输出要求；
@@ -1010,3 +1077,28 @@ P9 设计保证：
 P9 production implementation 必须绑定本次 committed design baseline；任何后续设计问题继续执行 design-first amendment。
 
 US SEC provider 仍属于 P11，不得提前进入 P9。
+
+### 22.1 Future research-consumption architecture
+
+本次新增 cross-phase designs：
+
+- `design/28-ffdf-research-consumption-semantic-architecture.md`
+- `design/29-research-mcp-visual-resolved-query-detailed-design.md`
+
+它们不修改 P9 v1 frozen candidate，也不授权在 P9 review/acceptance期间提前实现新 production。
+
+正式实施顺序：
+
+```text
+P9 v1 closeout
+→ merge/freeze design/28 + design/29
+→ Research MCP Visual/Resolved Query first
+→ P10 live research integration
+→ collect recurring review patterns
+→ deterministic Semantic Resolver
+```
+
+目标同时满足：
+
+- **现在能用**：FFDF structured data不足时，Codex可看 immutable PDF visual evidence继续研究；
+- **未来越来越自动**：稳定模式逐步进入 deterministic semantic rule，不让同类财报永远重复视觉复核。
