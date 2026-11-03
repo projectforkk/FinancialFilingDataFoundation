@@ -884,7 +884,19 @@ deterministic gate、accounting consistency、document completeness。
 - 若解决方案会改变外部依赖版本、运行时、数据契约或验收标准，必须重新执行相应 Gate；
 - 若确认问题只影响文档/治理且不影响 production candidate，也必须形成新的设计 baseline，并在验收冻结中明确记录该结论。
 
-### 21.1 Governance text encoding
+### 21.1 Design / directory governance
+
+设计书统一索引：`design/00-design-management-index.md`。
+
+项目目录统一治理：`design/15-project-directory-management.md`。
+
+从 P6 起，所有 FFDF 自有 dependency/runtime/worktree/workspace/data 必须位于：
+
+`D:\Codex\FinancialFilingDataFoundation\`
+
+历史 sibling path 只作为历史 evidence，不再作为 active default。
+
+### 21.2 Governance text encoding
 
 所有 tracked Markdown / JSON governance artifacts 统一使用 `UTF-8 without BOM`。
 
@@ -899,7 +911,7 @@ deterministic gate、accounting consistency、document completeness。
 5. `git diff --check` + UTF-8 decode validation；
 6. 再继续 phase closeout。
 
-### 21.2 Accepted baseline 与 main HEAD
+### 21.3 Accepted baseline 与 main HEAD
 
 正常规则：阶段 implementation 通过 Independent Acceptance 后才进入 `main`。
 
@@ -915,7 +927,7 @@ deterministic gate、accounting consistency、document completeness。
 6. 若该阶段 FAIL / ABORT，必须通过可追踪的 revert commit 撤销未验收 implementation，不得改写历史；
 7. 后续阶段恢复“acceptance PASS 后再进入 main”的正常规则。
 
-### 21.3 Candidate Worktree 隔离规则
+### 21.4 Candidate Worktree 隔离规则
 
 Code Review / Independent Acceptance 的证据必须绑定到固定 candidate SHA，不得依赖可能被其他进程切换分支的共享开发工作树。
 

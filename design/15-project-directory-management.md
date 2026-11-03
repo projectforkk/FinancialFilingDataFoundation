@@ -1,0 +1,253 @@
+# 15 — Project Directory / Workspace Management 详细设计
+
+状态：**ACTIVE GOVERNANCE BASELINE**
+
+适用阶段：P6–P11 及后续维护。
+
+## 1. 唯一项目根
+
+FFDF 在目标 PC 的唯一项目管理根：
+
+`D:\Codex\FinancialFilingDataFoundation`
+
+除操作系统/用户级工具外，**所有 FFDF 自有文件与目录必须位于该根目录以内**。
+
+禁止继续新增：
+- `D:\Codex\FinancialFilingDataFoundation-*`
+- `D:\Codex\dependencies\<FFDF dependency>`
+- `D:\Codex\runtimes\<FFDF runtime>`
+
+## 2. Canonical Layout
+
+```text
+D:\Codex\FinancialFilingDataFoundation\
+  .git/
+  src/
+  tests/
+  design/
+  development/
+  acceptance/
+
+  dependencies/
+    dayu-agent/
+
+  runtimes/
+    ffdf-dayu-2115c86/
+      .venv/
+
+  worktrees/
+    active/
+    review/
+    acceptance/
+    archive/
+
+  workspace/
+    current/
+    live/
+    acceptance/
+    archive/
+
+  data/
+```
+
+## 3. Tracked / Untracked Boundary
+
+Git tracked：
+- src
+- tests
+- design
+- development
+- acceptance
+- PROJECT_STATUS.md
+- AGENTS.md
+- configuration / source code
+
+Git ignored operational roots：
+- `/dependencies/`
+- `/runtimes/`
+- `/worktrees/`
+- `/workspace/`
+- `/data/`
+
+这些目录虽然位于 project root，但不是 source-of-truth Git artifacts。
+
+## 4. Main Checkout
+
+项目根自身是 canonical Git checkout。
+
+目标稳态：
+- `D:\Codex\FinancialFilingDataFoundation` checkout `main`
+- 不再使用 `FinancialFilingDataFoundation-main-sync-*` sibling 目录作为 main
+- phase branch 在需要时使用 project-contained isolated worktree
+
+## 5. Phase Worktree Naming
+
+Active development：
+
+`worktrees\active\p<phase>-<short-name>`
+
+Code Review：
+
+`worktrees\review\p<phase>-<shortsha>`
+
+Independent Acceptance：
+
+`worktrees\acceptance\p<phase>-<shortsha>`
+
+历史需要保留的 checkout：
+
+`worktrees\archive\<historical-name>`
+
+所有 path 使用小写 phase prefix；SHA 只用作路径标签，不作为业务 identity。
+
+## 6. Historical Worktree Policy
+
+P0–P5 已完成阶段：
+- Git commit/history 是正式真源；
+- ignored workspace/live evidence 若仅存在本地，迁移到 `workspace\archive\<phase-or-worktree>`；
+- clean、无独有本地 evidence 的 historical worktree 可安全退役；
+- 不使用 `git reset --hard` / `git clean`；
+- worktree 退役前必须检查 tracked status 和 ignored evidence。
+
+## 7. Dependency Layout
+
+Dayu pinned checkout：
+
+旧：
+`D:\Codex\dependencies\dayu-agent`
+
+新：
+`D:\Codex\FinancialFilingDataFoundation\dependencies\dayu-agent`
+
+要求：
+- exact pinned commit
+- detached or otherwise explicitly pinned
+- clean worktree
+- 不修改 upstream
+- move/reclone 后重新核对 HEAD/status
+
+## 8. Runtime Layout
+
+Dayu runtime：
+
+旧：
+`D:\Codex\runtimes\ffdf-dayu-2115c86\.venv`
+
+新：
+`D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-dayu-2115c86\.venv`
+
+Windows Python venv **不得直接文件搬迁作为正式迁移方式**，因为 launcher/metadata 可能含原路径。
+
+迁移必须：
+1. 保留旧 runtime；
+2. 在新路径从 approved base Python 重建 venv；
+3. 从新 Dayu checkout 安装 pinned package；
+4. doctor/import tests；
+5. live/no-network smoke；
+6. FFDF main runtime isolation check；
+7. 新 runtime PASS 后旧 runtime 才可退役。
+
+## 9. External Tools Exception
+
+以下不属于 FFDF 自有目录，不要求搬入项目根：
+- system/user Python base interpreter
+- uv-managed base Python
+- Git installation
+- VS Code/Codex
+- OS package caches
+- unrelated project repositories，例如 FIReport
+
+FFDF design 只记录 executable path，不复制这些系统工具。
+
+## 10. Workspace / Evidence
+
+所有新 generated evidence：
+- development smoke
+- live samples
+- review helper
+- acceptance helper
+- temporary DB
+- generated PDFs for unit tests
+
+必须位于 project-root `workspace/` 或 isolated checkout 自身被忽略的 workspace。
+
+阶段结束后需要保留的本地-only evidence迁入：
+`workspace\archive\P<phase>\...`
+
+## 11. Raw Data
+
+项目正式 raw/document store 必须位于：
+`data/`
+或用户明确配置的 project-root 子目录。
+
+不得恢复到 `D:\Codex\<other-root>`。
+
+## 12. Path Configuration
+
+代码/设计中不得再把旧 sibling paths 写成新的默认值。
+
+允许：
+- historical evidence 保留旧 path，明确标注 historical
+- migration receipt 记录 old_path/new_path
+
+新 active configuration 必须使用 project-root layout。
+
+## 13. Migration Safety
+
+目录迁移顺序：
+
+1. commit 本设计；
+2. update .gitignore；
+3. verify all source Git worktrees；
+4. archive local-only evidence；
+5. consolidate canonical main checkout；
+6. migrate Dayu source；
+7. rebuild Dayu runtime；
+8. migrate/retire historical worktrees；
+9. verify no FFDF-owned sibling directories remain；
+10. run regression + Dayu doctor；
+11. write migration receipt。
+
+任何 dirty worktree：
+`BLOCKED_DIRECTORY_MIGRATION_DIRTY_WORKTREE`
+
+不得自动覆盖。
+
+## 14. Git-aware Move
+
+Linked worktree 优先：
+`git worktree move`
+
+若 Git 不允许 nested linked worktree：
+- 先 archive local-only evidence；
+- remove clean historical worktree through `git worktree remove`；
+- future isolated Review/Acceptance 使用 project-contained ignored Git checkout/clone strategy；
+- 必须先更新本设计记录实际机制。
+
+禁止用普通 `Move-Item` 搬一个 active linked worktree 然后手改 .git metadata。
+
+## 15. Acceptance
+
+目录迁移 PASS 必须满足：
+
+1. canonical root = `D:\Codex\FinancialFilingDataFoundation`
+2. root checkout main and clean
+3. no project-owned `FinancialFilingDataFoundation-*` sibling dirs
+4. Dayu source under project `dependencies`
+5. Dayu runtime under project `runtimes`
+6. Dayu pin/clean PASS
+7. Dayu doctor PASS
+8. FFDF main venv remains Dayu/Docling/Torch-free
+9. historical local-only evidence preserved
+10. full unit regression PASS
+11. no source/history loss
+12. PROJECT_STATUS records migration result
+
+## 16. P6–P11 Rule
+
+从 P6 起：
+- development/review/acceptance worktree/checkout path 必须位于 project root
+- all phase helper/evidence paths must remain under project root
+- no new FFDF-owned sibling directory under `D:\Codex`
+
+该规则优先于历史阶段文档中的旧绝对路径。

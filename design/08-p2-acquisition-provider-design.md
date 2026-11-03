@@ -239,7 +239,7 @@ P2 Gate 禁止的是：
 
 推荐 canonical dependency root：
 
-`D:\Codex\dependencies\dayu-agent`
+`D:\Codex\FinancialFilingDataFoundation\dependencies\dayu-agent`
 
 具体路径可配置，不能作为业务 identity。
 

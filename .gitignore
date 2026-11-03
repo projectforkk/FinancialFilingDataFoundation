@@ -15,10 +15,13 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Runtime data
+# Runtime / project-local operational data
 workspace/
 data/
 cache/
+dependencies/
+runtimes/
+worktrees/
 *.sqlite
 *.sqlite3
 
