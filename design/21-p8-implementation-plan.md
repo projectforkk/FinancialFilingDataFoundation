@@ -39,7 +39,7 @@ No MCP SDK import.
 
 Per P8-ISSUE-002:
 - constructor/catalog list are lazy and catalog-only；
-- first artifact-dependent access validates one document's full P3/P5/P6/P7 bundle；
+- first artifact-dependent access validates one document's full P3/P5/P6/P7 bundle (P8 v1 live gate <=20s)；
 - validated bundle is cached for warm calls；
 - test constructor/list_documents do not open artifact files。
 
