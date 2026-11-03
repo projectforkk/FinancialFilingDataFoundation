@@ -760,19 +760,23 @@ P8-F full regression initially used a basetemp nested under the already-deep act
 
 P4/P5/P6 tests create additional atomic temp directories containing 64-char document SHA values. On this Windows host the combined path became too long and `Path.write_text()` failed with `FileNotFoundError` before product assertions ran.
 
-Diagnostic rerun of the same failing P4 test with short basetemp:
+Initial diagnostic rerun with a short external basetemp proved the failure was path length rather than product behavior. That external location is **not accepted** because project directory governance requires FFDF-owned execution state to remain under the canonical project root.
 
-`D:\Codex\_ffdf_p8_pytest\diag`
+A second diagnostic used the project-root-local short path:
 
-resulted in PASS.
+`D:\Codex\FinancialFilingDataFoundation\workspace\t\p8\diag-full`
+
+Result:
+`231 passed`
 
 Approved solution：
-1. P8 development/review/acceptance pytest on Windows must use a short external basetemp root under `D:\Codex\_ffdf_p8_pytest`；
-2. temp root is test execution state only, not production/config/artifact truth；
-3. do not modify P4/P5/P6 atomic output naming or accepted production code merely to accommodate deep review worktree paths；
-4. isolated Git worktree remains required；
-5. full regression evidence from the long basetemp run is invalidated and must be rerun from a short basetemp；
-6. acceptance instruction must freeze the exact short basetemp convention.
+1. P8 development/review/acceptance pytest on Windows must use a short **project-root-local** basetemp under `D:\Codex\FinancialFilingDataFoundation\workspace\t\p8\<run>`；
+2. the directory remains ignored operational test state under the canonical project root；
+3. do not use any `D:\Codex\_ffdf_*` sibling directory；
+4. do not modify P4/P5/P6 atomic output naming or accepted production code merely to accommodate deep review worktree paths；
+5. isolated Git worktree remains required；
+6. full regression evidence from the long basetemp run is invalidated and must be rerun with the project-root-local short basetemp；
+7. acceptance instruction must freeze this exact in-project convention.
 
 ### P8-ISSUE-002 — Eager artifact validation made MCP cold connect exceed the 15s gate
 
@@ -797,7 +801,7 @@ Approved solution:
 5. upstream corruption still raises `P8_UPSTREAM_ARTIFACT_INVALID` on first artifact access；
 6. add tests proving constructor/list_documents do not load/touch artifact contents；
 7. cold protocol connect/list-tools <=15s；
-8. record first-document trusted-load latency separately (<=15s)。
+8. record first-document trusted-load latency separately (<=20s, per P8-ISSUE-003)。
 
 The first integration run remains valid evidence for protocol/tool correctness but **fails the cold-start performance gate** and is invalidated for performance acceptance.
 
