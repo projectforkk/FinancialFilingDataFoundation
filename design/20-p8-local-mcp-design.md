@@ -758,6 +758,27 @@ This is an empirical performance-policy amendment, not a correctness relaxation.
 
 Affected gates: P8-H/I/K.
 
+### P8-ISSUE-006 — SDK boundary tests span two intentionally different runtimes
+
+P8-E/F first server-adapter test attempt exposed a runtime-testing boundary:
+
+- FFDF main ARM64 runtime intentionally has no `mcp`/`anyio` dependency；
+- dedicated MCP runtime intentionally contains only the frozen MCP runtime dependencies and has no `pytest`；
+- a pytest module that imports MCP/AnyIO before skip logic fails collection in main runtime；
+- installing pytest into the dedicated runtime solely for tests would mutate the frozen runtime lock without production need。
+
+Approved solution：
+1. main pytest suite remains SDK-free and exercises Catalog/Service/security semantics；
+2. any repository pytest module touching MCP SDK must skip before importing SDK-only dependencies and must not add AnyIO as a main-runtime requirement；
+3. server registration / SDK protocol verification is executed by a tracked **stdlib standalone harness** under the dedicated MCP runtime；
+4. official SDK stdio live harness may use AnyIO transitively supplied by MCP, but does not require pytest；
+5. dedicated MCP runtime lock remains unchanged；
+6. acceptance must run both the main pytest suite and the dedicated-runtime standalone SDK harness。
+
+This changes test execution only, not MCP product behavior.
+
+Affected gates: P8-E/F/H/I/K.
+
 ### P8-ISSUE-005 — Runtime lock working-tree bytes vary across Windows worktrees without an EOL contract
 
 Code Review of candidate `599db48a62622cb18de2c61d7100e8186a7ca936` found:
