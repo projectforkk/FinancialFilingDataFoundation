@@ -55,6 +55,7 @@ Gate: focused service tests PASS.
 Gate: server import/tool registration tests PASS.
 
 ## P8-F — Deterministic / Security Regression
+- on Windows use short external pytest basetemp root: `D:\Codex\_ffdf_p8_pytest\<run>`
 - full P0–P8 suite
 - no upstream mutation
 - no network/AI/shell
