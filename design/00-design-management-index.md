@@ -144,7 +144,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P3 | 10-p3 | 11-p3 | acceptance/14 | DONE |
 | P4 | 10-p4 | 11-p4 | acceptance/17 | DONE |
 | P5 | 12 | 13 | acceptance/20 | DONE |
-| P6 | 16 | 17 | TBD | DESIGN AUTHORIZED |
+| P6 | 16 | 17 | acceptance/21 (baseline) | DESIGN READY |
 | P7 | 18 | 19 | TBD | NOT STARTED |
 | P8 | 20 | 21 | TBD | NOT STARTED |
 | P9 | 22 | 23 | TBD | NOT STARTED |
