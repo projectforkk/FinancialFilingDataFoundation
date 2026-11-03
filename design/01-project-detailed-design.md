@@ -884,7 +884,22 @@ deterministic gate、accounting consistency、document completeness。
 - 若解决方案会改变外部依赖版本、运行时、数据契约或验收标准，必须重新执行相应 Gate；
 - 若确认问题只影响文档/治理且不影响 production candidate，也必须形成新的设计 baseline，并在验收冻结中明确记录该结论。
 
-### 21.1 Accepted baseline 与 main HEAD
+### 21.1 Governance text encoding
+
+所有 tracked Markdown / JSON governance artifacts 统一使用 `UTF-8 without BOM`。
+
+禁止使用会按宿主默认代码页重新编码 Unicode 的写回方式。Windows PowerShell 仅可用于只读展示或显式 UTF-8 no-BOM 写入；正式文档修改优先使用能够明确保持 UTF-8 的工具/代码路径。
+
+若发现治理文档出现乱码/替换字符：
+
+1. STOP 当前 closeout；
+2. 确认事实来源；
+3. 以已验收 Git evidence 重建受损文案；
+4. 保存为 UTF-8 no-BOM；
+5. `git diff --check` + UTF-8 decode validation；
+6. 再继续 phase closeout。
+
+### 21.2 Accepted baseline 与 main HEAD
 
 正常规则：阶段 implementation 通过 Independent Acceptance 后才进入 `main`。
 

@@ -6,197 +6,139 @@
 
 ## Current state
 
-**P3_IN_ACCEPTANCE**
+**P3_DONE / P4_DESIGN_AUTHORIZED**
 
-## Approved phase
+## Accepted baseline
 
-**P3 — Native Page / Section / FTS（CODE REVIEW PASS / READY FOR ACCEPTANCE）**
-
-P1 completed branch：
-
-`task/p1-identity-registry-planner`
-
-P2 completed branch：
-
-`task/p2-acquisition-provider`
-
-P3 development branch：
-
-`task/p3-native-page-section`
-
-P3 branch start design baseline：
-
-`2140cc009805260ce2fe63b13e78d9e049d73e2d`
-
-P2 Code Review：
-
-- verdict: `PASS`
-- evidence: `development/21-p2-code-review.md`
-- reviewed candidate: `881c80be1938a128448ea3ed0b4e2cb962f46018`
-- deterministic suite: `87 passed`
-- live CN/HK: `PASS`
-- Dayu pin: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
-- blocker: `NONE`
-
-P3 Code Review：
-
-- verdict: `PASS`
-- evidence: `development/25-p3-code-review.md`
-- reviewed candidate: `3c3536db0bdfdfbc5300004731b04d992930904f`
-- full suite: `104 passed`
-- live CN/HK: `PASS`
-- blocker: `NONE`
-
-P3 Independent Acceptance：
-
-- instruction: `acceptance/13-p3-acceptance-run-instruction.md`
-- frozen candidate: `7b81c97e73448389e38cf9936a8af7dfe074d1e1`
-- status: `IN_PROGRESS`
-- accepted baseline remains P2 until P3 verdict PASS
-
-P2 Independent Acceptance：
-
-- verdict: `PASS`
-- instruction: `acceptance/10-p2-acceptance-run-instruction.md`
-- evidence: `acceptance/11-p2-acceptance-result.md`
-- frozen candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
-- deterministic suite: `87 passed`
-- live CN/HK: `PASS`
-- blocker: `NONE`
-
-当前 P1 独立验收执行指令：
-
-`acceptance/07-p1-acceptance-run-instruction.md`
-
-Frozen acceptance candidate：
-
-`3b382f4091a96a2dff40144253da42bf8de1fcc2`
-
-该 candidate 已冻结；后续 branch HEAD 的状态/验收证据提交不改变验收输入。
-
-P1 Code Review：
-
-- final verdict: `PASS`
-- final evidence: `development/13-p1-final-code-review.md`
-- reviewed candidate: `f5c5cd76b33199639a5266959fbf7dc0968a95c4`
-- tests: `54 passed`
-- previous evidence `development/10-p1-code-review.md` remains historical and was invalidated by `P1-ISSUE-008`.
-
-P1 Independent Acceptance：
-
-- verdict: `PASS`
-- evidence: `acceptance/08-p1-acceptance-result.md`
-- frozen candidate: `3b382f4091a96a2dff40144253da42bf8de1fcc2`
-- full suite: `54 passed in 2.05s`
-- blocker: `NONE`
-
-当前 P1 design baseline：
-
-以 P1 task branch 中最新已提交的 design baseline 为准；所有设计修正必须先提交并进入 GitHub。
-
-当前已验收 baseline：
-
-- phase: `P2_DONE`
-- accepted candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
+- phase: `P3_DONE`
+- frozen acceptance candidate: `7b81c97e73448389e38cf9936a8af7dfe074d1e1`
+- reviewed production candidate: `3c3536db0bdfdfbc5300004731b04d992930904f`
 - acceptance verdict: `PASS`
+- acceptance evidence: `acceptance/14-p3-acceptance-result.md`
+- accepted merge commit: `24cb4571a9d9f97b4b963d6339970c931d979c4d`
+- accepted_baseline_sha: `24cb4571a9d9f97b4b963d6339970c931d979c4d`
+- full regression: `104 passed`
+
+## Phase history
+
+### P0 — Native PDF Parsing Feasibility Probe
+
+- status: `DONE / PASS`
+- acceptance evidence: `acceptance/05-p0-acceptance-result.md`
+- closeout: `edff06b2b1138b50d742e92ce8b8df628c6d2c61`
+
+### P1 — Identity / Registry / Incremental Planner
+
+- status: `DONE / PASS`
+- acceptance evidence: `acceptance/08-p1-acceptance-result.md`
+- frozen candidate: `3b382f4091a96a2dff40144253da42bf8de1fcc2`
+- accepted merge: `1cb6e88be318c0a1424d74ee601c336075361cd6`
+
+### P2 — Acquisition Provider
+
+- status: `DONE / PASS`
 - acceptance evidence: `acceptance/11-p2-acceptance-result.md`
-- accepted merge commit: `4add9fff36b61e2521e9c8d749cee829adb4ab6f`
-- accepted_baseline_sha: `4add9fff36b61e2521e9c8d749cee829adb4ab6f`
-- closeout main verification: `87 passed`
+- frozen candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
+- reviewed production candidate: `881c80be1938a128448ea3ed0b4e2cb962f46018`
+- accepted merge: `4add9fff36b61e2521e9c8d749cee829adb4ab6f`
+- deterministic suite: `87 passed`
+- live CN / HK: `PASS`
+- Dayu pin: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
 
-治理异常 `P1-ISSUE-004` 已在 P1-K 以非破坏方式收口：未改写历史；最终 `main` 的 `src/tests` 与 frozen acceptance candidate 零差异，并通过 54 项 closeout 回归。P1 现已成为新的 accepted baseline。
+### P3 — Native Page / Section / FTS
 
-P0 acceptance freeze/result 已保留为历史证据，不再作为当前 P1 验收入口。
+- status: `DONE / PASS`
+- acceptance evidence: `acceptance/14-p3-acceptance-result.md`
+- frozen candidate: `7b81c97e73448389e38cf9936a8af7dfe074d1e1`
+- reviewed production candidate: `3c3536db0bdfdfbc5300004731b04d992930904f`
+- full suite: `104 passed in 2.65s`
+- CN fresh dual-root: `PASS`
+- HK fresh dual-root: `PASS`
+- accepted merge: `24cb4571a9d9f97b4b963d6339970c931d979c4d`
 
-P0 独立验收结果：
+## Approved next phase
 
-- verdict: `PASS`
-- evidence: `acceptance/05-p0-acceptance-result.md`
-- accepted candidate: `63547b5cfd3112a7c0598a32139b9b191c356c69`
+**P4 — Table Candidate Detection**
 
-## Design baseline
+Status:
 
-当前设计基线由以下文件共同组成：
+`DESIGN AUTHORIZED / DEVELOPMENT NOT STARTED`
 
-- `AGENTS.md`
-- `design/01-project-detailed-design.md`
-- `design/02-incremental-and-acquisition-design.md`
-- `design/03-parsed-financial-document-contract.md`
-- `design/04-pdf-quality-gate-design.md`
-- `design/05-p0-implementation-plan.md`
-- `design/06-p1-identity-registry-planner-design.md`
-- `design/07-p1-implementation-plan.md`
-- `design/08-p2-acquisition-provider-design.md`
-- `design/09-p2-implementation-plan.md`
-- `design/10-p3-native-page-section-design.md`
-- `design/11-p3-implementation-plan.md`
-- `development/01-development-roadmap.md`
-- `development/02-p0-development-instruction.md`
-- `development/07-p1-development-instruction.md`
-- `development/14-p2-development-instruction.md`
-- `development/22-p3-development-instruction.md`
-- `acceptance/01-acceptance-strategy.md`
-- `acceptance/02-p0-acceptance-instruction.md`
-- `acceptance/06-p1-acceptance-instruction.md`
-- `acceptance/09-p2-acceptance-instruction.md`
-- `acceptance/12-p3-acceptance-instruction.md`
+Planned branch:
 
-P0 closeout：
+`task/p4-table-candidate-detection`
 
-`edff06b2b1138b50d742e92ce8b8df628c6d2c61`
+P4 must not start production implementation until its detailed design and execution plan are committed.
 
-P1 accepted baseline：
+## Current runtime boundaries
 
-`1cb6e88be318c0a1424d74ee601c336075361cd6`
+### FFDF main runtime
 
-P1 closeout/status main HEAD：
+`D:\Codex\FinancialFilingDataFoundation\.venv`
 
-`6d7fda466fb83997da88d6d3586a8ed877f31810`
+- Python 3.14.9 ARM64
+- PyMuPDF 1.28.2
+- Dayu absent
+- Docling absent
+- Torch absent
 
-本次 P2 design baseline 提交完成后，以该 main HEAD 创建 `task/p2-acquisition-provider`。
+### Dayu acquisition runtime
 
-## Current scope
+`D:\Codex\runtimes\ffdf-dayu-2115c86\.venv`
 
-- 多年份财报数据源构建。
-- 增量判定：已有数据 → 本地文件 → 下载 → 解析。
-- CN/HK：PDF extraction。
-- US：预留 SEC HTML / Inline XBRL / XBRL provider。
-- Local MCP：0 AI API。
-- Codex：只处理本机解析无法可靠完成的局部复核。
-- CRDE / 财报分析：下游，不属于首期 Extraction 实现范围。
+- Python 3.12.14 AMD64
+- dayu-agent 0.1.4
+- pinned source commit: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
 
-## Verified Dayu reference baseline
+The P2 Dayu runtime is isolated from the FFDF main runtime.
 
-Dayu 参考基线：
+## Accepted live source identities
 
-`2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
+### CN sample
 
-已核对：
-- CN/HK 高层 `fins download` 会在 PDF acquisition 后继续 Docling conversion；
-- FFDF 若复用 Dayu，应复用 acquisition/downloader 的窄能力，不以 Docling 为默认 parser；
-- Dayu 正式 package dependencies 包含 Docling / Docling Core；
-- `dayu.fins` / `dayu.fins.downloaders` / `dayu.fins.pipelines` initializer 会扩大 import surface；
-- P2 因此采用 pinned read-only checkout + dedicated Dayu acquisition runtime + subprocess JSON boundary；
-- FFDF main runtime 继续保持 Dayu / Docling absent。
+- market: `CN`
+- ticker: `600519`
+- period: `FY2024`
+- provider: `cninfo`
+- source id: `1222993920`
+- SHA256: `5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30`
+- size: `3,626,217`
 
-## Representative performance evidence
+### HK sample
 
-贵州茅台 FY2024：
-- 143 pages；
-- 143/143 有 native text；
-- PDF → Docling JSON 约 1802.6s；
-- Docling JSON → snapshot 约 31.6s。
+- market: `HK`
+- ticker: `00700`
+- period: `FY2024`
+- provider: `hkexnews`
+- source id: `11618398`
+- SHA256: `70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0`
+- size: `5,241,364`
 
-因此 P0 首先验证：目标 PC 上轻量 native PDF path 的真实性能与可读取性。
+## Governance rules
 
-## Phase status
+1. GitHub is the truth source.
+2. Every phase follows:
+   `DESIGN → DEVELOPMENT → CODE REVIEW → INDEPENDENT ACCEPTANCE → DONE`.
+3. If a problem is found and a solution is identified:
+   `STOP → update design → commit design baseline → rerun affected gates → continue`.
+4. Do not use destructive reset / clean / force push to hide state.
+5. Original source documents are immutable.
+6. MCP AI API calls are forbidden.
+7. Tracked Markdown / JSON governance artifacts use `UTF-8 without BOM`.
+8. Phase code enters the accepted baseline only after Independent Acceptance PASS.
+9. P4 may implement only table candidate detection; table reconstruction remains P5.
 
-- P0 Native PDF Parsing Feasibility Probe: `DONE / PASS`
-- P1 Identity / Registry / Incremental Planner: `DONE / PASS`
-- P2 Acquisition Provider: `DONE / PASS`
-- P3 Native Page / Section Extraction: `DESIGN_AUTHORIZED / DEVELOPMENT_NOT_STARTED`
-- P4+：未开始
+## Roadmap
 
-P2 已通过 Independent Acceptance；CN/HK official raw-document acquisition 已成为 accepted baseline。US SEC 仍属于 P11。
-
-现在允许进入 P3 详细设计；P3 设计提交完成前不开始 production implementation。
+- P0 — Native PDF Parsing Feasibility Probe: `DONE`
+- P1 — Identity / Registry / Incremental Planner: `DONE`
+- P2 — Acquisition Provider: `DONE`
+- P3 — Native Page / Section / FTS: `DONE`
+- P4 — Table Candidate Detection: `DESIGN AUTHORIZED`
+- P5 — Table Reconstruction / Cross-page: `NOT STARTED`
+- P6 — Raw Facts / Evidence: `NOT STARTED`
+- P7 — Quality Gate / Validation: `NOT STARTED`
+- P8 — Local MCP: `NOT STARTED`
+- P9 — Codex Review Overlay: `NOT STARTED`
+- P10 — Codex Skill: `NOT STARTED`
+- P11 — US SEC Provider: `NOT STARTED`
