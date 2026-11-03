@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P3_DONE / P4_DESIGN_READY**
+**P4_IN_ACCEPTANCE**
 
 ## Accepted baseline
 
@@ -62,13 +62,29 @@
 
 Status:
 
-`DESIGN READY / DEVELOPMENT NOT STARTED`
+`CODE REVIEW PASS / READY FOR ACCEPTANCE`
 
-Planned branch:
+Development branch:
 
 `task/p4-table-candidate-detection`
 
-P4 must not start production implementation until its detailed design and execution plan are committed.
+P4 implementation and final Code Review are complete; Independent Acceptance has not yet started.
+
+P4 Code Review:
+
+- verdict: `PASS`
+- evidence: `development/29-p4-code-review.md`
+- reviewed candidate: `ea78b2f9adbf0ad6564146ba166da85d1085bf81`
+- full suite: `133 passed`
+- live CN/HK: `PASS`
+- blocker: `NONE`
+
+P4 Independent Acceptance:
+
+- instruction: `acceptance/16-p4-acceptance-run-instruction.md`
+- frozen candidate: `647d6179bdde9e370185fea1d389f0087370faae`
+- status: `IN_PROGRESS`
+- accepted baseline remains P3 until PASS
 
 ## Current runtime boundaries
 
