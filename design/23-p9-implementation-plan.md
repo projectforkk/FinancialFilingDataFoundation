@@ -5,6 +5,20 @@
 详细设计：
 `design/22-p9-review-overlay-design.md`
 
+## Current Recovery Baseline — P9-ISSUE-004
+
+GitHub 当前 P9 branch 已包含未来 P10 路线 amendment；本地 active worktree 另有 handoff-reported、尚未提交的 P9-B–F candidate。该本地 candidate 在 WorkHome 失联前记录为 focused `7 passed`、full unit `242 passed / 0 fail`，但在重新连接并核验 worktree 前不得视为当前已验证事实或 accepted baseline。
+
+安全恢复顺序固定为：
+1. 恢复 WorkHome；
+2. 在 `worktrees/active/p9-review-overlay` 执行只读 `git status/log/rev-parse` 核验；
+3. 确认已知未提交 P9 production/tests 仍存在且无 tracked conflict；
+4. 只允许安全 fast-forward/sync GitHub 的 design-only commits；
+5. 禁止 reset / clean / checkout 覆盖 / 删除或从 GitHub 重建本地未提交 P9 文件；
+6. 完成现场核验后继续 **P9-G — CLI**，再补 negative tests、P9-H–M。
+
+本治理同步不授权提前实施 P10/P11。
+
 ---
 
 ## P9-A — Design Baseline
@@ -216,7 +230,7 @@ PASS 后：
 - post-merge full regression
 - PROJECT_STATUS P9_DONE
 - design index/roadmap/master design
-- authorize P10 Design only
+- authorize P10 Codex Dynamic Research Integration Design only
 
 ---
 
