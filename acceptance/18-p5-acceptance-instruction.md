@@ -29,14 +29,15 @@ PASS / FAIL / BLOCKED。
 18. table_groups.jsonl dual-root byte-identical；
 19. input fingerprint mismatch blocked；
 20. tampered table/row/cell/group identity blocked；
-21. CN live structure guards PASS；
-22. HK pages 124 / 126 / 133 structure guards PASS；
-23. at least one valid continuation group across live CN/HK, unless a design-first evidence update formally changes this expectation；
-24. CN <=10s；
-25. HK <=20s；
-26. raw PDF / P3 / P4 artifacts unchanged；
-27. no PDF reopen；
-28. no OCR/Docling/Dayu/network/AI；
-29. no P6 raw fact/evidence implementation。
+21. tampered derived reconstruction fields（anchors、cell text/bbox/numeric、quality signals、group score/signals）必须通过 full recomputation semantic equality 被检出；
+22. CN live structure guards PASS；
+23. HK pages 124 / 126 / 133 structure guards PASS；
+24. at least one valid continuation group across live CN/HK, unless a design-first evidence update formally changes this expectation；
+25. CN <=10s；
+26. HK <=20s；
+27. raw PDF / P3 / P4 artifacts unchanged；
+28. no PDF reopen；
+29. no OCR/Docling/Dayu/network/AI；
+30. no P6 raw fact/evidence implementation。
 
 P5 PASS 后才允许 P6。
