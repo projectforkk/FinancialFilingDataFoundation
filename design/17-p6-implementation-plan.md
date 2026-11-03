@@ -43,6 +43,7 @@ invalid source ref blocked.
 - period/unit/scope explicit-only extraction
 - longest/non-overlapping unit phrase matching
 - explicit scope phrases only (no bare 公司/company)
+- longest/non-overlapping scope phrase matching
 - warning aggregates
 
 Gate:
