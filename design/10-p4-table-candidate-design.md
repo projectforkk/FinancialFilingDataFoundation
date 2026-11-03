@@ -148,7 +148,7 @@ SHA256(
 
 ## 7. Candidate Region Unit
 
-P4 以**连续 block group** 为候选区域。
+P4 优先以**连续 block group** 为候选区域。
 
 同一页按 P3 `reading_order_index` 遍历 text blocks。
 
@@ -159,6 +159,28 @@ P4 以**连续 block group** 为候选区域。
 - vertical gap <= page_height * 0.04；
 - horizontal overlap / common column anchors 足够；
 - 中间没有明显长段 prose separator。
+
+### 7.1 Distributed-block fallback
+
+P3 实际 HK annual report 证明：复杂财务表可能把同一视觉表格的 row labels / numeric columns 拆成大量独立 text blocks；单个 block 内甚至只有 1 个 numeric token，因此 block-local seed 会漏掉整张表。
+
+P4 允许一个 **page-level distributed-block fallback candidate**，但仍只做 candidate detection，不做 reconstruction。
+
+触发至少满足：
+
+- page numeric_token_count >= 12；
+- numeric-bearing block count >= 4；
+- page-level repeated numeric x anchor count >= 2；
+- 且满足 financial keyword/context 或 numeric_token_count >= 20。
+
+fallback candidate：
+
+- `block_nos` = 参与 numeric evidence 的 blocks；
+- bbox = 这些 evidence blocks 的 union bbox；
+- signal = `DISTRIBUTED_NUMERIC_BLOCKS`；
+- 可叠加 keyword / section / drawing signals；
+- 不能输出/推断 cells、rows、columns；
+- 若与 block-local candidate 高度重叠，不重复输出更弱 candidate。
 
 P4 只输出 bbox + block references。
 
@@ -506,7 +528,7 @@ load_table_candidates(
 
 ## 22. Live Acceptance Expectations
 
-P4 不要求人工标注所有表。
+P4 不要求人工标注所有表，但必须设置代表性 recall guard。
 
 必须至少证明：
 
@@ -518,7 +540,8 @@ CN 600519 FY2024：
 HK 00700 FY2024：
 - financial statements / notes 中有 candidate；
 - candidate count > 0；
-- repeated run deterministic。
+- repeated run deterministic；
+- 基于已验收 P3 artifact 的事实页：page 124 `綜合收益表`、page 126 `綜合財務狀況表`、page 133 `綜合現金流量表` 必须命中 candidate，防止 distributed-block layout 回归漏检。
 
 并记录 top candidates 的 page / score / signals 供 P5 review。
 

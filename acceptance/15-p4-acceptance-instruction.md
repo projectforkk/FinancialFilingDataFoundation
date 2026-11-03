@@ -19,12 +19,13 @@
 12. artifact reuse validation；
 13. corrupt manifest / JSONL / count mismatch blocked；
 14. CN 600519 FY2024 candidate_count > 0；
-15. HK 00700 FY2024 candidate_count > 0；
-16. dual-root byte-identical candidates；
-17. CN <=5s；
-18. HK <=10s；
-19. P3 artifacts and raw PDFs unchanged；
-20. no reconstructed cell/table objects。
+15. HK 00700 FY2024 candidate_count > 0，且 pages 124 / 126 / 133 均有 candidate；
+16. distributed-block synthetic regression PASS，且不输出 reconstructed cells/rows/columns；
+17. dual-root byte-identical candidates；
+18. CN <=5s；
+19. HK <=10s；
+20. P3 artifacts and raw PDFs unchanged；
+21. no reconstructed cell/table objects。
 
 验收不得修改 production/tests/design/config。
 
