@@ -752,6 +752,28 @@ This is an empirical performance-policy amendment, not a correctness relaxation.
 
 Affected gates: P8-H/I/K.
 
+### P8-ISSUE-003 — deep Windows worktree pytest temp paths exceed filesystem path limit
+
+P8-F full regression initially used a basetemp nested under the already-deep active worktree:
+
+`.../worktrees/active/p8-local-mcp/workspace/pytest-p8-final-dev`
+
+P4/P5/P6 tests create additional atomic temp directories containing 64-char document SHA values. On this Windows host the combined path became too long and `Path.write_text()` failed with `FileNotFoundError` before product assertions ran.
+
+Diagnostic rerun of the same failing P4 test with short basetemp:
+
+`D:\Codex\_ffdf_p8_pytest\diag`
+
+resulted in PASS.
+
+Approved solution：
+1. P8 development/review/acceptance pytest on Windows must use a short external basetemp root under `D:\Codex\_ffdf_p8_pytest`；
+2. temp root is test execution state only, not production/config/artifact truth；
+3. do not modify P4/P5/P6 atomic output naming or accepted production code merely to accommodate deep review worktree paths；
+4. isolated Git worktree remains required；
+5. full regression evidence from the long basetemp run is invalidated and must be rerun from a short basetemp；
+6. acceptance instruction must freeze the exact short basetemp convention.
+
 ### P8-ISSUE-002 — Eager artifact validation made MCP cold connect exceed the 15s gate
 
 Official SDK stdio integration succeeded functionally and negotiated protocol `2026-07-28`, but initial implementation constructed `McpQueryService` by validating/loading every catalog document during server creation.
