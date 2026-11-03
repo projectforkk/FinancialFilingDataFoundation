@@ -99,6 +99,19 @@ P5 Independent Acceptance:
 
 P6 must not start production implementation until its detailed design and execution plan are committed.
 
+## Project directory consolidation
+
+- verdict: `PASS`
+- design: `design/15-project-directory-management.md`
+- evidence: `development/34-directory-consolidation-evidence.md`
+- canonical root: `D:\Codex\FinancialFilingDataFoundation`
+- all linked worktrees inside project root: `PASS`
+- Dayu source inside project root: `PASS`
+- Dayu runtime inside project root: `PASS`
+- runtime lock: `runtime-locks/dayu-2115c86-py312-win-amd64.lock.txt`
+- old/new accepted package snapshot: `MATCH`
+- full regression after migration: `156 passed`
+
 ## Current runtime boundaries
 
 ### FFDF main runtime
@@ -113,7 +126,7 @@ P6 must not start production implementation until its detailed design and execut
 
 ### Dayu acquisition runtime
 
-`D:\Codex\runtimes\ffdf-dayu-2115c86\.venv`
+`D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-dayu-2115c86\.venv`
 
 - Python 3.12.14 AMD64
 - dayu-agent 0.1.4
@@ -155,7 +168,10 @@ The P2 Dayu runtime is isolated from the FFDF main runtime.
 6. MCP AI API calls are forbidden.
 7. Tracked Markdown / JSON governance artifacts use `UTF-8 without BOM`.
 8. Phase code enters the accepted baseline only after Independent Acceptance PASS.
-9. P4 may implement only table candidate detection; table reconstruction remains P5.
+9. P6 may implement only Raw Facts / Evidence; P7 quality/validation remains separate.
+10. Design index: `design/00-design-management-index.md`.
+11. Directory governance: `design/15-project-directory-management.md`.
+12. All FFDF-owned dependencies/runtimes/worktrees/workspace/data are managed under `D:\Codex\FinancialFilingDataFoundation`.
 
 ## Roadmap
 
@@ -163,9 +179,9 @@ The P2 Dayu runtime is isolated from the FFDF main runtime.
 - P1 — Identity / Registry / Incremental Planner: `DONE`
 - P2 — Acquisition Provider: `DONE`
 - P3 — Native Page / Section / FTS: `DONE`
-- P4 — Table Candidate Detection: `DESIGN AUTHORIZED`
-- P5 — Table Reconstruction / Cross-page: `NOT STARTED`
-- P6 — Raw Facts / Evidence: `NOT STARTED`
+- P4 — Table Candidate Detection: `DONE`
+- P5 — Table Reconstruction / Cross-page: `DONE`
+- P6 — Raw Facts / Evidence: `DESIGN AUTHORIZED`
 - P7 — Quality Gate / Validation: `NOT STARTED`
 - P8 — Local MCP: `NOT STARTED`
 - P9 — Codex Review Overlay: `NOT STARTED`
