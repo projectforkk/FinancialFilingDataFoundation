@@ -11,6 +11,7 @@ Initial design baseline:
 Design amendments:
 - P7-ISSUE-001 remove implicit P4 dependency: branch `1c0bc22e1db34f2e5d82ef933157be4e73cb07be`
 - P7-ISSUE-002 source-lineage duplicate/conflict identity: branch `a66fadfe6069f31674816a06e6da172dec98cc67`
+- P7-ISSUE-003 preflight execution error vs BLOCKED status: branch `8bf04bf337bc1375475fab8eb3a80e145d145a7e`
 
 Production commit:
 `34d2a75d23731826dba2c48946a2f8056279fb33`
@@ -88,7 +89,7 @@ First live issue counts were invalidated and rerun.
 
 Final P7 focused:
 
-`23 passed in 0.83s`
+`24 passed in 0.73s`
 
 Coverage:
 - status priority
@@ -99,6 +100,7 @@ Coverage:
 - cash reconciliation pass/fail
 - same-lineage duplicate/conflict
 - repeated metric across distinct rows not conflict
+- preflight missing/corrupt input returns P7_INPUT_ARTIFACT_INVALID and no validation artifact
 - semantic coverage thresholds
 - row-without-label threshold
 - stable issue ID
@@ -115,7 +117,7 @@ Coverage:
 
 P0–P7:
 
-`212 passed in 4.75s`
+`213 passed in 5.40s`
 
 Additional:
 - compileall PASS
@@ -258,7 +260,21 @@ issues SHA:
 
 Performance <=15s: PASS.
 
-## 9. Reuse Semantics
+## 9. P7-ISSUE-003 Final Clarification
+
+Code Review confirmed upstream P3/P5/P6 loaders can reject missing/corrupt/version-mismatched/tampered input before P7 has a trustworthy document identity.
+
+Final design semantics:
+- preflight input failure → `ValidationError(P7_INPUT_ARTIFACT_INVALID)`;
+- no validation artifact is persisted;
+- `ValidationStatus.BLOCKED` is reserved for blocking findings after trusted input loading/identity establishment;
+- current production implementation already behaved this way, so no production-code change was required;
+- dedicated regression now locks this boundary.
+
+Final focused suite after clarification: `24 passed`.
+Final full suite after clarification: `213 passed`.
+
+## 10. Reuse Semantics
 
 Synthetic complete validation:
 - status PASS
@@ -273,7 +289,7 @@ Synthetic REVIEW_REQUIRED:
 - reuse_eligible false
 - planner does not return REUSE_DATA.
 
-## 10. Gate Result
+## 11. Gate Result
 
 - P7-B Models/Policy: PASS
 - P7-C Structural/Evidence: PASS
