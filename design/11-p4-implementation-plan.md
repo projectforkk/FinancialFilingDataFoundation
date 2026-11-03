@@ -30,6 +30,19 @@ Gate：focused unit tests PASS。
 - score/signals
 - no cell/row/column reconstruction
 
+### P4-ISSUE-002 — Candidate artifact identity integrity
+
+P4-G Code Review 发现：初版 loader 仅检查 candidate_id 非空/唯一，没有根据 page/bbox/block_nos 重算 ID，也没有验证 page upper bound / bbox ordering。JSONL 若被修改但保留旧 ID，可能错误通过 reuse validation。
+
+Approved fix:
+- manifest 必须持有 page_count；
+- validate page range；
+- validate finite ordered bbox；
+- validate non-empty integer block_nos；
+- recompute candidate_id and require exact match；
+- add tampered bbox/page/id regression tests；
+- rerun P4-D/E/G。
+
 ### P4-ISSUE-001 — HK distributed-block table layout
 
 P3 accepted HK artifact shows major statements split numeric values across many independent blocks. Initial block-local detector returned only 2 candidates and missed known financial statement pages 124/126/133.

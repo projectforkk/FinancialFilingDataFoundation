@@ -417,7 +417,12 @@ score round to 3 decimals。
 - P3 parser_version；
 - P3 artifact identity；
 - candidates.jsonl 存在且可完整 JSONL decode；
-- candidate document/page/bbox identity valid；
+- candidate `document_sha256` 与 manifest 一致；
+- `1 <= page_no <= manifest.page_count`；
+- bbox 必须为 4 个 finite number，且 `x1 >= x0 / y1 >= y0`；
+- block_nos 必须为 non-empty deterministic integer list；
+- loader 必须按 `document_sha256 + page_no + normalized_bbox + sorted(block_nos)` **重新计算 candidate_id 并与存储值精确比较**；
+- candidate_id 唯一；
 - manifest candidate_count 与 JSONL count 一致。
 
 全部 PASS → reuse。
