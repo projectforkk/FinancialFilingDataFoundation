@@ -1,0 +1,13 @@
+{
+  "dayu_source_dir": "D:\\Codex\\FinancialFilingDataFoundation\\dependencies\\dayu-agent",
+  "market": "CN",
+  "operation": "discover",
+  "protocol_version": "ffdf-dayu-acquisition-v1",
+  "request_id": "discover-f77b6262f08544cbab37e964cb10a244",
+  "target_periods": [
+    "Q3"
+  ],
+  "ticker": "002371",
+  "window_end": "2026-11-04",
+  "window_start": "2026-01-01"
+}

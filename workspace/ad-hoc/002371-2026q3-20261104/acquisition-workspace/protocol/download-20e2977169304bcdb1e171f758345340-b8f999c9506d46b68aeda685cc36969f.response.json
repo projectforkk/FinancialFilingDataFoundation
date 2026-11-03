@@ -1,0 +1,29 @@
+{
+  "candidate": {
+    "amended": false,
+    "etag": null,
+    "filing_date": "2026-10-29",
+    "fiscal_period": "Q3",
+    "fiscal_year": 2026,
+    "language": "zh",
+    "last_modified": "Thu, 29 Oct 2026 09:54:48 GMT",
+    "provider": "cninfo",
+    "provider_company_id": "CNINFO:9900006137",
+    "provider_company_name": "北方华创",
+    "remote_content_length": 231478,
+    "source_id": "1225641389",
+    "source_title": "2026年三季度报告",
+    "source_url": "http://static.cninfo.com.cn/finalpage/2026-10-30/1225641389.PDF",
+    "ticker": "002371"
+  },
+  "dayu_content_length": 231478,
+  "dayu_temp_sha256": "a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "docling_conversion_used": false,
+  "downloaded_at": "2026-11-03T15:09:34+00:00",
+  "operation": "download",
+  "protocol_version": "ffdf-dayu-acquisition-v1",
+  "request_id": "download-20e2977169304bcdb1e171f758345340",
+  "runner_version": "p2-dayu-runner-v1",
+  "staging_path": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\raw-store\\staging\\002371-2026-qg4myt7z.pdf",
+  "status": "OK"
+}

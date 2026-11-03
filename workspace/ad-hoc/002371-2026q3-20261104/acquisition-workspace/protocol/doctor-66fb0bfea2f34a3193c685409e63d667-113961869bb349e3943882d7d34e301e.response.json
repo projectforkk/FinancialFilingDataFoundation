@@ -1,0 +1,33 @@
+{
+  "cn_downloader_origin": "D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-dayu-2115c86\\.venv\\Lib\\site-packages\\dayu\\fins\\downloaders\\cninfo_downloader.py",
+  "cwd": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\acquisition-workspace",
+  "dayu_module_origin": "D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-dayu-2115c86\\.venv\\Lib\\site-packages\\dayu\\__init__.py",
+  "dayu_package_version": "0.1.4",
+  "dayu_pinned_commit": "2115c86d5a9027bb51cbbc8a4d0175080732e4e6",
+  "dayu_repository": "https://github.com/noho/dayu-agent",
+  "dayu_source_clean": true,
+  "dayu_source_dir": "D:\\Codex\\FinancialFilingDataFoundation\\dependencies\\dayu-agent",
+  "dayu_source_head": "2115c86d5a9027bb51cbbc8a4d0175080732e4e6",
+  "docling_conversion_used": false,
+  "hk_downloader_origin": "D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-dayu-2115c86\\.venv\\Lib\\site-packages\\dayu\\fins\\downloaders\\hkexnews_downloader.py",
+  "import_ms": 3259.498,
+  "network_used": false,
+  "operation": "doctor",
+  "protocol_version": "ffdf-dayu-acquisition-v1",
+  "python_build": "3.12.14 (main, Aug 14 2026, 15:40:22) [MSC v.1944 64 bit (AMD64)]",
+  "python_executable": "D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-dayu-2115c86\\.venv\\Scripts\\python.exe",
+  "python_prefix": "D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-dayu-2115c86\\.venv",
+  "python_version": "3.12.14",
+  "query_model_origin": "D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-dayu-2115c86\\.venv\\Lib\\site-packages\\dayu\\fins\\pipelines\\cn_download_models.py",
+  "request_id": "doctor-66fb0bfea2f34a3193c685409e63d667",
+  "runner_version": "p2-dayu-runner-v1",
+  "site_packages": [
+    "D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-dayu-2115c86\\.venv\\Lib\\site-packages"
+  ],
+  "status": "OK",
+  "transitively_loaded_modules": [
+    "dayu.fins.pipelines.cn_download_filing_workflow",
+    "dayu.fins.pipelines.cn_download_workflow",
+    "dayu.fins.docling_export"
+  ]
+}

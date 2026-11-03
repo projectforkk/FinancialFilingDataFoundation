@@ -1,0 +1,33 @@
+{
+  "document_sha256": "a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "evidence_count": 315,
+  "evidence_file": "evidence.jsonl",
+  "extractor_version": "p6-raw-fact-extractor-v1",
+  "fact_count": 315,
+  "facts_file": "raw_facts.jsonl",
+  "input_fingerprints": {
+    "p3_pages_sha256": "7a4b12a298d42d5c2a6fa215ebc671d07cf64d7d825dafb8bc4eea2156b64fa5",
+    "p3_parser_version": "p3-native-page-section-v1",
+    "p3_sections_sha256": "d5defb763fafba8a270f036e1c7b5733276b5ba3be98fcd79c1c04683be716cf",
+    "p5_groups_sha256": "4de55a0945eec78c2bcf1ec4d064c449a45b44ac547e0300fff9a8c3076f11ab",
+    "p5_manifest_sha256": "66931e97bf396db7f27b77ce133037081cd35b5ab0024a8bbb46f2920b59b53c",
+    "p5_reconstruction_version": "p5-table-reconstruction-v1",
+    "p5_tables_sha256": "40b9ca7c02d25cf1b8dd3b50b3aa62c2b1aad8c07d6be2c4b69dc6f4aa77f094",
+    "p6_extractor_version": "p6-raw-fact-extractor-v1"
+  },
+  "p3_artifact_dir": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\p3-native\\a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "p5_artifact_dir": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\p5-tables\\a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "schema_version": "p6-raw-facts-evidence-v1",
+  "tables_with_facts": 10,
+  "timings_ms": {
+    "extract": 25.126,
+    "persist": 10.325,
+    "total": 84.383
+  },
+  "warnings": [
+    {
+      "count": 33,
+      "reason_code": "ROW_WITHOUT_LABEL"
+    }
+  ]
+}

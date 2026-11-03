@@ -1,0 +1,71 @@
+{
+  "blocking_issue_count": 0,
+  "compatibility_status": "COMPATIBLE",
+  "document_sha256": "a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "failure_issue_count": 0,
+  "input_fingerprints": {
+    "p3_document_sha256": "4316d7fd3639cad9fa95d84fa7094ef2df02e1074187b01d7ce8221c4c89654d",
+    "p3_pages_sha256": "7a4b12a298d42d5c2a6fa215ebc671d07cf64d7d825dafb8bc4eea2156b64fa5",
+    "p3_parser_version": "p3-native-page-section-v1",
+    "p5_groups_sha256": "4de55a0945eec78c2bcf1ec4d064c449a45b44ac547e0300fff9a8c3076f11ab",
+    "p5_manifest_sha256": "66931e97bf396db7f27b77ce133037081cd35b5ab0024a8bbb46f2920b59b53c",
+    "p5_reconstruction_version": "p5-table-reconstruction-v1",
+    "p5_tables_sha256": "40b9ca7c02d25cf1b8dd3b50b3aa62c2b1aad8c07d6be2c4b69dc6f4aa77f094",
+    "p6_evidence_sha256": "b1f7eb1d3c6e8e817a44886b4378ed806e5b4cd353d9e07d280422f5148d9208",
+    "p6_extractor_version": "p6-raw-fact-extractor-v1",
+    "p6_facts_sha256": "de9e4da360f5fd77c11d720d3b56ced8deb17bd789173cc449ae4502afa76206",
+    "p6_manifest_sha256": "968a7588798e99397957e234e79b0eb6c48029a6222138c13ab71c6c5df7a618",
+    "p7_policy_version": "p7-quality-policy-v1"
+  },
+  "issue_count": 3,
+  "issues_file": "issues.jsonl",
+  "metrics": {
+    "blocking_issue_count": 0,
+    "core_statement_signal_count": 2,
+    "core_statement_signals": {
+      "balance": true,
+      "cashflow": true,
+      "income": false
+    },
+    "evaluated_rule_count": 0,
+    "evidence_count": 315,
+    "evidence_coverage_ratio": 1.0,
+    "fact_density_per_table": 31.5,
+    "failed_rule_count": 0,
+    "failure_issue_count": 0,
+    "info_issue_count": 0,
+    "p6_warning_counts": {
+      "ROW_WITHOUT_LABEL": 33
+    },
+    "page_count": 10,
+    "pages_with_facts": 10,
+    "passed_rule_count": 0,
+    "period_nonnull_ratio": 0.022222,
+    "raw_fact_count": 315,
+    "reconstructed_table_count": 10,
+    "review_issue_count": 2,
+    "row_without_label_count": 33,
+    "row_without_label_ratio": 0.094828,
+    "scope_nonnull_ratio": 0.146032,
+    "skipped_rule_count": 2,
+    "source_word_coverage_ratio": 1.0,
+    "table_group_count": 1,
+    "tables_with_facts": 10,
+    "tables_without_facts": 0,
+    "tables_without_facts_ratio": 0.0,
+    "unique_metric_count": 142,
+    "unit_nonnull_ratio": 0.0,
+    "warning_issue_count": 1
+  },
+  "policy_version": "p7-quality-policy-v1",
+  "reuse_eligible": false,
+  "review_issue_count": 2,
+  "schema_version": "p7-validation-v1",
+  "timings_ms": {
+    "persist": 0.812,
+    "total": 173.562,
+    "validation": 172.749
+  },
+  "validation_status": "REVIEW_REQUIRED",
+  "warning_issue_count": 1
+}

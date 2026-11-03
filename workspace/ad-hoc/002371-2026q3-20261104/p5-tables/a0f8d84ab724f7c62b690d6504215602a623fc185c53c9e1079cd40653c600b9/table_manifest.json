@@ -1,0 +1,25 @@
+{
+  "document_sha256": "a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "group_count": 1,
+  "groups_file": "table_groups.jsonl",
+  "input_fingerprints": {
+    "p3_pages_sha256": "7a4b12a298d42d5c2a6fa215ebc671d07cf64d7d825dafb8bc4eea2156b64fa5",
+    "p3_sections_sha256": "d5defb763fafba8a270f036e1c7b5733276b5ba3be98fcd79c1c04683be716cf",
+    "p4_candidates_sha256": "833a511da8e3e62371396056554b40ef56bdda69f46806a9fe1979193462b5bd",
+    "p4_manifest_sha256": "47e0cfe63f49b587b32616491a93488e6b247bc110d2759a739937a33ad0a6d0"
+  },
+  "p3_artifact_dir": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\p3-native\\a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "p3_parser_version": "p3-native-page-section-v1",
+  "p4_artifact_dir": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\p4-candidates\\a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "p4_detector_version": "p4-table-candidate-v1",
+  "reconstruction_version": "p5-table-reconstruction-v1",
+  "schema_version": "p5-reconstructed-tables-v1",
+  "table_count": 10,
+  "tables_file": "tables.jsonl",
+  "timings_ms": {
+    "persist": 5.49,
+    "reconstruct": 15.21,
+    "total": 30.729
+  },
+  "warnings": []
+}

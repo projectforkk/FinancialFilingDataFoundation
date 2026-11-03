@@ -1,0 +1,20 @@
+{
+  "document_sha256": "a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "file_size": 231478,
+  "page_count": 10,
+  "pages_file": "pages.jsonl",
+  "parser_version": "p3-native-page-section-v1",
+  "schema_version": "p3-native-document-v1",
+  "search_db_file": "search.sqlite",
+  "section_count": 93,
+  "sections_file": "sections.jsonl",
+  "source_path": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\raw-store\\sha256\\a0\\a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9.pdf",
+  "timings_ms": {
+    "native_extract": 49.464,
+    "open": 0.728,
+    "persist": 18.76,
+    "section": 6.915,
+    "total": 77.235
+  },
+  "warnings": []
+}

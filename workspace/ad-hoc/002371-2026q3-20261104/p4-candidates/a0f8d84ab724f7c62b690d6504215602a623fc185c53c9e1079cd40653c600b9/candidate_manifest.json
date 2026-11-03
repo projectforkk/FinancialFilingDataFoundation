@@ -1,0 +1,17 @@
+{
+  "candidate_count": 10,
+  "candidates_file": "candidates.jsonl",
+  "detector_version": "p4-table-candidate-v1",
+  "document_sha256": "a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "p3_artifact_dir": "D:\\Codex\\FinancialFilingDataFoundation\\workspace\\ad-hoc\\002371-2026q3-20261104\\p3-native\\a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9",
+  "p3_parser_version": "p3-native-page-section-v1",
+  "p3_schema_version": "p3-native-document-v1",
+  "page_count": 10,
+  "schema_version": "p4-table-candidates-v1",
+  "timings_ms": {
+    "detect": 7.443,
+    "persist": 0.36,
+    "total": 16.973
+  },
+  "warnings": []
+}
