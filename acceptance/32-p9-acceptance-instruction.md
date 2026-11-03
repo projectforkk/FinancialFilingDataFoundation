@@ -59,8 +59,9 @@
 50. no external MCP SDK requirement
 51. no P8 tool mutation
 52. no P10/P11 implementation
-53. local CLI JSON stdout only
+53. local CLI deterministic JSON contract：success = exit 0 / stdout exactly one JSON / stderr empty；handled runtime failure = stdout empty / stderr exactly one JSON / exit 1；parser-level failure = stdout empty / stderr exactly one JSON / exit 2 / reason_code `P9_CLI_ARGUMENT_ERROR` / message `invalid command line arguments`；必须直接覆盖 no subcommand、unknown subcommand、missing required argument、`--input-json` + `--input-file` conflict
 54. performance gates
+55. resolution payload security invariant：完整 provisional persisted payload 在 resolution_id hash/persist 前执行 deterministic recursive string-leaf validation；URL/path/shell/SQL/Python/credential adversarial payload全部拒绝为 `P9_RESOLUTION_CONTENT_FORBIDDEN`；historical re-load/semantic validation同样执行；错误不得回显 offending secret/content；benign `2024/2025`、`P5/P6 evidence`、自然语言 keyword 不误拒
 
 ## Synthetic golden
 

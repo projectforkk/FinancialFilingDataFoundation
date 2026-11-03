@@ -1368,10 +1368,14 @@ CLI：
 
 - 不调用 Codex
 - 不调用 network
-- JSON stdout only
-- diagnostics stderr
+- 成功时 exit 0，stdout exactly one JSON document，stderr empty
+- handled runtime failure 时 stdout empty，stderr exactly one deterministic JSON object，exit 1
+- parser-level failure（包括无 subcommand、unknown subcommand、missing required argument、mutually-exclusive misuse）不得输出 argparse usage/error 文本；stdout empty，stderr exactly one deterministic JSON object，exit 2
+- 所有 parser-level failure 使用稳定 reason_code `P9_CLI_ARGUMENT_ERROR` 与稳定 message `invalid command line arguments`，不得依赖 Python/argparse 版本生成的 usage/error 文案
 - resolution input使用 explicit JSON file/string
 - 不读取任意 secret
+
+实现必须把 argument parsing 本身放入 CLI JSON error boundary；允许通过自定义 `ArgumentParser.error()` / equivalent deterministic mechanism 把 parser failure 转换为 P9 diagnostic，但不得让 `SystemExit(2)` 绕过该边界。
 
 P10 只验证/编排 Codex 对 P8/P9 的直接使用，不重实现 overlay persistence，也不复制运行时研究规则。
 
@@ -1601,7 +1605,7 @@ Acceptance evidence至少记录：
 
 ## 49. Security / scope
 
-P9 resolution payload不得包含：
+P9 persisted resolution payload不得包含：
 
 - file paths
 - URLs
@@ -1610,9 +1614,45 @@ P9 resolution payload不得包含：
 - Python code
 - credentials
 
-justification仅审计文本，max 4000 chars。
+这不是仅针对 `reviewer_id` 或 `justification` 的局部规则，而是 **payload-wide persisted-content invariant**。
 
-P9 production不执行 justification内容。
+### 49.1 Enforcement point
+
+在计算 `resolution_id`、写入 immutable resolution JSON 之前，P9 必须对已经完成 target/evidence normalization、before/after 构造后的完整：
+
+`ReviewResolution.to_dict(include_id=False)`
+
+执行递归 string-leaf security validation。
+
+同一 validator 也必须用于读取/语义验证既有 resolution；即使攻击者手工修改 payload 并重新计算 resolution SHA，也不能通过历史 resolution semantic validation。
+
+任何命中均失败：
+
+- reason_code = `P9_RESOLUTION_CONTENT_FORBIDDEN`
+- message = `resolution payload contains forbidden content`
+
+错误不得回显疑似 secret / command / URL / path 原文。
+
+### 49.2 Deterministic forbidden-content classes
+
+validator 必须使用固定、可测试、无网络/AI 的 deterministic rules，至少覆盖：
+
+1. URL：scheme URL（例如 `https://`、`http://`、`ftp://`、`file://`、`ssh://`）和 `www.` URL；
+2. file path：Windows drive-root / UNC path、POSIX absolute path、显式 `../` / `..\\` traversal；
+3. shell command：明确的 command-launch / execution syntax，例如 `cmd /c`、`powershell` / `pwsh`、`bash`、`sh -c`、`Invoke-Expression`、`curl`、`wget`、destructive shell forms；
+4. SQL：明确 statement syntax，例如 `SELECT ... FROM`、`INSERT INTO`、`UPDATE ... SET`、`DELETE FROM`、`DROP/ALTER/CREATE TABLE`、`UNION SELECT`、`PRAGMA`；
+5. Python code：明确 executable syntax，例如 line-start `import` / `from ... import` / `def` / `class`，以及 `__import__()`、`exec()`、`eval()`、`os.*()`、`subprocess.*()`；
+6. credentials：`password/passwd/secret/token/api_key/access_key/private_key` 等 assignment form，以及 Bearer credential form。
+
+普通财务语义文本不得仅因为包含斜杠、关键字单词或自然语言而被误判；例如 `2024/2025`、`P5/P6 evidence`、`SQL review completed` 本身不构成 forbidden content。
+
+### 49.3 Field boundary
+
+caller-controlled free-text/string fields（包括 `value`、`reviewer_id`、`justification`）必须受上述完整规则约束。
+
+target / evidence caller input不得原样信任；只有经既有 P5/P6/base identity validation 后形成的 canonical target/evidence refs 才可进入 provisional resolution，但最终仍受 payload-wide validator 检查。
+
+justification仅审计文本，max 4000 chars；P9 production不执行其内容。
 
 ---
 
@@ -1733,6 +1773,44 @@ Approved solution:
 9. push the integrated candidate normally to `task/p9-review-overlay` and stop. P9-I/J/K/L/M remain unauthorized until independent GitHub code review of the pushed candidate completes。
 
 Affected gates: P9-G candidate integration/re-verification only. P9-I and later gates remain closed.
+
+### P9-ISSUE-006 — P9-J-F1 payload security invariant was specified but not operationalized
+
+Formal P9-J review at `development/62-p9-j-formal-code-review-result.md` proved that the candidate accepted forbidden persisted content, including a URL in `justification` and SQL statement text in `value`.
+
+Root cause:
+- Section 49 stated the forbidden categories but did not define the exact validation point, read-time revalidation, deterministic detection classes, stable reason code/message, or benign-text false-positive boundary；
+- implementation therefore validated only a few reviewer-id secret markers and justification length, leaving the full persisted resolution unguarded。
+
+Approved solution:
+1. Section 49 becomes a payload-wide persisted-content invariant；
+2. validate the complete normalized provisional `ReviewResolution.to_dict(include_id=False)` before resolution ID hashing/persistence；
+3. run the same validation during historical resolution semantic validation；
+4. deterministic classes cover URL/path/shell/SQL/Python/credential syntax；
+5. reject with `P9_RESOLUTION_CONTENT_FORBIDDEN` / `resolution payload contains forbidden content` without echoing offending content；
+6. add adversarial tests for all six classes and benign non-matches；
+7. no P9-K until detached corrective re-review passes。
+
+Affected gates: P9-D / P9-JR / P9-K / P9-L.
+
+### P9-ISSUE-007 — P9-J-F2 argparse parser failures escaped the JSON CLI boundary
+
+Formal P9-J review proved four parser-level cases emitted argparse `usage:/error:` text and `SystemExit(2)` outside the designed P9 diagnostic contract.
+
+Root cause:
+- `parser.parse_args(argv)` ran before the existing `ReviewError` / generic exception JSON boundary；
+- design said JSON stdout / diagnostics stderr but did not freeze parser-level exit code, reason code, message, or argparse-version independence。
+
+Approved solution:
+1. argument parsing itself must execute inside the P9 JSON diagnostic boundary；
+2. parser-level failures must never emit argparse usage/error prose；
+3. all parser-level failures use exit 2, stdout empty, stderr exactly one JSON object；
+4. stable diagnostic is `P9_CLI_ARGUMENT_ERROR` / `invalid command line arguments`；
+5. directly test no subcommand, unknown subcommand, missing required argument, and mutually-exclusive input misuse；
+6. handled runtime failures remain exit 1 and success remains exit 0；
+7. no P9-K until detached corrective re-review passes。
+
+Affected gates: P9-G / P9-JR / P9-K / P9-L.
 
 发现问题必须：
 

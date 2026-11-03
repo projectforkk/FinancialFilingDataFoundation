@@ -189,6 +189,31 @@ Detached：
 
 ---
 
+## P9-JR — Formal Review Corrective Gate
+
+仅在 P9-J verdict = FAIL / CHANGES REQUIRED 且 design amendment 已 commit/push 后执行。
+
+当前 authorized corrective scope 仅限：
+
+- P9-J-F1：实现 payload-wide persisted resolution security validator，并在 submit 前与 historical semantic validation 时强制执行；
+- P9-J-F2：把 argparse/parser-level failures 纳入 deterministic JSON diagnostic boundary；
+- 为 F1/F2 增加 direct/adversarial unit tests；
+- 重跑 focused P9 tests、full unit、compile/import、diff/scope checks；
+- 创建新的 exact detached corrective candidate 做 P9-J re-review。
+
+Gate：
+
+- F1 adversarial probes（至少 URL in justification、SQL in value，并覆盖 path/shell/Python/credential classes）全部 deterministic reject；
+- benign slash/keyword examples不误拒；
+- 四个 parser-level cases均 stdout empty、stderr exactly one JSON object、reason_code/message stable、exit 2；
+- focused/full unit PASS；
+- no P0-P8 unintended diff；
+- detached P9-J re-review PASS。
+
+P9-JR PASS 前 P9-K 继续关闭。
+
+---
+
 ## P9-K — Acceptance Freeze
 
 固定：
