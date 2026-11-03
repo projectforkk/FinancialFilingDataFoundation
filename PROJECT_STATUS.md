@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P8_DONE / P9_DESIGN_READY**
+**P8_DONE / P9_DEVELOPMENT_RECOVERY_PENDING**
 
 ## Accepted baseline
 
@@ -120,7 +120,7 @@
 
 Status:
 
-`DESIGN READY / DEVELOPMENT NOT STARTED`
+`DEVELOPMENT IN PROGRESS — LOCAL UNCOMMITTED CANDIDATE / RE-VERIFICATION REQUIRED`
 
 Planned branch:
 
@@ -167,9 +167,11 @@ P8 final Independent Acceptance freeze:
 
 P9 detailed design, implementation plan, development instruction and acceptance baseline are complete.
 
-Production remains blocked until this P9 design baseline is committed/pushed and the formal P9 worktree is created.
+GitHub branch `task/p9-review-overlay` contains the current design/governance baseline. A handoff-reported P9-B–F production/test candidate exists only in the WorkHome active worktree and is not yet committed or accepted. Before the Remote Desktop Commander outage, that local candidate was reported as core compile/import PASS, focused `7 passed`, and full unit regression `242 passed / 0 fail`; these results require local re-verification after WorkHome reconnect and must not be treated as accepted baseline evidence.
 
-Current gate: `P9-A Design Baseline Commit / P9-B Development Preparation`.
+Recovery rule: reconnect WorkHome → verify local `git status/log/rev-parse` and the existing untracked P9 files → safely fast-forward/sync design-only commits without reset/clean/checkout overwrite or reconstruction → continue P9-G CLI and remaining negative tests.
+
+Current gate: `P9 local recovery / design sync → P9-G Local CLI`.
 
 ## Project directory consolidation
 
@@ -272,6 +274,6 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P6 — Raw Facts / Evidence: `DONE`
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
-- P9 — Codex Review Overlay: `DESIGN AUTHORIZED`
+- P9 — Codex Review Overlay: `DEVELOPMENT IN PROGRESS / LOCAL RE-VERIFICATION PENDING`
 - P10 — Codex Dynamic Research Integration: `NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`
