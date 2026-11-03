@@ -349,8 +349,9 @@ P6 在当前 fact row 之前的 rows 中搜索 header-like nonnumeric cells：
 - 前若干 header-like rows / label text
 
 规则：
+- scope matcher 也必须采用 **longest / most-specific non-overlapping match**；例如 `母公司财务报表` 不得同时再计入其子串 `公司财务报表`，`parent company` 不得因内部 `company` 片段产生第二种 scope；
 - unique scope → raw_scope 原文；
-- conflicting scopes → null + `AMBIGUOUS_RAW_SCOPE`；
+- 只有独立、不重叠的不同 normalized scope key 同时存在才是 conflicting scopes → null + `AMBIGUOUS_RAW_SCOPE`；
 - none → null。
 
 禁止根据 issuer/market 猜 scope。
@@ -755,6 +756,22 @@ load_raw_facts(
 ---
 
 ## 31. P6 Issue Log
+
+### P6-ISSUE-005 — Explicit scope phrases can overlap
+
+Regression after P6-ISSUE-004 showed `母公司财务报表` matches both:
+- PARENT: `母公司财务报表`
+- COMPANY_ONLY substring: `公司财务报表`
+
+Treating every regex hit as independent evidence incorrectly makes one explicit PARENT phrase ambiguous.
+
+Approved solution:
+- scope matching uses longest/most-specific non-overlapping selection per text, identical in principle to P6-ISSUE-003 unit matching；
+- overlapping child spans do not count as independent scope evidence；
+- genuinely independent PARENT + CONSOLIDATED (or other different scope) evidence remains ambiguous；
+- add regression for `母公司财务报表` and overlapping English phrases.
+
+Affected gates: P6-D/F/H/J.
 
 ### P6-ISSUE-004 — Bare 公司/company scope patterns are too broad
 
