@@ -752,7 +752,7 @@ This is an empirical performance-policy amendment, not a correctness relaxation.
 
 Affected gates: P8-H/I/K.
 
-### P8-ISSUE-003 — deep Windows worktree pytest temp paths exceed filesystem path limit
+### P8-ISSUE-004 — deep Windows worktree pytest temp paths exceed filesystem path limit
 
 P8-F full regression initially used a basetemp nested under the already-deep active worktree:
 
