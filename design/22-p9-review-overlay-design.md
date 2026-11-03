@@ -1702,6 +1702,38 @@ Approved solution:
 
 Affected gates: governance/status synchronization only. P9-G remains the next development gate after safe local recovery.
 
+### P9-ISSUE-005 — Local validated P9-G candidate diverged from newer remote governance commit
+
+After `development/51-p9-codex-local-execution-instruction.md` was added on GitHub at remote commit `2c56e38a51f148b86ce6f4754bf9bae7a157fd7e`, the WorkHome Codex completed and committed a local P9 candidate at `e6f83d560822214ab4ede0e317f853d100b6c9ea` before incorporating that new remote governance commit.
+
+Observed local validation for the candidate:
+- focused P9 tests: `29 passed`；
+- full unit regression: `264 passed`；
+- compile/import: PASS；
+- scope scan: PASS；
+- immutability checks: PASS；
+- synthetic REVIEW_REQUIRED → PASS path: PASS。
+
+The normal push was correctly rejected as non-fast-forward because the remote P9 branch had advanced with the governance-only `development/51` commit. No force push, reset, rebase, destructive clean, or overwrite was performed. A temporary P9-I live verification may have been executed locally but is not part of the committed candidate and is not accepted evidence.
+
+Root cause:
+- GitHub remained the design/version truth source and advanced with a new one-gate instruction while local implementation work was already in flight；
+- the resulting histories diverged even though the remote change is governance-only and the local candidate is production/tests/evidence work；
+- `development/51` explicitly required STOP rather than self-authorizing merge/rebase when safe fast-forward was no longer possible。
+
+Approved solution:
+1. `development/51` supersedes the earlier broad P9-G→M execution request. Until a subsequent instruction explicitly authorizes another Gate, only recovery/integration of the P9-G candidate is allowed；
+2. preserve local candidate commit `e6f83d560822214ab4ede0e317f853d100b6c9ea` unchanged as an auditable implementation candidate；
+3. do not rebase, reset, cherry-pick-overwrite, force push, or reconstruct the candidate；
+4. create a normal non-destructive merge that combines the current remote governance head with the local candidate, provided the merge has no production/test semantic conflict；
+5. if conflicts exist only in governance/evidence files, resolve them in favor of the latest GitHub governance semantics while preserving factual local development evidence；
+6. if any conflict touches P9 production/tests or changes candidate semantics, STOP and report the exact conflict before resolving；
+7. after the merge, rerun the P9-G verification required by `development/51` because the integration commit changes repository state, even though the incoming remote delta is governance-only；
+8. ensure no P9-I live outputs/artifacts are included in the pushed candidate；
+9. push the integrated candidate normally to `task/p9-review-overlay` and stop. P9-I/J/K/L/M remain unauthorized until independent GitHub code review of the pushed candidate completes。
+
+Affected gates: P9-G candidate integration/re-verification only. P9-I and later gates remain closed.
+
 发现问题必须：
 
 ```text
