@@ -656,6 +656,12 @@ P8 runtime lock：
 - package snapshot match
 - protocol integration smoke
 
+Tracked runtime lock 的字节级可复现性还必须满足：
+- `.gitattributes` 强制 `runtime-locks/*.txt text eol=lf`；
+- lock UTF-8 without BOM；
+- Git blob bytes 与任意 clean checkout working-tree bytes SHA256 必须一致；
+- Acceptance 记录 lock Git-blob SHA256 与 working-tree SHA256，二者必须相同。
+
 不得 silent dependency upgrade。
 
 ---
@@ -751,6 +757,39 @@ Approved solution:
 This is an empirical performance-policy amendment, not a correctness relaxation.
 
 Affected gates: P8-H/I/K.
+
+### P8-ISSUE-005 — Runtime lock working-tree bytes vary across Windows worktrees without an EOL contract
+
+Code Review of candidate `599db48a62622cb18de2c61d7100e8186a7ca936` found:
+
+- active development worktree lock SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`；
+- detached Review worktree lock SHA256: `bba9c2eac0ed123bf92172e15d65a2679e93a9c66c599ded8511a24b2979032b`；
+- both worktrees were at the same Git commit；
+- raw Git blob SHA256 in both repositories remained `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`；
+- global Git config has `core.autocrlf=true`；
+- active worktree retained LF bytes while a fresh detached checkout materialized CRLF bytes。
+
+Impact:
+- dependency versions did not change；
+- however the documented byte-level lock SHA was not portable across clean worktrees；
+- Independent Acceptance could incorrectly report lock drift solely from checkout EOL conversion。
+
+Root cause:
+tracked runtime locks had no repository-level EOL rule.
+
+Approved solution:
+1. add tracked `.gitattributes`；
+2. enforce `runtime-locks/*.txt text eol=lf`；
+3. keep lock UTF-8 without BOM；
+4. renormalize/check the tracked runtime lock；
+5. create a fresh detached worktree after the attribute commit；
+6. verify Git blob SHA256 == working-tree SHA256 == documented lock SHA256；
+7. invalidate Review candidate `599db48...` as the final acceptance path even though its production behavior passed；
+8. rerun Code Review from a new candidate containing this design amendment and EOL control。
+
+No runtime package content or production tool behavior is changed by this amendment.
+
+Affected gates: P8-B/I/J/K.
 
 ### P8-ISSUE-004 — deep Windows worktree pytest temp paths exceed filesystem path limit
 

@@ -78,6 +78,8 @@ From dedicated MCP runtime:
 - cold startup performance
 
 ## P8-I — Code Review
+Before freezing Review candidate, verify runtime lock EOL portability per P8-ISSUE-005: Git blob SHA == clean checkout working-tree SHA.
+
 Detached worktree:
 `worktrees/review/p8-<sha>`
 
