@@ -8,55 +8,57 @@
 ## Mandatory
 
 1. frozen candidate HEAD stable
-2. P0–P8 prior accepted source/tests zero unintended diff
-3. full P0–P9 suite PASS
-4. review manifest/input fingerprints valid
-5. P7 PASS -> empty queue
-6. P7 REVIEW_REQUIRED -> one task per REVIEW issue
-7. WARNING/INFO do not become tasks
-8. FAIL/BLOCKED cannot be dismissed by P9
-9. task IDs deterministic
-10. supported/unsupported reason mapping correct
-11. reviewer metadata validated
-12. reviewed_at timezone-aware and caller supplied
-13. resolution ID deterministic
-14. resolution JSON immutable / idempotent
-15. P5 cell evidence resolves
-16. P6 evidence resolves
-17. evidence pages derived, not trusted blindly
-18. target/evidence relationship validated
-19. raw non-null fields never overwritten
-20. raw_value / parsed_numeric_value unchanged
-21. raw_metric_name unchanged
-22. no-op resolution rejected
-23. conflicting raw patch rejected
-24. supersession graph valid
-25. unknown/cycle/competing child errors
-26. overlapping same value deterministic
-27. overlapping different value conflict
-28. zero-overlay snapshot deterministic
-29. overlay_set_hash deterministic
-30. resolved_facts preserve every raw field
-31. effective period/unit/scope only from explicit overlay
-32. statement classification remains overlay-only
-33. period coverage uses P7 PERIOD_REVIEW
-34. unit coverage uses P7 UNIT_REVIEW
-35. ambiguity requires explicit attestation
-36. core statement review augments, never rewrites, base signals
-37. unsupported issue stays unresolved
-38. resolved validation priority correct
-39. resolved_reuse_eligible only when resolved PASS / compatible
-40. resolved ParsedDataRecord helper deterministic
-41. no implicit Registry write
-42. snapshot semantic recomputation/tamper guard
-43. base catalog/P3/P5/P6/P7 immutable
-44. no source PDF open
-45. no network/AI/Codex API
-46. no external MCP SDK requirement
-47. no P8 tool mutation
-48. no P10/P11 implementation
-49. local CLI JSON stdout only
-50. performance gates
+2. accepted P8 baseline = `ee934ad05812c69b79f76db43e62cfd4050efb8e` / `acceptance/33-p8-issue006-acceptance-result.md`
+3. P0–P8 prior accepted source/tests zero unintended diff
+4. full P0–P9 suite PASS
+5. review manifest/input fingerprints valid
+6. P7 PASS -> empty queue
+7. P7 REVIEW_REQUIRED -> one task per REVIEW issue
+8. WARNING/INFO do not become tasks
+9. FAIL/BLOCKED cannot be dismissed by P9
+10. task IDs deterministic
+11. supported/unsupported reason mapping correct
+12. reviewer metadata validated
+13. reviewed_at timezone-aware and caller supplied
+14. resolution ID deterministic
+15. resolution JSON immutable / idempotent
+16. P5 cell evidence resolves
+17. P6 evidence resolves
+18. evidence pages derived, not trusted blindly
+19. attestation caller direct evidence is rejected/omitted; persisted attestation inherits union of active supporting-resolution evidence
+20. target/evidence relationship validated
+21. raw non-null fields never overwritten
+22. raw_value / parsed_numeric_value unchanged
+23. raw_metric_name unchanged
+24. no-op resolution rejected
+25. conflicting raw patch rejected
+26. supersession graph valid
+27. unknown/cycle/competing child errors
+28. overlapping same value deterministic
+29. overlapping different value conflict
+30. zero-overlay snapshot deterministic
+31. overlay_set_hash deterministic
+32. resolved_facts preserve every raw field
+33. effective period/unit/scope only from explicit overlay
+34. statement classification remains overlay-only
+35. period coverage uses P7 PERIOD_REVIEW
+36. unit coverage uses P7 UNIT_REVIEW
+37. ambiguity requires explicit attestation
+38. core statement review augments, never rewrites, base signals
+39. unsupported issue stays unresolved
+40. resolved validation priority correct
+41. resolved_reuse_eligible only when resolved PASS / compatible
+42. resolved ParsedDataRecord helper deterministic
+43. no implicit Registry write
+44. snapshot semantic recomputation/tamper guard
+45. base catalog/P3/P5/P6/P7 immutable
+46. no source PDF open
+47. no network/AI/Codex API
+48. no external MCP SDK requirement
+49. no P8 tool mutation
+50. no P10/P11 implementation
+51. local CLI JSON stdout only
+52. performance gates
 
 ## Synthetic golden
 

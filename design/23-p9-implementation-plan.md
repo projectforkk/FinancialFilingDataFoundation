@@ -15,6 +15,8 @@
 - development instruction
 - acceptance instruction
 - design index/status/roadmap update
+- latest accepted P8 baseline merged into P9 branch（P9-ISSUE-001）
+- refreshed environment/internal-import audit after baseline merge
 - commit/push
 
 Gate：
@@ -45,6 +47,7 @@ focused queue tests PASS。
 - P5 cell index
 - target selection
 - evidence-to-target validation
+- P9-ISSUE-002 attestation evidence inheritance from active supporting resolutions
 - derived evidence pages
 - before/after calculation
 - fill-only raw conflict guard

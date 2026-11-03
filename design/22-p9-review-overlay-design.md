@@ -6,8 +6,10 @@
 
 前置条件：
 - P0–P8 = DONE / PASS
-- accepted P8 merge = `415d2ad82e890be855198d4d4c57bca8d1beb406`
-- P8 closeout = `development/47-p8-closeout.md`
+- accepted P8 merge = `ee934ad05812c69b79f76db43e62cfd4050efb8e`
+- P8 final acceptance = `acceptance/33-p8-issue006-acceptance-result.md`
+- P8 reviewed candidate = `537ebbd17454f80c8838f58abbbd02d5994f8716`
+- P8 closeout = `development/47-p8-closeout.md`（历史初次 closeout）；最新 accepted baseline 以 PROJECT_STATUS / accepted merge 为准
 - P7 validation schema = `p7-validation-v1`
 - P6 raw fact schema = `p6-raw-facts-evidence-v1`
 - project directory consolidation = PASS
@@ -698,7 +700,9 @@ Active resolution：
 
 ## 21. Evidence refs
 
-Resolution必须至少 1 个 evidence ref。
+普通 field/table/classification resolution必须至少 1 个直接 evidence ref。
+
+`ATTEST_ISSUE_RESOLVED` 是唯一例外：caller不得自由提交 direct evidence refs；P9 必须从所有 `supporting_resolution_ids` 自动合并其已经验证的 evidence refs，并将合并后的 refs/pages持久化到 attestation resolution。因此**每个 persisted resolution最终仍必须拥有至少 1 个可验证 evidence ref**。
 
 Allowed：
 
@@ -761,7 +765,21 @@ evidence refs必须全部属于 same table（P5 cell或table内 fact evidence）
 
 ### ISSUE attestation
 
-evidence来自 supporting resolutions，不单独自由引用。
+caller submission：
+- `evidence_refs` 必须为空或省略；
+- `supporting_resolution_ids` 必须非空。
+
+P9 自动：
+1. 验证每个 support resolution active / same issue / evidence valid；
+2. union 所有 supporting resolution 的 persisted evidence refs；
+3. deterministic dedupe/sort；
+4. 自动写入 attestation persisted `evidence_refs`；
+5. 自动派生 `evidence_pages`。
+
+若 union 为空：
+`P9_EVIDENCE_INVALID`。
+
+因此 attestation 不单独自由引用证据，但 persisted record 仍具备 evidence chain。
 
 ---
 
@@ -1540,7 +1558,46 @@ P9 production不执行 justification内容。
 
 ## 50. P9 Issue Log
 
-初始：无。
+### P9-ISSUE-001 — P9 design baseline referenced pre-Issue-006 P8 accepted merge
+
+P9 initial design commit `4487da2` referenced P8 accepted merge `415d2ad...`. After P8-ISSUE-006, P8 was independently re-reviewed/re-accepted and the final accepted merge became `ee934ad05812c69b79f76db43e62cfd4050efb8e` with acceptance evidence `acceptance/33-p8-issue006-acceptance-result.md`.
+
+Impact:
+- P8 production MCP behavior is unchanged；
+- P8 tests/design/evidence changed；
+- P9 production had not started；
+- P9 environment dependency decision remains valid, but base identity/audit references must be refreshed before P9-B.
+
+Approved solution:
+1. update P9 precondition to final P8 accepted merge `ee934ad...`；
+2. require P9 branch to contain latest accepted main before production development；
+3. rerun the no-new-dependency/internal-import environment audit against the refreshed branch；
+4. record new audit evidence；
+5. no P9 production code before this amendment is committed/pushed。
+
+Affected gates: P9-A / environment audit only.
+
+### P9-ISSUE-002 — Attestation direct-evidence rule conflicted with persisted-resolution evidence invariant
+
+Initial P9 design simultaneously required:
+- every resolution to have at least one evidence ref；
+- `ATTEST_ISSUE_RESOLVED` to use evidence from supporting resolutions and not accept free direct evidence。
+
+Without an explicit persistence rule, an attestation could either violate the universal evidence invariant or require the caller to duplicate evidence that P9 is supposed to derive/validate.
+
+Approved solution:
+1. caller attestation `evidence_refs` must be omitted or empty；
+2. `supporting_resolution_ids` must be non-empty and resolve to active same-issue resolutions；
+3. P9 unions the persisted validated evidence refs from all supporting resolutions；
+4. refs are deterministically deduped/sorted；
+5. evidence pages are derived from that union；
+6. the persisted attestation resolution stores the inherited evidence refs/pages；
+7. empty inherited evidence union is `P9_EVIDENCE_INVALID`；
+8. caller-provided direct attestation evidence is rejected rather than trusted。
+
+This preserves both caller-boundary safety and the invariant that every persisted resolution has an auditable evidence chain.
+
+Affected gates: P9-C / P9-D / P9-F / acceptance.
 
 发现问题必须：
 
