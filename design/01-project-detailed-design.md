@@ -114,7 +114,7 @@ born-digital PDF 默认不得运行：
 ```text
                    User / Codex
                         |
-                   Parsing Skill
+              Direct Tool Orchestration
                         |
                      Local MCP
                         |
@@ -343,20 +343,22 @@ MCP_AI_API_CALLS = FORBIDDEN
 
 MCP 只调用本机代码 / 文件 / SQLite / acquisition adapter。
 
-### 5.11 Codex Skill
+### 5.11 Codex Dynamic Research Integration
 
-Skill 是 SOP / orchestration。
+P10 不实现固定业务语义的 Codex Skill。Codex 直接接收用户在每次 research run 提供的运行时研究规范文件，并基于这些文件当前内容动态选择 P8/P9 工具完成信息获取与 review。
 
-负责：
-- build plan；
-- run parse；
-- inspect review queue；
-- text review；
-- render difficult page；
-- submit resolution；
-- validate / export。
+P10 的固定职责仅包括：
+- 验证 Codex 可以发现并调用 P8 read-only MCP；
+- 验证 Codex 可以通过 P9 local API/CLI 执行受控 review，而不是修改 raw artifacts；
+- 规定“运行时研究规范优先”的集成边界：不得把固定问题数量、日期范围、报告 Schema、章节映射或研究业务规则复制进 P10；
+- 允许使用薄层 AGENTS.md / integration instruction 告知 Codex FFDF 工具的能力、边界和禁止事项，但该薄层不得复制研究规则正文；
+- 每次 research run 开始时读取并冻结用户提供研究规范文件的内容哈希；同一 run 中不得静默切换到修改后的文件版本；
+- Codex 根据当前问题的信息需求动态选择 document / fact / table / evidence / validation 工具，不维护“问题编号 → 固定接口序列”的硬编码映射；
+- 当 P8 返回 REVIEW_REQUIRED 时，Codex 必须读取证据并通过 P9 resolution contract 处理；证据不足时保持 unresolved，不得猜测；
+- 本地 FFDF 无法提供且运行时研究规范要求补充的外部信息，由 Codex 按当次规范规定的来源边界获取；P10 不固化研究来源策略；
+- 对运行时规范提出但当前工具链不具备的能力，显式返回 incompatible / blocked，不得通过猜测或静默降级完成。
 
-Skill 不应承担 deterministic parsing。
+P10 不承担 deterministic parsing，不生成或维护固定研究问题清单，也不成为研究业务规则真源。
 
 ---
 
@@ -841,9 +843,22 @@ deterministic gate、accounting consistency、document completeness。
 
 仅处理 REVIEW_REQUIRED。
 
-### P10 — Codex Skill
+### P10 — Codex Dynamic Research Integration
 
-编排完整 multi-year data foundation workflow。
+不实现固定 Codex Skill，也不复制用户研究规则。
+
+建立并验收 Codex 对 FFDF 的直接动态调用模式：
+- 用户每次直接提供当前版本的研究 Prompt / constraints / question list 或其他研究规范文件；
+- Codex 必须先完整读取当前运行时文件，再根据问题动态推导信息需求；
+- 财报结构化数据优先通过 P8 read-only MCP 获取；
+- REVIEW_REQUIRED 通过 P9受控 review contract 处理；
+- 允许薄层 AGENTS.md / integration instruction 只描述 FFDF 工具能力与边界；
+- 对每次 research run 固定输入规范 SHA256，禁止运行中静默切换规则版本；
+- 验证不同版本研究规范无需修改 P10 production 即可改变研究任务、查询范围和输出要求；
+- 验证工具选择由信息需求驱动，而非由固定问题编号驱动；
+- 验证无法支持的新增能力会显式 BLOCKED / INCOMPATIBLE，而不是猜测或静默降级。
+
+P10 acceptance 必须包含至少一个完整 live research run，证明 Codex 能直接读取动态研究规范、调用 P8/P9、取得可追溯证据，并按运行时规范完成信息查询。
 
 ### P11 — US SEC Provider
 

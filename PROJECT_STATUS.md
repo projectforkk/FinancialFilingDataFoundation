@@ -273,5 +273,5 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DESIGN AUTHORIZED`
-- P10 — Codex Skill: `NOT STARTED`
+- P10 — Codex Dynamic Research Integration: `NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`

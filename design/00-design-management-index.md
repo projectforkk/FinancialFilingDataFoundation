@@ -133,7 +133,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 - `21-p8-implementation-plan.md`
 - `22-p9-review-overlay-design.md`
 - `23-p9-implementation-plan.md`
-- `24-p10-codex-skill-design.md`
+- `24-p10-codex-dynamic-research-integration-design.md`
 - `25-p10-implementation-plan.md`
 - `26-p11-sec-provider-design.md`
 - `27-p11-implementation-plan.md`

@@ -131,4 +131,4 @@ Acceptance executor不得修改：
 - runtime/dependencies
 - P3/P5/P6/P7/P8 artifacts
 
-P9 PASS 后才允许 P10 Codex Skill design。
+P9 PASS 后才允许 P10 Codex Dynamic Research Integration design。

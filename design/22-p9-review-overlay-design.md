@@ -56,7 +56,7 @@ P9 production **不调用 Codex、OpenAI API 或任何远程 LLM API**。
 原因：
 
 - Review Overlay 是本地数据 contract / persistence / validation infrastructure；
-- “Codex 阅读上下文、判断语义、选择 resolution”属于 P10 Skill orchestration；
+- “Codex 阅读上下文、判断语义、选择 resolution”属于未来 P10 Codex Dynamic Research Integration（由 Codex 基于运行时研究规范直接编排）；
 - P9 只接受 reviewer 已明确提交的 resolution payload；
 - 这样 P9 能 deterministic unit test / acceptance，不把模型行为混入 production truth。
 
@@ -67,7 +67,7 @@ P9 production **不调用 Codex、OpenAI API 或任何远程 LLM API**。
 
 但只是审计字段，不触发模型调用。
 
-P10 可在未来使用 P8 read-only tools + P9 local APIs/CLI 进行 Codex review。
+P10 可在未来由 Codex 直接使用 P8 read-only tools + P9 local APIs/CLI 进行 review；不要求固定 Skill。
 
 ---
 
@@ -115,7 +115,7 @@ P9 v1 禁止：
 - remote AI/API
 - MCP mutation tools
 - P8 tool contract changes
-- P10 Skill implementation
+- P10 Dynamic Research Integration implementation
 - P11 SEC provider
 - automatic reviewer decision
 - silent issue dismissal
@@ -1201,7 +1201,7 @@ P9本身禁止：
 
 只返回 record。
 
-P10 Skill可在未来：
+P10 Dynamic Research Integration 可在未来：
 - review完成
 - materialize
 - 检查 resolved PASS
@@ -1349,7 +1349,7 @@ build_resolved_parsed_data_record(
 
 ## 41. Local CLI
 
-P9提供 deterministic local CLI，供未来 P10 Skill调用。
+P9提供 deterministic local CLI，供未来 P10 Codex direct integration 调用。
 
 入口：
 
@@ -1373,7 +1373,7 @@ CLI：
 - resolution input使用 explicit JSON file/string
 - 不读取任意 secret
 
-P10只负责编排 reviewer reasoning，不重实现 overlay persistence。
+P10 只验证/编排 Codex 对 P8/P9 的直接使用，不重实现 overlay persistence，也不复制运行时研究规则。
 
 ---
 
@@ -1699,7 +1699,7 @@ STOP
 Independent Acceptance PASS：
 
 - P9 → DONE
-- P10 Codex Skill design authorized
+- P10 Codex Dynamic Research Integration design authorized
 
 P10 production不得在 P9 acceptance期间开始。
 
