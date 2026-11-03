@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P8_DONE / P9_I_AUTHORIZED**
+**P8_DONE / P9_J_AUTHORIZED**
 
 ## Accepted baseline
 
@@ -120,7 +120,7 @@
 
 Status:
 
-`P9-G / P9-H PASS — P9-I LIVE AUTHORIZED`
+`P9-G / P9-H / P9-I PASS — P9-J FORMAL REVIEW AUTHORIZED`
 
 Planned branch:
 
@@ -167,19 +167,21 @@ P8 final Independent Acceptance freeze:
 
 P9 detailed design, implementation plan, development instruction and acceptance baseline are complete.
 
-The P9 production/test candidate has been corrected and re-reviewed on GitHub.
+The P9 production/test candidate has been corrected, re-reviewed, and live-validated.
 
 Corrective implementation commit: `f3b6dcd1b243c7a77734a1cdfa7459f38d91c842`.
 
 Corrective evidence: `development/56-p9-g-corrective-evidence.md` records focused `40 passed`, full unit regression `275 passed`, compile/import/diff/scope/immutability PASS, and synthetic REVIEW_REQUIRED → PASS.
 
-GitHub corrective re-review is recorded in `development/57-p9-g-corrective-github-rereview.md` with verdict `PASS`; F1-F5 are closed. The same evidence satisfies the P9-H full-regression/scope gate.
+GitHub corrective re-review is recorded in `development/57-p9-g-corrective-github-rereview.md` with verdict `PASS`; F1-F5 are closed and P9-H is satisfied.
 
-Current instruction: `development/58-p9-i-live-instruction.md`.
+P9-I live evidence is recorded in `development/59-p9-i-live-evidence.md`; GitHub live-evidence review in `development/60-p9-i-github-live-review.md` records verdict `PASS`. CN/HK exact queues, honest resolved states, dual-root determinism, performance gates, and catalog/P3/P5/P6/P7 immutability all passed.
 
-Current gate: `P9-I — Live CN/HK validation`.
+Current instruction: `development/61-p9-j-formal-code-review-instruction.md`.
 
-P9-J/K/L/M, main merge, P10 and P11 remain closed until P9-I evidence is pushed and reviewed.
+Current gate: `P9-J — Formal Detached Code Review`.
+
+P9-K/L/M, main merge, P10 and P11 remain closed until the formal detached review result is pushed and reviewed.
 
 ## Project directory consolidation
 
@@ -282,6 +284,6 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P6 — Raw Facts / Evidence: `DONE`
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
-- P9 — Codex Review Overlay: `P9-G PASS / P9-H PASS / P9-I AUTHORIZED`
+- P9 — Codex Review Overlay: `P9-G PASS / P9-H PASS / P9-I PASS / P9-J AUTHORIZED`
 - P10 — Codex Dynamic Research Integration: `NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`
