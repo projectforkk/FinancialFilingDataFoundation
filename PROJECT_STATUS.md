@@ -102,7 +102,7 @@
 
 Status:
 
-`CODE REVIEW PASS / READY FOR ACCEPTANCE REFREEZE`
+`P8_IN_ACCEPTANCE / ISSUE-006 REFREEZE`
 
 Planned branch:
 
@@ -143,7 +143,13 @@ P8 prior Independent Acceptance:
 - frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
 - status: `HISTORICAL / INVALIDATED FOR FINAL CLOSEOUT BY P8-ISSUE-006`
 
-Current gate: `P8-J Acceptance Refreeze after P8-ISSUE-006`.
+P8 current Independent Acceptance freeze:
+
+- instruction: `acceptance/32-p8-issue006-refreeze.md`
+- frozen candidate: `31525235a44c8576d22fba542438b491e15e653b`
+- review: `development/48-p8-issue006-code-review.md`
+
+Current gate: `P8-K Independent Acceptance after P8-ISSUE-006`.
 
 ## Project directory consolidation
 
