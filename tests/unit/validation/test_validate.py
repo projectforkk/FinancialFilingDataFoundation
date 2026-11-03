@@ -444,6 +444,22 @@ def _build_chain(tmp_path: Path) -> tuple[Path, Path, Path]:
     return p3, p5, p6
 
 
+def test_preflight_missing_input_returns_execution_error_without_artifact(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing"
+    output = tmp_path / "p7"
+    with pytest.raises(ValidationError) as exc_info:
+        validate_document_artifacts(
+            missing,
+            missing,
+            missing,
+            output,
+        )
+    assert exc_info.value.reason_code == "P7_INPUT_ARTIFACT_INVALID"
+    assert not output.exists()
+
+
 def test_full_artifact_is_pass_and_reusable(tmp_path: Path) -> None:
     p3, p5, p6 = _build_chain(tmp_path)
     artifact = validate_document_artifacts(
