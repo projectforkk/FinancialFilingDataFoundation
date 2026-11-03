@@ -1372,10 +1372,11 @@ CLI：
 - handled runtime failure 时 stdout empty，stderr exactly one deterministic JSON object，exit 1
 - parser-level failure（包括无 subcommand、unknown subcommand、missing required argument、mutually-exclusive misuse）不得输出 argparse usage/error 文本；stdout empty，stderr exactly one deterministic JSON object，exit 2
 - 所有 parser-level failure 使用稳定 reason_code `P9_CLI_ARGUMENT_ERROR` 与稳定 message `invalid command line arguments`，不得依赖 Python/argparse 版本生成的 usage/error 文案
+- P9 machine CLI **不提供 argparse 纯文本 help surface**；root `-h/--help` 与任一 subcommand `-h/--help` 均按 parser-level failure 处理：exit 2 / stdout empty / exactly one JSON stderr，且不得出现 usage/help prose
 - resolution input使用 explicit JSON file/string
 - 不读取任意 secret
 
-实现必须把 argument parsing 本身放入 CLI JSON error boundary；允许通过自定义 `ArgumentParser.error()` / equivalent deterministic mechanism 把 parser failure 转换为 P9 diagnostic，但不得让 `SystemExit(2)` 绕过该边界。
+实现必须把 argument parsing 本身放入 CLI JSON error boundary；允许通过自定义 `ArgumentParser.error()` / equivalent deterministic mechanism 把 parser failure 转换为 P9 diagnostic，但不得让 `SystemExit(2)` 或 argparse help action 绕过该边界。
 
 P10 只验证/编排 Codex 对 P8/P9 的直接使用，不重实现 overlay persistence，也不复制运行时研究规则。
 
@@ -1638,13 +1639,24 @@ P9 persisted resolution payload不得包含：
 validator 必须使用固定、可测试、无网络/AI 的 deterministic rules，至少覆盖：
 
 1. URL：scheme URL（例如 `https://`、`http://`、`ftp://`、`file://`、`ssh://`）和 `www.` URL；
-2. file path：Windows drive-root / UNC path、POSIX absolute path、显式 `../` / `..\\` traversal；
+2. file path：
+   - Windows drive-root token 必须在 string start 或任意非字母数字 boundary 后识别，因此 `C:\\secret.txt` 与 `path=C:\\secret.txt` 都必须拒绝；
+   - UNC path 必须拒绝；
+   - POSIX absolute path 必须包含 single-segment 与 multi-segment，因此 `/tmp`、`/secret.txt`、`/etc/passwd` 都必须拒绝；
+   - 显式 `../` / `..\\` traversal 必须拒绝；
+   - slash 位于字母数字 token 内部时不得仅凭 slash 判定为 path，因此 `2024/2025`、`P5/P6` 不得误拒；
 3. shell command：明确的 command-launch / execution syntax，例如 `cmd /c`、`powershell` / `pwsh`、`bash`、`sh -c`、`Invoke-Expression`、`curl`、`wget`、destructive shell forms；
-4. SQL：明确 statement syntax，例如 `SELECT ... FROM`、`INSERT INTO`、`UPDATE ... SET`、`DELETE FROM`、`DROP/ALTER/CREATE TABLE`、`UNION SELECT`、`PRAGMA`；
+4. SQL：必须按 **statement grammar** 识别，而不是仅凭 `SELECT` / `FROM` 等自然语言关键字：
+   - `SELECT * FROM <sql_object>` 必须拒绝；
+   - `SELECT <projection> FROM <sql_object>` 在 `<sql_object>` 后为 string end、semicolon 或 SQL clause（`WHERE/JOIN/GROUP BY/ORDER BY/HAVING/LIMIT/OFFSET/UNION`）时必须拒绝；
+   - quoted/backtick/bracketed object、schema-qualified object、comma projection、SQL function projection 均视为 SQL signal；
+   - `INSERT INTO`、`DELETE FROM <sql_object>`、`DROP/ALTER/CREATE TABLE`、`UNION SELECT`、`PRAGMA` 必须拒绝；
+   - `UPDATE <sql_object> SET` 只有出现 assignment-like `<identifier> =` 时才作为 SQL 拒绝，避免把自然语言 “update guidance set by management” 当 SQL；
+   - 自然语言 `Select revenue from the annual report evidence.` 必须允许；
 5. Python code：明确 executable syntax，例如 line-start `import` / `from ... import` / `def` / `class`，以及 `__import__()`、`exec()`、`eval()`、`os.*()`、`subprocess.*()`；
 6. credentials：`password/passwd/secret/token/api_key/access_key/private_key` 等 assignment form，以及 Bearer credential form。
 
-普通财务语义文本不得仅因为包含斜杠、关键字单词或自然语言而被误判；例如 `2024/2025`、`P5/P6 evidence`、`SQL review completed` 本身不构成 forbidden content。
+普通财务语义文本不得仅因为包含斜杠、关键字单词或自然语言而被误判；至少 `2024/2025`、`P5/P6 evidence`、`SQL review completed`、`Select revenue from the annual report evidence.` 必须允许。
 
 ### 49.3 Field boundary
 
@@ -1811,6 +1823,45 @@ Approved solution:
 7. no P9-K until detached corrective re-review passes。
 
 Affected gates: P9-G / P9-JR / P9-K / P9-L.
+
+### P9-ISSUE-008 — P9-JR security classifier still had path false negatives and SQL natural-language false positive
+
+Formal detached re-review `development/66-p9-jr-formal-rereview-result.md` proved that the first corrective candidate:
+- allowed POSIX absolute path `/tmp`；
+- allowed Windows path when preceded by assignment text, e.g. `path=C:\\secrets\\payload.txt`；
+- rejected ordinary natural language `Select revenue from the annual report evidence.` as SQL。
+
+Root cause:
+- path regex encoded incidental surrounding-character assumptions instead of the contract's path-token boundary；
+- SQL regex treated lexical `SELECT ... FROM` as sufficient rather than recognizing SQL object/statement grammar。
+
+Approved solution:
+1. Windows drive-root is recognized at start or after any non-alphanumeric boundary；
+2. POSIX absolute path explicitly includes single-segment and multi-segment forms；
+3. slash inside alphanumeric tokens remains benign；
+4. SQL detection uses statement grammar and SQL-object termination/clause signals；
+5. UPDATE requires assignment-like SET syntax；
+6. direct regression cases are frozen in acceptance item 55；
+7. original URL/SQL/security probes remain mandatory。
+
+Affected gates: P9-JR2 / P9-K / P9-L.
+
+### P9-ISSUE-009 — argparse built-in help remained a non-JSON success path
+
+Formal detached re-review proved:
+- root `--help` returned exit 0 + plain argparse stdout；
+- `tasks --help` returned exit 0 + plain argparse stdout。
+
+This violates Section 41's machine-CLI invariant that every success emits exactly one JSON document.
+
+Approved solution:
+1. P9 machine CLI has no argparse text-help surface；
+2. disable built-in help for root parser and every subparser；
+3. `-h/--help` is unsupported input and must flow through the same parser-level JSON error contract；
+4. root and subcommand help probes become mandatory acceptance item 53 cases；
+5. no text usage/help output is permitted。
+
+Affected gates: P9-JR2 / P9-K / P9-L.
 
 发现问题必须：
 

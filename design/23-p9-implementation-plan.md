@@ -214,6 +214,32 @@ P9-JR PASS 前 P9-K 继续关闭。
 
 ---
 
+## P9-JR2 — Second Formal Review Corrective Gate
+
+Trigger：
+`development/66-p9-jr-formal-rereview-result.md` = FAIL / CHANGES REQUIRED。
+
+Authorized scope only：
+
+- P9-JR-F1：修正 file-path false negatives 与 SQL natural-language false positive；
+- P9-JR-F2：关闭 argparse help text surface，使 root/subcommand `-h/--help` 走 deterministic JSON parser error；
+- 增加 direct/adversarial regression tests；
+- focused/full/compile/scope verification；
+- 新 exact candidate detached formal review。
+
+Gate：
+
+- `/tmp`、`/etc/passwd`、`C:\\secret.txt`、`path=C:\\secret.txt`、traversal 全部 deterministic reject；
+- `2024/2025`、`P5/P6 evidence`、`SQL review completed`、`Select revenue from the annual report evidence.` 全部 allow；
+- 原始 `SELECT * FROM secrets` 仍 reject；
+- root/subcommand `-h/--help` 均 exit 2 / stdout empty / one JSON stderr；
+- focused/full PASS；
+- detached re-review PASS。
+
+P9-JR2 PASS 前 P9-K 继续关闭。
+
+---
+
 ## P9-K — Acceptance Freeze
 
 固定：
