@@ -11,6 +11,7 @@ from .evidence import (
     build_indexes,
     resolve_target,
     validate_direct_evidence,
+    validate_resolution_history,
     validate_reviewer,
 )
 from .models import (
@@ -171,6 +172,10 @@ def list_resolutions(review_dir: str | Path) -> tuple[ReviewResolution, ...]:
     ids = [item.resolution_id for item in resolutions]
     if len(ids) != len(set(ids)):
         raise ReviewError("P9_RESOLUTION_STORE_CORRUPT", "duplicate resolution_id")
+    _validate_graph(resolutions)
+    _, bundle, tasks = load_review_base(directory)
+    indexes = build_indexes(bundle, tasks)
+    validate_resolution_history(indexes, resolutions)
     return resolutions
 
 
@@ -370,7 +375,7 @@ def submit_resolution(
         reason_code=task.reason_code,
         action=submission.action,
         target=selection.target,
-        value=selection.normalized_value,
+        value=selection.submitted_value,
         evidence_refs=evidence_refs,
         evidence_pages=evidence_pages,
         before=before,

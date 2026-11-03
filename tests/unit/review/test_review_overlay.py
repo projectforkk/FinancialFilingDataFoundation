@@ -391,6 +391,7 @@ def _submission(
     evidence_refs: list[dict],
     reviewed_at: str,
     supersedes: str | None = None,
+    justification: str = "Deterministic P9 synthetic test resolution.",
 ) -> ResolutionSubmission:
     return ResolutionSubmission.from_dict(
         {
@@ -402,10 +403,32 @@ def _submission(
             "reviewer_type": "HUMAN",
             "reviewer_id": "p9-unit-reviewer",
             "reviewed_at": reviewed_at,
-            "justification": "Deterministic P9 synthetic test resolution.",
+            "justification": justification,
             "supersedes_resolution_id": supersedes,
         }
     )
+
+
+def _submission_payload(submission: ResolutionSubmission) -> dict:
+    return {
+        "review_task_id": submission.review_task_id,
+        "action": submission.action.value,
+        "target": dict(submission.target),
+        "value": submission.value,
+        "evidence_refs": [dict(ref) for ref in submission.evidence_refs],
+        "evidence_pages": (
+            None
+            if submission.evidence_pages is None
+            else list(submission.evidence_pages)
+        ),
+        "reviewer_type": submission.reviewer_type.value,
+        "reviewer_id": submission.reviewer_id,
+        "reviewed_at": submission.reviewed_at,
+        "justification": submission.justification,
+        "supersedes_resolution_id": submission.supersedes_resolution_id,
+        "supporting_resolution_ids": list(submission.supporting_resolution_ids),
+        "expected_observed_count": submission.expected_observed_count,
+    }
 
 
 def _graph_resolution(
@@ -792,6 +815,369 @@ def test_tampered_before_state_is_rejected_after_id_recomputation(review_fixture
     assert exc_info.value.reason_code == "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT"
 
 
+def test_submit_revalidates_resigned_historical_before_before_new_write(review_fixture) -> None:
+    _, _, _, _, overlay, _, bundle, tasks = review_fixture
+    period_task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    unit_task = _task(tasks, "RAW_UNIT_COVERAGE_LOW")
+    table, cell = _table_and_cell(bundle)
+    evidence = [
+        {
+            "type": "P5_CELL",
+            "table_id": table["table_id"],
+            "cell_id": cell["cell_id"],
+        }
+    ]
+    first = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            period_task,
+            action="SET_PERIOD",
+            target={
+                "target_type": "TABLE_COLUMN_FIELD",
+                "table_id": table["table_id"],
+                "column_index": 1,
+                "field": "period",
+            },
+            value="PERIOD_HISTORY",
+            evidence_refs=evidence,
+            reviewed_at="2026-11-03T22:00:00+09:00",
+        ),
+    )
+    _resign_resolution_file(
+        overlay.review_dir / "resolutions" / f"{first.resolution_id}.json",
+        lambda payload: payload["before"].update({"affected_fact_ids": []}),
+    )
+    files_before = sorted(path.name for path in (overlay.review_dir / "resolutions").glob("*.json"))
+
+    with pytest.raises(ReviewError) as exc_info:
+        submit_resolution(
+            overlay.review_dir,
+            _submission(
+                unit_task,
+                action="SET_UNIT",
+                target={
+                    "target_type": "TABLE_FIELD",
+                    "table_id": table["table_id"],
+                    "field": "unit",
+                },
+                value="UNIT_HISTORY",
+                evidence_refs=evidence,
+                reviewed_at="2026-11-03T22:01:00+09:00",
+            ),
+        )
+
+    assert exc_info.value.reason_code == "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT"
+    assert sorted(path.name for path in (overlay.review_dir / "resolutions").glob("*.json")) == files_before
+
+
+def test_materialize_revalidates_resigned_superseded_parent(
+    review_fixture,
+) -> None:
+    _, _, _, _, overlay, _, bundle, tasks = review_fixture
+    task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    table, cell = _table_and_cell(bundle)
+    target = {
+        "target_type": "TABLE_COLUMN_FIELD",
+        "table_id": table["table_id"],
+        "column_index": 1,
+        "field": "period",
+    }
+    evidence = [
+        {
+            "type": "P5_CELL",
+            "table_id": table["table_id"],
+            "cell_id": cell["cell_id"],
+        }
+    ]
+    parent = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            task,
+            action="SET_PERIOD",
+            target=target,
+            value="PERIOD_PARENT",
+            evidence_refs=evidence,
+            reviewed_at="2026-11-03T22:00:00+09:00",
+        ),
+    )
+    child = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            task,
+            action="SET_PERIOD",
+            target=target,
+            value="PERIOD_CHILD",
+            evidence_refs=evidence,
+            reviewed_at="2026-11-03T22:01:00+09:00",
+            supersedes=parent.resolution_id,
+        ),
+    )
+    replacement_parent = _resign_resolution_file(
+        overlay.review_dir / "resolutions" / f"{parent.resolution_id}.json",
+        lambda payload: payload.update(
+            {
+                "evidence_refs": [
+                    {
+                        "type": "P5_CELL",
+                        "table_id": "tampered-table",
+                        "cell_id": "tampered-cell",
+                    }
+                ]
+            }
+        ),
+    )
+    replacement_parent_id = replacement_parent.stem
+    _resign_resolution_file(
+        overlay.review_dir / "resolutions" / f"{child.resolution_id}.json",
+        lambda payload: payload.update(
+            {
+                "base_active_resolution_ids": [replacement_parent_id],
+                "base_overlay_set_hash_before": _overlay_hash_before(
+                    payload["document_sha256"],
+                    payload["base_validation_report_sha256"],
+                    (replacement_parent_id,),
+                ),
+                "supersedes_resolution_id": replacement_parent_id,
+            }
+        ),
+    )
+
+    with pytest.raises(ReviewError) as exc_info:
+        materialize_resolved_view(overlay.review_dir)
+
+    assert exc_info.value.reason_code == "P9_EVIDENCE_INVALID"
+
+
+def test_attestation_rejects_resigned_support_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, _, overlay, _, bundle, tasks = _build_extra_issue_fixture(
+        tmp_path,
+        monkeypatch,
+        reason_code="RAW_UNIT_AMBIGUOUS",
+        observed={"count": 1},
+    )
+    task = _task(tasks, "RAW_UNIT_AMBIGUOUS")
+    table, cell = _table_and_cell(bundle)
+    support = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            task,
+            action="SET_UNIT",
+            target={
+                "target_type": "TABLE_FIELD",
+                "table_id": table["table_id"],
+                "field": "unit",
+            },
+            value="UNIT_SUPPORT",
+            evidence_refs=[
+                {
+                    "type": "P5_CELL",
+                    "table_id": table["table_id"],
+                    "cell_id": cell["cell_id"],
+                }
+            ],
+            reviewed_at="2026-11-03T22:00:00+09:00",
+        ),
+    )
+    tampered = _resign_resolution_file(
+        overlay.review_dir / "resolutions" / f"{support.resolution_id}.json",
+        lambda payload: payload.update(
+            {
+                "evidence_refs": [
+                    {
+                        "type": "P5_CELL",
+                        "table_id": "tampered-table",
+                        "cell_id": "tampered-cell",
+                    }
+                ]
+            }
+        ),
+    )
+    with pytest.raises(ReviewError) as exc_info:
+        submit_resolution(
+            overlay.review_dir,
+            ResolutionSubmission.from_dict(
+                {
+                    "review_task_id": task.review_task_id,
+                    "action": "ATTEST_ISSUE_RESOLVED",
+                    "target": {
+                        "target_type": "ISSUE",
+                        "issue_id": task.issue_id,
+                        "expected_observed_count": 1,
+                    },
+                    "value": None,
+                    "evidence_refs": [],
+                    "supporting_resolution_ids": [tampered.stem],
+                    "expected_observed_count": 1,
+                    "reviewer_type": "HUMAN",
+                    "reviewer_id": "p9-attestation-reviewer",
+                    "reviewed_at": "2026-11-03T22:01:00+09:00",
+                    "justification": "Tampered support evidence must be rejected.",
+                }
+            ),
+        )
+    assert exc_info.value.reason_code == "P9_EVIDENCE_INVALID"
+
+
+def test_cli_resolutions_rejects_semantically_corrupt_store(
+    review_fixture,
+    capsys,
+) -> None:
+    _, _, _, _, overlay, _, bundle, tasks = review_fixture
+    task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    table, cell = _table_and_cell(bundle)
+    resolution = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            task,
+            action="SET_PERIOD",
+            target={
+                "target_type": "TABLE_COLUMN_FIELD",
+                "table_id": table["table_id"],
+                "column_index": 1,
+                "field": "period",
+            },
+            value="PERIOD_CLI_CORRUPT",
+            evidence_refs=[
+                {
+                    "type": "P5_CELL",
+                    "table_id": table["table_id"],
+                    "cell_id": cell["cell_id"],
+                }
+            ],
+            reviewed_at="2026-11-03T22:00:00+09:00",
+        ),
+    )
+    _resign_resolution_file(
+        overlay.review_dir / "resolutions" / f"{resolution.resolution_id}.json",
+        lambda payload: payload["before"].update({"affected_fact_ids": []}),
+    )
+    with pytest.raises(ReviewError) as exc_info:
+        list_resolutions(overlay.review_dir)
+    assert exc_info.value.reason_code == "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT"
+
+    exit_code = review_cli_main(
+        ["resolutions", "--review-dir", str(overlay.review_dir)]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert json.loads(captured.err)["reason_code"] == "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT"
+
+
+def test_fill_preserves_trimmed_value_and_effective_value(review_fixture) -> None:
+    _, _, _, _, overlay, _, bundle, tasks = review_fixture
+    task = _task(tasks, "RAW_UNIT_COVERAGE_LOW")
+    table, cell = _table_and_cell(bundle)
+    saved = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            task,
+            action="SET_UNIT",
+            target={
+                "target_type": "TABLE_FIELD",
+                "table_id": table["table_id"],
+                "field": "unit",
+            },
+            value="  人民币   百万元  ",
+            evidence_refs=[
+                {
+                    "type": "P5_CELL",
+                    "table_id": table["table_id"],
+                    "cell_id": cell["cell_id"],
+                }
+            ],
+            reviewed_at="2026-11-03T22:00:00+09:00",
+        ),
+    )
+    assert saved.value == "人民币   百万元"
+
+    snapshot = materialize_resolved_view(overlay.review_dir)
+    rows = [
+        json.loads(line)
+        for line in snapshot.resolved_facts_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    affected = set(saved.before["affected_fact_ids"])
+    assert affected
+    assert {
+        row["effective_unit"]
+        for row in rows
+        if row["raw_fact_id"] in affected
+    } == {"人民币   百万元"}
+
+
+def test_raw_whitespace_equivalence_still_uses_collapsed_comparison(
+    review_fixture,
+    monkeypatch,
+) -> None:
+    _, _, _, _, overlay, manifest, bundle, tasks = review_fixture
+    fact = bundle.context.facts[0]
+    fact["raw_unit"] = "人民币 百万元"
+    monkeypatch.setattr(
+        review_store_module,
+        "load_review_base",
+        lambda review_dir: (manifest, bundle, tasks),
+    )
+    task = _task(tasks, "RAW_UNIT_COVERAGE_LOW")
+    with pytest.raises(ReviewError) as exc_info:
+        submit_resolution(
+            overlay.review_dir,
+            _submission(
+                task,
+                action="SET_UNIT",
+                target={
+                    "target_type": "FACT_FIELD",
+                    "raw_fact_id": fact["raw_fact_id"],
+                    "field": "unit",
+                },
+                value="  人民币   百万元  ",
+                evidence_refs=[
+                    {"type": "P6_EVIDENCE", "evidence_id": fact["evidence_id"]}
+                ],
+                reviewed_at="2026-11-03T22:00:00+09:00",
+            ),
+        )
+    assert exc_info.value.reason_code == "P9_RESOLUTION_NO_EFFECT"
+
+
+def test_justification_uses_raw_4000_character_boundary(review_fixture) -> None:
+    _, _, _, _, _, _, _, tasks = review_fixture
+    task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    base = {
+        "action": "SET_PERIOD",
+        "target": {},
+        "value": "PERIOD",
+        "evidence_refs": [],
+        "reviewed_at": "2026-11-03T22:00:00+09:00",
+    }
+    validate_reviewer(
+        _submission(task, **base, justification="x" * 4000)
+    )
+    for justification in ("x" * 4001, "x" + (" " * 4000), " " * 20):
+        with pytest.raises(ReviewError) as exc_info:
+            validate_reviewer(
+                _submission(task, **base, justification=justification)
+            )
+        assert exc_info.value.reason_code == "P9_INVALID_RESOLUTION"
+
+
+def test_prepare_rejects_unknown_deterministic_staging_directory(tmp_path: Path) -> None:
+    catalog, _ = _build_fixture(tmp_path)
+    review_root = tmp_path / "review"
+    review_root.mkdir()
+    stale = review_root / f".{DOC_SHA}.tmp"
+    stale.mkdir()
+
+    with pytest.raises(ReviewError) as exc_info:
+        prepare_review_overlay(tmp_path, catalog, DOC_SHA, review_root)
+
+    assert exc_info.value.reason_code == "P9_PERSIST_FAILED"
+    assert stale.is_dir()
+
+
 def test_resolved_parsed_data_record_is_deterministic(review_fixture) -> None:
     _, _, _, _, overlay, _, _, _ = review_fixture
     snapshot = materialize_resolved_view(overlay.review_dir)
@@ -853,6 +1239,146 @@ def test_cli_diagnostics_are_json_on_stderr_only(tmp_path: Path, capsys) -> None
     payload = json.loads(lines[0])
     assert payload["status"] == "ERROR"
     assert payload["reason_code"] == "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT"
+
+
+def test_cli_full_success_matrix_is_json_only(
+    review_fixture,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    root, catalog, _, _, overlay, _, bundle, tasks = review_fixture
+
+    def call(args: list[str]) -> str:
+        exit_code = review_cli_main(args)
+        captured = capsys.readouterr()
+        assert exit_code == 0
+        assert captured.err == ""
+        lines = captured.out.splitlines()
+        assert len(lines) == 1
+        payload = json.loads(lines[0])
+        assert payload["status"] == "OK"
+        return lines[0]
+
+    prepare_args = [
+        "prepare",
+        "--project-root",
+        str(root),
+        "--catalog",
+        str(catalog),
+        "--document-sha256",
+        DOC_SHA,
+        "--review-root",
+        str(root / "review"),
+    ]
+    assert call(prepare_args) == call(prepare_args)
+
+    tasks_args = ["tasks", "--review-dir", str(overlay.review_dir)]
+    assert call(tasks_args) == call(tasks_args)
+
+    table, cell = _table_and_cell(bundle)
+    period_task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    unit_task = _task(tasks, "RAW_UNIT_COVERAGE_LOW")
+    period_submission = _submission(
+        period_task,
+        action="SET_PERIOD",
+        target={
+            "target_type": "TABLE_COLUMN_FIELD",
+            "table_id": table["table_id"],
+            "column_index": 1,
+            "field": "period",
+        },
+        value="CLI_PERIOD",
+        evidence_refs=[
+            {
+                "type": "P5_CELL",
+                "table_id": table["table_id"],
+                "cell_id": cell["cell_id"],
+            }
+        ],
+        reviewed_at="2026-11-03T22:00:00+09:00",
+    )
+    period_json = json.dumps(
+        _submission_payload(period_submission),
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    submit_json_args = [
+        "submit",
+        "--review-dir",
+        str(overlay.review_dir),
+        "--input-json",
+        period_json,
+    ]
+    assert call(submit_json_args)
+
+    unit_submission = _submission(
+        unit_task,
+        action="SET_UNIT",
+        target={
+            "target_type": "TABLE_FIELD",
+            "table_id": table["table_id"],
+            "field": "unit",
+        },
+        value="CLI_UNIT",
+        evidence_refs=[
+            {
+                "type": "P5_CELL",
+                "table_id": table["table_id"],
+                "cell_id": cell["cell_id"],
+            }
+        ],
+        reviewed_at="2026-11-03T22:01:00+09:00",
+    )
+    input_file = tmp_path / "cli-submission.json"
+    input_file.write_text(
+        json.dumps(_submission_payload(unit_submission), ensure_ascii=False, sort_keys=True),
+        encoding="utf-8",
+        newline="\n",
+    )
+    submit_file_args = [
+        "submit",
+        "--review-dir",
+        str(overlay.review_dir),
+        "--input-file",
+        str(input_file),
+    ]
+    assert call(submit_file_args)
+
+    resolutions_args = ["resolutions", "--review-dir", str(overlay.review_dir)]
+    assert call(resolutions_args) == call(resolutions_args)
+
+    materialize_args = ["materialize", "--review-dir", str(overlay.review_dir)]
+    assert call(materialize_args) == call(materialize_args)
+
+    report_args = ["report", "--review-dir", str(overlay.review_dir)]
+    assert call(report_args) == call(report_args)
+
+
+@pytest.mark.parametrize("payload", ["{", "[]"])
+def test_cli_submit_rejects_malformed_and_non_object_json(
+    review_fixture,
+    capsys,
+    payload: str,
+) -> None:
+    _, _, _, _, overlay, _, _, _ = review_fixture
+
+    exit_code = review_cli_main(
+        [
+            "submit",
+            "--review-dir",
+            str(overlay.review_dir),
+            "--input-json",
+            payload,
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    lines = captured.err.splitlines()
+    assert len(lines) == 1
+    diagnostic = json.loads(lines[0])
+    assert diagnostic["status"] == "ERROR"
+    assert diagnostic["reason_code"] == "P9_INVALID_RESOLUTION"
 
 
 def test_attestation_rejects_direct_evidence_and_inherits_supporting_evidence(
@@ -1414,6 +1940,8 @@ def test_review_source_has_no_forbidden_network_or_ai_surface() -> None:
         "mcp.server",
         "mcpserver",
         "subprocess",
+        "uuid",
+        "random",
     )
     for path in review_root.glob("*.py"):
         source = path.read_text(encoding="utf-8").lower()

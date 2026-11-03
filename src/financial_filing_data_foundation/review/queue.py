@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import shutil
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -523,9 +522,16 @@ def prepare_review_overlay(
     queue_bytes = _jsonl_bytes(tasks)
 
     review_base.mkdir(parents=True, exist_ok=True)
-    temp_dir = review_base / f".{document.document_sha256}.{uuid.uuid4().hex}.tmp"
-    temp_dir.mkdir(parents=False, exist_ok=False)
+    temp_dir = review_base / f".{document.document_sha256}.tmp"
+    if temp_dir.exists():
+        raise ReviewError(
+            "P9_PERSIST_FAILED",
+            f"deterministic staging directory already exists: {temp_dir}",
+        )
+    temp_created = False
     try:
+        temp_dir.mkdir(parents=False, exist_ok=False)
+        temp_created = True
         (temp_dir / "resolutions").mkdir()
         (temp_dir / "snapshots").mkdir()
         (temp_dir / "review_queue.jsonl").write_bytes(queue_bytes)
@@ -549,7 +555,7 @@ def prepare_review_overlay(
         context = _load_context_from_review(final_dir)
         return _artifact_from_context(context)
     except Exception as exc:
-        if temp_dir.exists():
+        if temp_created and temp_dir.exists():
             shutil.rmtree(temp_dir, ignore_errors=True)
         if isinstance(exc, ReviewError):
             raise

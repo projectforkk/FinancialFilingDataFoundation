@@ -21,11 +21,10 @@ from financial_filing_data_foundation.validation.policy import (
 from .evidence import (
     _ACTION_FIELD,
     active_effective_assignments,
-    build_before_after,
     build_indexes,
+    normalize_semantic,
     resolve_target,
-    validate_direct_evidence,
-    validate_reviewer,
+    validate_resolution_semantics,
 )
 from .models import (
     P9_VERSION,
@@ -35,7 +34,6 @@ from .models import (
     REVIEW_POLICY_VERSION,
     SNAPSHOT_MANIFEST_SCHEMA_VERSION,
     ResolutionAction,
-    ResolutionSubmission,
     ResolvedIssueState,
     ResolvedSnapshot,
     ReviewError,
@@ -58,123 +56,6 @@ def _jsonl_bytes(rows: Sequence[Mapping[str, Any]]) -> bytes:
 
 def _resolution_by_id(review_dir: Path) -> dict[str, ReviewResolution]:
     return {item.resolution_id: item for item in list_resolutions(review_dir)}
-
-
-def _validate_resolution_semantics(
-    resolution: ReviewResolution,
-    indexes,
-    task,
-    all_by_id: Mapping[str, ReviewResolution],
-) -> Any:
-    prior: list[ReviewResolution] = []
-    for resolution_id in resolution.base_active_resolution_ids:
-        item = all_by_id.get(resolution_id)
-        if item is None:
-            raise ReviewError(
-                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                f"resolution prior state is missing: {resolution_id}",
-            )
-        prior.append(item)
-    prior_effective = active_effective_assignments(prior)
-
-    submission = ResolutionSubmission(
-        review_task_id=resolution.review_task_id,
-        action=resolution.action,
-        target=resolution.target,
-        value=resolution.value,
-        reviewer_type=resolution.reviewer_type,
-        reviewer_id=resolution.reviewer_id,
-        reviewed_at=resolution.reviewed_at,
-        justification=resolution.justification,
-        evidence_refs=(
-            ()
-            if resolution.action is ResolutionAction.ATTEST_ISSUE_RESOLVED
-            else resolution.evidence_refs
-        ),
-        evidence_pages=(
-            None
-            if resolution.action is ResolutionAction.ATTEST_ISSUE_RESOLVED
-            else resolution.evidence_pages
-        ),
-        supersedes_resolution_id=resolution.supersedes_resolution_id,
-        supporting_resolution_ids=resolution.supporting_resolution_ids,
-        expected_observed_count=resolution.expected_observed_count,
-    )
-    validate_reviewer(submission)
-    selection = resolve_target(indexes, task, submission, prior_effective)
-
-    if resolution.action is ResolutionAction.ATTEST_ISSUE_RESOLVED:
-        support: list[ReviewResolution] = []
-        for support_id in resolution.supporting_resolution_ids:
-            item = all_by_id.get(support_id)
-            if item is None or support_id not in resolution.base_active_resolution_ids:
-                raise ReviewError(
-                    "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                    f"attestation support was not active in prior state: {support_id}",
-                )
-            if item.review_task_id != resolution.review_task_id or item.issue_id != resolution.issue_id:
-                raise ReviewError(
-                    "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                    "attestation support crosses task/issue",
-                )
-            if item.action is ResolutionAction.ATTEST_ISSUE_RESOLVED:
-                raise ReviewError(
-                    "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                    "attestation support cannot itself be attestation",
-                )
-            support.append(item)
-        refs_by_key: dict[bytes, dict[str, Any]] = {}
-        pages: set[int] = set()
-        for item in support:
-            for ref in item.evidence_refs:
-                refs_by_key[canonical_json_bytes(ref)] = dict(ref)
-            pages.update(int(page) for page in item.evidence_pages)
-        expected_refs = tuple(refs_by_key[key] for key in sorted(refs_by_key))
-        expected_pages = tuple(sorted(pages))
-        if not expected_refs:
-            raise ReviewError(
-                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                "attestation inherited evidence is empty",
-            )
-        if expected_refs != resolution.evidence_refs or expected_pages != resolution.evidence_pages:
-            raise ReviewError(
-                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                "attestation inherited evidence/pages were tampered",
-            )
-        expected_before = {
-            "target": selection.target,
-            "base_observed": dict(indexes.issue_by_id[task.issue_id].get("observed") or {}),
-            "supporting_resolution_ids": sorted(item.resolution_id for item in support),
-        }
-        expected_after = {
-            "value": "RESOLVED",
-            "expected_observed_count": resolution.expected_observed_count,
-        }
-        if resolution.before != expected_before or resolution.after != expected_after:
-            raise ReviewError(
-                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-                "attestation before/after state mismatch",
-            )
-        return selection
-
-    refs, pages = validate_direct_evidence(indexes, selection, submission)
-    if refs != resolution.evidence_refs or pages != resolution.evidence_pages:
-        raise ReviewError(
-            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-            "resolution evidence/pages semantic mismatch",
-        )
-    expected_before, expected_after = build_before_after(selection)
-    if resolution.before != expected_before:
-        raise ReviewError(
-            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-            "resolution before-state does not match explicit prior overlay state",
-        )
-    if resolution.after != expected_after:
-        raise ReviewError(
-            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
-            "resolution after-state mismatch",
-        )
-    return selection
 
 
 def _generate(
@@ -214,7 +95,7 @@ def _generate(
         task = task_by_id.get(resolution.review_task_id)
         if task is None or task.issue_id != resolution.issue_id or task.reason_code != resolution.reason_code:
             raise ReviewError("P9_ARTIFACT_INCOMPLETE_OR_CORRUPT", "resolution task/issue mismatch")
-        selections[resolution.resolution_id] = _validate_resolution_semantics(
+        selections[resolution.resolution_id] = validate_resolution_semantics(
             resolution,
             indexes,
             task,
@@ -228,12 +109,12 @@ def _generate(
     for resolution in sorted(selected, key=lambda item: item.resolution_id):
         if resolution.action in _ACTION_FIELD:
             field = _ACTION_FIELD[resolution.action]
-            value = str(resolution.value or "")
             selection = selections[resolution.resolution_id]
+            value = str(selection.submitted_value or "")
             for fact_id in selection.affected_fact_ids:
                 key = (fact_id, field)
                 prior = field_assignments.get(key)
-                if prior is not None and prior[0] != value:
+                if prior is not None and normalize_semantic(prior[0]) != normalize_semantic(value):
                     raise ReviewError(
                         "P9_RESOLUTION_CONFLICT",
                         f"conflicting active values for {fact_id}/{field}",

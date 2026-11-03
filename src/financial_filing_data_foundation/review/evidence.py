@@ -38,6 +38,7 @@ class TargetSelection:
     affected_fact_ids: tuple[str, ...]
     already_explicit_fact_ids: tuple[str, ...]
     normalized_value: str | None
+    submitted_value: str | None
     base_raw_values: dict[str, Any]
     current_effective_values: dict[str, Any]
 
@@ -59,6 +60,18 @@ def _context_of(value: _BaseContext | ReviewIndexes | ReviewBaseBundle) -> _Base
 
 def normalize_semantic(value: str) -> str:
     return " ".join(value.strip().split())
+
+
+def _trimmed_text(value: Any, label: str, max_len: int = 256) -> str:
+    if not isinstance(value, str):
+        raise ReviewError("P9_INVALID_RESOLUTION", f"{label} must be a string")
+    trimmed = value.strip()
+    if not trimmed or len(trimmed) > max_len:
+        raise ReviewError(
+            "P9_INVALID_RESOLUTION",
+            f"{label} must contain 1..{max_len} non-whitespace characters",
+        )
+    return trimmed
 
 
 def _required_text(value: Any, label: str, max_len: int = 256) -> str:
@@ -195,7 +208,8 @@ def _fill_selection(
 
     affected: list[str] = []
     explicit: list[str] = []
-    wanted = normalize_semantic(value)
+    submitted = value.strip()
+    wanted = normalize_semantic(submitted)
     effective = current_effective or {}
     base_raw_values: dict[str, Any] = {}
     current_effective_values: dict[str, Any] = {}
@@ -235,6 +249,7 @@ def _fill_selection(
         affected_fact_ids=tuple(sorted(affected)),
         already_explicit_fact_ids=tuple(sorted(explicit)),
         normalized_value=wanted,
+        submitted_value=submitted,
         base_raw_values={key: base_raw_values[key] for key in sorted(base_raw_values)},
         current_effective_values={
             key: current_effective_values[key] for key in sorted(current_effective_values)
@@ -292,7 +307,7 @@ def resolve_target(
         ResolutionAction.SET_UNIT,
         ResolutionAction.SET_SCOPE,
     }:
-        text = _required_text(value, "value") if value is not None else ""
+        text = _trimmed_text(value, "value") if value is not None else ""
         if not text:
             raise ReviewError("P9_INVALID_RESOLUTION", "fill action requires value")
         return _fill_selection(
@@ -340,6 +355,7 @@ def resolve_target(
             affected_fact_ids=fact_ids,
             already_explicit_fact_ids=(),
             normalized_value=classification,
+            submitted_value=classification,
             base_raw_values={},
             current_effective_values={"statement_class": current_statement},
         )
@@ -405,6 +421,7 @@ def resolve_target(
             affected_fact_ids=(),
             already_explicit_fact_ids=(),
             normalized_value="RESOLVED",
+            submitted_value="RESOLVED",
             base_raw_values={},
             current_effective_values={},
         )
@@ -551,6 +568,192 @@ def validate_direct_evidence(
     return tuple(result), derived_pages
 
 
+def validate_resolution_semantics(
+    resolution: ReviewResolution,
+    indexes: ReviewIndexes,
+    task: ReviewTask,
+    all_by_id: Mapping[str, ReviewResolution],
+) -> TargetSelection:
+    context = indexes.context
+    if resolution.document_sha256 != str(context.document.document_sha256):
+        raise ReviewError(
+            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "resolution document identity mismatch",
+        )
+    if resolution.base_validation_report_sha256 != str(
+        context.manifest["base_validation_report_sha256"]
+    ):
+        raise ReviewError(
+            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "resolution base validation identity mismatch",
+        )
+    if resolution.review_task_id != task.review_task_id:
+        raise ReviewError(
+            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "resolution task identity mismatch",
+        )
+    if resolution.issue_id != task.issue_id or resolution.reason_code != task.reason_code:
+        raise ReviewError(
+            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "resolution issue/reason identity mismatch",
+        )
+
+    prior: list[ReviewResolution] = []
+    for resolution_id in resolution.base_active_resolution_ids:
+        item = all_by_id.get(resolution_id)
+        if item is None:
+            raise ReviewError(
+                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                f"resolution prior state is missing: {resolution_id}",
+            )
+        prior.append(item)
+    prior_effective = active_effective_assignments(prior)
+
+    submission = ResolutionSubmission(
+        review_task_id=resolution.review_task_id,
+        action=resolution.action,
+        target=resolution.target,
+        value=resolution.value,
+        reviewer_type=resolution.reviewer_type,
+        reviewer_id=resolution.reviewer_id,
+        reviewed_at=resolution.reviewed_at,
+        justification=resolution.justification,
+        evidence_refs=(
+            ()
+            if resolution.action is ResolutionAction.ATTEST_ISSUE_RESOLVED
+            else resolution.evidence_refs
+        ),
+        evidence_pages=(
+            None
+            if resolution.action is ResolutionAction.ATTEST_ISSUE_RESOLVED
+            else resolution.evidence_pages
+        ),
+        supersedes_resolution_id=resolution.supersedes_resolution_id,
+        supporting_resolution_ids=resolution.supporting_resolution_ids,
+        expected_observed_count=resolution.expected_observed_count,
+    )
+    validate_reviewer(submission)
+    selection = resolve_target(indexes, task, submission, prior_effective)
+
+    if resolution.action is ResolutionAction.ATTEST_ISSUE_RESOLVED:
+        support: list[ReviewResolution] = []
+        for support_id in resolution.supporting_resolution_ids:
+            item = all_by_id.get(support_id)
+            if item is None or support_id not in resolution.base_active_resolution_ids:
+                raise ReviewError(
+                    "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                    f"attestation support was not active in prior state: {support_id}",
+                )
+            if (
+                item.review_task_id != resolution.review_task_id
+                or item.issue_id != resolution.issue_id
+            ):
+                raise ReviewError(
+                    "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                    "attestation support crosses task/issue",
+                )
+            if item.action is ResolutionAction.ATTEST_ISSUE_RESOLVED:
+                raise ReviewError(
+                    "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                    "attestation support cannot itself be attestation",
+                )
+            support.append(item)
+        refs_by_key: dict[bytes, dict[str, Any]] = {}
+        pages: set[int] = set()
+        for item in support:
+            for ref in item.evidence_refs:
+                refs_by_key[canonical_json_bytes(ref)] = dict(ref)
+            pages.update(int(page) for page in item.evidence_pages)
+        expected_refs = tuple(refs_by_key[key] for key in sorted(refs_by_key))
+        expected_pages = tuple(sorted(pages))
+        if not expected_refs:
+            raise ReviewError(
+                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "attestation inherited evidence is empty",
+            )
+        if (
+            expected_refs != resolution.evidence_refs
+            or expected_pages != resolution.evidence_pages
+        ):
+            raise ReviewError(
+                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "attestation inherited evidence/pages were tampered",
+            )
+        expected_before = {
+            "target": selection.target,
+            "base_observed": dict(indexes.issue_by_id[task.issue_id].get("observed") or {}),
+            "supporting_resolution_ids": sorted(item.resolution_id for item in support),
+        }
+        expected_after = {
+            "value": "RESOLVED",
+            "expected_observed_count": resolution.expected_observed_count,
+        }
+        if resolution.before != expected_before or resolution.after != expected_after:
+            raise ReviewError(
+                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                "attestation before/after state mismatch",
+            )
+        return selection
+
+    refs, pages = validate_direct_evidence(indexes, selection, submission)
+    if refs != resolution.evidence_refs or pages != resolution.evidence_pages:
+        raise ReviewError(
+            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "resolution evidence/pages semantic mismatch",
+        )
+    expected_before, expected_after = build_before_after(selection)
+    if resolution.before != expected_before:
+        raise ReviewError(
+            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "resolution before-state does not match explicit prior overlay state",
+        )
+    if resolution.after != expected_after:
+        raise ReviewError(
+            "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+            "resolution after-state mismatch",
+        )
+    return selection
+
+
+def validate_resolution_history(
+    indexes: ReviewIndexes,
+    resolutions: Sequence[ReviewResolution],
+) -> None:
+    all_by_id = {item.resolution_id: item for item in resolutions}
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(resolution_id: str) -> None:
+        if resolution_id in visiting:
+            raise ReviewError(
+                "P9_RESOLUTION_STORE_CORRUPT",
+                "resolution semantic dependency cycle detected",
+            )
+        if resolution_id in visited:
+            return
+        resolution = all_by_id.get(resolution_id)
+        if resolution is None:
+            raise ReviewError(
+                "P9_RESOLUTION_STORE_CORRUPT",
+                f"resolution dependency is missing: {resolution_id}",
+            )
+        visiting.add(resolution_id)
+        for prior_id in resolution.base_active_resolution_ids:
+            visit(prior_id)
+        task = indexes.task_by_id.get(resolution.review_task_id)
+        if task is None:
+            raise ReviewError(
+                "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",
+                f"resolution task is missing: {resolution.review_task_id}",
+            )
+        validate_resolution_semantics(resolution, indexes, task, all_by_id)
+        visiting.remove(resolution_id)
+        visited.add(resolution_id)
+
+    for resolution_id in sorted(all_by_id):
+        visit(resolution_id)
+
+
 def build_indexes(
     bundle: ReviewBaseBundle,
     tasks: Sequence[ReviewTask | Mapping[str, Any]],
@@ -612,11 +815,15 @@ def validate_reviewer(submission: ResolutionSubmission) -> None:
             "P9_INVALID_RESOLUTION",
             "reviewer_id must not contain secret material",
         )
-    justification = normalize_semantic(submission.justification)
-    if not justification or len(justification) > 4096:
+    justification = submission.justification
+    if (
+        not isinstance(justification, str)
+        or not justification.strip()
+        or len(justification) > 4000
+    ):
         raise ReviewError(
             "P9_INVALID_RESOLUTION",
-            "justification must contain 1..4096 non-whitespace characters",
+            "justification must contain 1..4000 raw characters and non-whitespace text",
         )
     text = submission.reviewed_at.strip()
     if not text:
@@ -656,7 +863,7 @@ def active_effective_assignments(
             for fact_id in resolution.before.get("affected_fact_ids") or ():
                 key = (str(fact_id), field)
                 prior = assignments.get(key)
-                if prior is not None and prior != value:
+                if prior is not None and normalize_semantic(prior) != normalize_semantic(value):
                     raise ReviewError(
                         "P9_RESOLUTION_CONFLICT",
                         f"conflicting active values for {key[0]}/{field}",
@@ -689,7 +896,7 @@ def build_before_after(
         "current_effective_values": dict(selection.current_effective_values),
     }
     after = {
-        "value": selection.normalized_value,
+        "value": selection.submitted_value,
         "expected_affected_fact_count": len(selection.affected_fact_ids),
     }
     return before, after
