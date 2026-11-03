@@ -48,8 +48,16 @@ def _submission_payload(args: argparse.Namespace) -> dict[str, Any]:
     return value
 
 
+class _JsonArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise ReviewError(
+            "P9_CLI_ARGUMENT_ERROR",
+            "invalid command line arguments",
+        )
+
+
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _JsonArgumentParser(
         prog="python -m financial_filing_data_foundation.review.cli",
         description="FFDF P9 deterministic review overlay CLI",
     )
@@ -122,8 +130,8 @@ def _run(args: argparse.Namespace) -> Any:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
-    args = parser.parse_args(argv)
     try:
+        args = parser.parse_args(argv)
         result = _run(args)
     except ReviewError as exc:
         print(
@@ -136,7 +144,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             file=sys.stderr,
         )
-        return 1
+        return 2 if exc.reason_code == "P9_CLI_ARGUMENT_ERROR" else 1
     except Exception as exc:
         print(
             _json(

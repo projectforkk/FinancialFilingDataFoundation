@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping, Sequence
@@ -60,6 +61,79 @@ def _context_of(value: _BaseContext | ReviewIndexes | ReviewBaseBundle) -> _Base
 
 def normalize_semantic(value: str) -> str:
     return " ".join(value.strip().split())
+
+
+_FORBIDDEN_RESOLUTION_TEXT_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\b(?:https?|ftp|file|ssh)://|\bwww\.", re.IGNORECASE),
+    re.compile(r"(?:^|[\s\"'(])(?:[a-z]:[\\/]|\\\\[^\\\s]+\\[^\\\s]+)", re.IGNORECASE),
+    re.compile(r"(?<![\w:])/(?:[A-Za-z0-9._~-]+/)+[A-Za-z0-9._~-]*"),
+    re.compile(r"(?:^|[\\/])\.\.(?:[\\/]|$)"),
+    re.compile(
+        r"(?:^|[\r\n;&|])\s*(?:"
+        r"cmd(?:\.exe)?\s+/[ck]\b|"
+        r"powershell(?:\.exe)?\s+-\w+|"
+        r"pwsh(?:\.exe)?\s+-\w+|"
+        r"bash(?:\.exe)?\s+-[lc]\b|"
+        r"sh\s+-c\b|"
+        r"invoke-expression\b|"
+        r"rm\s+-rf\b|"
+        r"del\s+/[qsf]\b|"
+        r"curl(?:\.exe)?\s+\S+|"
+        r"wget(?:\.exe)?\s+\S+"
+        r")",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    re.compile(
+        r"\b(?:"
+        r"select\b.{0,200}\bfrom\b|"
+        r"insert\s+into\b|"
+        r"update\b.{0,200}\bset\b|"
+        r"delete\s+from\b|"
+        r"(?:drop|alter|create)\s+table\b|"
+        r"union\s+select\b|"
+        r"pragma\b"
+        r")",
+        re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"(?:^|\n)\s*(?:"
+        r"import\s+[A-Za-z_]|"
+        r"from\s+[A-Za-z_][\w.]*\s+import\s+|"
+        r"def\s+[A-Za-z_]\w*\s*\(|"
+        r"class\s+[A-Za-z_]\w*\s*[:(]"
+        r")|"
+        r"\b(?:__import__|exec|eval|print)\s*\(|"
+        r"\b(?:os|" r"sub" r"process)\.[A-Za-z_]\w*\s*\(",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    re.compile(
+        r"\b(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)"
+        r"\s*[:=]\s*\S+|\bbearer\s+[A-Za-z0-9._~+/=-]{8,}",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _iter_string_leaves(value: Any):
+    if isinstance(value, str):
+        yield value
+        return
+    if isinstance(value, Mapping):
+        for item in value.values():
+            yield from _iter_string_leaves(item)
+        return
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _iter_string_leaves(item)
+
+
+def validate_resolution_payload_security(payload: Any) -> None:
+    for text in _iter_string_leaves(payload):
+        if any(pattern.search(text) for pattern in _FORBIDDEN_RESOLUTION_TEXT_PATTERNS):
+            raise ReviewError(
+                "P9_RESOLUTION_CONTENT_FORBIDDEN",
+                "resolution payload contains forbidden content",
+            )
 
 
 def _trimmed_text(value: Any, label: str, max_len: int = 256) -> str:
@@ -575,6 +649,7 @@ def validate_resolution_semantics(
     all_by_id: Mapping[str, ReviewResolution],
 ) -> TargetSelection:
     context = indexes.context
+    validate_resolution_payload_security(resolution.to_dict(include_id=False))
     if resolution.document_sha256 != str(context.document.document_sha256):
         raise ReviewError(
             "P9_ARTIFACT_INCOMPLETE_OR_CORRUPT",

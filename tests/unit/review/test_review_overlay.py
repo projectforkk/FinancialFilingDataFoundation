@@ -1164,6 +1164,133 @@ def test_justification_uses_raw_4000_character_boundary(review_fixture) -> None:
         assert exc_info.value.reason_code == "P9_INVALID_RESOLUTION"
 
 
+@pytest.mark.parametrize(
+    ("field_name", "forbidden_text"),
+    [
+        ("justification", "https://attacker.example/path"),
+        ("value", "SELECT * FROM secrets"),
+        ("justification", r"C:\\secrets\\payload.txt"),
+        ("justification", "powershell -Command Get-ChildItem"),
+        ("justification", "import os\nos.system('whoami')"),
+        ("justification", "token=super-secret-value"),
+    ],
+)
+def test_resolution_payload_security_rejects_forbidden_content(
+    review_fixture,
+    field_name: str,
+    forbidden_text: str,
+) -> None:
+    _, _, _, _, overlay, _, bundle, tasks = review_fixture
+    task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    table, cell = _table_and_cell(bundle)
+    kwargs = {
+        "action": "SET_PERIOD",
+        "target": {
+            "target_type": "TABLE_COLUMN_FIELD",
+            "table_id": table["table_id"],
+            "column_index": 1,
+            "field": "period",
+        },
+        "value": "SAFE_PERIOD",
+        "evidence_refs": [
+            {
+                "type": "P5_CELL",
+                "table_id": table["table_id"],
+                "cell_id": cell["cell_id"],
+            }
+        ],
+        "reviewed_at": "2026-11-04T08:00:00+09:00",
+        "justification": "Evidence-grounded period review.",
+    }
+    kwargs[field_name] = forbidden_text
+
+    with pytest.raises(ReviewError) as exc_info:
+        submit_resolution(
+            overlay.review_dir,
+            _submission(task, **kwargs),
+        )
+
+    assert exc_info.value.reason_code == "P9_RESOLUTION_CONTENT_FORBIDDEN"
+    assert str(exc_info.value) == "resolution payload contains forbidden content"
+    assert forbidden_text not in str(exc_info.value)
+
+
+def test_resolution_payload_security_allows_benign_slashes_and_keywords(
+    review_fixture,
+) -> None:
+    _, _, _, _, overlay, _, bundle, tasks = review_fixture
+    task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    table, cell = _table_and_cell(bundle)
+
+    saved = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            task,
+            action="SET_PERIOD",
+            target={
+                "target_type": "TABLE_COLUMN_FIELD",
+                "table_id": table["table_id"],
+                "column_index": 1,
+                "field": "period",
+            },
+            value="2024/2025",
+            evidence_refs=[
+                {
+                    "type": "P5_CELL",
+                    "table_id": table["table_id"],
+                    "cell_id": cell["cell_id"],
+                }
+            ],
+            reviewed_at="2026-11-04T08:01:00+09:00",
+            justification="P5/P6 evidence checked; SQL review completed.",
+        ),
+    )
+
+    assert saved.value == "2024/2025"
+
+
+def test_historical_resolution_payload_security_rejects_resigned_forbidden_content(
+    review_fixture,
+) -> None:
+    _, _, _, _, overlay, _, bundle, tasks = review_fixture
+    task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    table, cell = _table_and_cell(bundle)
+    saved = submit_resolution(
+        overlay.review_dir,
+        _submission(
+            task,
+            action="SET_PERIOD",
+            target={
+                "target_type": "TABLE_COLUMN_FIELD",
+                "table_id": table["table_id"],
+                "column_index": 1,
+                "field": "period",
+            },
+            value="SAFE_PERIOD",
+            evidence_refs=[
+                {
+                    "type": "P5_CELL",
+                    "table_id": table["table_id"],
+                    "cell_id": cell["cell_id"],
+                }
+            ],
+            reviewed_at="2026-11-04T08:02:00+09:00",
+        ),
+    )
+    _resign_resolution_file(
+        overlay.review_dir / "resolutions" / f"{saved.resolution_id}.json",
+        lambda payload: payload.update(
+            {"justification": "https://attacker.example/resigned"}
+        ),
+    )
+
+    with pytest.raises(ReviewError) as exc_info:
+        list_resolutions(overlay.review_dir)
+
+    assert exc_info.value.reason_code == "P9_RESOLUTION_CONTENT_FORBIDDEN"
+    assert str(exc_info.value) == "resolution payload contains forbidden content"
+
+
 def test_prepare_rejects_unknown_deterministic_staging_directory(tmp_path: Path) -> None:
     catalog, _ = _build_fixture(tmp_path)
     review_root = tmp_path / "review"
@@ -1207,6 +1334,42 @@ def test_resolved_parsed_data_record_is_deterministic(review_fixture) -> None:
     assert RECONSTRUCTION_VERSION in first.parser_version
     assert EXTRACTOR_VERSION in first.parser_version
     assert P7_POLICY_VERSION in first.parser_version
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        [],
+        ["unknown-command"],
+        ["tasks"],
+        [
+            "submit",
+            "--review-dir",
+            "ignored",
+            "--input-json",
+            "{}",
+            "--input-file",
+            "ignored.json",
+        ],
+    ],
+)
+def test_cli_parser_level_failures_are_deterministic_json(
+    args: list[str],
+    capsys,
+) -> None:
+    exit_code = review_cli_main(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    lines = captured.err.splitlines()
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload == {
+        "message": "invalid command line arguments",
+        "reason_code": "P9_CLI_ARGUMENT_ERROR",
+        "status": "ERROR",
+    }
 
 
 def test_cli_success_writes_one_json_document_to_stdout(review_fixture, capsys) -> None:

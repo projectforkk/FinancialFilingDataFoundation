@@ -12,6 +12,7 @@ from .evidence import (
     resolve_target,
     validate_direct_evidence,
     validate_resolution_history,
+    validate_resolution_payload_security,
     validate_reviewer,
 )
 from .models import (
@@ -394,6 +395,7 @@ def submit_resolution(
             else submission.expected_observed_count
         ),
     )
+    validate_resolution_payload_security(provisional.to_dict(include_id=False))
     resolution_id = sha256_bytes(canonical_json_bytes(provisional.to_dict(include_id=False)))
     resolution = ReviewResolution(
         resolution_id=resolution_id,
