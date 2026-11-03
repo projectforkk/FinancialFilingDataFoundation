@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P7_DONE / P8_IN_REVIEW**
+**P7_DONE / P8_READY_FOR_ACCEPTANCE**
 
 ## Accepted baseline
 
@@ -102,7 +102,7 @@
 
 Status:
 
-`DEVELOPMENT COMPLETE / CODE REVIEW PENDING`
+`CODE REVIEW PASS / READY FOR ACCEPTANCE`
 
 Planned branch:
 
@@ -117,7 +117,19 @@ P7 Independent Acceptance:
 - live CN/HK validation: `PASS`
 - blocker: `NONE`
 
-P8 must not start production implementation until its detailed design and execution plan are committed.
+P8 final Code Review:
+
+- verdict: `PASS`
+- evidence: `development/45-p8-code-review.md`
+- reviewed candidate: `599db48a62622cb18de2c61d7100e8186a7ca936`
+- full regression: `231 passed`
+- runtime lock: `MATCH`
+- official SDK protocol: `2026-07-28`
+- exact tools: `11 / 11 PASS`
+- live CN/HK: `PASS`
+- blocker: `NONE`
+
+Next gate: `P8-J Acceptance Freeze`.
 
 ## Project directory consolidation
 
