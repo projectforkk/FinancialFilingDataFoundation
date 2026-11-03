@@ -11,13 +11,13 @@
 ## Accepted baseline
 
 - phase: `P8_DONE`
-- frozen acceptance candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
-- reviewed production candidate: `d31a5851767f102082e2078cd09df2b023e84227`
+- frozen acceptance candidate: `31525235a44c8576d22fba542438b491e15e653b`
+- reviewed production candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/31-p8-acceptance-result.md`
-- accepted merge commit: `415d2ad82e890be855198d4d4c57bca8d1beb406`
-- accepted_baseline_sha: `415d2ad82e890be855198d4d4c57bca8d1beb406`
-- full regression: `231 passed`
+- acceptance evidence: `acceptance/33-p8-issue006-acceptance-result.md`
+- accepted merge commit: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
+- accepted_baseline_sha: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
+- full regression: `235 passed`
 - official MCP protocol: `2026-07-28`
 - exact MCP tools: `11 / 11 PASS`
 - runtime lock SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
@@ -102,16 +102,17 @@
 ### P8 — Local MCP
 
 - status: `DONE / PASS`
-- acceptance evidence: `acceptance/31-p8-acceptance-result.md`
-- frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
-- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
-- full suite: `231 passed`
+- acceptance evidence: `acceptance/33-p8-issue006-acceptance-result.md`
+- frozen candidate: `31525235a44c8576d22fba542438b491e15e653b`
+- reviewed candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
+- full suite: `235 passed`
 - official MCP protocol: `2026-07-28`
 - exact tools: `11 / 11 PASS`
 - live CN/HK MCP queries: `PASS`
 - runtime package lock: `30 / 30 MATCH`
 - runtime lock byte reproducibility: `PASS`
-- accepted merge: `415d2ad82e890be855198d4d4c57bca8d1beb406`
+- P8-ISSUE-006 dual-runtime test boundary: `PASS`
+- accepted merge: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
 
 ## Approved next phase
 
@@ -128,24 +129,25 @@ Planned branch:
 P8 Independent Acceptance:
 
 - verdict: `PASS`
-- evidence: `acceptance/31-p8-acceptance-result.md`
-- frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
-- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
-- full suite: `231 passed`
+- evidence: `acceptance/33-p8-issue006-acceptance-result.md`
+- frozen candidate: `31525235a44c8576d22fba542438b491e15e653b`
+- reviewed candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
+- full suite: `235 passed`
 - official SDK protocol: `2026-07-28`
 - exact tools: `11 / 11 PASS`
 - live CN/HK: `PASS`
 - runtime lock/package/byte reproducibility: `PASS`
+- dual-runtime test boundary: `PASS`
 - read-only immutability: `25 / 25 files unchanged`
 - blocker: `NONE`
-- accepted merge: `415d2ad82e890be855198d4d4c57bca8d1beb406`
+- accepted merge: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
 
 P8 final Code Review:
 
 - final verdict: `PASS`
-- final evidence: `development/46-p8-final-code-review.md`
-- reviewed candidate: `d31a5851767f102082e2078cd09df2b023e84227`
-- full regression: `231 passed`
+- final evidence: `development/48-p8-issue006-code-review.md`
+- reviewed candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
+- full regression: `235 passed`
 - runtime package lock: `MATCH`
 - runtime lock blob/worktree SHA: `MATCH`
 - lock SHA256: `8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
@@ -158,9 +160,10 @@ Historical review `development/45-p8-code-review.md` and freeze `acceptance/28-p
 
 P8 final Independent Acceptance freeze:
 
-- instruction: `acceptance/30-p8-final-acceptance-freeze.md`
-- frozen candidate: `fd8dccc7367ce682c972ab3aeff3c8d602044c41`
-- prior freezes `acceptance/28` and `acceptance/29`: historical / invalidated
+- instruction: `acceptance/32-p8-issue006-refreeze.md`
+- frozen candidate: `31525235a44c8576d22fba542438b491e15e653b`
+- result: `acceptance/33-p8-issue006-acceptance-result.md`
+- prior freeze/result `acceptance/30` / `acceptance/31`: historical after P8-ISSUE-006
 
 P9 detailed design, implementation plan, development instruction and acceptance baseline are complete.
 

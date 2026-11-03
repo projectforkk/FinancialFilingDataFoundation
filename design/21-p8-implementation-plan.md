@@ -51,8 +51,10 @@ Gate: focused service tests PASS.
 - stdio only
 - no stdout logging
 - deterministic error mapping
+- main pytest remains SDK-free
+- dedicated MCP runtime executes tracked stdlib server-registration harness (no pytest dependency)
 
-Gate: server import/tool registration tests PASS.
+Gate: server import/tool registration standalone harness PASS.
 
 ## P8-F — Deterministic / Security Regression
 - on Windows use short project-root-local pytest basetemp: `D:\Codex\FinancialFilingDataFoundation\workspace\t\p8\<run>`

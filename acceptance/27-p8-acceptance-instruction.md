@@ -12,33 +12,34 @@ Mandatory:
 4. main venv仍无 mcp package
 5. dedicated runtime = Python 3.12.14 AMD64 + exact mcp==2.3.0
 6. dedicated runtime lock `mcp-2.3.0-py312-win-amd64.lock.txt` reproducible; `.gitattributes` enforces LF; Git blob SHA256 == clean checkout working-tree SHA256 == documented lock SHA256
-7. official SDK stdio server starts
-8. protocol negotiation succeeds
-9. exact 11 tool names
-10. no arbitrary path tool
-11. no shell/sql/python execution tool
-12. no HTTP/SSE listener
-13. no network/AI imports/calls
-14. catalog paths project-root-relative only
-15. absolute/traversal catalog paths blocked
-16. duplicate document identities blocked
-17. upstream P3/P5/P6/P7 loaders validated
-18. upstream corruption returned as execution error, not validation BLOCKED
-19. list documents deterministic
-20. search/read pages deterministic
-21. sections deterministic
-22. table list/detail deterministic
-23. fact list/detail deterministic
-24. evidence exact relation
-25. validation report/issues deterministic
-26. argument/pagination/payload limits
-27. CN live tool calls PASS
-28. HK live tool calls PASS
-29. upstream artifacts/catalog unchanged
-30. cold startup/connect/list-tools <=15s without document bundle load
-31. first trusted bundle load per document <=20s
-32. warm representative business calls meet tool performance gates
-33. ffdf_list_documents is catalog-only and does not claim unvalidated P7 status
+7. dedicated MCP runtime executes tracked stdlib server-registration/SDK-boundary harness without adding pytest to the runtime lock
+8. official SDK stdio server starts
+9. protocol negotiation succeeds
+10. exact 11 tool names
+11. no arbitrary path tool
+12. no shell/sql/python execution tool
+13. no HTTP/SSE listener
+14. no network/AI imports/calls
+15. catalog paths project-root-relative only
+16. absolute/traversal catalog paths blocked
+17. duplicate document identities blocked
+18. upstream P3/P5/P6/P7 loaders validated
+19. upstream corruption returned as execution error, not validation BLOCKED
+20. list documents deterministic
+21. search/read pages deterministic
+22. sections deterministic
+23. table list/detail deterministic
+24. fact list/detail deterministic
+25. evidence exact relation
+26. validation report/issues deterministic
+27. argument/pagination/payload limits
+28. CN live tool calls PASS
+29. HK live tool calls PASS
+30. upstream artifacts/catalog unchanged
+31. cold startup/connect/list-tools <=15s without document bundle load
+32. first trusted bundle load per document <=20s
+33. warm representative business calls meet tool performance gates
+34. ffdf_list_documents is catalog-only and does not claim unvalidated P7 status
 
 Windows pytest execution rule:
 - use short project-root-local basetemp under `D:\Codex\FinancialFilingDataFoundation\workspace\t\p8\<acceptance-run>`；
