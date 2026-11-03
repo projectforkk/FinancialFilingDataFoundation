@@ -1680,6 +1680,27 @@ No P9 resolution-store production code existed before this amendment.
 
 Affected gates: P9-D / P9-E / P9-F / P9-J / P9-L.
 
+### P9-ISSUE-004 — P10 route amendment left subordinate P9 governance/status text stale
+
+After commit `5c059bad6938978a93c3f9a6f107d7a7560f7bd9` replaced the future P10 fixed Skill route with `P10 — Codex Dynamic Research Integration`, a governance consistency check found that some subordinate P9 artifacts still described the superseded route or the pre-development state.
+
+Observed stale items:
+- `design/23-p9-implementation-plan.md` had not explicitly named the new P10 route at closeout authorization；
+- `development/48-p9-development-instruction.md` still prohibited “P10 Skill implementation” instead of the current P10 route；
+- `PROJECT_STATUS.md` still said `DEVELOPMENT NOT STARTED` / production blocked pending initial P9 setup, while the handoff records an existing local, uncommitted P9 candidate that had already reached focused `7 passed` and full unit regression `242 passed / 0 fail` before the WorkHome connection outage.
+
+The local candidate is **not** an accepted baseline and cannot be treated as verified until WorkHome is reachable and the active worktree is re-audited.
+
+Approved solution:
+1. keep `5c059bad...` as the P10 route design baseline and do not move the future P10 work into main before P9 closeout；
+2. synchronize `design/23` and `development/48` terminology to `P10 Codex Dynamic Research Integration`；
+3. update `PROJECT_STATUS.md` to distinguish accepted P8 baseline, GitHub P9 design baseline, and the handoff-reported local uncommitted P9 candidate pending WorkHome re-verification；
+4. record the safe recovery sequence as WorkHome reconnect → local git/status verification → safe fast-forward of design-only commits without deleting/rebuilding untracked P9 files → continue P9-G；
+5. do not modify P9 production/tests from GitHub while the local uncommitted worktree cannot be inspected；
+6. this governance-only amendment does not invalidate already reported P9-B–F test evidence, but those results remain provisional until local re-verification after reconnect.
+
+Affected gates: governance/status synchronization only. P9-G remains the next development gate after safe local recovery.
+
 发现问题必须：
 
 ```text
