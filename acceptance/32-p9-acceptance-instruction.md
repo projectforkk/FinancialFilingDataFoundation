@@ -32,33 +32,35 @@
 23. raw_metric_name unchanged
 24. no-op resolution rejected
 25. conflicting raw patch rejected
-26. supersession graph valid
-27. unknown/cycle/competing child errors
-28. overlapping same value deterministic
-29. overlapping different value conflict
-30. zero-overlay snapshot deterministic
-31. overlay_set_hash deterministic
-32. resolved_facts preserve every raw field
-33. effective period/unit/scope only from explicit overlay
-34. statement classification remains overlay-only
-35. period coverage uses P7 PERIOD_REVIEW
-36. unit coverage uses P7 UNIT_REVIEW
-37. ambiguity requires explicit attestation
-38. core statement review augments, never rewrites, base signals
-39. unsupported issue stays unresolved
-40. resolved validation priority correct
-41. resolved_reuse_eligible only when resolved PASS / compatible
-42. resolved ParsedDataRecord helper deterministic
-43. no implicit Registry write
-44. snapshot semantic recomputation/tamper guard
-45. base catalog/P3/P5/P6/P7 immutable
-46. no source PDF open
-47. no network/AI/Codex API
-48. no external MCP SDK requirement
-49. no P8 tool mutation
-50. no P10/P11 implementation
-51. local CLI JSON stdout only
-52. performance gates
+26. base_active_resolution_ids are store-computed and historical before state is recomputable
+27. base_overlay_set_hash_before deterministic and tamper-checked
+28. supersession graph valid
+29. unknown/cycle/competing child errors
+30. overlapping same value deterministic
+31. overlapping different value conflict
+32. zero-overlay snapshot deterministic
+33. overlay_set_hash deterministic
+34. resolved_facts preserve every raw field
+35. effective period/unit/scope only from explicit overlay
+36. statement classification remains overlay-only
+37. period coverage uses P7 PERIOD_REVIEW
+38. unit coverage uses P7 UNIT_REVIEW
+39. ambiguity requires explicit attestation
+40. core statement review augments, never rewrites, base signals
+41. unsupported issue stays unresolved
+42. resolved validation priority correct
+43. resolved_reuse_eligible only when resolved PASS / compatible
+44. resolved ParsedDataRecord helper deterministic
+45. no implicit Registry write
+46. snapshot semantic recomputation/tamper guard
+47. base catalog/P3/P5/P6/P7 immutable
+48. no source PDF open
+49. no network/AI/Codex API
+50. no external MCP SDK requirement
+51. no P8 tool mutation
+52. no P10/P11 implementation
+53. local CLI JSON stdout only
+54. performance gates
 
 ## Synthetic golden
 
