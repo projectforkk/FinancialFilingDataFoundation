@@ -25,9 +25,21 @@ Gate：focused unit tests PASS。
 - load P3 pages/sections
 - block seed detection
 - adjacent seed grouping
+- distributed-block page fallback
 - bbox aggregation
 - score/signals
 - no cell/row/column reconstruction
+
+### P4-ISSUE-001 — HK distributed-block table layout
+
+P3 accepted HK artifact shows major statements split numeric values across many independent blocks. Initial block-local detector returned only 2 candidates and missed known financial statement pages 124/126/133.
+
+Approved fix:
+- add page-level numeric-bearing-block fallback;
+- output only candidate bbox/block references/signals;
+- no reconstruction semantics;
+- add synthetic regression test;
+- require HK pages 124/126/133 in live recall guard.
 
 Gate：detector tests PASS。
 
