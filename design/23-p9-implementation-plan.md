@@ -59,6 +59,7 @@ target/evidence tests PASS。
 实现：
 - canonical submission validation
 - explicit reviewer/timestamp
+- explicit `base_active_resolution_ids` / `base_overlay_set_hash_before` prior-state contract (P9-ISSUE-003)
 - stable resolution ID
 - immutable per-ID JSON
 - idempotency
