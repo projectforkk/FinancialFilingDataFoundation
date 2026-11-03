@@ -183,6 +183,35 @@ Current gate: `P9-J — Formal Detached Code Review`.
 
 P9-K/L/M, main merge, P10 and P11 remain closed until the formal detached review result is pushed and reviewed.
 
+## Future research-consumption design track
+
+Design-only branch:
+
+`design/research-consumption-visual-semantic`
+
+Purpose:
+- define how Codex continues research when structured data is incomplete；
+- define trusted PDF visual fallback without arbitrary filesystem access；
+- define how durable P9 reviewed results are automatically reused by later Codex runs；
+- define the long-term deterministic semantic resolver that reduces repeated visual review。
+
+Current design files:
+- `design/28-ffdf-research-consumption-semantic-architecture.md`
+- `design/29-research-mcp-visual-resolved-query-detailed-design.md`
+
+Key decisions:
+- `REVIEW_REQUIRED` blocks canonical reuse, not necessarily current evidence-aware research；
+- P8 remains immutable raw/evidence MCP；
+- P9 is durable review persistence, not the financial reasoning engine；
+- Research MCP Visual Fallback is implemented before the full deterministic semantic resolver；
+- Visual Trigger Matrix, Missing-Fact Locator, table/page/group fallback, HIGH_DETAIL/tiling, RUN_LOCAL_VERIFIED and DERIVED_USE_READY are explicit contracts；
+- recurring visual-review patterns may become semantic-rule candidates only through Design-First + Golden validation。
+
+Governance:
+- this design track does **not** change the P9-J frozen review candidate；
+- no new production is authorized by these documents while P9 v1 is still in formal review/acceptance；
+- after P9 v1 closeout, 28/29 must be merged/frozen before Research MCP implementation starts。
+
 ## Project directory consolidation
 
 - verdict: `PASS`
@@ -287,3 +316,5 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P9 — Codex Review Overlay: `P9-G PASS / P9-H PASS / P9-I PASS / P9-J AUTHORIZED`
 - P10 — Codex Dynamic Research Integration: `NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`
+- Cross-phase Research MCP Visual/Resolved Query: `DESIGN PROPOSED (design/29)`
+- Cross-phase Deterministic Semantic Reconstruction: `DESIGN PROPOSED (design/28)`
