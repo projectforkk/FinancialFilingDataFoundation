@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P7_DONE / P8_IN_DEVELOPMENT**
+**P7_DONE / P8_IN_REVIEW**
 
 ## Accepted baseline
 
@@ -102,7 +102,7 @@
 
 Status:
 
-`IN DEVELOPMENT`
+`DEVELOPMENT COMPLETE / CODE REVIEW PENDING`
 
 Planned branch:
 
