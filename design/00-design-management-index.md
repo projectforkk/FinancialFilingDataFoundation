@@ -108,8 +108,10 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 15-project-directory-management.md | project directory/workspace | ACTIVE |
 | 16-p6-raw-facts-evidence-design.md | P6 | ACCEPTED HISTORY |
 | 17-p6-implementation-plan.md | P6 | ACCEPTED HISTORY |
-| 18-p7-quality-validation-design.md | P7 | ACTIVE DESIGN |
-| 19-p7-implementation-plan.md | P7 | ACTIVE PLAN |
+| 18-p7-quality-validation-design.md | P7 | ACCEPTED HISTORY |
+| 19-p7-implementation-plan.md | P7 | ACCEPTED HISTORY |
+| 20-p8-local-mcp-design.md | P8 | ACTIVE DESIGN |
+| 21-p8-implementation-plan.md | P8 | ACTIVE PLAN |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -150,7 +152,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P5 | 12 | 13 | acceptance/20 | DONE |
 | P6 | 16 | 17 | acceptance/23 | DONE |
 | P7 | 18 | 19 | acceptance/26 | DONE |
-| P8 | 20 | 21 | TBD | DESIGN AUTHORIZED |
+| P8 | 20 | 21 | acceptance/27 (baseline) | DESIGN READY |
 | P9 | 22 | 23 | TBD | NOT STARTED |
 | P10 | 24 | 25 | TBD | NOT STARTED |
 | P11 | 26 | 27 | TBD | NOT STARTED |
@@ -284,10 +286,10 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P7_DONE / P8_DESIGN_AUTHORIZED`
+`P7_DONE / P8_DESIGN_READY`
 
 下一步：
-1. P8 detailed design 20；
-2. P8 implementation plan 21；
-3. commit design baseline；
+1. commit P8 design baseline；
+2. P8 environment/SDK audit；
+3. create P8 development branch/worktree；
 4. only then start P8 production code。

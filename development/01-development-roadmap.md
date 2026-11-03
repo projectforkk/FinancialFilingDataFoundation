@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P7 DONE / P8 DESIGN AUTHORIZED**
+状态：**P7 DONE / P8 DESIGN READY**
 
 ## 总原则
 
@@ -96,7 +96,7 @@ deterministic validation、blocking issues、quality gates、reuse eligibility�
 
 ## P8 — Local MCP
 
-状态：`DESIGN AUTHORIZED`
+状态：`DESIGN READY`
 
 目标：
 本地 deterministic MCP tools，只暴露已验证的数据能力；MCP AI API calls 继续禁止。
