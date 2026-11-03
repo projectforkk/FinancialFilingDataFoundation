@@ -314,9 +314,11 @@ P6 在当前 fact row 之前的 rows 中搜索 header-like nonnumeric cells：
 - `美元`
 
 规则：
+- unit matcher 必须采用 **longest / most-specific non-overlapping match**；例如 `百万元` 不得同时再命中其子串 `万元`，`千港元` 不得同时再命中子串 `港元`；
+- 对同一 text span，先按 match length descending、pattern specificity、start position 选择最具体 match，再做 table-level unique normalized-key 判断；
 - unique normalized raw phrase → raw_unit 保留原 phrase；
 - 多个等价形式可归为同一 normalized key，但输出使用稳定的首个原文 phrase；
-- 冲突 unit → null + `AMBIGUOUS_RAW_UNIT`；
+- 只有真正不同 normalized unit key 同时存在时才是冲突 → null + `AMBIGUOUS_RAW_UNIT`；
 - 无 unit → null。
 
 货币符号仅在 value cell 中出现时，不推导整表 unit。
@@ -329,15 +331,18 @@ P6 在当前 fact row 之前的 rows 中搜索 header-like nonnumeric cells：
 
 中文：
 - 合并
-- 合并报表
+- 合并报表 / 合并财务报表
 - 母公司
-- 公司
+- 母公司财务报表
+- 公司财务报表 / 公司口径（仅明确 scope phrase）
 
 英文：
-- consolidated
-- company
+- consolidated / consolidated financial statements
 - parent company
 - separate financial statements
+- company only / company financial statements
+
+**禁止使用裸 `公司` 或裸 `company` 作为 scope 命中条件**，因为它们可能只是 issuer/company name 的组成部分。
 
 仅扫描：
 - table candidate keywords
@@ -750,6 +755,33 @@ load_raw_facts(
 ---
 
 ## 31. P6 Issue Log
+
+### P6-ISSUE-004 — Bare 公司/company scope patterns are too broad
+
+Code Review compared the design scope vocabulary with the implemented conservative matcher. A bare `公司` / `company` token can occur in issuer names and ordinary prose, so treating it as scope evidence would violate P6's explicit-only/no-guessing rule.
+
+Approved solution:
+- remove bare `公司` / `company` from valid scope matches；
+- accept only explicit scope phrases such as `母公司`, `公司财务报表`, `公司口径`, `parent company`, `company only`, `company financial statements`, `separate financial statements`；
+- add tests showing issuer/company name alone does not set raw_scope.
+
+Affected gates: P6-D/F/H/J.
+
+### P6-ISSUE-003 — Overlapping unit substrings can create false ambiguity
+
+Code Review found deterministic matcher overlap:
+- `百万元` also contains `万元`；
+- `千港元` also contains `港元`。
+
+A matcher that records every regex hit would incorrectly classify a single explicit unit as conflicting units.
+
+Approved solution:
+- per text, use longest/most-specific non-overlapping unit match；
+- child substring matches covered by a selected longer unit span do not count as separate unit evidence；
+- only distinct normalized unit keys from independent evidence are ambiguous；
+- add regression tests for `百万元` and `千港元`。
+
+Affected gates: P6-D/F/H/J.
 
 ### P6-ISSUE-002 — Historical P5 live manifests contain pre-consolidation absolute P3/P4 paths
 

@@ -41,6 +41,8 @@ invalid source ref blocked.
 - multi-value fact generation
 - group mapping
 - period/unit/scope explicit-only extraction
+- longest/non-overlapping unit phrase matching
+- explicit scope phrases only (no bare 公司/company)
 - warning aggregates
 
 Gate:
