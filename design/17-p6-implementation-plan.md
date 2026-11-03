@@ -71,7 +71,8 @@ Gate:
 full deterministic suite PASS.
 
 ## P6-G — Live CN/HK
-使用 accepted P3/P5 artifacts。
+
+先按 P6-ISSUE-002 在 project-root `workspace/live/p6-inputs` 从 accepted raw PDF SHA 重建 fresh P3→P4→P5，并验证与历史 accepted fingerprints/outputs deterministic equivalent；P6 live 只使用这组 project-root fresh artifacts。
 
 CN:
 - 600519 FY2024

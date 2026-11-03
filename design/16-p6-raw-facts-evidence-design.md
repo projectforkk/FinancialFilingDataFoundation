@@ -751,6 +751,30 @@ load_raw_facts(
 
 ## 31. P6 Issue Log
 
+### P6-ISSUE-002 — Historical P5 live manifests contain pre-consolidation absolute P3/P4 paths
+
+After project-directory consolidation, accepted P5 live artifact files are preserved under project-root archived worktrees, but their manifests still record historical absolute paths such as:
+
+- `D:\Codex\FinancialFilingDataFoundation-P3Acceptance-...`
+- `D:\Codex\FinancialFilingDataFoundation-P4Acceptance-...`
+
+Those old sibling paths intentionally no longer exist. Historical P5 artifacts must remain immutable; P6 must not edit accepted manifests merely to repair paths.
+
+Approved solution for P6 live input:
+
+1. locate accepted CN/HK raw PDFs by exact accepted SHA；
+2. generate fresh P3 artifacts under `workspace/live/p6-inputs/p3`；
+3. generate fresh P4 candidates from those P3 artifacts；
+4. generate fresh P5 tables from those P3/P4 artifacts；
+5. compare fresh P3 pages/sections SHA, P4 candidates SHA, and P5 tables/groups bytes or semantic counts against accepted historical evidence/fingerprints；
+6. only if deterministic equivalence checks pass may the fresh project-root P3/P5 artifacts become P6 live input；
+7. do not mutate historical accepted P3/P4/P5 artifacts；
+8. future phase live fixtures must use project-root paths per design/15.
+
+This is a live-fixture portability issue, not permission to weaken artifact fingerprint validation.
+
+Affected gates: P6-G/H/I/J and directory-governance live evidence.
+
 ### P6-ISSUE-001 — Numeric year header row could be misclassified as raw facts
 
 P5 structural table can represent `项目 | 2024 | 2023` as LABEL + numeric VALUE cells. A naive P6 eligibility rule would emit facts `项目=2024/2023`.
