@@ -33,7 +33,8 @@ Gate: blocking/failure tests PASS.
 ## P7-D — Coverage / Warning Policy
 - P6 warning mapping
 - period/unit/scope coverage
-- tables_without_facts
+- tables_without_facts / reconstructed-table structural metrics
+- no implicit P4 reopen or candidate_count inference
 - core statement signal
 
 Gate: threshold boundary tests PASS.

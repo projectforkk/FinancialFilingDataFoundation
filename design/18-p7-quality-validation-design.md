@@ -246,10 +246,12 @@ P6 contract正常时：
 
 ### Structural
 
-- candidate_count
 - reconstructed_table_count
 - tables_without_facts
+- tables_without_facts_ratio
 - fact_density_per_table
+
+`candidate_count` **不是 P7 v1 必选指标**，因为 P7 正式输入不包含 P4 artifact。不得沿 P5 manifest 中可能已失效的 `p4_artifact_dir` 去隐式打开 P4。若未来调用方显式提供 P4 artifact，可增加 optional observation，但不得改变当前 validation status 语义。
 
 ### Reconciliation
 
@@ -805,6 +807,27 @@ Independent Acceptance PASS后：
 
 ---
 
-## 33. Issue Rule
+## 33. P7 Issue Log
+
+### P7-ISSUE-001 — P7 metrics originally required candidate_count without P4 as an input
+
+Implementation preparation found a contract mismatch:
+
+- formal P7 inputs are P3 / P5 / P6；
+- P5 manifest contains a P4 fingerprint and historical path, but does not guarantee a portable/available P4 artifact path；
+- requiring `candidate_count` would either fabricate it from reconstructed table count or implicitly follow a possibly stale absolute path。
+
+Approved solution:
+- P7 v1 mandatory structural metrics exclude `candidate_count`；
+- use `reconstructed_table_count`, `tables_with_facts`, `tables_without_facts`, `tables_without_facts_ratio`, `fact_density_per_table`；
+- never infer candidate_count from table_count；
+- never reopen P4 through P5 manifest path；
+- optional explicit P4 observation may be added only in a later design revision。
+
+Affected gates: P7-B/C/D/H/J/L。
+
+---
+
+## 34. Issue Rule
 
 problem → STOP → root cause → update design → commit → rerun affected gates → continue。
