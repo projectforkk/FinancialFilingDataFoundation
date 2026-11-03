@@ -36,6 +36,7 @@ invalid source ref blocked.
 ## P6-D — Fact Extraction
 实现：
 - row eligibility
+- period-header suppression / column period map
 - label assembly
 - multi-value fact generation
 - group mapping
