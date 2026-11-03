@@ -32,6 +32,9 @@ Design amendments:
   initial amendment `52db63e9407d415c06ab15b0be6517c594316507`,
   issue-number correction `dd3fb8a934ba2b9e0df8d2ad545e764c7aac118a`,
   final project-root path correction `7708abb383fd8e8c6fafdf6cad09f8e20ca15993`
+- P8-ISSUE-005 — runtime lock EOL portability:
+  design amendment `261c664a8ec39e194bb87a50bc01a9176a1365c1`,
+  `.gitattributes` implementation `e8ca4a9c670a7da6065b2fefa58c323ea5b30c86`
 
 Earlier development evidence:
 `development/43-p8-development-evidence.md`
@@ -111,6 +114,13 @@ Main FFDF runtime:
 
 External MCP package:
 **absent**
+
+Runtime-lock checkout contract:
+- `.gitattributes`: `runtime-locks/*.txt text eol=lf`
+- Git blob SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
+- fresh detached checkout working-tree SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
+- blob/worktree bytes equal: `PASS`
+- CRLF present: `false`
 
 ---
 
@@ -228,7 +238,33 @@ Result:
 
 ---
 
-## 7. Final Unit / Regression
+## 7. P8-ISSUE-005 — Runtime Lock EOL Portability
+
+Code Review of the earlier candidate `599db48a62622cb18de2c61d7100e8186a7ca936` found that global `core.autocrlf=true` materialized the tracked lock as CRLF in a fresh detached worktree, while the active worktree still held LF bytes. Dependency content was unchanged, but the byte-level lock SHA differed across worktrees.
+
+Design was amended before repository changes.
+
+Implemented:
+- tracked `.gitattributes`；
+- `runtime-locks/*.txt text eol=lf`；
+- current lock remains UTF-8 without BOM；
+- no package version changed。
+
+Fresh detached verification at `e8ca4a9c670a7da6065b2fefa58c323ea5b30c86`:
+- Git blob SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`；
+- working-tree SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`；
+- blob CRLF: false；
+- worktree CRLF: false；
+- bytes equal: PASS。
+
+The earlier `599db48...` Review candidate is invalidated as the final acceptance path. A new Review candidate must include this amendment.
+
+Result:
+**CLOSED / PASS**
+
+---
+
+## 8. Final Unit / Regression
 
 P8 focused:
 
@@ -252,7 +288,7 @@ Additional:
 
 ---
 
-## 8. Canonical Live Catalog
+## 9. Canonical Live Catalog
 
 Operational ignored catalog:
 
@@ -287,7 +323,7 @@ All catalog artifact paths:
 
 ---
 
-## 9. Business Service Live
+## 10. Business Service Live
 
 Final main-runtime live service run:
 
@@ -344,7 +380,7 @@ Catalog + P3/P5/P6/P7 before/after snapshot:
 
 ---
 
-## 10. Official MCP SDK Stdio Integration
+## 11. Official MCP SDK Stdio Integration
 
 Client:
 
@@ -414,7 +450,7 @@ Integration output:
 
 ---
 
-## 11. Security / Read-only Boundary
+## 12. Security / Read-only Boundary
 
 Verified:
 
@@ -435,7 +471,7 @@ Verified:
 
 ---
 
-## 12. Final Gate Result
+## 13. Final Gate Result
 
 - P8-A Design Baseline: PASS
 - P8-B Environment / SDK: PASS
