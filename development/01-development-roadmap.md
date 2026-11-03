@@ -1,4 +1,4 @@
-﻿# 01 窶・Development Roadmap
+# 01 窶・Development Roadmap
 
 迥ｶ諤・ｼ啀2 DONE / P3 DESIGN READY
 
@@ -75,4 +75,3 @@ CN/HK Dayu narrow adapter縲・
 ## P10 窶・Codex Skill
 
 ## P11 窶・US SEC Provider
-
