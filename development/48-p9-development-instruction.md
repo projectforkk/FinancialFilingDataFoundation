@@ -37,8 +37,19 @@
 - canonical metric mapping；
 - overwriting P3/P5/P6/P7；
 - Registry mutation；
-- P10 Skill implementation；
+- P10 Dynamic Research Integration implementation；
 - P11 SEC provider。
+
+## Recovery boundary — P9-ISSUE-004
+
+当前 GitHub branch 只保存设计/治理 baseline；handoff 记录的 P9-B–F production/tests 仍位于 WorkHome active worktree 且尚未提交。
+
+在 WorkHome 恢复前禁止：
+- 从 GitHub 创建替代 `review/*.py` / `tests/unit/review/test_review_overlay.py`；
+- 删除、覆盖或重建本地未提交 candidate；
+- 将 handoff-reported test result 误写成 accepted baseline。
+
+恢复后必须先核验本地 Git / untracked state，再安全同步 design-only commits。现场一致后从 P9-G CLI 继续。
 
 ## Reviewer boundary
 
