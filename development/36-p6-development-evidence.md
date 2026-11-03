@@ -11,9 +11,15 @@ Initial design baseline:
 Design amendments:
 - P6-ISSUE-001 period-header guard: branch commit `70904fc533bc7b389a67c205d3d2d8645c5e164b`
 - P6-ISSUE-002 live-input portability: branch commit `e606a2a60de232c36ee5bc7c9549ca4d9e1ff1ee`
+- P6-ISSUE-003 overlapping unit substrings: design commit `dad376f8bc98c5fd4f4724a2425ea15009138ca6`
+- P6-ISSUE-004 bare 公司/company scope too broad: design commit `dad376f8bc98c5fd4f4724a2425ea15009138ca6`
+- P6-ISSUE-005 overlapping explicit scope phrases: design commit `c8b88c010727e2d932b2e88cc4dbc461a6d5b34e`
 
-Production commit:
+Initial production commit:
 `ed47132d38c4bfe59fdd81e9848592dec5b29823`
+
+Final hardened production commit:
+`11fce802f146b2d8ed064dbe63ec3c81d918be21`
 
 Accepted baseline before P6:
 `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
@@ -53,7 +59,7 @@ Not implemented:
 
 P6 focused:
 
-`24 passed in 0.53s`
+`33 passed`
 
 Coverage includes:
 - integer/decimal/thousands
@@ -67,6 +73,10 @@ Coverage includes:
 - evidence/source refs
 - invalid ref blocking
 - unit ambiguity
+- longest/non-overlapping unit matching (`百万元`, `千港元`)
+- bare 公司/company rejected as scope evidence
+- explicit company/parent scope phrases accepted
+- longest/non-overlapping scope matching
 - no-label row warning
 - dual-root byte identity
 - reuse
@@ -79,7 +89,7 @@ Coverage includes:
 
 P0–P6:
 
-`180 passed in 4.54s`
+`189 passed`
 
 Additional:
 - compileall PASS
@@ -148,7 +158,7 @@ P4 manifest hashes differ because manifests contain artifact paths/timings; dete
 - dual-root raw_facts byte-identical: PASS
 - dual-root evidence byte-identical: PASS
 - input immutability: PASS
-- timings: 1923.815 / 2666.362 ms
+- final hardened timings: 1864.482 / 2708.921 ms
 - raw_facts SHA: `30b9845ecb8b0b9216a6f3fefdd640b9f63fe24fb71984cf1cb44ae0f39cb2c3`
 - evidence SHA: `17d127ba1b37b7f39a1d9dae8336016261cb6b6ec7ac95ed70e97f3b519e39d2`
 - non-null raw period: 133
@@ -171,7 +181,7 @@ Performance <=10s: PASS.
 - dual-root raw_facts byte-identical: PASS
 - dual-root evidence byte-identical: PASS
 - input immutability: PASS
-- timings: 4048.807 / 4413.516 ms
+- final hardened timings: 4241.041 / 4252.186 ms
 - raw_facts SHA: `a35142503ed53eeb57c441d6b69e4ce73e6990f2282d436b0cf20636c2222340`
 - evidence SHA: `1bbf8bdd55a78663419ecffbe1471cb59862426bf70ba2831c6444246da79573`
 - non-null raw period: 0
@@ -205,6 +215,29 @@ No canonical metric field exists.
 - P6-E Persistence/Reuse/Tamper: PASS
 - P6-F Full Regression: PASS
 - P6-G Live CN/HK: PASS
+- P6-ISSUE-003/004/005 regression: PASS
+
+## 9. Final Hardening Result
+
+After Code Review identified unit/scope evidence overlap risks:
+
+- unit matching now uses longest/most-specific non-overlapping spans;
+- `百万元` is not double-counted as `万元`;
+- `千港元` is not double-counted as `港元`;
+- bare `公司` / `company` is not scope evidence;
+- explicit `母公司财务报表`, `公司财务报表`, `company only`, `company financial statements`, `separate financial statements` remain supported;
+- overlapping `母公司财务报表` no longer self-conflicts with substring `公司财务报表`.
+
+Final focused suite: `33 passed`.
+Final full P0–P6 suite: `189 passed`.
+
+Final live raw fact/evidence SHA remained unchanged after hardening:
+- CN facts: `30b9845ecb8b0b9216a6f3fefdd640b9f63fe24fb71984cf1cb44ae0f39cb2c3`
+- CN evidence: `17d127ba1b37b7f39a1d9dae8336016261cb6b6ec7ac95ed70e97f3b519e39d2`
+- HK facts: `a35142503ed53eeb57c441d6b69e4ce73e6990f2282d436b0cf20636c2222340`
+- HK evidence: `1bbf8bdd55a78663419ecffbe1471cb59862426bf70ba2831c6444246da79573`
+
+This confirms the hardening changes corrected matcher semantics without changing accepted live fact/evidence output.
 
 Next:
 **P6-H — Code Review**
