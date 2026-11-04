@@ -161,7 +161,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 | 27 | TBD | DESIGN AUTHORIZED |
+| P11 | historical branch only | historical branch only | N/A | OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED |
 
 ---
 
@@ -292,7 +292,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_DESIGN_AUTHORIZED`
+`PROJECT_CLOSED / CN_HK_SCOPE_COMPLETE / P0_P10_DONE_PASS`
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
@@ -431,3 +431,10 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 121. P11 design authorization = `development/143-p11-design-authorization.md`；
 122. P11 = DESIGN AUTHORIZED / PRODUCTION CLOSED；
 123. Research MCP production / Semantic Resolver production remain closed / not authorized。
+
+124. final scope contract = `design/30-project-final-cn-hk-scope.md`.
+125. final production markets = `CN`, `HK` only.
+126. P11 US SEC Provider = `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`; historical P11 artifacts remain audit-only.
+127. closeout decision = `development/144-final-cn-hk-project-scope-closeout.md`.
+128. P0-P10 accepted behavior remains frozen; future market expansion requires a new explicit scope lifecycle.
+129. final full repository design/code consistency review = `development/145-final-full-repository-consistency-review.md` = PASS.

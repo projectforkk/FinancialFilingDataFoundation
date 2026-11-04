@@ -47,6 +47,8 @@ P9_POLICY_VERSION_V1 = "p9-review-policy-v1"
 P9_RESOLUTION_SCHEMA_VERSION_V1 = "p9-review-resolution-v1"
 P9_RESOLVED_VIEW_SCHEMA_VERSION_V1 = "p9-resolved-view-v1"
 
+# P11_SEC_PROVIDER is retained as UNAVAILABLE for accepted P10 contract compatibility.
+# Final project scope is CN/HK only; no SEC provider production is authorized.
 CAPABILITY_MANIFEST_V1 = (
     ("P8_RAW_QUERY", "AVAILABLE"),
     ("P8_PAGE_TEXT", "AVAILABLE"),

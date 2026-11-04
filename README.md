@@ -1,39 +1,66 @@
 # Financial Filing Data Foundation
 
-Financial Filing Data Foundation（FFDF，多市场财报数据基础引擎）用于读取指定公司的多年份正式财报，建立可复用、可追溯、增量更新的财报分析数据源。
+Financial Filing Data Foundation (FFDF) is a local, deterministic financial-filing data foundation for **CN and HK markets only**.
 
-## 核心目标
+## Final project status
 
-输入“公司 + 市场 + 年份范围”，系统按以下优先级工作：
+**PROJECT CLOSED / CN-HK SCOPE COMPLETE / US SEC OUT OF SCOPE**
 
-1. **已有解析数据优先复用**：若目标财报已有有效、通过验证的数据资产，则直接复用，不重新解析。
-2. **本地原始文件优先**：若数据尚不存在，但本地已有对应正式财报文件，则直接使用本地文件。
-3. **缺失时才下载**：仅当数据不存在且本地没有原始文件时，才通过 Acquisition Provider 下载正式财报。
-4. **解析一次，长期复用**：解析结果持久化为带 Evidence 的结构化数据资产，供 CRDE 或其他财报分析流程重复使用。
-5. **财报分析不是本项目第一阶段职责**：本项目首先解决 acquisition / extraction / validation / persistence / incremental reuse。
+The accepted production baseline is P0-P10. P11 US SEC Provider was authorized for design exploration only and is now superseded by the final CN/HK scope decision. No SEC provider production is part of this project closeout.
 
-## 首期范围
+## Supported markets
 
-- CN：A 股正式财报 PDF。
-- HK：港股正式财报 PDF。
-- US：后续通过 SEC HTML / Inline XBRL / XBRL Provider 接入。
-- CN/HK PDF 默认采用本机轻量 native parser；禁止 born-digital PDF 全量 OCR / 全量重型神经网络解析。
-- Codex 仅处理本机 Quality Gate 无法可靠解决的局部文本或疑难页面。
-- 本地 MCP Server **不得调用任何 AI API**。
+- CN — mainland China official filings, acquired through the accepted CNINFO/Dayu path.
+- HK — Hong Kong official filings, acquired through the accepted HKEX/Dayu path.
 
-## 顶层目录
+The production identity contract exposes `SUPPORTED_MARKETS = ("CN", "HK")`. Other markets are rejected by the accepted identity/planner/acquisition boundary.
 
-```text
-design/       详细设计、接口契约、架构决策
-development/  开发计划、任务指令、实现交付记录
-acceptance/   验收计划、验收指令、验收证据
-src/          生产代码（后续开发阶段实现）
-tests/        单元、集成、golden、性能测试
-.agents/      Codex Skill（后续阶段）
+## What FFDF provides
+
+1. deterministic filing identity, registry and incremental planning;
+2. CN/HK official filing acquisition with provenance and content-addressed raw storage;
+3. native PDF page/section extraction and FTS;
+4. table candidate detection and cross-page table reconstruction;
+5. raw facts with first-class evidence links;
+6. deterministic quality validation and reuse gates;
+7. local read-only MCP access to accepted data;
+8. durable evidence-grounded review overlay;
+9. dynamic Codex research integration over the accepted P8/P9 capabilities.
+
+## Explicit non-goals
+
+- US SEC HTML / Inline XBRL / XBRL provider;
+- UK filing provider;
+- remote AI calls from MCP or production parsing code;
+- mutation of original source documents;
+- silent guessing of filing identity, periods, facts or evidence;
+- production Semantic Resolver or Research MCP beyond the accepted P8/P9/P10 boundary.
+
+The P10 capability manifest intentionally continues to report `P11_SEC_PROVIDER = UNAVAILABLE` for accepted-contract compatibility.
+
+## Project root
+
+All FFDF-owned code, runtimes, worktrees, workspace data and temporary test paths are managed under:
+
+`D:\Codex\FinancialFilingDataFoundation`
+
+## Accepted phase baseline
+
+P0 through P10 are `DONE / PASS`. The final planned development sequence ends at P10.
+
+Historical P11 design documents and branches are retained as audit history only. They are not production scope and must not be merged into the final CN/HK baseline without a new, explicit scope reopening.
+
+## Verification
+
+On Windows, use a short project-local pytest base path to avoid MAX_PATH false failures:
+
+```powershell
+$root='D:\Codex\FinancialFilingDataFoundation'
+$tmp="$root\.t\u"
+$env:TEMP=$tmp
+$env:TMP=$tmp
+$env:PYTHONPATH="$root\src"
+& "$root\.venv\Scripts\python.exe" -m pytest -q --basetemp "$tmp\b" tests/unit
 ```
 
-## 当前阶段
-
-**PROJECT_BOOTSTRAP / DESIGN_BASELINE**
-
-当前仅完成项目初始化与详细设计准备，不代表生产代码已实现，也不代表任何功能已验收。
+See `PROJECT_STATUS.md`, `design/30-project-final-cn-hk-scope.md`, and the final closeout/review records under `development/`.

@@ -8,8 +8,13 @@ from financial_filing_data_foundation.identity import (
     FilingPolicy,
     FilingRequirement,
     FilingSlotKey,
+    SUPPORTED_MARKETS,
     build_required_slots,
 )
+
+
+def test_supported_markets_are_final_cn_hk_scope() -> None:
+    assert SUPPORTED_MARKETS == ("CN", "HK")
 
 
 def test_filing_slot_key_is_stable_and_normalized() -> None:

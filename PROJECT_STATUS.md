@@ -6,7 +6,13 @@
 
 ## Current state
 
-**P10_DONE / P11_DESIGN_AUTHORIZED**
+**PROJECT_CLOSED / CN_HK_SCOPE_COMPLETE / P0_P10_DONE_PASS**
+
+Final production markets: `CN`, `HK`.
+
+P11 US SEC Provider is superseded by the final scope decision and is `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`. Historical P11 design artifacts remain audit history only.
+
+Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
 ## Accepted baseline
 
@@ -155,17 +161,21 @@
 - design/28: future semantic reference / implementation not authorized
 - design/29: future Research MCP reference / production not authorized
 
-## Approved next phase
+## Final project scope
 
-**P11 — US SEC Provider (DESIGN ONLY)**
+**CN/HK ONLY — NO FURTHER PHASE AUTHORIZED**
 
-Status:
+Final scope contract:
 
-`P11 DESIGN AUTHORIZED / PRODUCTION NOT AUTHORIZED`
+`design/30-project-final-cn-hk-scope.md`
 
-Authorization:
+Closeout decision:
 
-`development/143-p11-design-authorization.md`
+`development/144-final-cn-hk-project-scope-closeout.md`
+
+Historical P11 design authorization:
+
+`development/143-p11-design-authorization.md` — superseded for current execution; retained for audit history only.
 
 P10-C is closed:
 
@@ -575,13 +585,13 @@ Final main verification:
 
 Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and historical only.
 
-P10 is DONE / PASS. P11 / Research MCP production / Semantic Resolver production remain unauthorized.
+P10 is DONE / PASS. US SEC Provider is outside the final project scope; Research MCP production and Semantic Resolver production remain unauthorized.
 
 Still not authorized:
 
 - Research MCP production;
 - Semantic Resolver production;
-- P11 production;
+- US SEC Provider production (final project scope: out of scope);
 - any weakening of P8 read-only or P9 durable-review boundaries.
 
 ## Project directory consolidation
@@ -687,4 +697,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
+- P11 — US SEC Provider: `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`

@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Iterable
 
 
-_ALLOWED_MARKETS = frozenset({"CN", "HK"})
+SUPPORTED_MARKETS = ("CN", "HK")
+_ALLOWED_MARKETS = frozenset(SUPPORTED_MARKETS)
 _ALLOWED_PERIODS = frozenset({"Q1", "H1", "Q3", "FY"})
 
 

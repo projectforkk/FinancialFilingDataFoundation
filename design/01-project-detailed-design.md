@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P10 DONE / P11 DESIGN AUTHORIZED**
+状态：**FINAL BASELINE — P0-P10 DONE / CN-HK SCOPE CLOSED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -18,7 +18,7 @@
 
 因此系统必须遵循“**每份正式财报只做必要的一次解析，之后长期复用；只对新增/缺失期间做增量补齐**”。
 
-本项目首期最难的问题是 CN/HK 财报 PDF extraction。US 市场后续优先走 SEC HTML / Inline XBRL / XBRL，而非把 PDF 作为默认入口。
+本项目最终生产范围为 CN/HK 财报数据基盘。US SEC HTML / Inline XBRL / XBRL 不属于最终项目范围；历史 P11 设计探索仅保留为审计资料。最终范围契约见 `design/30-project-final-cn-hk-scope.md`。
 
 ---
 
@@ -132,12 +132,12 @@ born-digital PDF 默认不得运行：
                PARSE_LOCAL   Acquisition
                               Provider
                                  |
-               +-----------------+------------------+
-               |                 |                  |
-              CN                HK                 US
-           Dayu/CNINFO       Dayu/HKEX         SEC Provider
-               |                 |                  |
-             PDF               PDF           HTML/iXBRL/XBRL
+               +-----------------+
+               |                 |
+              CN                HK
+           Dayu/CNINFO       Dayu/HKEX
+               |                 |
+             PDF               PDF
                +---------+-------+
                          |
                 Native PDF Parser
@@ -250,7 +250,7 @@ class AcquisitionProvider(Protocol):
 首期适配：
 - CN：复用 Dayu 的 CNINFO discovery/downloader 能力；
 - HK：复用 Dayu 的 HKEX discovery/downloader 能力；
-- US：后续 SEC Provider。
+- US: OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED (historical P11 design only).
 
 Dayu CN/HK 当前高层 `fins download` 会在 PDF 下载后继续 Docling conversion，因此本项目不得把该高层 workflow 当作“纯下载”接口；应通过窄 adapter 复用 discovery/downloader 能力，输出 PDF + provenance 后结束。
 
@@ -866,9 +866,11 @@ P10 acceptance 必须包含至少一个完整 live research run，证明 Codex �
 
 同时必须包含 negative capability case：如果 structured evidence不足且需要未验收的 PDF visual capability，P10 必须显式 BLOCK/GAP，不得猜测或越权实现 Research MCP。
 
-### P11 — US SEC Provider
+### P11 — US SEC Provider（历史设计探索 / 不执行）
 
-接入 HTML / Inline XBRL / XBRL，复用统一 ParsedFinancialDocument Contract。
+最终状态：`OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`。
+
+历史设计授权不再构成当前开发计划；不接入 US SEC HTML / Inline XBRL / XBRL。若未来重新引入 US 市场，必须重新授权范围并重新执行完整 Design / Development / Review / Acceptance 生命周期。
 
 ---
 
@@ -1033,7 +1035,7 @@ Accepted chain：
 - reconciled `design/28` remains future semantic reference only；
 - reconciled `design/29` remains future Research MCP reference only。
 
-P10 is closed. P11 production, Research MCP production, and Semantic Resolver production require separate future authorization.
+P10 is closed. US SEC Provider is outside the final project scope. Research MCP production and Semantic Resolver production remain separate future capabilities and are not authorized by this closeout.
 
 继续保持职责边界：
 
@@ -1056,4 +1058,4 @@ Semantic Resolver
 
 P9 不是 `REVIEW_REQUIRED` 的强制修复器；不得用 overlay 掩盖 raw extraction defect。
 
-P11 US SEC provider、Research MCP production 与 Semantic Resolver production 均未获授权，不得提前进入。
+US SEC Provider is outside the final project scope. Research MCP production and Semantic Resolver production remain unauthorized.

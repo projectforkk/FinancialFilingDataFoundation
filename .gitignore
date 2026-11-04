@@ -22,6 +22,8 @@ cache/
 dependencies/
 runtimes/
 worktrees/
+.t/
+t/
 *.sqlite
 *.sqlite3
 
