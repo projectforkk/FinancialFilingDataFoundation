@@ -282,14 +282,19 @@ Exact entity-body byte caps:
 | `SUBMISSIONS_CURRENT_JSON` | 32 MiB = 33,554,432 |
 | `SUBMISSIONS_HISTORY_JSON` | 16 MiB = 16,777,216 |
 
-Enforcement:
+Response framing/header cardinality is validated before body read. Header names are matched case-insensitively and **all field instances** are inspected; implementations MUST NOT collapse repeated framing fields before validation.
 
-1. `Content-Length`, when present, must be one unambiguous non-negative ASCII decimal integer; malformed, negative or conflicting multiple values => `P11_HTTP_FAILED`;
-2. if parsed `Content-Length` is greater than the cap, abort before body read;
-3. regardless of `Content-Length`, stream/count exact entity bytes;
-4. as soon as count exceeds the cap, abort;
-5. if a valid declared Content-Length exists and actual EOF byte count differs, return `P11_HTTP_FAILED`;
-6. never parse a truncated body.
+Exact framing rules:
+
+1. `Transfer-Encoding` may be absent or present as exactly **one** header field. More than one Transfer-Encoding field => `P11_HTTP_FAILED`.
+2. when present, its value after ASCII SP/HTAB trim and ASCII lowercase MUST be exactly `chunked`; comma lists, parameters, empty value and every other coding => `P11_HTTP_FAILED`.
+3. `Content-Length` may be absent or present as exactly **one** header field; more than one is rejected even when values are textually equal.
+4. Transfer-Encoding and Content-Length MUST NOT coexist; any response containing both => `P11_HTTP_FAILED` before body read.
+5. when Transfer-Encoding is absent and Content-Length is present, its trimmed value MUST match `^[0-9]+$`; if greater than the class cap, abort before body read.
+6. when Transfer-Encoding is exactly `chunked`, the standard-library framing layer dechunks the response and P11 counts/caps the **dechunked entity bytes** delivered by that layer. Chunk framing/trailers never enter `SecHttpResponse.body`; Content-Length parity is not evaluated because Content-Length is forbidden with chunked.
+7. regardless of framing, stream/count exact delivered entity bytes and abort with `P11_RESPONSE_TOO_LARGE` as soon as the cap is exceeded.
+8. for non-chunked responses with a valid Content-Length, actual EOF entity-byte count MUST equal the declared length; mismatch => `P11_HTTP_FAILED`.
+9. never parse a truncated or framing-invalid body.
 
 Exceeded cap => `P11_RESPONSE_TOO_LARGE`.
 
@@ -307,15 +312,9 @@ Response classification order is normative:
 
 Only HTTP status `200` is a successful JSON fetch.
 
-Successful JSON responses must have normalized media type exactly:
+Successful JSON responses require exactly **one** `Content-Type` header field. After ASCII SP/HTAB trim and ASCII lowercase, its entire value MUST be exactly `application/json`. Parameters are not accepted in P11-D v1. Missing, repeated or different Content-Type => `P11_CONTENT_TYPE_INVALID`. A future SEC content-type change requires a reviewed Design-First amendment rather than ad hoc parser widening.
 
-`application/json`
-
-Media-type matching is ASCII case-insensitive and ignores legal parameters after `;`.
-
-Missing/different media type => `P11_CONTENT_TYPE_INVALID`.
-
-`Content-Encoding` must be absent or normalize case-insensitively to exactly `identity`. Any other content-coding => `P11_HTTP_FAILED`; P11-D never transparently decompresses discovery JSON. `Transfer-Encoding: chunked` is permitted because the decoded HTTP entity stream is still byte-counted against the same cap.
+`Content-Encoding` may be absent or present as exactly **one** header field. When present, after ASCII SP/HTAB trim and ASCII lowercase its entire value MUST be exactly `identity`. Repeated fields, comma lists and every other content-coding => `P11_HTTP_FAILED`; P11-D never transparently decompresses discovery JSON.
 
 JSON body rules:
 
@@ -343,7 +342,7 @@ Exact redirect maximum:
 
 Every redirect:
 
-- requires a non-empty `Location`;
+- requires exactly one `Location` header field with a non-empty value; missing or repeated Location => `P11_REDIRECT_NOT_ALLOWED`;
 - resolves relative Location against the current URL;
 - revalidates scheme/host/port/userinfo/fragment under Section 7;
 - obtains a new shared rate-gate reservation;
@@ -351,9 +350,16 @@ Every redirect:
 
 Invalid redirect, loop, disallowed target, missing Location or redirect count >3 => `P11_REDIRECT_NOT_ALLOWED`.
 
-Redirects do not reset retry counters or the 120-second logical deadline.
+Redirects do not reset retry counters or the 120-second logical deadline. A followed redirect increments `redirect_count` exactly once; it does not increment `retry_count`.
 
 ## 12. Retry contract
+
+Counter semantics are logical-fetch-global:
+
+- `retry_count` starts at 0 and increments exactly once only when a retryable failure causes another attempt to be scheduled; redirects do not increment it;
+- at most 3 retries may be scheduled, so `retry_count` is 0..3;
+- `redirect_count` starts at 0 and increments only when a validated redirect is followed; it is 0..3;
+- neither counter resets after redirects or retries.
 
 Exact retry maximum:
 
@@ -367,7 +373,14 @@ Deterministic fallback backoff before retry 1/2/3:
 
 No jitter in P11 v1.
 
-A logical fetch has an additional absolute cap of 8 outbound request starts total, including initial attempts, retries and redirect hops. Reaching the cap without success => mapped according to the last failure class; no ninth start occurs.
+A logical fetch has an additional absolute cap of 8 emitted/potentially-emitted outbound request starts total, including initial attempts, retries and redirect hops. `outbound_start_count` starts at 0 and increments at Section 14.3 step 7 immediately before header emission, therefore including partial-send failures. Connection-preparation failures before that step do not increment it.
+
+Before any new send transition, if `outbound_start_count == 8`, no ninth send occurs. Mapping:
+
+- if the pending action is a retry after HTTP 429 => `P11_RATE_LIMITED`;
+- if the pending action is any other retry => `P11_HTTP_FAILED`;
+- if the pending action is following an otherwise valid redirect => `P11_HTTP_FAILED` with outbound-start-cap diagnostic context;
+- a successful HTTP 200 received from the eighth emitted start succeeds normally.
 
 Retryable:
 
@@ -396,7 +409,9 @@ Exhausted 5xx/transport retry => `P11_HTTP_FAILED`.
 
 ## 13. Retry-After
 
-For HTTP 429 only, recognized `Retry-After` forms:
+For HTTP 429 only, `Retry-After` may be absent or appear as exactly one header field. More than one Retry-After field is ambiguous and returns `P11_RATE_LIMITED` without retry.
+
+When one Retry-After field is present, recognized forms are:
 
 - non-negative ASCII decimal integer seconds (`^[0-9]+$`);
 - IMF-fixdate only, exact English/GMT grammar `ddd, DD Mon YYYY HH:MM:SS GMT`; obsolete RFC850/asctime date forms are not accepted.
@@ -480,7 +495,7 @@ While holding the exclusive byte lock:
 4. if elapsed <125,000,000 ns, wait the remaining duration while holding the lock;
 5. after the wait, sample fresh monotonic/Unix times and atomically write `phase=RESERVED` with those timestamps; this write is a crash marker, not yet the accepted start timestamp;
 6. if the RESERVED write/replace fails, release and return `P11_RATE_LIMIT_SCOPE_UNSAFE`; no HTTP request bytes may be sent;
-7. while still holding the same kernel lock, emit the HTTP request line + headers on the already prepared TLS connection;
+7. while still holding the same kernel lock, increment the logical fetch `outbound_start_count` exactly once for this send transition, then emit the HTTP request line + headers on the already prepared TLS connection; entering this step counts even if header emission later raises because partial HTTP bytes may already have left the process;
 8. whether header emission succeeds or raises after any possible partial send, sample fresh monotonic/Unix times and atomically write `phase=READY` with that **post-send safe timestamp** before normal lock release;
 9. if the READY write fails, close the connection, release the kernel lock, return `P11_RATE_LIMIT_SCOPE_UNSAFE`, and treat the attempt as potentially emitted; a later process that observes the retained RESERVED state takes the full conservative recovery wait;
 10. release the lock only after the READY state is durably replaced;
@@ -667,7 +682,7 @@ Exact client-layer mapping:
 | exhausted/unacceptable 429 wait | `P11_RATE_LIMITED` |
 | initial non-HTTPS/disallowed host/port/userinfo/fragment | `P11_SOURCE_HOST_NOT_ALLOWED` |
 | invalid/disallowed/excess redirect | `P11_REDIRECT_NOT_ALLOWED` |
-| timeout, transport failure, non-retried 403/404, exhausted 5xx, malformed UTF-8/JSON | `P11_HTTP_FAILED` |
+| timeout, transport failure, invalid/ambiguous HTTP framing headers, non-retried 403/404, exhausted 5xx, malformed UTF-8/JSON | `P11_HTTP_FAILED` |
 | body over cap | `P11_RESPONSE_TOO_LARGE` |
 | invalid/missing JSON content type | `P11_CONTENT_TYPE_INVALID` |
 | valid JSON with invalid SEC discovery schema/fields/conflicting duplicate accession | `P11_SUBMISSIONS_INVALID` |
@@ -725,50 +740,62 @@ Before P11-D implementation can close, focused tests must prove at least:
 10. allowed same-content-class redirect manually follows through a second request-start transition;
 11. redirect to bad host/path/query blocked;
 12. redirect >3 blocked;
-13. 10s connect / 10s header-send / 30s read / 120s logical deadline behavior is bounded;
-14. connection preparation occurs before the shared send gate and emits no HTTP request bytes;
-15. TLS uses verified default context/hostname checking with no proxy or unverified-context escape hatch
-16. a prepared HTTPS connection is closed when later rate-gate acquisition/validation fails
-17. each JSON content class cap enforced by Content-Length and streaming count;
-18. malformed/conflicting Content-Length and declared-vs-actual mismatch fail closed;
-19. wrong/missing content type blocked;
-20. non-identity Content-Encoding blocked;
-21. invalid UTF-8/BOM/malformed JSON blocked;
-22. 403 no retry;
-23. 404 no retry storm;
-24. 5xx max three retries with exact 1/2/4 schedule;
-25. 429 Retry-After seconds;
-26. 429 Retry-After HTTP-date with no downward rounding;
-27. Retry-After >60s fails without early retry;
-28. total emitted HTTP outbound-start cap =8;
-29. every retry/redirect that emits request bytes passes through shared gate;
-30. two-process shared-root gate observes >=125ms between actual simulated HTTP header-send starts and <=8 starts in every half-open one-second window;
-31. crash-holder OS lock release recovery;
-32. malformed/missing/RESERVED state takes full 125ms conservative recovery before reset;
-33. a simulated sender delayed after reservation cannot collapse actual send spacing because the kernel lock is held through header emission and READY records a post-send safe timestamp;
-34. lock acquisition >5s blocks with `P11_RATE_LIMIT_SCOPE_UNSAFE`;
-35. connection-preparation failure consumes retry budget but not emitted-request count;
-36. current-only discovery;
-37. historical-shard discovery;
-38. non-overlapping historical shard not fetched;
-39. required parallel arrays must all exist and have equal lengths;
-40. `isXBRL`/`isInlineXBRL` accept integer 0/1 only;
-41. public `SecDiscoveryCandidate.is_xbrl` and `is_inline_xbrl` are non-null bool for every accepted row
-42. `SecDiscoveryCandidate` exposes no generated rich ordering; canonical sort with mixed null/non-null optional fields uses only `(filing_date, accession_number)` and cannot raise cross-type comparison errors
-43. historical descriptor `filingCount` must equal shard row count;
-44. exact duplicate historical descriptors with the same required tuple collapse and fetch one shard even when ignored extra metadata differs
-45. same historical descriptor name with different filingFrom/filingTo/filingCount => `P11_SUBMISSIONS_INVALID` before overlap filtering
-46. historical descriptor input reorder yields identical canonical `(filingFrom, filingTo, name)` selected fetch order
-47. ticker `cik_str` accepts JSON integer only (bool/string/float rejected) and normalizes to 10-digit CIK;
-48. duplicate identical accession dedupes;
-49. same-accession semantic-equal current/history rows with different source URLs dedupe and produce one ASCII-sorted unique provenance tuple
-50. provenance tuple content/order is excluded from candidate equality/hash and cannot create a semantic conflict
-51. duplicate conflicting accession => `P11_SUBMISSIONS_INVALID`;
-52. current/shard input order changes do not change canonical output;
-53. ticker rows sorted `(ticker,cik)` and ambiguity retained;
-54. target accession exact match / not-found behavior;
-55. no silent amendment supersession;
-56. no P11-E package/asset write or fetch occurs.
+13. missing/repeated Location header is rejected and a followed redirect increments redirect_count but not retry_count
+14. 10s connect / 10s header-send / 30s read / 120s logical deadline behavior is bounded;
+15. connection preparation occurs before the shared send gate and emits no HTTP request bytes;
+16. TLS uses verified default context/hostname checking with no proxy or unverified-context escape hatch
+17. a prepared HTTPS connection is closed when later rate-gate acquisition/validation fails
+18. each JSON content class cap enforced by Content-Length and streaming count;
+19. single `Transfer-Encoding: chunked` with no Content-Length is accepted and cap counts dechunked entity bytes
+20. Transfer-Encoding plus Content-Length is rejected before body read
+21. repeated Transfer-Encoding, repeated Content-Length, comma-list/multi-token or unsupported transfer coding is rejected
+22. non-chunked single Content-Length requires exact EOF parity while chunked response never applies Content-Length parity
+23. Content-Type must be exactly one field with entire normalized value `application/json`; parameters/repeats are rejected
+24. Content-Encoding absent or exactly one `identity`; repeats/lists/other codings are rejected
+25. partial/failed header-send transition still increments outbound_start_count exactly once while connection-preparation failure does not
+26. malformed/conflicting Content-Length and declared-vs-actual mismatch fail closed;
+27. wrong/missing content type blocked;
+28. non-identity Content-Encoding blocked;
+29. invalid UTF-8/BOM/malformed JSON blocked;
+30. 403 no retry;
+31. 404 no retry storm;
+32. 5xx max three retries with exact 1/2/4 schedule;
+33. 429 Retry-After seconds;
+34. 429 Retry-After HTTP-date with no downward rounding;
+35. multiple Retry-After fields fail closed as `P11_RATE_LIMITED` without retry
+36. Retry-After >60s fails without early retry;
+37. total emitted HTTP outbound-start cap =8;
+38. eighth-start HTTP 200 succeeds; a pending ninth redirect/retry is blocked with the exact cap-exhaustion mapping
+39. partial-send failure counts one outbound start but increments retry_count only if another retry is actually scheduled
+40. redirect/retry interleaving preserves global retry_count 0..3 and redirect_count 0..3 without reset
+41. every retry/redirect that emits request bytes passes through shared gate;
+42. two-process shared-root gate observes >=125ms between actual simulated HTTP header-send starts and <=8 starts in every half-open one-second window;
+43. crash-holder OS lock release recovery;
+44. malformed/missing/RESERVED state takes full 125ms conservative recovery before reset;
+45. a simulated sender delayed after reservation cannot collapse actual send spacing because the kernel lock is held through header emission and READY records a post-send safe timestamp;
+46. lock acquisition >5s blocks with `P11_RATE_LIMIT_SCOPE_UNSAFE`;
+47. connection-preparation failure consumes retry budget but not emitted-request count;
+48. current-only discovery;
+49. historical-shard discovery;
+50. non-overlapping historical shard not fetched;
+51. required parallel arrays must all exist and have equal lengths;
+52. `isXBRL`/`isInlineXBRL` accept integer 0/1 only;
+53. public `SecDiscoveryCandidate.is_xbrl` and `is_inline_xbrl` are non-null bool for every accepted row
+54. `SecDiscoveryCandidate` exposes no generated rich ordering; canonical sort with mixed null/non-null optional fields uses only `(filing_date, accession_number)` and cannot raise cross-type comparison errors
+55. historical descriptor `filingCount` must equal shard row count;
+56. exact duplicate historical descriptors with the same required tuple collapse and fetch one shard even when ignored extra metadata differs
+57. same historical descriptor name with different filingFrom/filingTo/filingCount => `P11_SUBMISSIONS_INVALID` before overlap filtering
+58. historical descriptor input reorder yields identical canonical `(filingFrom, filingTo, name)` selected fetch order
+59. ticker `cik_str` accepts JSON integer only (bool/string/float rejected) and normalizes to 10-digit CIK;
+60. duplicate identical accession dedupes;
+61. same-accession semantic-equal current/history rows with different source URLs dedupe and produce one ASCII-sorted unique provenance tuple
+62. provenance tuple content/order is excluded from candidate equality/hash and cannot create a semantic conflict
+63. duplicate conflicting accession => `P11_SUBMISSIONS_INVALID`;
+64. current/shard input order changes do not change canonical output;
+65. ticker rows sorted `(ticker,cik)` and ambiguity retained;
+66. target accession exact match / not-found behavior;
+67. no silent amendment supersession;
+68. no P11-E package/asset write or fetch occurs.
 
 ## 22. Implementation authorization gate
 

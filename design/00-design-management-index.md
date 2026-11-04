@@ -296,7 +296,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_ISSUE_043_OPEN_AMENDMENT_REQUIRED`
+`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_ISSUE_043_REMEDIATED_REVIEW_REQUIRED`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
@@ -328,6 +328,8 @@ P11 latest reviewed candidate：
 - P11-D ISSUE-041 stop = `development/218-p11-d-historical-shard-descriptor-review-stop.md`；
 - P11-D ISSUE-042 preflight stop = `development/219-p11-d-discovery-candidate-ordering-preflight-stop.md`；
 - P11-D ISSUE-041/042 amendment evidence = `development/220-p11-d-issues041042-amendment-evidence.md` = PASS；
+- P11-D ISSUE-043 stop = `development/222-p11-d-response-framing-review-stop.md`；
+- P11-D ISSUE-043 amendment evidence = `development/223-p11-d-response-framing-amendment-evidence.md` = PASS；
 - next action = freeze P11-D amended design candidate and run fresh detached design review；
 - P11-B = CLOSED / PASS；
 - design/28 semantic architecture = reference only / implementation not authorized；

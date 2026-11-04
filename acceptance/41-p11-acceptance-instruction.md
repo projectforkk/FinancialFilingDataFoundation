@@ -113,13 +113,22 @@ Mandatory:
 - HTTPS only;
 - SEC allowlist only;
 - redirect target revalidated;
+- redirect requires exactly one non-empty Location header; repeated/missing Location blocked;
 - timeout bounded;
-- retry count bounded;
+- retry count bounded and global across redirects; redirects do not increment/reset retry_count;
+- redirect_count bounded 0..3 and global across retries;
 - 429 respects Retry-After where present;
+- Retry-After is absent or exactly one field; repeated fields => `P11_RATE_LIMITED` without retry;
 - 404 does not retry indefinitely;
 - 403 surfaces blocked/access-denied;
 - 5xx bounded retry;
 - response-size cap enforced;
+- Transfer-Encoding absent or exactly one `chunked`; repeated/list/unsupported coding blocked;
+- Transfer-Encoding + Content-Length blocked before body read;
+- Content-Length at most one field and exact EOF parity only for non-chunked response;
+- chunked cap applies to dechunked entity bytes;
+- Content-Type exactly one normalized whole value `application/json` with no parameters;
+- Content-Encoding absent or exactly one `identity`;
 - content type validated;
 - file:// rejected;
 - arbitrary caller URL rejected.
@@ -131,7 +140,8 @@ Mandatory:
 - redirect maximum = 3 and automatic redirects disabled;
 - retry maximum = 3 with deterministic 1s/2s/4s fallback;
 - Retry-After maximum accepted wait = 60s;
-- total outbound-start cap per logical fetch = 8;
+- total outbound-start cap per logical fetch = 8; partial-send failures count, connection-preparation failures do not;
+- eighth-start HTTP 200 may succeed; a pending ninth 429 retry => `P11_RATE_LIMITED`, other retry/redirect => `P11_HTTP_FAILED`;
 - shared lock path/state schema and 5s lock-acquisition ceiling exactly match design/31;
 - invalid/corrupt rate state may recover only after a full 125ms wait while holding the safe kernel lock;
 - rolling rate measurement uses half-open `[t,t+1s)` windows;
