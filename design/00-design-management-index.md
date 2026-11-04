@@ -379,6 +379,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 69. P10-K evidence = `development/117-p10-k-negative-gates-evidence.md` = PASS；
 70. P10-K = CLOSED；
 71. P10-L authorization = `development/118-p10-l-formal-review-authorization.md`；
-72. P10-L = AUTHORIZED FORMAL REVIEW ONLY / NO CANDIDATE CHANGES；
-73. P10-M and later remain closed；
-74. P11 / Research MCP production / Semantic Resolver production remain closed。
+72. P10-L formal review result = `development/119-p10-l-formal-code-review-result.md` = PASS；
+73. P10-L = CLOSED；
+74. P10-M and later remain closed pending separate authorization；
+75. P11 / Research MCP production / Semantic Resolver production remain closed。

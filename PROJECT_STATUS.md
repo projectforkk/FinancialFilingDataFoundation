@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-L FORMAL REVIEW ONLY / NO CANDIDATE CHANGES`
+`P10-L CLOSED / P10-M CLOSED PENDING SEPARATE AUTHORIZATION`
 
 P10-C is closed:
 
@@ -351,7 +351,11 @@ P10-L formal review authorization:
 
 `development/118-p10-l-formal-review-authorization.md`
 
-Only detached formal review is authorized; candidate changes remain forbidden.
+P10-L formal review result:
+
+`development/119-p10-l-formal-code-review-result.md = PASS`
+
+P10-L is closed. P10-M remains closed until a separate explicit authorization.
 
 Still not authorized:
 
