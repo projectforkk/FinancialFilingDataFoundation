@@ -5,8 +5,8 @@ Status: **AUTHORIZED — P10-B ONLY**
 Phase:
 `P10 — Codex Dynamic Research Integration`
 
-Design baseline:
-`acb9009d4751bbe5f8f8acec32ea7ffe30ce4c2f`
+Design baseline (P10-ISSUE-001 amended):
+`ee5ddb9798f45b9abac081fb4f7c2c999c131b6c`
 
 Authoritative design:
 - `design/24-p10-codex-dynamic-research-integration-design.md`
@@ -56,13 +56,21 @@ If any dependency/runtime change appears necessary:
 
 `STOP → design amendment → commit/push → reassess`
 
-### P10-B observed stop — P10-ISSUE-001
+### P10-B observed stop — P10-ISSUE-001 — RESOLVED FOR RERUN
 
 The first read-only probe observed that the FFDF main runtime does not install the repository package into site-packages; imports succeed only after binding the candidate `src` on `PYTHONPATH`.
 
 This is not permission to install anything.
 
-P10-B is STOPPED until design/24 + design/25 + acceptance/38 freeze the exact-candidate source-path invocation contract and that amendment is committed/pushed. After the amendment, rerun/complete P10-B using the amended contract.
+The Design-First amendment was committed/pushed at `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c`.
+
+P10-B is now authorized to restart from a clean worktree using:
+
+```powershell
+$env:PYTHONPATH="<this exact P10-B candidate worktree>\src"
+```
+
+The audit must explicitly record both the expected bare-import failure and the successful exact-candidate source-bound imports.
 
 ## 4. Git / baseline checks
 

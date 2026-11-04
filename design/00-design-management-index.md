@@ -302,14 +302,14 @@ P10 design candidate：
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
-Design baseline 已形成：
-`acb9009d4751bbe5f8f8acec32ea7ffe30ce4c2f`
+Current amended design baseline：
+`ee5ddb9798f45b9abac081fb4f7c2c999c131b6c`
 
-P10-B first probe发现 `P10-ISSUE-001`：main runtime不安装 repository package，必须冻结 exact-candidate `PYTHONPATH=<worktree>\\src` source binding。
+P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<worktree>\\src` source binding 已由 `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c` 冻结。
 
 当前：
-1. P10-B = STOPPED pending Design-First amendment push；
-2. amendment涉及 design/24、design/25、acceptance/38 与 instruction/status；
+1. P10-B = AUTHORIZED FOR READ-ONLY RERUN；
+2. instruction = `development/77-p10-environment-audit-instruction.md`；
 3. 不安装 package、不改 runtime；
-4. amendment push 后才允许按新 contract恢复 P10-B read-only audit；
+4. audit必须记录 bare import expected failure + exact-candidate source-bound import PASS；
 5. P10-C 及以后、P11、Research MCP production、Semantic Resolver production继续关闭。
