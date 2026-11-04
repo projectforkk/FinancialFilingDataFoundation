@@ -121,7 +121,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
-| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | P11-D CLOSED / PASS |\n| 32-p11-e-acquisition-package-contract.md | P11-E SEC acquisition / immutable source-package contract | ISSUE-048 A-L REMEDIATED / FINAL AMENDED DESIGN READY / REVIEW AUTHORIZATION PENDING / IMPLEMENTATION CLOSED / PROVIDER PRODUCTION CLOSED |
+| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | P11-D CLOSED / PASS |\n| 32-p11-e-acquisition-package-contract.md | P11-E SEC acquisition / immutable source-package contract | FINAL CANDIDATE 1698b67 / DETACHED FULL RE-REVIEW AUTHORIZED / PENDING / IMPLEMENTATION CLOSED / PROVIDER PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -330,7 +330,7 @@ P11 latest reviewed candidate：
 - P11-D ISSUE-041/042 amendment evidence = `development/220-p11-d-issues041042-amendment-evidence.md` = PASS；
 - P11-D ISSUE-043 stop = `development/222-p11-d-response-framing-review-stop.md`；
 - P11-D ISSUE-043 amendment evidence = `development/223-p11-d-response-framing-amendment-evidence.md` = PASS；
-- next action = freeze the ISSUE-048-remediated design/32 with development/253 as a new exact candidate, then authorize another fresh detached full design review; no P11-E implementation or provider-production authorization yet；
+- next action = fresh detached full P11-E design re-review of exact candidate 1698b6730f0849d168dd215247fcf90fa2c353b0 under development/254; no implementation or provider-production authorization yet；
 - P11-B = CLOSED / PASS；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
