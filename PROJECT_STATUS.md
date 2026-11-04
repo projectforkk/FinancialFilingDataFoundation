@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-D ONLY / P10-ISSUE-003 AMENDED BASELINE`
+`P10-D CANDIDATE PASS / DETACHED REVIEW AUTHORIZED — P10-E CLOSED`
 
 Design baseline:
 
@@ -164,7 +164,7 @@ Design baseline:
 
 Current instruction:
 
-`development/88-p10-d-context-reauthorization.md`
+`development/90-p10-d-code-review-instruction.md`
 
 Historical authorization:
 
@@ -202,7 +202,13 @@ P10-D pre-implementation contract review found `P10-ISSUE-003`; the corrected co
 
 Stop record: `development/87-p10-d-preimplementation-design-stop.md`.
 
-P10-D is reauthorized by `development/88-p10-d-context-reauthorization.md`. Scope is Research Context / Capability Manifest only; evidence must use `development/89-p10-d-context-evidence.md`. P10-E and later remain closed.
+P10-D reauthorization: `development/88-p10-d-context-reauthorization.md`.
+
+Final production/test candidate: `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`.
+
+Development evidence: `development/89-p10-d-context-evidence.md` = PASS; latest evidence commit `1033c5b779f1877172546d6e30d7ad204b28fd7e`.
+
+Detached review instruction: `development/90-p10-d-code-review-instruction.md`. P10-E and later remain closed until review result PASS and a separate explicit authorization.
 
 Still not authorized:
 
