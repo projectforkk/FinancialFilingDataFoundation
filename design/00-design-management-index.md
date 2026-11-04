@@ -546,6 +546,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 217. P11-A formal review result = `development/203-p11-final-detached-design-review-result.md` = PASS；
 218. P11-A = CLOSED / PASS；
 219. P11-B authorization = `development/204-p11-b-environment-runtime-probe-authorization.md`；
-220. P11-B = AUTHORIZED / ISOLATED PROBE ONLY；
-221. P11 production = CLOSED；
-222. Research MCP production / Semantic Resolver production remain closed / not authorized。
+220. P11-B result = `development/205-p11-environment-runtime-probe.md` = PASS；
+221. P11-B = CLOSED / PASS；
+222. P11-C = NEXT / NOT YET AUTHORIZED；
+223. P11 production = CLOSED；
+224. Research MCP production / Semantic Resolver production remain closed / not authorized。
