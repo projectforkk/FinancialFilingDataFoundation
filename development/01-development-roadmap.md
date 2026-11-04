@@ -117,7 +117,7 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`P11-A PASS / P11-B PASS / P11-C PASS / P11-D IMPLEMENTATION AUTHORIZED / PRODUCTION NOT STARTED`
+状态：`P11-A PASS / P11-B PASS / P11-C PASS / P11-D ISSUE-044 OPEN / IMPLEMENTATION STOPPED / DESIGN AMENDMENT REQUIRED`
 
 Latest reviewed design candidate：
 - historical exact candidate = `cd2fa0b01d23c0e3f75945c5cce5120738f51077` = INELIGIBLE after P11-ISSUE-039；
