@@ -432,6 +432,60 @@ def test_serialized_context_contains_no_absolute_project_path(tmp_path: Path) ->
     assert context.p9_review_root == "reviews/a"
 
 
+
+
+def test_p8_public_contract_drift_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, catalog = _fixture_root(tmp_path)
+    bundle = _bundle(root)
+    monkeypatch.setattr(
+        context_module,
+        "CATALOG_SCHEMA_VERSION",
+        "p8-mcp-catalog-v2",
+    )
+
+    with pytest.raises(P10Error) as exc_info:
+        build_research_context(bundle, catalog, "reviews/a")
+    _assert_reason(exc_info, "P10_CONTEXT_INCOMPATIBLE")
+
+
+def test_p9_public_contract_drift_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, catalog = _fixture_root(tmp_path)
+    bundle = _bundle(root)
+    monkeypatch.setattr(
+        context_module,
+        "POLICY_VERSION",
+        "p9-review-policy-v2",
+    )
+
+    with pytest.raises(P10Error) as exc_info:
+        build_research_context(bundle, catalog, "reviews/a")
+    _assert_reason(exc_info, "P10_CONTEXT_INCOMPATIBLE")
+
+
+def test_review_root_symlink_escape_rejected_when_supported(
+    tmp_path: Path,
+) -> None:
+    root, catalog = _fixture_root(tmp_path)
+    bundle = _bundle(root)
+    outside = tmp_path / "outside-review"
+    outside.mkdir()
+    link = root / "reviews" / "outside-link"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlink unavailable without elevated privileges")
+
+    with pytest.raises(P10Error) as exc_info:
+        build_research_context(bundle, catalog, "reviews/outside-link")
+    _assert_reason(exc_info, "P10_CONTEXT_PATH_OUTSIDE_PROJECT")
+
+
 def test_main_runtime_has_no_external_mcp_sdk() -> None:
     assert importlib.util.find_spec("mcp") is None
 
