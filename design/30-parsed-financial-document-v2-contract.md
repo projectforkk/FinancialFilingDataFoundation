@@ -301,7 +301,7 @@ For Inline XBRL/XBRL:
 - scale/sign/format/continuation locators remain auditable source metadata;
 - invalid/unsupported transformation => parsed value null + explicit validation issue, never guess.
 
-The exact parser/runtime transformation registry implementation MUST be frozen by the required P11-G preimplementation Design-First parser-contract amendment after P11-B; P11-G production cannot begin before that freeze.
+The exact parser/runtime transformation registry implementation MUST be frozen by the required P11-F preimplementation Design-First parser-contract amendment after P11-B; P11-F production cannot begin before that freeze.
 
 ## 11. evidence.jsonl
 
