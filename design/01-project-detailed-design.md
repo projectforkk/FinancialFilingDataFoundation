@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P10 DONE / P11 DESIGN AUTHORIZED**
+状态：**DESIGN BASELINE — P10 DONE / P11 DESIGN READY**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -868,19 +868,21 @@ P10 acceptance 必须包含至少一个完整 live research run，证明 Codex �
 
 ### P11 — US SEC Provider
 
-状态：**DESIGN CANDIDATE / DETACHED REVIEW PENDING / PRODUCTION CLOSED**
+状态：**DESIGN READY / P11-A PASS / PRODUCTION CLOSED**
 
 P11 通过官方 SEC/EDGAR 入口接入 HTML / Inline XBRL / XBRL。
 
 由于 accepted `ParsedFinancialDocument v1`、P3/P5/P6 evidence 都是物理 PDF page/bbox 语义，P11 不允许把 SEC HTML 伪装成 PDF。P11 新增 source-neutral `ParsedFinancialDocument v2`，以 DOM/XBRL node locator 作为真实 evidence coordinate；v1 保持 accepted history 不变。
 
-P11 设计候选：
-- `design/26-p11-sec-provider-design.md`；
-- `design/27-p11-implementation-plan.md`；
-- `design/30-parsed-financial-document-v2-contract.md`；
-- `acceptance/41-p11-acceptance-instruction.md`；
-- `development/144-p11-environment-interface-audit.md`；
-- `development/145-p11-design-reconciliation.md`。
+P11 accepted design baseline：
+- exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
+- final detached review = `development/177-p11-final-detached-design-review-result.md` = PASS；
+- detailed design = `design/26-p11-sec-provider-design.md`；
+- implementation plan = `design/27-p11-implementation-plan.md`；
+- source-neutral contract = `design/30-parsed-financial-document-v2-contract.md`；
+- acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
+- environment/interface audit = `development/144-p11-environment-interface-audit.md`；
+- reconciliation = `development/145-p11-design-reconciliation.md`。
 
 P11 v1 不修改 accepted P8/P9/P10 contract；后续若要把 SEC-native artifacts 直接暴露给 P10，需要单独 compatibility design/review/acceptance。
 
@@ -1047,7 +1049,7 @@ Accepted chain：
 - reconciled `design/28` remains future semantic reference only；
 - reconciled `design/29` remains future Research MCP reference only。
 
-P10 is closed. P11 design is authorized and under detached design review; P11 production remains closed. Research MCP production and Semantic Resolver production remain unauthorized.
+P10 is closed. P11-A design baseline is PASS / DESIGN READY on exact candidate `b0424620f4b7e6fc0b898c657166b171fc35e7a7`; P11 production remains closed. The next permitted work is P11-B Environment / SEC Runtime Probe under separate authorization. Research MCP production and Semantic Resolver production remain unauthorized.
 
 继续保持职责边界：
 

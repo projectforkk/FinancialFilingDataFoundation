@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P10 DONE / P11 DESIGN AUTHORIZED**
+状态：**P10 DONE / P11 DESIGN READY**
 
 ## 总原则
 
@@ -117,15 +117,19 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`DESIGN CANDIDATE / DETACHED REVIEW PENDING / PRODUCTION NOT STARTED`
+状态：`DESIGN READY / P11-A PASS / PRODUCTION NOT STARTED`
 
-设计候选：
+Accepted design baseline：
+- exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
+- final detached review = `development/177-p11-final-detached-design-review-result.md` = PASS；
 - `design/26-p11-sec-provider-design.md`；
 - `design/27-p11-implementation-plan.md`；
 - `design/30-parsed-financial-document-v2-contract.md`；
 - `acceptance/41-p11-acceptance-instruction.md`；
 - `development/144-p11-environment-interface-audit.md`；
 - `development/145-p11-design-reconciliation.md`。
+
+Next gate：`P11-B Environment / SEC Runtime Probe`，requires separate authorization；provider production remains CLOSED.
 
 目标：
 SEC HTML / iXBRL / XBRL first acquisition and extraction path。

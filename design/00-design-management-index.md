@@ -116,11 +116,11 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
-| 26-p11-sec-provider-design.md | P11 | DESIGN CANDIDATE / PRODUCTION CLOSED |
-| 27-p11-implementation-plan.md | P11 | DESIGN CANDIDATE / PRODUCTION CLOSED |
+| 26-p11-sec-provider-design.md | P11 | DESIGN READY / PRODUCTION CLOSED |
+| 27-p11-implementation-plan.md | P11 | DESIGN READY / PRODUCTION CLOSED |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
-| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | DESIGN CANDIDATE / PRODUCTION CLOSED |
+| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | DESIGN READY / PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -164,7 +164,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 | 27 | acceptance/41 (candidate) | DESIGN CANDIDATE / REVIEW PENDING |
+| P11 | 26 | 27 | acceptance/41 | DESIGN READY / P11-A PASS |
 
 ---
 
@@ -295,16 +295,19 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_DESIGN_CANDIDATE_REVIEW_PENDING`
+`P10_DONE / P11_DESIGN_READY`
 
-P11 design candidate：
+P11 accepted design baseline：
+- exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
+- final detached review = `development/177-p11-final-detached-design-review-result.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
 - environment/interface audit = `development/144-p11-environment-interface-audit.md`；
 - reconciliation = `development/145-p11-design-reconciliation.md`；
-- P11 production = CLOSED pending detached design review + separate development authorization；
+- P11 production = CLOSED；
+- next permitted gate = P11-B Environment / SEC Runtime Probe under separate authorization；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
@@ -479,9 +482,12 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 163. candidate `85df002516d577531e68c303ad86c0903ca813c6` = INELIGIBLE after fresh review；
 164. review authorization = `development/173-p11-registry-artifact-parity-final-review-authorization.md`；
 165. review stop = `development/174-p11-artifact-path-contract-review-stop.md`；
-166. P11-ISSUE-031 = REMEDIATED / FRESH REVIEW REQUIRED；
+166. P11-ISSUE-031 = REMEDIATED / CLOSED BY FINAL REVIEW；
 167. amendment evidence = `development/175-p11-artifact-path-amendment-evidence.md` = PASS；
-168. exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
-169. review authorization = `development/176-p11-artifact-path-final-review-authorization.md`；
-170. P11 production = CLOSED；
-171. Research MCP production / Semantic Resolver production remain closed / not authorized。
+168. accepted P11-A design candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
+169. final review authorization = `development/176-p11-artifact-path-final-review-authorization.md`；
+170. final detached design review = `development/177-p11-final-detached-design-review-result.md` = PASS；
+171. P11-A = CLOSED / DESIGN READY；
+172. P11 production = CLOSED；
+173. next permitted gate = P11-B Environment / SEC Runtime Probe under separate authorization；
+174. Research MCP production / Semantic Resolver production remain closed / not authorized。
