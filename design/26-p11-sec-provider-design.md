@@ -874,6 +874,75 @@ Reuse path classification:
 
 P11-I MUST atomically commit the complete export directory at this final path and reload it successfully before P11-K may call `register_parsed_data`.
 
+### Final export idempotency / collision contract
+
+The final path is deterministic:
+
+`<parsed_root>/<parse_run_id>/export-v2`
+
+and final artifact bytes are immutable once accepted.
+
+P11-I MUST follow this exact commit contract:
+
+#### Final path absent
+
+If the final path does not exist:
+
+1. build the complete export under a project-local staging directory;
+2. run the complete v2 loader against staging;
+3. atomically move/rename the staging directory to the final path;
+4. reload the final path;
+5. only after successful final reload may P11-K persist the registry row.
+
+#### Final path already exists
+
+If the final path already exists, P11-I MUST NOT overwrite, delete, replace or mutate it.
+
+Instead:
+
+1. verify the existing final path is a directory at the exact expected layout;
+2. load/validate the existing final export;
+3. require existing `manifest.parse_run_id == requested parse_run_id`;
+4. require existing document/package/parser/schema/config/identity/validation semantics to equal the current deterministic output;
+5. compare every required final artifact file as exact bytes against the newly generated staging export.
+
+If every required file is present, both exports load successfully, and every required file byte is identical:
+
+- discard/retire staging;
+- classify the commit as idempotent success;
+- reuse the existing immutable final directory;
+- P11-K may proceed.
+
+If any required file differs, is missing, fails loading, or carries a different identity:
+
+`P11_FINAL_ARTIFACT_COLLISION`
+
+and the run is BLOCKED.
+
+No replacement of the existing final path is permitted.
+
+#### Registry failure after final commit
+
+If P11-I commits/reuses a valid final export and P11-K registry persistence fails:
+
+- leave the final export unchanged;
+- absence of a ParsedDataRecord means the orphan final export is not discoverable/reusable through the package-aware selector;
+- a later retry may regenerate staging, perform the exact-existing-final byte/identity verification above, and retry registry persistence;
+- do not create a second final path;
+- do not delete the orphan final export merely because registry persistence failed.
+
+#### Staging
+
+Staging is never registry-eligible and never reusable.
+
+A stale staging directory may be removed only by an explicitly scoped cleanup path that proves:
+
+- the path is below the configured P11 staging root;
+- it is not the deterministic final export path;
+- no registry row points to it.
+
+Normal runtime logic never treats staging presence as success.
+
 For each candidate record, the selector MUST load the v2 artifact through the accepted v2 loader and verify all of:
 
 1. loader/schema/hash/ID/source-reference integrity passes;
@@ -1102,12 +1171,13 @@ HTTP/security:
 - P11_RESPONSE_TOO_LARGE
 - P11_CONTENT_TYPE_INVALID
 
-Package:
+Package/storage:
 - P11_PACKAGE_INVALID
 - P11_PACKAGE_ASSET_MISSING
 - P11_PACKAGE_HASH_MISMATCH
 - P11_SOURCE_CONTENT_DRIFT
 - P11_PATH_OUTSIDE_PROJECT
+- P11_FINAL_ARTIFACT_COLLISION
 
 Planner/reuse:
 - P11_PACKAGE_AWARE_PLANNER_REQUIRED
@@ -1254,7 +1324,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-032 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/180`. The current amended design contains explicit resolutions for ISSUE-010..032; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-033 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/183`. The current amended design contains explicit resolutions for ISSUE-010..033; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 

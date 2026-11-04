@@ -245,8 +245,16 @@ Finalization-order acceptance:
 - manifest.blocking_issue_count == len(validation.blocking_issues);
 - no provisional/fabricated validation placeholder is accepted;
 - complete staging export passes the final v2 loader before commit;
-- P11-I atomically commits the complete `<parsed_root>/<parse_run_id>/export-v2` directory;
-- P11-K registry persistence occurs only after the committed directory reloads successfully;
+- final path absent => atomic move/rename staging to exact `<parsed_root>/<parse_run_id>/export-v2`;
+- final path already exists and every required file is byte-identical plus loader/identity semantics match => idempotent success without replacing/mutating final bytes;
+- final path already exists and any required byte/file/identity/validation semantic differs or is invalid => P11_FINAL_ARTIFACT_COLLISION / BLOCKED;
+- existing final export is never overwritten, deleted or replaced;
+- after new commit or idempotent existing-final success, final directory reload succeeds before P11-K;
+- P11-K registry persistence occurs only after the final directory reloads successfully;
+- simulated P11-K registry failure leaves the valid final export unchanged and unregistered;
+- later retry may verify the existing final export idempotently and retry registry persistence;
+- unregistered orphan final export is not selected for reuse;
+- staging path is never registered or reusable;
 - P11-K does not mutate committed artifact bytes.
 
 No P3/P6 v1 schema masquerading.
@@ -504,6 +512,7 @@ Exact mandatory results:
 - bad content type -> P11_CONTENT_TYPE_INVALID
 - package hash mismatch -> P11_PACKAGE_HASH_MISMATCH
 - source drift -> P11_SOURCE_CONTENT_DRIFT
+- existing deterministic final export differs from current staging/identity -> P11_FINAL_ARTIFACT_COLLISION
 - generic US planner call -> P11_PACKAGE_AWARE_PLANNER_REQUIRED
 - same document SHA but different source package -> P11_SOURCE_PACKAGE_CHANGE
 - missing reuse artifact -> P11_REUSE_ARTIFACT_MISSING

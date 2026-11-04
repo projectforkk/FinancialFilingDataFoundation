@@ -374,3 +374,20 @@ Responsibilities are now disjoint:
 The older H-writer/I-validation wording in historical reconciliation sections records prior issue chronology only and is not normative after this section.
 
 This closes P11-ISSUE-032 in the amended design, pending fresh detached review.
+
+
+## 25. Final export collision / idempotent persistence reconciliation — ISSUE-033
+
+P11-ISSUE-033 closes the deterministic final-path retry ambiguity.
+
+The authoritative persistence semantics are now:
+
+- immutable final path keyed by deterministic parse_run_id;
+- no overwrite/delete/replace of an existing final export;
+- exact byte-identical + identity-valid existing final = idempotent success;
+- any differing/invalid existing final = P11_FINAL_ARTIFACT_COLLISION / BLOCKED;
+- registry failure after final commit does not invalidate/delete the final artifact;
+- retry verifies the existing final artifact before retrying registry persistence;
+- orphan final artifacts without registry rows are not package-aware reuse candidates.
+
+This preserves deterministic artifact identity, safe retry behavior and registry-as-candidate-index semantics without schema migration.

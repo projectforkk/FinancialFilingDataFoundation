@@ -295,14 +295,13 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_032_REMEDIATED_REVIEW_PENDING`
+`P10_DONE / P11_ISSUE_033_REMEDIATED_REVIEW_PENDING`
 
 P11 latest reviewed candidate：
-- historical exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7` = INELIGIBLE after P11-ISSUE-032；
-- authoritative stop = `development/178-p11-validation-finalization-review-stop.md`；
-- stale PASS = `development/177-p11-final-detached-design-review-result.md` = INVALID / SUPERSEDED；
-- invalidity record = `development/179-p11-b042462-stale-pass-result-invalid.md`；
-- ISSUE-032 amendment evidence = `development/180-p11-validation-finalization-amendment-evidence.md` = PASS；
+- historical exact candidate = `992583b87af8f8c682dc434cc134317f4db35522` = INELIGIBLE after P11-ISSUE-033；
+- authoritative stop = `development/182-p11-final-export-collision-review-stop.md`；
+- prior ISSUE-032 amendment evidence = `development/180-p11-validation-finalization-amendment-evidence.md` = PASS；
+- ISSUE-033 amendment evidence = `development/183-p11-final-export-idempotency-amendment-evidence.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
@@ -496,6 +495,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 175. candidate `992583b87af8f8c682dc434cc134317f4db35522` = INELIGIBLE after fresh review；
 176. review authorization = `development/181-p11-validation-finalization-final-review-authorization.md`；
 177. review stop = `development/182-p11-final-export-collision-review-stop.md`；
-178. P11-ISSUE-033 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
-179. P11 production = CLOSED；
-180. Research MCP production / Semantic Resolver production remain closed / not authorized。
+178. P11-ISSUE-033 = REMEDIATED / FRESH REVIEW REQUIRED；
+179. amendment evidence = `development/183-p11-final-export-idempotency-amendment-evidence.md` = PASS；
+180. amended exact candidate = PENDING FREEZE；
+181. P11 production = CLOSED；
+182. Research MCP production / Semantic Resolver production remain closed / not authorized。

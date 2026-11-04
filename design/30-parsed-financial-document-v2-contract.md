@@ -90,8 +90,16 @@ Normative order:
 5. P11-I serializes final `validation.json` from the P11-H validation model;
 6. P11-I derives manifest `validation_status` and `blocking_issue_count` from that same final validation model and serializes final `manifest.json`;
 7. P11-I runs the complete v2 loader against the staging export directory;
-8. only after successful reload does P11-I atomically commit the complete directory to `<parsed_root>/<parse_run_id>/export-v2`;
-9. only then may P11-K persist `ParsedDataRecord.artifact_path`.
+8. P11-I evaluates the deterministic final path `<parsed_root>/<parse_run_id>/export-v2`:
+   - if absent, atomically move/rename the complete staging directory to the final path;
+   - if present, never overwrite it; load it and compare every required artifact file byte-for-byte with staging plus exact identity/validation semantics;
+9. any existing-final mismatch/missing/invalid state => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
+10. after a new atomic commit or idempotent existing-final match, reload the final path successfully;
+11. only then may P11-K persist `ParsedDataRecord.artifact_path`.
+
+A successful existing-final match is idempotent success and keeps the original final directory byte-unchanged.
+
+If registry persistence later fails, the valid final export remains immutable and unregistered. A retry may verify the same final export and retry registry persistence; the orphan final export is not reusable without a registry row.
 
 Forbidden:
 
@@ -99,6 +107,8 @@ Forbidden:
 - a final `manifest.json` written before validation;
 - a registry-eligible final export missing `validation.json`;
 - P11-H committing the final export;
+- overwriting/deleting/replacing an existing final export directory;
+- treating staging presence as committed success;
 - P11-K mutating final export bytes after registration.
 
 The final `manifest.json.validation_status` MUST equal `validation.json.status`.

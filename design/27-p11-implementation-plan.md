@@ -336,8 +336,16 @@ Finalization order:
 3. derive manifest `validation_status` and `blocking_issue_count` exactly from that validation model;
 4. serialize final `manifest.json`;
 5. verify all required files/counts/IDs/hashes/source references with the v2 loader in a project-local staging directory;
-6. atomically commit the complete directory to `<parsed_root>/<parse_run_id>/export-v2`;
-7. only after the final directory exists and reloads successfully may P11-K persist `ParsedDataRecord`.
+6. evaluate the deterministic final path `<parsed_root>/<parse_run_id>/export-v2`:
+   - absent => atomic move/rename staging to final path;
+   - present => never overwrite; load existing final export and require exact identity plus byte-for-byte equality of every required artifact against staging;
+7. if existing final path differs/misses/fails => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
+8. after new commit or idempotent existing-final success, reload the final path;
+9. only after successful final reload may P11-K persist `ParsedDataRecord`.
+
+Existing-final byte equality is checked over every required v2 file, not merely manifest identity.
+
+A successful idempotent existing-final check discards/retires staging and keeps the original final directory unchanged.
 
 Final writer/loader must verify:
 
@@ -416,9 +424,13 @@ For periodic filings:
 - persist ParsedDataRecord only after the v2 artifact has been written/loaded and validation completed;
 - artifact_path is mandatory for P11 periodic records and is the project-root-relative POSIX path to the exact `<parsed_root>/<parse_run_id>/export-v2` directory;
 - parse_run_id is validated as lowercase 64-hex before path construction;
-- the complete export-v2 directory is atomically committed before register_parsed_data;
+- the complete export-v2 directory is atomically committed or idempotently verified before register_parsed_data;
+- an existing final export is never overwritten/deleted/replaced;
+- any existing-final byte/identity mismatch => P11_FINAL_ARTIFACT_COLLISION;
 - registry never points to manifest.json, another child file, or a staging/partial directory;
 - no trailing slash is stored;
+- if register_parsed_data fails after final export success, leave the final export unchanged and unregistered; a later retry may re-verify the exact existing final export and retry registry persistence;
+- an unregistered orphan final export is not reusable because the package-aware selector discovers candidates only from registry rows;
 - no P11 registry schema migration is required solely to store source_package_sha256.
 
 ### Package-aware reuse public API

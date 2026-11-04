@@ -563,3 +563,25 @@ Resolution in current amendment:
 - provisional validation placeholders and post-registration artifact mutation are forbidden.
 
 No production/test/runtime change was made.
+
+
+## 21. Final export idempotency finding — P11-ISSUE-033
+
+Fresh review of `992583b87af8f8c682dc434cc134317f4db35522` passed ISSUE-010..032 automated guards, but manual persistence review found deterministic `parse_run_id` makes the final path reusable across retries while the design did not freeze existing-final collision semantics.
+
+Stop:
+`development/182-p11-final-export-collision-review-stop.md`
+
+Resolution in current amendment:
+
+- final `<parsed_root>/<parse_run_id>/export-v2` is immutable;
+- absent final path => staging loader PASS → atomic move/rename → final reload;
+- existing final path is never overwritten/deleted/replaced;
+- existing final is idempotent success only when loader/identity/validation semantics match and every required artifact byte equals staging;
+- any mismatch/missing/invalid existing final => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
+- P11-K registry failure leaves the valid final artifact unchanged and unregistered;
+- later retry may verify the same final artifact and retry registry persistence;
+- unregistered orphan final artifacts are not reusable because reuse discovery starts from registry rows;
+- staging is never registry-eligible/reusable.
+
+No production/test/runtime change was made.

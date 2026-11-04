@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 FINAL DESIGN REVIEW STOPPED — P11-ISSUE-033 / PRODUCTION CLOSED`
+`P11-ISSUE-033 REMEDIATED / AMENDED DESIGN READY FOR CANDIDATE FREEZE / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-032. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`). Review of exact candidate `b0424620f4b7e6fc0b898c657166b171fc35e7a7` passed the automated ISSUE-010..031 matrix but manual cross-gate review found P11-ISSUE-032. Stop: `development/178-p11-validation-finalization-review-stop.md`. The premature `development/177-p11-final-detached-design-review-result.md` remains INVALID / NOT AUTHORITATIVE by `development/179-p11-b042462-stale-pass-result-invalid.md`. ISSUE-032 is remediated in the current amended design by moving final validation computation to P11-H and final v2 serialization/loader/atomic commit to P11-I; evidence: `development/180-p11-validation-finalization-amendment-evidence.md = PASS`. A fresh exact-candidate detached design review is still required. P11 production remains CLOSED.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-033. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`, `182`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`, `183`). Candidate `992583b87af8f8c682dc434cc134317f4db35522` passed ISSUE-010..032 automated guards but manual persistence review found P11-ISSUE-033: deterministic final export collision/retry semantics were not frozen. Stop: `development/182-p11-final-export-collision-review-stop.md`. ISSUE-033 is remediated in the current amended design: final export is immutable, byte-identical retries are idempotent, any existing-final mismatch is `P11_FINAL_ARTIFACT_COLLISION`, and registry-failure recovery preserves the final artifact for verified retry. Evidence: `development/183-p11-final-export-idempotency-amendment-evidence.md = PASS`. A fresh exact-candidate detached design review is still required. P11 production remains CLOSED.
 
 P10-C is closed:
 
@@ -704,4 +704,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-032 REMEDIATED / CANDIDATE FREEZE PENDING / PRODUCTION NOT STARTED`
+- P11 — US SEC Provider: `ISSUE-033 REMEDIATED / CANDIDATE FREEZE PENDING / PRODUCTION NOT STARTED`
