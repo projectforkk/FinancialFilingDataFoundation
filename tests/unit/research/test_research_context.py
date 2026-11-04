@@ -4,7 +4,6 @@ import hashlib
 import importlib.util
 import inspect
 import json
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -218,6 +217,48 @@ def test_stale_caller_catalog_vs_changed_file_rejected(tmp_path: Path) -> None:
     with pytest.raises(P10Error) as exc_info:
         build_research_context(bundle, catalog, "reviews/a")
 
+    _assert_reason(exc_info, "P10_CATALOG_INVALID")
+
+
+
+
+def test_manually_malformed_catalog_fields_map_to_p10_error(
+    tmp_path: Path,
+) -> None:
+    root, _ = _fixture_root(tmp_path)
+    bundle = _bundle(root)
+
+    bad_root = McpCatalog(
+        project_root="not-a-path",  # type: ignore[arg-type]
+        catalog_path="catalog.json",  # type: ignore[arg-type]
+        documents=(),
+    )
+    with pytest.raises(P10Error) as exc_info:
+        build_research_context(bundle, bad_root, "reviews/a")
+    _assert_reason(exc_info, "P10_CATALOG_INVALID")
+
+    bad_path = McpCatalog(
+        project_root=root.resolve(),
+        catalog_path=123,  # type: ignore[arg-type]
+        documents=(),
+    )
+    with pytest.raises(P10Error) as exc_info:
+        build_research_context(bundle, bad_path, "reviews/a")
+    _assert_reason(exc_info, "P10_CATALOG_INVALID")
+
+
+def test_non_catalog_object_maps_to_p10_catalog_error(
+    tmp_path: Path,
+) -> None:
+    root, _ = _fixture_root(tmp_path)
+    bundle = _bundle(root)
+
+    with pytest.raises(P10Error) as exc_info:
+        build_research_context(
+            bundle,
+            object(),  # type: ignore[arg-type]
+            "reviews/a",
+        )
     _assert_reason(exc_info, "P10_CATALOG_INVALID")
 
 

@@ -227,8 +227,8 @@ def _context_project_root(p8_catalog: McpCatalog) -> Path:
             "p8_catalog must be an accepted McpCatalog",
         )
     try:
-        root = p8_catalog.project_root.resolve(strict=True)
-    except (OSError, RuntimeError, ValueError) as exc:
+        root = Path(p8_catalog.project_root).expanduser().resolve(strict=True)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
         raise P10Error(
             "P10_CATALOG_INVALID",
             "catalog project root is invalid",
@@ -244,8 +244,11 @@ def _context_project_root(p8_catalog: McpCatalog) -> Path:
 def _catalog_identity(p8_catalog: McpCatalog) -> tuple[Path, str]:
     root = _context_project_root(p8_catalog)
     try:
-        catalog_path = p8_catalog.catalog_path.resolve(strict=True)
-    except (OSError, RuntimeError, ValueError) as exc:
+        raw_catalog_path = Path(p8_catalog.catalog_path).expanduser()
+        if not raw_catalog_path.is_absolute():
+            raw_catalog_path = root / raw_catalog_path
+        catalog_path = raw_catalog_path.resolve(strict=True)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
         raise P10Error(
             "P10_CATALOG_INVALID",
             "catalog path is invalid",
