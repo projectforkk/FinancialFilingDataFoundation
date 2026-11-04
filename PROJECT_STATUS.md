@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-G CLOSED / P10-H CLOSED PENDING SEPARATE AUTHORIZATION`
+`AUTHORIZED — P10-H VALIDATION ONLY / NO PRODUCTION CHANGES`
 
 P10-C is closed:
 
@@ -286,7 +286,11 @@ Detached review result:
 
 `development/107-p10-g-detached-review-result.md = PASS`
 
-P10-H remains closed until a separate explicit authorization.
+P10-H validation authorization:
+
+`development/108-p10-h-full-regression-authorization.md`
+
+Only validation/evidence is authorized; production changes remain forbidden.
 
 Still not authorized:
 
