@@ -295,7 +295,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_039_REMEDIATED_REVIEW_REQUIRED`
+`P10_DONE / P11_ISSUE_039_CANDIDATE_FROZEN_FORMAL_REVIEW_AUTHORIZED`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
@@ -305,12 +305,14 @@ P11 latest reviewed candidate：
 - historical exact candidate = `cd2fa0b01d23c0e3f75945c5cce5120738f51077` = INELIGIBLE after P11-ISSUE-039；
 - authoritative stop = `development/200-p11-phase-banner-review-stop.md`；
 - ISSUE-039 amendment evidence = `development/201-p11-phase-banner-amendment-evidence.md` = PASS；
+- exact amended candidate = `5877a238f5af6102ef48e56141cdb893590b6aab`；
+- formal review authorization = `development/202-p11-phase-banner-final-review-authorization.md`；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
 - P11 production = CLOSED；
-- next action = exact amended candidate must pass a separately authorized fresh detached P11-A review；
+- next action = run fresh detached P11-A formal review against exact candidate `5877a23...`；
 - P11-B = NOT AUTHORIZED；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -535,5 +537,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 212. review stop = `development/200-p11-phase-banner-review-stop.md`；
 213. P11-ISSUE-039 = REMEDIATED / FRESH REVIEW REQUIRED；
 214. amendment evidence = `development/201-p11-phase-banner-amendment-evidence.md` = PASS；
-215. P11 production = CLOSED；
-216. Research MCP production / Semantic Resolver production remain closed / not authorized。
+215. amended exact candidate = `5877a238f5af6102ef48e56141cdb893590b6aab`；
+216. formal review authorization = `development/202-p11-phase-banner-final-review-authorization.md`；
+217. P11 production = CLOSED；
+218. Research MCP production / Semantic Resolver production remain closed / not authorized。
