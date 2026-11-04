@@ -295,19 +295,21 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_036_REMEDIATED_REVIEW_PENDING`
+`P10_DONE / P11_ISSUE_036_CANDIDATE_FROZEN_REVIEW_AUTHORIZED`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47` = INELIGIBLE after P11-ISSUE-036；
 - authoritative stop = `development/191-p11-registry-concurrency-review-stop.md`；
 - ISSUE-035 amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS and remains valid；
 - ISSUE-036 amendment evidence = `development/192-p11-registry-concurrency-amendment-evidence.md` = PASS；
+- exact amended candidate = `cb35f537c75390d9b63b55af72c7278520ebd9be`；
+- review authorization = `development/193-p11-registry-concurrency-final-review-authorization.md`；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
 - P11 production = CLOSED；
-- next action = freeze amended exact candidate and run fresh detached P11-A review；
+- next action = run fresh detached P11-A review against exact candidate `cb35f53...`；
 - P11-B = NOT AUTHORIZED；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -514,5 +516,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 194. review stop = `development/191-p11-registry-concurrency-review-stop.md`；
 195. P11-ISSUE-036 = REMEDIATED / FRESH REVIEW REQUIRED；
 196. amendment evidence = `development/192-p11-registry-concurrency-amendment-evidence.md` = PASS；
-197. P11 production = CLOSED；
-198. Research MCP production / Semantic Resolver production remain closed / not authorized。
+197. amended exact candidate = `cb35f537c75390d9b63b55af72c7278520ebd9be`；
+198. review authorization = `development/193-p11-registry-concurrency-final-review-authorization.md`；
+199. P11 production = CLOSED；
+200. Research MCP production / Semantic Resolver production remain closed / not authorized。
