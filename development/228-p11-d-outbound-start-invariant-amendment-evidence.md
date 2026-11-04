@@ -11,7 +11,7 @@ STOP:
 Amended contract:
 `design/31-p11-d-http-discovery-contract.md`
 
-Amended contract SHA256:
+Canonical Git-blob SHA256 of amended `design/31-p11-d-http-discovery-contract.md`:
 `497407adb368f8abbbe12afa1096fb7d9674d2fdb1a5778c8468b8f4b52dfaf9`
 
 ## Exact remediation
