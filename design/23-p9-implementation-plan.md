@@ -5,6 +5,20 @@
 详细设计：
 `design/22-p9-review-overlay-design.md`
 
+## Current Recovery Baseline — P9-ISSUE-004
+
+GitHub 当前 P9 branch 已包含未来 P10 路线 amendment；本地 active worktree 另有 handoff-reported、尚未提交的 P9-B–F candidate。该本地 candidate 在 WorkHome 失联前记录为 focused `7 passed`、full unit `242 passed / 0 fail`，但在重新连接并核验 worktree 前不得视为当前已验证事实或 accepted baseline。
+
+安全恢复顺序固定为：
+1. 恢复 WorkHome；
+2. 在 `worktrees/active/p9-review-overlay` 执行只读 `git status/log/rev-parse` 核验；
+3. 确认已知未提交 P9 production/tests 仍存在且无 tracked conflict；
+4. 只允许安全 fast-forward/sync GitHub 的 design-only commits；
+5. 禁止 reset / clean / checkout 覆盖 / 删除或从 GitHub 重建本地未提交 P9 文件；
+6. 完成现场核验后继续 **P9-G — CLI**，再补 negative tests、P9-H–M。
+
+本治理同步不授权提前实施 P10/P11。
+
 ---
 
 ## P9-A — Design Baseline
@@ -15,6 +29,8 @@
 - development instruction
 - acceptance instruction
 - design index/status/roadmap update
+- latest accepted P8 baseline merged into P9 branch（P9-ISSUE-001）
+- refreshed environment/internal-import audit after baseline merge
 - commit/push
 
 Gate：
@@ -45,6 +61,7 @@ focused queue tests PASS。
 - P5 cell index
 - target selection
 - evidence-to-target validation
+- P9-ISSUE-002 attestation evidence inheritance from active supporting resolutions
 - derived evidence pages
 - before/after calculation
 - fill-only raw conflict guard
@@ -172,6 +189,81 @@ Detached：
 
 ---
 
+## P9-JR — Formal Review Corrective Gate
+
+仅在 P9-J verdict = FAIL / CHANGES REQUIRED 且 design amendment 已 commit/push 后执行。
+
+当前 authorized corrective scope 仅限：
+
+- P9-J-F1：实现 payload-wide persisted resolution security validator，并在 submit 前与 historical semantic validation 时强制执行；
+- P9-J-F2：把 argparse/parser-level failures 纳入 deterministic JSON diagnostic boundary；
+- 为 F1/F2 增加 direct/adversarial unit tests；
+- 重跑 focused P9 tests、full unit、compile/import、diff/scope checks；
+- 创建新的 exact detached corrective candidate 做 P9-J re-review。
+
+Gate：
+
+- F1 adversarial probes（至少 URL in justification、SQL in value，并覆盖 path/shell/Python/credential classes）全部 deterministic reject；
+- benign slash/keyword examples不误拒；
+- 四个 parser-level cases均 stdout empty、stderr exactly one JSON object、reason_code/message stable、exit 2；
+- focused/full unit PASS；
+- no P0-P8 unintended diff；
+- detached P9-J re-review PASS。
+
+P9-JR PASS 前 P9-K 继续关闭。
+
+---
+
+## P9-JR2 — Second Formal Review Corrective Gate
+
+Trigger：
+`development/66-p9-jr-formal-rereview-result.md` = FAIL / CHANGES REQUIRED。
+
+Authorized scope only：
+
+- P9-JR-F1：修正 file-path false negatives 与 SQL natural-language false positive；
+- P9-JR-F2：关闭 argparse help text surface，使 root/subcommand `-h/--help` 走 deterministic JSON parser error；
+- 增加 direct/adversarial regression tests；
+- focused/full/compile/scope verification；
+- 新 exact candidate detached formal review。
+
+Gate：
+
+- `/tmp`、`/etc/passwd`、`C:\\secret.txt`、`path=C:\\secret.txt`、traversal 全部 deterministic reject；
+- `2024/2025`、`P5/P6 evidence`、`SQL review completed`、`Select revenue from the annual report evidence.` 全部 allow；
+- 原始 `SELECT * FROM secrets` 仍 reject；
+- root/subcommand `-h/--help` 均 exit 2 / stdout empty / one JSON stderr；
+- focused/full PASS；
+- detached re-review PASS。
+
+P9-JR2 PASS 前 P9-K 继续关闭。
+
+---
+
+## P9-JR3 — Shell-Token Corrective Gate
+
+Trigger：
+`development/70-p9-jr2-formal-rereview-result.md` = FAIL / CHANGES REQUIRED。
+
+Authorized scope：
+
+- reject bare command-segment executable tokens `powershell/pwsh/bash/curl/wget` plus existing argument forms；
+- add direct regression tests；
+- focused/full/contract probe；
+- fresh detached formal review。
+
+Gate：
+
+- all five bare executable probes reject with `P9_RESOLUTION_CONTENT_FORBIDDEN`；
+- argument forms continue rejecting；
+- benign finance/natural-language probes remain allowed；
+- focused/full PASS；
+- detached re-review PASS。
+
+P9-JR3 PASS 前 P9-K 关闭。
+
+---
+
 ## P9-K — Acceptance Freeze
 
 固定：
@@ -191,6 +283,13 @@ Detached：
 ## P9-L — Independent Acceptance
 
 Detached project-root worktree。
+
+Windows pytest path hard constraint：
+- basetemp 必须位于 `D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\<single-char>`；
+- `<single-char>` 必须恰好一个字符；
+- focused / synthetic / full 使用不同单字符目录；
+- 已实测 deep snapshot path：259 chars PASS；260 chars FAIL；
+- acceptance 不得自行换成更长 basetemp。
 
 不得修改：
 - production
@@ -213,7 +312,7 @@ PASS 后：
 - post-merge full regression
 - PROJECT_STATUS P9_DONE
 - design index/roadmap/master design
-- authorize P10 Design only
+- authorize P10 Codex Dynamic Research Integration Design only
 
 ---
 

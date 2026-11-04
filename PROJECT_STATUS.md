@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P8_DONE / P9_DESIGN_READY**
+**P8_DONE / P9_J_AUTHORIZED**
 
 ## Accepted baseline
 
@@ -120,7 +120,7 @@
 
 Status:
 
-`DESIGN READY / DEVELOPMENT NOT STARTED`
+`P9-G / P9-H / P9-I PASS — P9-J FORMAL REVIEW AUTHORIZED`
 
 Planned branch:
 
@@ -167,9 +167,21 @@ P8 final Independent Acceptance freeze:
 
 P9 detailed design, implementation plan, development instruction and acceptance baseline are complete.
 
-Production remains blocked until this P9 design baseline is committed/pushed and the formal P9 worktree is created.
+The P9 production/test candidate has been corrected, re-reviewed, and live-validated.
 
-Current gate: `P9-A Design Baseline Commit / P9-B Development Preparation`.
+Corrective implementation commit: `f3b6dcd1b243c7a77734a1cdfa7459f38d91c842`.
+
+Corrective evidence: `development/56-p9-g-corrective-evidence.md` records focused `40 passed`, full unit regression `275 passed`, compile/import/diff/scope/immutability PASS, and synthetic REVIEW_REQUIRED → PASS.
+
+GitHub corrective re-review is recorded in `development/57-p9-g-corrective-github-rereview.md` with verdict `PASS`; F1-F5 are closed and P9-H is satisfied.
+
+P9-I live evidence is recorded in `development/59-p9-i-live-evidence.md`; GitHub live-evidence review in `development/60-p9-i-github-live-review.md` records verdict `PASS`. CN/HK exact queues, honest resolved states, dual-root determinism, performance gates, and catalog/P3/P5/P6/P7 immutability all passed.
+
+Current instruction: `development/61-p9-j-formal-code-review-instruction.md`.
+
+Current gate: `P9-J — Formal Detached Code Review`.
+
+P9-K/L/M, main merge, P10 and P11 remain closed until the formal detached review result is pushed and reviewed.
 
 ## Project directory consolidation
 
@@ -272,6 +284,6 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P6 — Raw Facts / Evidence: `DONE`
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
-- P9 — Codex Review Overlay: `DESIGN AUTHORIZED`
-- P10 — Codex Skill: `NOT STARTED`
+- P9 — Codex Review Overlay: `P9-G PASS / P9-H PASS / P9-I PASS / P9-J AUTHORIZED`
+- P10 — Codex Dynamic Research Integration: `NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`

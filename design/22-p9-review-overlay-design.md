@@ -6,8 +6,10 @@
 
 前置条件：
 - P0–P8 = DONE / PASS
-- accepted P8 merge = `415d2ad82e890be855198d4d4c57bca8d1beb406`
-- P8 closeout = `development/47-p8-closeout.md`
+- accepted P8 merge = `ee934ad05812c69b79f76db43e62cfd4050efb8e`
+- P8 final acceptance = `acceptance/33-p8-issue006-acceptance-result.md`
+- P8 reviewed candidate = `537ebbd17454f80c8838f58abbbd02d5994f8716`
+- P8 closeout = `development/47-p8-closeout.md`（历史初次 closeout）；最新 accepted baseline 以 PROJECT_STATUS / accepted merge 为准
 - P7 validation schema = `p7-validation-v1`
 - P6 raw fact schema = `p6-raw-facts-evidence-v1`
 - project directory consolidation = PASS
@@ -54,7 +56,7 @@ P9 production **不调用 Codex、OpenAI API 或任何远程 LLM API**。
 原因：
 
 - Review Overlay 是本地数据 contract / persistence / validation infrastructure；
-- “Codex 阅读上下文、判断语义、选择 resolution”属于 P10 Skill orchestration；
+- “Codex 阅读上下文、判断语义、选择 resolution”属于未来 P10 Codex Dynamic Research Integration（由 Codex 基于运行时研究规范直接编排）；
 - P9 只接受 reviewer 已明确提交的 resolution payload；
 - 这样 P9 能 deterministic unit test / acceptance，不把模型行为混入 production truth。
 
@@ -65,7 +67,7 @@ P9 production **不调用 Codex、OpenAI API 或任何远程 LLM API**。
 
 但只是审计字段，不触发模型调用。
 
-P10 可在未来使用 P8 read-only tools + P9 local APIs/CLI 进行 Codex review。
+P10 可在未来由 Codex 直接使用 P8 read-only tools + P9 local APIs/CLI 进行 review；不要求固定 Skill。
 
 ---
 
@@ -113,7 +115,7 @@ P9 v1 禁止：
 - remote AI/API
 - MCP mutation tools
 - P8 tool contract changes
-- P10 Skill implementation
+- P10 Dynamic Research Integration implementation
 - P11 SEC provider
 - automatic reviewer decision
 - silent issue dismissal
@@ -704,7 +706,9 @@ Active resolution：
 
 ## 21. Evidence refs
 
-Resolution必须至少 1 个 evidence ref。
+普通 field/table/classification resolution必须至少 1 个直接 evidence ref。
+
+`ATTEST_ISSUE_RESOLVED` 是唯一例外：caller不得自由提交 direct evidence refs；P9 必须从所有 `supporting_resolution_ids` 自动合并其已经验证的 evidence refs，并将合并后的 refs/pages持久化到 attestation resolution。因此**每个 persisted resolution最终仍必须拥有至少 1 个可验证 evidence ref**。
 
 Allowed：
 
@@ -767,7 +771,21 @@ evidence refs必须全部属于 same table（P5 cell或table内 fact evidence）
 
 ### ISSUE attestation
 
-evidence来自 supporting resolutions，不单独自由引用。
+caller submission：
+- `evidence_refs` 必须为空或省略；
+- `supporting_resolution_ids` 必须非空。
+
+P9 自动：
+1. 验证每个 support resolution active / same issue / evidence valid；
+2. union 所有 supporting resolution 的 persisted evidence refs；
+3. deterministic dedupe/sort；
+4. 自动写入 attestation persisted `evidence_refs`；
+5. 自动派生 `evidence_pages`。
+
+若 union 为空：
+`P9_EVIDENCE_INVALID`。
+
+因此 attestation 不单独自由引用证据，但 persisted record 仍具备 evidence chain。
 
 ---
 
@@ -1183,7 +1201,7 @@ P9本身禁止：
 
 只返回 record。
 
-P10 Skill可在未来：
+P10 Dynamic Research Integration 可在未来：
 - review完成
 - materialize
 - 检查 resolved PASS
@@ -1331,7 +1349,7 @@ build_resolved_parsed_data_record(
 
 ## 41. Local CLI
 
-P9提供 deterministic local CLI，供未来 P10 Skill调用。
+P9提供 deterministic local CLI，供未来 P10 Codex direct integration 调用。
 
 入口：
 
@@ -1350,12 +1368,17 @@ CLI：
 
 - 不调用 Codex
 - 不调用 network
-- JSON stdout only
-- diagnostics stderr
+- 成功时 exit 0，stdout exactly one JSON document，stderr empty
+- handled runtime failure 时 stdout empty，stderr exactly one deterministic JSON object，exit 1
+- parser-level failure（包括无 subcommand、unknown subcommand、missing required argument、mutually-exclusive misuse）不得输出 argparse usage/error 文本；stdout empty，stderr exactly one deterministic JSON object，exit 2
+- 所有 parser-level failure 使用稳定 reason_code `P9_CLI_ARGUMENT_ERROR` 与稳定 message `invalid command line arguments`，不得依赖 Python/argparse 版本生成的 usage/error 文案
+- P9 machine CLI **不提供 argparse 纯文本 help surface**；root `-h/--help` 与任一 subcommand `-h/--help` 均按 parser-level failure 处理：exit 2 / stdout empty / exactly one JSON stderr，且不得出现 usage/help prose
 - resolution input使用 explicit JSON file/string
 - 不读取任意 secret
 
-P10只负责编排 reviewer reasoning，不重实现 overlay persistence。
+实现必须把 argument parsing 本身放入 CLI JSON error boundary；允许通过自定义 `ArgumentParser.error()` / equivalent deterministic mechanism 把 parser failure 转换为 P9 diagnostic，但不得让 `SystemExit(2)` 或 argparse help action 绕过该边界。
+
+P10 只验证/编排 Codex 对 P8/P9 的直接使用，不重实现 overlay persistence，也不复制运行时研究规则。
 
 ---
 
@@ -1583,7 +1606,7 @@ Acceptance evidence至少记录：
 
 ## 49. Security / scope
 
-P9 resolution payload不得包含：
+P9 persisted resolution payload不得包含：
 
 - file paths
 - URLs
@@ -1592,15 +1615,105 @@ P9 resolution payload不得包含：
 - Python code
 - credentials
 
-justification仅审计文本，max 4000 chars。
+这不是仅针对 `reviewer_id` 或 `justification` 的局部规则，而是 **payload-wide persisted-content invariant**。
 
-P9 production不执行 justification内容。
+### 49.1 Enforcement point
+
+在计算 `resolution_id`、写入 immutable resolution JSON 之前，P9 必须对已经完成 target/evidence normalization、before/after 构造后的完整：
+
+`ReviewResolution.to_dict(include_id=False)`
+
+执行递归 string-leaf security validation。
+
+同一 validator 也必须用于读取/语义验证既有 resolution；即使攻击者手工修改 payload 并重新计算 resolution SHA，也不能通过历史 resolution semantic validation。
+
+任何命中均失败：
+
+- reason_code = `P9_RESOLUTION_CONTENT_FORBIDDEN`
+- message = `resolution payload contains forbidden content`
+
+错误不得回显疑似 secret / command / URL / path 原文。
+
+### 49.2 Deterministic forbidden-content classes
+
+validator 必须使用固定、可测试、无网络/AI 的 deterministic rules，至少覆盖：
+
+1. URL：scheme URL（例如 `https://`、`http://`、`ftp://`、`file://`、`ssh://`）和 `www.` URL；
+2. file path：
+   - Windows drive-root token 必须在 string start 或任意非字母数字 boundary 后识别，因此 `C:\\secret.txt` 与 `path=C:\\secret.txt` 都必须拒绝；
+   - UNC path 必须拒绝；
+   - POSIX absolute path 必须包含 single-segment 与 multi-segment，因此 `/tmp`、`/secret.txt`、`/etc/passwd` 都必须拒绝；
+   - 显式 `../` / `..\\` traversal 必须拒绝；
+   - slash 位于字母数字 token 内部时不得仅凭 slash 判定为 path，因此 `2024/2025`、`P5/P6` 不得误拒；
+3. shell command：明确的 command-launch / execution syntax：
+   - command segment boundary 定义为 string start 或 newline / `;` / `&` / `|` 后的首个 token；
+   - `powershell` / `powershell.exe`、`pwsh` / `pwsh.exe`、`bash` / `bash.exe`、`curl` / `curl.exe`、`wget` / `wget.exe` 作为完整 command segment 或 command-segment 起始 executable token 时必须拒绝，即使没有参数；
+   - `cmd /c` / `cmd /k`、`sh -c`、`Invoke-Expression`、destructive shell forms 同样拒绝；
+   - executable 名称仅出现在普通句子中间、且不是 command-segment 起点时，不因关键词本身拒绝；
+4. SQL：必须按 **statement grammar** 识别，而不是仅凭 `SELECT` / `FROM` 等自然语言关键字：
+   - `SELECT * FROM <sql_object>` 必须拒绝；
+   - `SELECT <projection> FROM <sql_object>` 在 `<sql_object>` 后为 string end、semicolon 或 SQL clause（`WHERE/JOIN/GROUP BY/ORDER BY/HAVING/LIMIT/OFFSET/UNION`）时必须拒绝；
+   - quoted/backtick/bracketed object、schema-qualified object、comma projection、SQL function projection 均视为 SQL signal；
+   - `INSERT INTO`、`DELETE FROM <sql_object>`、`DROP/ALTER/CREATE TABLE`、`UNION SELECT`、`PRAGMA` 必须拒绝；
+   - `UPDATE <sql_object> SET` 只有出现 assignment-like `<identifier> =` 时才作为 SQL 拒绝，避免把自然语言 “update guidance set by management” 当 SQL；
+   - 自然语言 `Select revenue from the annual report evidence.` 必须允许；
+5. Python code：明确 executable syntax，例如 line-start `import` / `from ... import` / `def` / `class`，以及 `__import__()`、`exec()`、`eval()`、`os.*()`、`subprocess.*()`；
+6. credentials：`password/passwd/secret/token/api_key/access_key/private_key` 等 assignment form，以及 Bearer credential form。
+
+普通财务语义文本不得仅因为包含斜杠、关键字单词或自然语言而被误判；至少 `2024/2025`、`P5/P6 evidence`、`SQL review completed`、`Select revenue from the annual report evidence.` 必须允许。
+
+### 49.3 Field boundary
+
+caller-controlled free-text/string fields（包括 `value`、`reviewer_id`、`justification`）必须受上述完整规则约束。
+
+target / evidence caller input不得原样信任；只有经既有 P5/P6/base identity validation 后形成的 canonical target/evidence refs 才可进入 provisional resolution，但最终仍受 payload-wide validator 检查。
+
+justification仅审计文本，max 4000 chars；P9 production不执行其内容。
 
 ---
 
 ## 50. P9 Issue Log
 
-初始：无。
+### P9-ISSUE-001 — P9 design baseline referenced pre-Issue-006 P8 accepted merge
+
+P9 initial design commit `4487da2` referenced P8 accepted merge `415d2ad...`. After P8-ISSUE-006, P8 was independently re-reviewed/re-accepted and the final accepted merge became `ee934ad05812c69b79f76db43e62cfd4050efb8e` with acceptance evidence `acceptance/33-p8-issue006-acceptance-result.md`.
+
+Impact:
+- P8 production MCP behavior is unchanged；
+- P8 tests/design/evidence changed；
+- P9 production had not started；
+- P9 environment dependency decision remains valid, but base identity/audit references must be refreshed before P9-B.
+
+Approved solution:
+1. update P9 precondition to final P8 accepted merge `ee934ad...`；
+2. require P9 branch to contain latest accepted main before production development；
+3. rerun the no-new-dependency/internal-import environment audit against the refreshed branch；
+4. record new audit evidence；
+5. no P9 production code before this amendment is committed/pushed。
+
+Affected gates: P9-A / environment audit only.
+
+### P9-ISSUE-002 — Attestation direct-evidence rule conflicted with persisted-resolution evidence invariant
+
+Initial P9 design simultaneously required:
+- every resolution to have at least one evidence ref；
+- `ATTEST_ISSUE_RESOLVED` to use evidence from supporting resolutions and not accept free direct evidence。
+
+Without an explicit persistence rule, an attestation could either violate the universal evidence invariant or require the caller to duplicate evidence that P9 is supposed to derive/validate.
+
+Approved solution:
+1. caller attestation `evidence_refs` must be omitted or empty；
+2. `supporting_resolution_ids` must be non-empty and resolve to active same-issue resolutions；
+3. P9 unions the persisted validated evidence refs from all supporting resolutions；
+4. refs are deterministically deduped/sorted；
+5. evidence pages are derived from that union；
+6. the persisted attestation resolution stores the inherited evidence refs/pages；
+7. empty inherited evidence union is `P9_EVIDENCE_INVALID`；
+8. caller-provided direct attestation evidence is rejected rather than trusted。
+
+This preserves both caller-boundary safety and the invariant that every persisted resolution has an auditable evidence chain.
+
+Affected gates: P9-C / P9-D / P9-F / acceptance.
 
 ### P9-ISSUE-003 — Immutable resolution before-state was not reconstructible from timestamp/supersession alone
 
@@ -1623,6 +1736,184 @@ No P9 resolution-store production code existed before this amendment.
 
 Affected gates: P9-D / P9-E / P9-F / P9-J / P9-L.
 
+### P9-ISSUE-004 — P10 route amendment left subordinate P9 governance/status text stale
+
+After commit `5c059bad6938978a93c3f9a6f107d7a7560f7bd9` replaced the future P10 fixed Skill route with `P10 — Codex Dynamic Research Integration`, a governance consistency check found that some subordinate P9 artifacts still described the superseded route or the pre-development state.
+
+Observed stale items:
+- `design/01-project-detailed-design.md` still contained one P9 scope guard naming the superseded `P10 Codex Skill` route；
+- `design/23-p9-implementation-plan.md` had not explicitly named the new P10 route at closeout authorization；
+- `development/48-p9-development-instruction.md` still prohibited “P10 Skill implementation” instead of the current P10 route；
+- `PROJECT_STATUS.md` still said `DEVELOPMENT NOT STARTED` / production blocked pending initial P9 setup, while the handoff records an existing local, uncommitted P9 candidate that had already reached focused `7 passed` and full unit regression `242 passed / 0 fail` before the WorkHome connection outage.
+
+The local candidate is **not** an accepted baseline and cannot be treated as verified until WorkHome is reachable and the active worktree is re-audited.
+
+Approved solution:
+1. keep `5c059bad...` as the P10 route design baseline and do not move the future P10 work into main before P9 closeout；
+2. synchronize the remaining stale P10 terminology in `design/01`, `design/23`, and `development/48` to `P10 Codex Dynamic Research Integration`；
+3. update `PROJECT_STATUS.md` to distinguish accepted P8 baseline, GitHub P9 design baseline, and the handoff-reported local uncommitted P9 candidate pending WorkHome re-verification；
+4. record the safe recovery sequence as WorkHome reconnect → local git/status verification → safe fast-forward of design-only commits without deleting/rebuilding untracked P9 files → continue P9-G；
+5. do not modify P9 production/tests from GitHub while the local uncommitted worktree cannot be inspected；
+6. this governance-only amendment does not invalidate already reported P9-B–F test evidence, but those results remain provisional until local re-verification after reconnect.
+
+Affected gates: governance/status synchronization only. P9-G remains the next development gate after safe local recovery.
+
+### P9-ISSUE-005 — Local validated P9-G candidate diverged from newer remote governance commit
+
+After `development/51-p9-codex-local-execution-instruction.md` was added on GitHub at remote commit `2c56e38a51f148b86ce6f4754bf9bae7a157fd7e`, the WorkHome Codex completed and committed a local P9 candidate at `e6f83d560822214ab4ede0e317f853d100b6c9ea` before incorporating that new remote governance commit.
+
+Observed local validation for the candidate:
+- focused P9 tests: `29 passed`；
+- full unit regression: `264 passed`；
+- compile/import: PASS；
+- scope scan: PASS；
+- immutability checks: PASS；
+- synthetic REVIEW_REQUIRED → PASS path: PASS。
+
+The normal push was correctly rejected as non-fast-forward because the remote P9 branch had advanced with the governance-only `development/51` commit. No force push, reset, rebase, destructive clean, or overwrite was performed. A temporary P9-I live verification may have been executed locally but is not part of the committed candidate and is not accepted evidence.
+
+Root cause:
+- GitHub remained the design/version truth source and advanced with a new one-gate instruction while local implementation work was already in flight；
+- the resulting histories diverged even though the remote change is governance-only and the local candidate is production/tests/evidence work；
+- `development/51` explicitly required STOP rather than self-authorizing merge/rebase when safe fast-forward was no longer possible。
+
+Approved solution:
+1. `development/51` supersedes the earlier broad P9-G→M execution request. Until a subsequent instruction explicitly authorizes another Gate, only recovery/integration of the P9-G candidate is allowed；
+2. preserve local candidate commit `e6f83d560822214ab4ede0e317f853d100b6c9ea` unchanged as an auditable implementation candidate；
+3. do not rebase, reset, cherry-pick-overwrite, force push, or reconstruct the candidate；
+4. create a normal non-destructive merge that combines the current remote governance head with the local candidate, provided the merge has no production/test semantic conflict；
+5. if conflicts exist only in governance/evidence files, resolve them in favor of the latest GitHub governance semantics while preserving factual local development evidence；
+6. if any conflict touches P9 production/tests or changes candidate semantics, STOP and report the exact conflict before resolving；
+7. after the merge, rerun the P9-G verification required by `development/51` because the integration commit changes repository state, even though the incoming remote delta is governance-only；
+8. ensure no P9-I live outputs/artifacts are included in the pushed candidate；
+9. push the integrated candidate normally to `task/p9-review-overlay` and stop. P9-I/J/K/L/M remain unauthorized until independent GitHub code review of the pushed candidate completes。
+
+Affected gates: P9-G candidate integration/re-verification only. P9-I and later gates remain closed.
+
+### P9-ISSUE-006 — P9-J-F1 payload security invariant was specified but not operationalized
+
+Formal P9-J review at `development/62-p9-j-formal-code-review-result.md` proved that the candidate accepted forbidden persisted content, including a URL in `justification` and SQL statement text in `value`.
+
+Root cause:
+- Section 49 stated the forbidden categories but did not define the exact validation point, read-time revalidation, deterministic detection classes, stable reason code/message, or benign-text false-positive boundary；
+- implementation therefore validated only a few reviewer-id secret markers and justification length, leaving the full persisted resolution unguarded。
+
+Approved solution:
+1. Section 49 becomes a payload-wide persisted-content invariant；
+2. validate the complete normalized provisional `ReviewResolution.to_dict(include_id=False)` before resolution ID hashing/persistence；
+3. run the same validation during historical resolution semantic validation；
+4. deterministic classes cover URL/path/shell/SQL/Python/credential syntax；
+5. reject with `P9_RESOLUTION_CONTENT_FORBIDDEN` / `resolution payload contains forbidden content` without echoing offending content；
+6. add adversarial tests for all six classes and benign non-matches；
+7. no P9-K until detached corrective re-review passes。
+
+Affected gates: P9-D / P9-JR / P9-K / P9-L.
+
+### P9-ISSUE-007 — P9-J-F2 argparse parser failures escaped the JSON CLI boundary
+
+Formal P9-J review proved four parser-level cases emitted argparse `usage:/error:` text and `SystemExit(2)` outside the designed P9 diagnostic contract.
+
+Root cause:
+- `parser.parse_args(argv)` ran before the existing `ReviewError` / generic exception JSON boundary；
+- design said JSON stdout / diagnostics stderr but did not freeze parser-level exit code, reason code, message, or argparse-version independence。
+
+Approved solution:
+1. argument parsing itself must execute inside the P9 JSON diagnostic boundary；
+2. parser-level failures must never emit argparse usage/error prose；
+3. all parser-level failures use exit 2, stdout empty, stderr exactly one JSON object；
+4. stable diagnostic is `P9_CLI_ARGUMENT_ERROR` / `invalid command line arguments`；
+5. directly test no subcommand, unknown subcommand, missing required argument, and mutually-exclusive input misuse；
+6. handled runtime failures remain exit 1 and success remains exit 0；
+7. no P9-K until detached corrective re-review passes。
+
+Affected gates: P9-G / P9-JR / P9-K / P9-L.
+
+### P9-ISSUE-008 — P9-JR security classifier still had path false negatives and SQL natural-language false positive
+
+Formal detached re-review `development/66-p9-jr-formal-rereview-result.md` proved that the first corrective candidate:
+- allowed POSIX absolute path `/tmp`；
+- allowed Windows path when preceded by assignment text, e.g. `path=C:\\secrets\\payload.txt`；
+- rejected ordinary natural language `Select revenue from the annual report evidence.` as SQL。
+
+Root cause:
+- path regex encoded incidental surrounding-character assumptions instead of the contract's path-token boundary；
+- SQL regex treated lexical `SELECT ... FROM` as sufficient rather than recognizing SQL object/statement grammar。
+
+Approved solution:
+1. Windows drive-root is recognized at start or after any non-alphanumeric boundary；
+2. POSIX absolute path explicitly includes single-segment and multi-segment forms；
+3. slash inside alphanumeric tokens remains benign；
+4. SQL detection uses statement grammar and SQL-object termination/clause signals；
+5. UPDATE requires assignment-like SET syntax；
+6. direct regression cases are frozen in acceptance item 55；
+7. original URL/SQL/security probes remain mandatory。
+
+Affected gates: P9-JR2 / P9-K / P9-L.
+
+### P9-ISSUE-009 — argparse built-in help remained a non-JSON success path
+
+Formal detached re-review proved:
+- root `--help` returned exit 0 + plain argparse stdout；
+- `tasks --help` returned exit 0 + plain argparse stdout。
+
+This violates Section 41's machine-CLI invariant that every success emits exactly one JSON document.
+
+Approved solution:
+1. P9 machine CLI has no argparse text-help surface；
+2. disable built-in help for root parser and every subparser；
+3. `-h/--help` is unsupported input and must flow through the same parser-level JSON error contract；
+4. root and subcommand help probes become mandatory acceptance item 53 cases；
+5. no text usage/help output is permitted。
+
+Affected gates: P9-JR2 / P9-K / P9-L.
+
+### P9-ISSUE-010 — Bare shell executable token was not classified as command launch
+
+Formal detached re-review `development/70-p9-jr2-formal-rereview-result.md` found that exact payload strings `powershell`, `pwsh`, `bash`, `curl`, and `wget` were allowed even though Section 49 explicitly lists those shell command surfaces.
+
+Root cause:
+the implementation only recognized selected argument forms and did not treat a bare executable token at command-segment boundary as a command launch.
+
+Approved solution:
+1. define command-segment boundary explicitly；
+2. reject the five executable tokens when they are the first token of a command segment, including bare exact forms；
+3. retain existing argument-form detection；
+4. do not reject the same keyword solely because it appears mid-sentence outside a command segment；
+5. freeze bare-token probes in acceptance item 55 and direct unit tests；
+6. perform a fresh detached review before P9-K。
+
+Affected gates: P9-JR3 / P9-K / P9-L.
+
+### P9-ISSUE-011 — P9 acceptance freeze used a two-character pytest basetemp and hit Windows path length
+
+The first P9-L attempt at frozen candidate `3c5a632d6026dcb5e388b747d1e6972b15b7776e`
+failed before semantic acceptance because the frozen focused command used
+`D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\af`.
+
+A representative deep snapshot output path was exactly 260 characters and
+failed with `FileNotFoundError` / `P9_PERSIST_FAILED`.
+
+The same path shape with a one-character basetemp
+`D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\f`
+is 259 characters and had already passed repeatedly in development/formal review.
+
+Root cause:
+the acceptance freeze did not preserve the previously verified one-character
+Windows basetemp constraint and introduced a two-character suffix.
+
+Approved solution:
+1. all P9 focused/synthetic/full acceptance pytest basetemps must be exactly one
+   character below `D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\`；
+2. the acceptance refreeze must use distinct one-character roots；
+3. the blocked acceptance attempt remains historical evidence and is not
+   silently reinterpreted as a product failure；
+4. no production/test change is authorized；
+5. create a new P9-K refreeze and rerun P9-L from a fresh detached worktree；
+6. any 260-character-or-longer deep path observed under the frozen test shape
+   is an acceptance environment blocker, not a reason to patch P9 snapshot semantics。
+
+Affected gates: P9-K refreeze / P9-L only.
+
 发现问题必须：
 
 ```text
@@ -1642,7 +1933,7 @@ STOP
 Independent Acceptance PASS：
 
 - P9 → DONE
-- P10 Codex Skill design authorized
+- P10 Codex Dynamic Research Integration design authorized
 
 P10 production不得在 P9 acceptance期间开始。
 
