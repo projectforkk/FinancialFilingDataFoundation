@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-B REVIEW PASS / CLOSED — P10-C NOT YET AUTHORIZED`
+`P10-B REVIEW PASS / CLOSED — P10-C AUTHORIZED`
 
 Design baseline:
 
@@ -178,7 +178,7 @@ P10-ISSUE-001 exact-candidate source binding is verified. No install/upgrade is 
 
 Design-owner review: `development/80-p10-b-github-review.md` = `PASS — P10-B CLOSED`.
 
-P10-C remains CLOSED until a separate explicit development instruction is committed/pushed.
+P10-C is authorized by `development/81-p10-c-spec-freeze-instruction.md` after that instruction is committed/pushed. Scope is Models / Spec Freeze only; P10-D and later remain closed.
 
 Still not authorized:
 

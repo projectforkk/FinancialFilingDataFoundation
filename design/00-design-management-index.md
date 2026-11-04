@@ -313,5 +313,6 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 3. design-owner review = `development/80-p10-b-github-review.md` = PASS；
 4. P10-ISSUE-001 exact-candidate source binding = CLOSED / PASS；
 5. no install/upgrade required；
-6. P10-C 仍未授权，需 separate explicit development instruction；
-7. P11 / Research MCP production / Semantic Resolver production继续关闭。
+6. P10-C Models / Spec Freeze = AUTHORIZED by `development/81-p10-c-spec-freeze-instruction.md` after instruction push；
+7. P10-D 及以后继续关闭；
+8. P11 / Research MCP production / Semantic Resolver production继续关闭。
