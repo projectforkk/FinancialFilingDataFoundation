@@ -135,7 +135,7 @@ Final role precedence remains:
 4. explicit requested exhibit => REQUESTED_EXHIBIT
 5. otherwise excluded
 
-An exhibit already satisfied by 1-3 adds no duplicate and retains the higher role. Every requested exhibit must match exactly one validated index item; zero match => P11_PACKAGE_ASSET_MISSING before selected asset downloads.
+Requested exhibit name exactly `index.json` is satisfied by the synthetic `FILING_INDEX` asset and requires no provider index item. Every other requested exhibit must match exactly one validated index item; zero match => P11_PACKAGE_ASSET_MISSING before selected asset downloads. If a requested item is already the primary or a structured asset, the request is satisfied by that existing logical row, no duplicate is added, and the higher-precedence role is retained.
 
 No unrelated HTML/text/image exhibits are auto-selected. No recursive link following. No external taxonomy resource is added by P11-E.
 
@@ -178,6 +178,8 @@ The existing design/26 canonical identity fixture must continue to hash exactly 
 ## 11. Dedicated source-package store layout
 
 P11-E does not modify or reuse P2 PDF RawDocumentStore semantics.
+
+`SecPackageStore(project_root)` applies the same canonical project-root validation as acquisition. A missing/non-directory root raises exact `ValueError("project_root must be an existing directory")`.
 
 Canonical root only: <project_root>/workspace/sec/raw
 
@@ -223,7 +225,9 @@ Normal cleanup removes only the current attempt staging. Foreign-attempt staging
 
 ## 14. Package loader invariants
 
-load_package(sha) validates:
+`load_package(sha)` first requires exact `^[0-9a-f]{64}$`; invalid input raises exact `ValueError("source_package_sha256 must be 64 lowercase hex")` before filesystem access.
+
+For valid SHA, load_package validates:
 - sha is 64 lowercase hex.
 - exact final layout/project containment.
 - manifest byte size <=16 MiB, UTF-8/no-BOM/LF-only/exactly one final LF.
@@ -239,7 +243,7 @@ load_package(sha) validates:
 - every blob is regular non-reparse and exact SHA/size.
 - count and aggregate caps still hold.
 
-Manifest/blob/hash/layout mismatch => P11_PACKAGE_HASH_MISMATCH, except explicit root escape => P11_PATH_OUTSIDE_PROJECT.
+On success `manifest_path` is the resolved final `<project_root>/workspace/sec/raw/packages/<sha>/manifest.json` path; it is storage metadata only and never enters package identity. Manifest/blob/hash/layout mismatch => P11_PACKAGE_HASH_MISMATCH, except explicit root escape => P11_PATH_OUTSIDE_PROJECT.
 
 ## 15. Receipt identity, schema and collision behavior
 
@@ -251,6 +255,15 @@ Receipt identity object exact keys:
 - responses
 
 Receipt `responses` contains exactly one identity row for each successfully captured logical requested resource used by the package: one row for accession `index.json` plus one row for every selected filing asset. Retry attempts and redirect hops never add extra response identity rows; they contribute only to diagnostics. Each row describes the final successful response for that logical requested resource.
+
+Response identity normalization is exact:
+- `requested_url` = exact canonical initial `https://www.sec.gov/Archives/...` URL constructed by Section 5.
+- `final_url` = accepted canonical SEC URL identity form after redirects: scheme `https`, lowercase host, default port 443 omitted, exact validated path, empty query and fragment.
+- `status` = integer 200.
+- index `declared_content_type` = canonical string `application/json`.
+- asset `declared_content_type` = null when absent; otherwise the single validated header value after outer ASCII SP/HTAB trim, preserving case and interior visible-ASCII bytes.
+- `etag` and `last_modified` = null when absent; otherwise the single header value after outer ASCII SP/HTAB trim, preserving case/interior visible-ASCII bytes.
+- any present receipt header value must be non-empty after trim and contain only visible ASCII bytes `0x20..0x7e`; repeated or invalid values fail `P11_HTTP_FAILED` before receipt identity construction.
 
 Each response identity row exact keys: requested_url, final_url, status, declared_content_type (string/null), etag (string/null), last_modified (string/null), asset_sha256, byte_size.
 Rows sort by (requested_url, asset_sha256, byte_size, final_url).
@@ -264,7 +277,7 @@ Final receipt exact keys:
 - diagnostics
 
 diagnostics exact keys:
-- acquired_at UTC ISO-8601 string
+- acquired_at exact UTC form `YYYY-MM-DDTHH:MM:SS.ffffffZ`
 - request_count non-negative int = sum of actual emitted HTTP request starts across all logical index/asset fetches in this acquisition attempt
 - retry_count non-negative int = sum of scheduled retries across all logical resource fetches
 - redirect_count non-negative int = sum of followed redirects across all logical resource fetches
@@ -288,7 +301,7 @@ Stable provider identity = (cik, accession_number). Immutable content identity =
 
 Before outcome classification P11-E performs a two-stage committed-package scan under `packages/`.
 
-Stage 1 is a minimal identity peek only. Consider only child directories whose name is exactly 64 lowercase hex and whose `manifest.json` is a regular non-reparse file inside the raw root. Read at most the frozen 16 MiB manifest cap plus one sentinel byte; over-cap input cannot establish drift identity and is not fully loaded unless it is already the exact current package path verified by Section 13. For in-cap input require strict UTF-8/no-BOM/valid JSON object and inspect only `cik` and `accession_number`. A manifest that cannot establish both as valid normalized strings equal to the current `(cik, accession_number)` is not a drift candidate and does not block an unrelated filing acquisition. Stage 1 never treats unverified package fields as reusable/valid package state.
+Stage 1 is a minimal identity peek only. Consider only child directories whose name is exactly 64 lowercase hex, whose hash is different from the current `source_package_sha256`, and whose `manifest.json` is a regular non-reparse file inside the raw root. Read at most the frozen 16 MiB manifest cap plus one sentinel byte; over-cap input cannot establish drift identity and is not a Stage-2 candidate. For in-cap input require strict UTF-8/no-BOM/valid JSON object and inspect only `cik` and `accession_number`. A manifest that cannot establish both as valid normalized strings equal to the current `(cik, accession_number)` is not a drift candidate and does not block an unrelated filing acquisition. Stage 1 never treats unverified package fields as reusable/valid package state.
 
 Stage 2 fully loads every Stage-1 same-accession candidate through `SecPackageStore.load_package()`. A manifest that claims the current valid cik/accession but fails full package/hash/blob/layout validation blocks with the loader's package failure; it MUST NOT be ignored as unrelated corruption.
 
@@ -401,8 +414,8 @@ Before P11-E implementation can close, tests must directly trace these exact 60 
 37. specific XML linkbase/instance precedence.
 38. generic .xml role.
 39. unrelated HTML/text/image not auto-selected.
-40. requested exhibit role.
-41. requested exhibit already higher-role adds no duplicate.
+40. requested exhibit role; requested `index.json` is satisfied by synthetic FILING_INDEX without a provider item.
+41. requested primary/structured exhibit already higher-role adds no duplicate.
 42. requested exhibit absent blocks pre-download.
 43. actual size equals declared.
 44. actual aggregate >512 MiB blocks streaming.
@@ -415,10 +428,10 @@ Before P11-E implementation can close, tests must directly trace these exact 60 
 51. package new non-replacing directory commit reloads.
 52. concurrent exact package writers: one new, loser exact-verifies.
 53. existing package difference/corruption blocks without mutation.
-54. loader rejects wrong hash/key/order/primary/count/path/blob semantics and returns immutable package state without any receipt selection.
-55. receipt ID excludes diagnostics but includes exactly one stable final response row per logical index/selected-asset resource; retries/redirects affect diagnostics only and aggregate counters exactly.
+54. store/root and loader public validation has exact ValueErrors; loader rejects wrong hash/key/order/primary/count/path/blob semantics, returns resolved final manifest_path, and returns immutable package state without any receipt selection.
+55. receipt ID excludes diagnostics but includes exactly one stable final response row per logical index/selected-asset resource; requested/final URL and header values follow exact canonical/trim rules, retries/redirects affect diagnostics only, and aggregate counters exactly.
 56. same receipt identity/different current diagnostics reuses existing authoritative receipt bytes/acquired_at without overwrite; identity collision blocks and acquisition result carries the committed receipt_id.
-57. two-stage drift scan enforces the 16 MiB peek cap, ignores unrelated/unidentifiable corruption, but a parseable same-cik/accession manifest that fails full loader blocks; with no other hashes COMMITTED_NEW => ACQUIRED_NEW and exact verified DESTINATION_EXISTS => REUSED_EXACT, both with empty prior tuple.
+57. two-stage drift scan skips the already verified current package hash, enforces the 16 MiB peek cap on other hashes, ignores unrelated/unidentifiable corruption, but a parseable same-cik/accession manifest that fails full loader blocks; with no other hashes COMMITTED_NEW => ACQUIRED_NEW and exact verified DESTINATION_EXISTS => REUSED_EXACT, both with empty prior tuple.
 58. same accession different verified package is preserved and surfaced as drift with ASCII-sorted unique other hashes, including later exact reacquisition when historical drift exists.
 59. registry occurs only after package+receipt verification, exact SourceMetadata uses committed receipt acquired_at and expected_identity=None; failure leaves package immutable.
 60. no P11-F parser/taxonomy-cache behavior and no P2 RawDocumentStore mutation/substitution.
