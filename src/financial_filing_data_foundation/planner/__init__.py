@@ -1,3 +1,4 @@
+from .errors import PackageAwarePlannerRequired
 from .incremental import IncrementalPlanner
 from .models import (
     FilingPlan,
@@ -8,6 +9,7 @@ from .models import (
 )
 
 __all__ = [
+    "PackageAwarePlannerRequired",
     "IncrementalPlanner",
     "FilingPlan",
     "PlannerAction",

@@ -1,15 +1,18 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
 
+from .sec import normalize_cik, normalize_sec_form, normalize_us_ticker
 
-_ALLOWED_MARKETS = frozenset({"CN", "HK"})
+
+_ALLOWED_MARKETS = frozenset({"CN", "HK", "US"})
 _ALLOWED_PERIODS = frozenset({"Q1", "H1", "Q3", "FY"})
+_ALLOWED_SLOT_PERIODS = frozenset({"Q1", "Q2", "H1", "Q3", "FY"})
 
 
 def _clean_text(value: str, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must not be empty")
     text = value.strip()
     if not text:
         raise ValueError(f"{field} must not be empty")
@@ -20,15 +23,21 @@ def _clean_text(value: str, field: str) -> str:
 class CompanyRef:
     market: str
     company_id: str
-    ticker: str
+    ticker: str | None
 
     def __post_init__(self) -> None:
         market = self.market.strip().upper()
         if market not in _ALLOWED_MARKETS:
             raise ValueError(f"unsupported P1 market: {self.market!r}")
         object.__setattr__(self, "market", market)
-        object.__setattr__(self, "company_id", _clean_text(self.company_id, "company_id"))
-        object.__setattr__(self, "ticker", _clean_text(self.ticker, "ticker"))
+        if market == "US":
+            object.__setattr__(self, "company_id", normalize_cik(self.company_id))
+            object.__setattr__(self, "ticker", normalize_us_ticker(self.ticker))
+        else:
+            object.__setattr__(
+                self, "company_id", _clean_text(self.company_id, "company_id")
+            )
+            object.__setattr__(self, "ticker", _clean_text(self.ticker, "ticker"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,11 +88,34 @@ class FilingSlotKey:
         if self.fiscal_year < 1900 or self.fiscal_year > 2200:
             raise ValueError(f"fiscal_year out of supported range: {self.fiscal_year}")
         period = self.raw_fiscal_period.strip().upper()
-        if period not in _ALLOWED_PERIODS:
+        if period not in _ALLOWED_SLOT_PERIODS:
             raise ValueError(f"unsupported P1 fiscal period: {period!r}")
+
+        filing_type = _clean_text(self.filing_type, "filing_type").upper()
+        if market == "US":
+            company_id = normalize_cik(self.company_id)
+            form = normalize_sec_form(filing_type)
+            if form.supplemental:
+                raise ValueError(
+                    "supplemental SEC form cannot use periodic FilingSlotKey"
+                )
+            filing_type = form.base_form
+            if filing_type == "10-Q" and period not in {"Q1", "Q2", "Q3"}:
+                raise ValueError(
+                    f"incompatible SEC form/period: {filing_type}/{period}"
+                )
+            if filing_type in {"10-K", "20-F", "40-F"} and period != "FY":
+                raise ValueError(
+                    f"incompatible SEC form/period: {filing_type}/{period}"
+                )
+        else:
+            company_id = _clean_text(self.company_id, "company_id")
+            if period == "Q2":
+                raise ValueError(f"unsupported P1 fiscal period: {period!r}")
+
         object.__setattr__(self, "market", market)
-        object.__setattr__(self, "company_id", _clean_text(self.company_id, "company_id"))
-        object.__setattr__(self, "filing_type", _clean_text(self.filing_type, "filing_type").upper())
+        object.__setattr__(self, "company_id", company_id)
+        object.__setattr__(self, "filing_type", filing_type)
         object.__setattr__(self, "raw_fiscal_period", period)
 
     def serialize(self) -> str:
@@ -122,8 +154,12 @@ class SourceMetadata:
     def __post_init__(self) -> None:
         object.__setattr__(self, "provider", _clean_text(self.provider, "provider"))
         object.__setattr__(self, "source_id", _clean_text(self.source_id, "source_id"))
-        object.__setattr__(self, "source_url", _clean_text(self.source_url, "source_url"))
-        object.__setattr__(self, "source_title", _clean_text(self.source_title, "source_title"))
+        object.__setattr__(
+            self, "source_url", _clean_text(self.source_url, "source_url")
+        )
+        object.__setattr__(
+            self, "source_title", _clean_text(self.source_title, "source_title")
+        )
         if self.acquired_at is not None:
             # Validate only; preserve the caller's exact ISO text.
             datetime.fromisoformat(self.acquired_at.replace("Z", "+00:00"))
