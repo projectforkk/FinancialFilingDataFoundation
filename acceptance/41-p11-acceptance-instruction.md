@@ -347,7 +347,7 @@ If the frozen runtime uses Arelle:
 
 If final implementation does not use Arelle, acceptance must instead prove an equivalent frozen XBRL parser contract with the same required semantics.
 
-## 16. Registry / reuse
+## 16. Registry / package-aware reuse
 
 Periodic filing:
 
@@ -356,11 +356,34 @@ Periodic filing:
 - source metadata accession/CIK correct;
 - slot bound only after period confirmation;
 - parsed record uses schema v2;
-- PASS + 0 blockers + COMPATIBLE => reusable;
-- REVIEW_REQUIRED not canonical reusable;
-- changed package/content blocks silent reuse.
+- P11 periodic ParsedDataRecord artifact_path is non-null project-root-relative POSIX under the configured P11 parsed-artifact root;
+- no P11 registry schema migration is required solely for source-package identity.
 
-Existing CN/HK registry behavior unchanged.
+Generic planner boundary:
+
+- IncrementalPlanner.build_plan with market=US returns/raises explicit P11_PACKAGE_AWARE_PLANNER_REQUIRED and does not perform document-SHA-only reuse;
+- existing CN/HK IncrementalPlanner behavior remains unchanged.
+
+Package-aware SEC selector acceptance cases:
+
+1. requested target slot + exact document SHA + exact package SHA + accepted parser/schema + PASS + 0 blockers + COMPATIBLE => reusable and P11-F/G/H/I parser/identity/v2/validation work is skipped;
+2. same document SHA but different current source_package_sha256 => P11_SOURCE_PACKAGE_CHANGE / no reuse;
+3. null or missing artifact_path => P11_REUSE_ARTIFACT_MISSING / no reuse;
+4. absolute/drive-relative/UNC/traversal/outside-root artifact path => P11_REUSE_ARTIFACT_PATH_INVALID / no reuse;
+5. v2 loader/hash/ID/source-reference failure => P11_REUSE_ARTIFACT_INVALID / no reuse;
+6. loaded manifest parse_run_id != registry record parse_run_id => P11_REUSE_ARTIFACT_INVALID;
+7. loaded manifest/document document_sha256 mismatch => P11_REUSE_ARTIFACT_INVALID;
+8. loaded manifest source_package_sha256 mismatch => no reuse; exact source-package change reason retained;
+9. loaded periodic document identity != requested target slot => P11_REUSE_ARTIFACT_INVALID;
+10. exact-package REVIEW_REQUIRED/blocked/incompatible record => not reusable;
+11. multiple fully reusable runs for one exact package select lexicographically smallest parse_run_id only after all exact-package checks;
+12. document_sha256 equality alone is never sufficient for US reuse.
+
+Changed package/content blocks silent reuse.
+
+Supplemental filings remain outside existing periodic ParsedDataRecord reuse.
+
+Existing CN/HK registry/reuse behavior unchanged.
 
 ## 17. Amendment behavior
 
@@ -424,6 +447,11 @@ Exact mandatory results:
 - bad content type -> P11_CONTENT_TYPE_INVALID
 - package hash mismatch -> P11_PACKAGE_HASH_MISMATCH
 - source drift -> P11_SOURCE_CONTENT_DRIFT
+- generic US planner call -> P11_PACKAGE_AWARE_PLANNER_REQUIRED
+- same document SHA but different source package -> P11_SOURCE_PACKAGE_CHANGE
+- missing reuse artifact -> P11_REUSE_ARTIFACT_MISSING
+- invalid/outside reuse artifact path -> P11_REUSE_ARTIFACT_PATH_INVALID
+- reuse artifact loader/hash/identity mismatch -> P11_REUSE_ARTIFACT_INVALID
 - unresolved dependency -> P11_DEPENDENCY_UNRESOLVED
 - visual-only requirement -> P11_VISUAL_RENDERING_REQUIRED
 - period conflict -> P11_PERIOD_CONFLICT

@@ -465,6 +465,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 149. P11 candidate `dff1e390f0a8825c75abb15cfb10c41543c676d5` = INELIGIBLE after detached review；
 150. review authorization = `development/163-p11-source-provenance-final-review-authorization.md`；
 151. review stop = `development/164-p11-package-aware-reuse-review-stop.md`；
-152. P11-ISSUE-027 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
-153. P11 production = CLOSED；
-154. Research MCP production / Semantic Resolver production remain closed / not authorized。
+152. P11-ISSUE-027..028 = REMEDIATED / CANDIDATE FREEZE REQUIRED；
+153. amendment evidence = `development/165-p11-package-aware-reuse-amendment-evidence.md` = PASS；
+154. P11 package-aware runtime reuse amended design = READY FOR CANDIDATE FREEZE；
+155. P11 production = CLOSED；
+156. Research MCP production / Semantic Resolver production remain closed / not authorized。

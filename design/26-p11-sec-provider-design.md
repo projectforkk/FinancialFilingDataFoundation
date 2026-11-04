@@ -639,6 +639,74 @@ For P11 v1, supplemental authority is limited to:
 
 A future generic supplemental registry is a separate additive contract and requires separate design/review/acceptance.
 
+### 17.1 Periodic SEC parsed-data reuse
+
+Accepted generic `IncrementalPlanner` reuse is document-SHA oriented. That is insufficient for SEC because filing-package identity may change while the primary document bytes remain identical.
+
+P11 v1 therefore freezes this boundary:
+
+- `IncrementalPlanner.build_plan` remains the accepted CN/HK planner;
+- after `CompanyRef` gains US support, generic `IncrementalPlanner.build_plan(company.market == "US", ...)` MUST reject with explicit `P11_PACKAGE_AWARE_PLANNER_REQUIRED`;
+- P11 orchestration uses the shared identity/slot primitives but a dedicated package-aware SEC reuse selector;
+- no US path may silently fall back to generic document-SHA-only reuse.
+
+Runtime position:
+
+```text
+requested periodic slot
+→ SEC discovery
+→ P11-E exact source-package assembly
+→ package-aware reuse selector
+    ├─ exact reusable package artifact found → REUSE_DATA / skip P11-F..I
+    └─ no exact reusable artifact → P11-F parse → P11-G final identity → P11-H v2 → P11-I validation → P11-K persist
+```
+
+The selector runs after the current exact source package is known but before parsing. Otherwise reuse would not save parser work.
+
+P11 package-aware reuse selector input:
+
+- requested target periodic `FilingSlotKey` from the P11 slot/request planner; it is a declared target, not yet newly source-confirmed;
+- current `document_sha256`;
+- current `source_package_sha256`;
+- accepted reuse policy / parser compatibility policy;
+- configured project root and P11 parsed-artifact root.
+
+Candidate discovery:
+
+- call existing `SQLiteRegistry.list_parsed_data(slot)`;
+- no registry schema migration is required solely for P11 v1 package-aware reuse;
+- every P11 periodic reusable `ParsedDataRecord` MUST have non-null `artifact_path`;
+- `artifact_path` is resolved as project-root-relative POSIX path under the configured P11 parsed-artifact root; absolute/drive-relative/UNC/traversal/outside-root paths are rejected.
+
+For each candidate record, the selector MUST load the v2 artifact through the accepted v2 loader and verify all of:
+
+1. loader/schema/hash/ID/source-reference integrity passes;
+2. loaded manifest `schema_version == parsed-financial-document-v2`;
+3. loaded manifest `parse_run_id == ParsedDataRecord.parse_run_id`;
+4. loaded manifest/document `document_sha256 == current document_sha256 == ParsedDataRecord.document_sha256`;
+5. loaded manifest `source_package_sha256 == current source_package_sha256`;
+6. loaded document periodic identity equals the requested target slot; because the artifact is for the exact current package and previously passed validation, its confirmed identity may safely satisfy the current request without re-parsing;
+7. parser/schema versions satisfy the accepted reuse policy;
+8. validation status = PASS;
+9. blocking issue count = 0;
+10. compatibility status = COMPATIBLE.
+
+A candidate failing any condition is not reusable.
+
+Specific rules:
+
+- same primary `document_sha256` but different `source_package_sha256` => no reuse and explicit `P11_SOURCE_PACKAGE_CHANGE`;
+- missing artifact_path => `P11_REUSE_ARTIFACT_MISSING`;
+- path outside configured parsed root => `P11_REUSE_ARTIFACT_PATH_INVALID`;
+- loader/hash/identity mismatch => `P11_REUSE_ARTIFACT_INVALID`;
+- exact-package candidates that otherwise fail validation/compatibility reuse the existing validation/reuse rejection semantics;
+- if more than one candidate is fully reusable for the exact same package/document/slot, select the lexicographically smallest `parse_run_id` after all exact-package checks;
+- no candidate may be chosen merely because its `document_sha256` matches.
+
+Registry persistence in P11-K may continue using existing `ParsedDataRecord` because `parse_run_id` and `artifact_path` bind to the package-aware v2 artifact; package equivalence is re-verified from that artifact before reuse.
+
+Existing CN/HK planner/reuse semantics remain unchanged.
+
 ## 18. Parser architecture
 
 Never route SEC HTML through PyMuPDF.
@@ -838,6 +906,13 @@ Package:
 - P11_SOURCE_CONTENT_DRIFT
 - P11_PATH_OUTSIDE_PROJECT
 
+Planner/reuse:
+- P11_PACKAGE_AWARE_PLANNER_REQUIRED
+- P11_SOURCE_PACKAGE_CHANGE
+- P11_REUSE_ARTIFACT_MISSING
+- P11_REUSE_ARTIFACT_PATH_INVALID
+- P11_REUSE_ARTIFACT_INVALID
+
 Parse:
 - P11_HTML_PARSE_FAILED
 - P11_IXBRL_PARSE_FAILED
@@ -968,7 +1043,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-026 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/162`. The current amended design contains explicit resolutions for ISSUE-010..026; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-028 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/165`. The current amended design contains explicit resolutions for ISSUE-010..028; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 

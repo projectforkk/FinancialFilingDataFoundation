@@ -299,3 +299,21 @@ P11-ISSUE-025 separates:
 All source-native v2 provenance and deterministic IDs use the logical ID together with the content SHA, so identical bytes in different SEC logical files remain distinguishable.
 
 P11-ISSUE-026 freezes P11 v1 package immutability across stage boundaries: P11-E is the only package-construction gate; P11-F parser/runtime dependencies cannot mutate the filing package or package hash.
+
+
+## 21. Package-aware SEC reuse reconciliation
+
+P11-ISSUE-027 reconciles P11 source-package identity with accepted P1 incremental planning without weakening CN/HK behavior.
+
+Accepted generic IncrementalPlanner remains document-SHA based for CN/HK. It is not a valid SEC package-aware reuse engine and therefore must fail closed for market=US.
+
+P11-K uses the existing periodic registry records only as candidate pointers. The authoritative package identity is reloaded from each candidate's v2 artifact and compared with the current source_package_sha256 before reuse.
+
+This avoids an additive registry migration solely for package identity while preventing stale same-document/different-package reuse.
+
+
+## 22. Package-aware reuse runtime-position reconciliation
+
+P11-ISSUE-028 distinguishes implementation-gate order from runtime orchestration order.
+
+Implementation still develops components through E/F/G/H/I/K, but runtime reuse is checked immediately after current source-package assembly and before parser execution. A previously validated exact-package artifact can therefore satisfy the requested slot without redundant parsing.

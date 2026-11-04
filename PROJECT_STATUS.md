@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 DESIGN REVIEW STOPPED — P11-ISSUE-027 PACKAGE-AWARE REUSE / PRODUCTION CLOSED`
+`P11 PACKAGE-AWARE RUNTIME REUSE AMENDED DESIGN READY FOR CANDIDATE FREEZE / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-026. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`). The current worktree contains the Design-First remediation through ISSUE-026 and is ready only for candidate freeze. Production remains CLOSED pending exact-candidate fresh detached design review PASS and a separate development authorization.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-028. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`). The current worktree contains the Design-First remediation through ISSUE-028 and is ready only for candidate freeze. Production remains CLOSED pending exact-candidate fresh detached design review PASS and a separate development authorization.
 
 P10-C is closed:
 

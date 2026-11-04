@@ -354,7 +354,7 @@ Tests:
 - unrelated exhibit not downloaded by default;
 - supplemental export retains accession identity.
 
-## P11-K — Registry / Parsed Data / Incremental Reuse
+## P11-K — Registry / Parsed Data / Package-Aware Incremental Reuse
 
 Integrate **periodic SEC v2 results only** into existing registry with additive compatibility.
 
@@ -362,22 +362,84 @@ Supplemental 8-K/6-K remain outside the existing SQLiteRegistry / ParsedDataReco
 
 Registry/ParsedData persistence occurs only after P11-I validation has produced the final status and P11-G identity is confirmed.
 
+### Generic planner safety boundary
+
+After P11-C adds US to CompanyRef:
+
+- accepted generic IncrementalPlanner remains CN/HK document-SHA planner;
+- IncrementalPlanner.build_plan for market=US MUST fail closed with `P11_PACKAGE_AWARE_PLANNER_REQUIRED`;
+- P11 v1 US orchestration MUST use the dedicated package-aware SEC reuse selector;
+- no generic planner fallback is allowed.
+
+### Periodic persistence
+
 For periodic filings:
 
 - register the primary exact source asset with the confirmed filing identity;
-- persist ParsedDataRecord only after the v2 package has been written/loaded and validation completed;
-- canonical reuse eligibility requires the rules below.
+- persist ParsedDataRecord only after the v2 artifact has been written/loaded and validation completed;
+- artifact_path is mandatory for P11 periodic records and is project-root-relative POSIX under the configured P11 parsed-artifact root;
+- no P11 registry schema migration is required solely to store source_package_sha256.
 
-Reuse requires:
+### Package-aware reuse selector
 
-- exact document/package identity;
-- parser version compatible;
-- schema v2 compatible;
-- PASS;
-- blocking issue count 0;
-- no source drift.
+Runtime orchestration position:
 
-Existing CN/HK reuse semantics unchanged.
+```text
+requested target slot
+→ discovery
+→ P11-E package
+→ package-aware reuse check
+    ├─ exact reusable artifact → REUSE_DATA and skip parser/identity/v2/validation
+    └─ no reusable artifact → P11-F → P11-G → P11-H → P11-I → persist
+```
+
+Input:
+
+- requested target FilingSlotKey (declared request target, not newly source-confirmed);
+- current document_sha256;
+- current source_package_sha256;
+- reuse policy / accepted parser-schema policy;
+- project root + configured P11 parsed-artifact root.
+
+Algorithm:
+
+1. call SQLiteRegistry.list_parsed_data(slot);
+2. reject records with null artifact_path;
+3. resolve artifact_path under the configured parsed root and reject absolute/drive-relative/UNC/traversal/outside-root paths;
+4. load artifact with the P11 v2 loader;
+5. require loaded manifest parse_run_id == record.parse_run_id;
+6. require loaded manifest/document document_sha256 == current document_sha256 == record.document_sha256;
+7. require loaded manifest source_package_sha256 == current source_package_sha256;
+8. require loaded document periodic identity == requested target slot;
+9. apply parser/schema reuse policy;
+10. require PASS, zero blockers and COMPATIBLE;
+11. only exact-package survivors are reusable;
+12. if multiple exact-package survivors remain, choose lexicographically smallest parse_run_id.
+
+Explicit results:
+
+- same document SHA + different package SHA => `P11_SOURCE_PACKAGE_CHANGE`, parse current package;
+- missing artifact => `P11_REUSE_ARTIFACT_MISSING`;
+- invalid/outside path => `P11_REUSE_ARTIFACT_PATH_INVALID`;
+- loader/hash/identity mismatch => `P11_REUSE_ARTIFACT_INVALID`;
+- no exact-package reusable record => parse current package;
+- document SHA equality alone is never sufficient.
+
+Focused tests:
+
+- exact package reuse PASS and parser/identity/v2/validation stages are skipped;
+- same primary bytes + different index/XBRL package => no reuse;
+- same package + two valid parse runs => deterministic smallest parse_run_id;
+- null/missing artifact path => no reuse;
+- absolute/UNC/traversal/outside-root artifact path => no reuse;
+- manifest package mismatch => no reuse;
+- manifest document mismatch => no reuse;
+- manifest parse_run mismatch => no reuse;
+- validation/compatibility rejection preserved;
+- generic IncrementalPlanner US call blocks;
+- existing CN/HK planner/reuse suite unchanged.
+
+Existing CN/HK reuse semantics remain unchanged.
 
 ## P11-L — Full Regression / Security
 

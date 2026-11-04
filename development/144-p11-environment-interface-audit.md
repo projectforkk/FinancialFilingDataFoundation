@@ -444,3 +444,44 @@ Resolution:
 - putting external dependencies into a future package requires a new versioned package identity design before package construction.
 
 No production/test/runtime change was made.
+
+
+## 17. Final detached review finding — P11-ISSUE-027
+
+Fresh review of `dff1e390f0a8825c75abb15cfb10c41543c676d5` passed the ISSUE-010..026 automated matrix, but manual audit of accepted P1 planner/registry found generic reuse is document-SHA oriented and can select a stale SEC parse when source_package_sha256 changes without primary document bytes changing.
+
+Stop:
+`development/164-p11-package-aware-reuse-review-stop.md`
+
+Accepted code facts:
+
+- ParsedDataRecord has document_sha256/parse_run_id/artifact_path but no source_package_sha256 column;
+- IncrementalPlanner lists parsed rows by slot and uses document_sha256 to filter current local raw;
+- for multiple reusable runs sharing one document SHA it selects the first parse_run_id deterministically;
+- SEC package identity can change through index/XBRL/schema/linkbase bytes while primary document SHA remains equal.
+
+Resolution in current amendment:
+
+- generic IncrementalPlanner remains CN/HK only for parsed-data reuse and explicitly blocks market=US with P11_PACKAGE_AWARE_PLANNER_REQUIRED;
+- P11-K adds a package-aware SEC selector;
+- selector loads the v2 artifact from safe project-relative artifact_path and verifies exact source_package_sha256, document_sha256, parse_run_id and confirmed slot before reuse;
+- same document SHA + different package SHA => P11_SOURCE_PACKAGE_CHANGE / no reuse;
+- no registry schema migration is required solely for package-aware reuse because package identity is revalidated from the immutable v2 artifact manifest;
+- CN/HK planner behavior remains unchanged.
+
+No production/test/runtime change was made during review/amendment.
+
+
+## 18. Pre-freeze runtime-order finding — P11-ISSUE-028
+
+While ISSUE-027 was being amended and before a new candidate was frozen, review found that requiring a newly confirmed slot before package-aware reuse would force P11-F parsing first, defeating incremental reuse.
+
+Resolution:
+
+- package-aware reuse runs after exact P11-E package assembly and before P11-F parsing;
+- input slot is the requested target periodic FilingSlotKey, not a newly source-confirmed identity;
+- an exact current package may reuse a previously PASS/compatible v2 artifact whose confirmed identity equals that requested target slot;
+- exact reuse skips P11-F/G/H/I;
+- no exact reusable package proceeds through parser → final identity → v2 → validation → persistence.
+
+No production/test/runtime change was made.
