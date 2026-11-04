@@ -101,22 +101,7 @@ Implementation follows design/24 Section 13:
 
 ## 4. Implementation defect found and corrected
 
-A direct adversarial probe against initial candidate `f4b5245` manually constructed:
-
-```python
-McpCatalog(
-    project_root="not-a-path",
-    catalog_path="not-a-path",
-    documents=(),
-)
-```
-
-Initial behavior leaked:
-
-```text
-AttributeError
-'str' object has no attribute 'resolve'
-```
+Candidate review found that initial implementation `f4b5245` called `.resolve()` directly on public `McpCatalog` path fields. A manually malformed `McpCatalog` instance could therefore escape the P10 error boundary with a native Python attribute/type error.
 
 This violated the already-frozen P10 error model; no design amendment was required.
 
@@ -187,13 +172,13 @@ Exact source binding:
 ```powershell
 $env:PYTHONPATH="D:\Codex\FinancialFilingDataFoundation\worktrees\active\p10-dynamic-research-design\src"
 $env:PYTHONDONTWRITEBYTECODE="1"
-D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit\research\test_research_context.py -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\0
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit\research\test_research_context.py -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\u
 ```
 
 Result:
 
 ```text
-29 passed in 0.30s
+29 passed in 0.29s
 ```
 
 Focused coverage includes:
@@ -223,13 +208,13 @@ Command:
 ```powershell
 $env:PYTHONPATH="D:\Codex\FinancialFilingDataFoundation\worktrees\active\p10-dynamic-research-design\src"
 $env:PYTHONDONTWRITEBYTECODE="1"
-D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\1
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\v
 ```
 
 Result:
 
 ```text
-368 passed in 25.07s
+368 passed in 25.18s
 EXIT_CODE=0
 ```
 
