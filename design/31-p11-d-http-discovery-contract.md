@@ -103,7 +103,7 @@ class SecHttpClient:
 Discovery exports:
 
 ```python
-@dataclass(frozen=True, slots=True, order=True)
+@dataclass(frozen=True, slots=True)
 class SecDiscoveryCandidate:
     cik: str
     accession_number: str
@@ -135,7 +135,7 @@ def discover_sec_filings(
 
 Both exception classes store the exact `reason_code` string on the instance and pass the exact `message` to `RuntimeError`; `str(exc)` therefore equals `message`. No raw User-Agent value may appear in an exception message.
 
-`SecDiscoveryCandidate.submission_source_urls` requires `dataclasses.field(compare=False)`. It is provenance only: it is excluded from dataclass equality and ordering, excluded from filing semantic identity, and excluded from every downstream package/parsed deterministic identity unless a later reviewed contract explicitly promotes a provenance field.
+`SecDiscoveryCandidate.submission_source_urls` requires `dataclasses.field(compare=False)`. It is provenance only: it is excluded from dataclass equality/hash, excluded from filing semantic identity, and excluded from every downstream package/parsed deterministic identity unless a later reviewed contract explicitly promotes a provenance field. `SecDiscoveryCandidate` intentionally has **no generated rich ordering**; all discovery ordering uses the explicit canonical key frozen in Section 17.
 
 No caller-supplied arbitrary HTTP headers or User-Agent parameter exists in the public API.
 
@@ -146,6 +146,9 @@ No caller-supplied arbitrary HTTP headers or User-Agent parameter exists in the 
 - converts it with `Path(project_root).expanduser().resolve(strict=True)`;
 - requires the result to be a directory or raises `ValueError("project_root must be an existing directory")`;
 - derives the shared rate directory only as `<resolved_project_root>/workspace/sec/rate`;
+- creates missing `workspace/sec/rate` components only beneath the resolved canonical root, then resolves the resulting rate directory and requires it to remain inside that root;
+- rejects a rate-directory path component that is a symlink/junction/reparse-point escape and rejects existing lock/state/temp paths that are symlinks, directories or non-regular files;
+- any containment/type/safe-create failure => `P11_RATE_LIMIT_SCOPE_UNSAFE` before network access;
 - never derives project root from cwd, `__file__`, a Git worktree path, a temporary directory, or the process executable;
 - never silently substitutes the current worktree as project root.
 
@@ -204,6 +207,12 @@ Accept-Encoding: identity
 HTTP/1.1 `Host` is generated only from the already validated target authority; default port 443 is not appended. No caller can override `Host`. P11-D generates no Cookie, Authorization, Referer, Range or conditional-cache header. A fresh connection is closed after the attempt/response and is not pooled across requests.
 
 `Accept-Encoding: identity` is normative so body-size accounting and preserved response bytes refer to the same entity bytes consumed by JSON parsing.
+
+### 6.1 TLS / proxy boundary
+
+P11-D connects directly with standard-library HTTPS and does not consume HTTP(S) proxy environment variables. TLS uses `ssl.create_default_context()` semantics with certificate verification required and hostname checking enabled. P11-D exposes no caller option to disable certificate/hostname verification or provide an unverified SSL context.
+
+TLS certificate/hostname failure is non-retryable `P11_HTTP_FAILED`. Any connection prepared before rate-gate acquisition MUST be closed if later rate-gate acquisition/validation fails.
 
 ## 7. URL / host / scheme rules
 
@@ -564,7 +573,20 @@ Historical shard descriptor exact required fields:
 - `filingTo`: JSON string, exact valid `YYYY-MM-DD`;
 - `filingCount`: JSON integer >=0 (bool rejected).
 
-Unexpected descriptor keys are permitted as SEC forward-compatible metadata but are ignored and never identity inputs. `filingFrom <= filingTo` is required. A shard is fetched only when `[filingFrom, filingTo]` overlaps the inclusive requested filing window. Invalid descriptor required fields/date interval => `P11_SUBMISSIONS_INVALID`.
+Unexpected descriptor keys are permitted as SEC forward-compatible metadata but are ignored and never identity inputs. `filingFrom <= filingTo` is required. Invalid descriptor required fields/date interval => `P11_SUBMISSIONS_INVALID`.
+
+Historical descriptor normalization is completed **before** overlap filtering or any shard fetch:
+
+1. validate every raw descriptor in `filings.files`; an invalid descriptor blocks even if its declared interval would be outside the requested window;
+2. normalized required descriptor tuple = `(name, filingFrom, filingTo, filingCount)`;
+3. group normalized descriptors by exact case-sensitive `name`;
+4. if repeated rows for one `name` have identical normalized required tuples, collapse them to one descriptor; differences only in ignored extra SEC metadata do not create a conflict;
+5. if one `name` has any different required value (`filingFrom`, `filingTo`, or `filingCount`), fail closed with `P11_SUBMISSIONS_INVALID`; first-wins/last-wins is forbidden;
+6. after dedupe, canonical descriptor order = `(filingFrom ASC, filingTo ASC, name ASC)` using the normalized date strings and ASCII filename;
+7. apply inclusive interval overlap against the requested filing window only after this validation/dedupe/sort step;
+8. fetch each selected descriptor `name` exactly once and in canonical descriptor order.
+
+Different descriptor names may share/overlap date intervals and remain distinct. Descriptor array input order is never a fetch-order or identity input.
 
 Historical shard response exact shape:
 
@@ -616,7 +638,9 @@ If the same accession appears more than once:
 4. duplicate provenance URLs collapse to one entry; the tuple is always non-empty;
 5. current-vs-history source location, shard fetch order and duplicate source-row order therefore cannot create a false filing conflict or change semantic equality/order.
 
-`SecDiscoveryCandidate.__eq__` / ordering semantics follow the same rule because `submission_source_urls` is `field(compare=False)`. Code MUST NOT use `dataclasses.asdict()` or full serialized-object equality as the duplicate semantic comparator unless provenance is explicitly removed first.
+`SecDiscoveryCandidate.__eq__` and generated hash semantics follow the same rule because `submission_source_urls` is `field(compare=False)`. No `<`, `<=`, `>`, `>=` ordering contract is generated. Code MUST NOT use `dataclasses.asdict()` or full serialized-object equality as the duplicate semantic comparator unless provenance is explicitly removed first.
+
+Canonical output sorting MUST always use the explicit key below; implementation MUST NOT rely on dataclass/native tuple comparison of optional semantic fields.
 
 Canonical output sort:
 
@@ -693,51 +717,58 @@ Before P11-D implementation can close, focused tests must prove at least:
 2. malformed/non-ASCII/control User-Agent blocks;
 3. configured grammar-valid User-Agent is sent exactly and raw value is not logged;
 4. same explicit canonical project root produces the same rate-gate path regardless of cwd/worktree; no cwd/module-path root autodiscovery
-5. initial http/file/bad host rejected before network;
-6. content-class URL grammar rejects arbitrary allowlisted-host paths, query strings and percent-encoded alternatives;
-7. explicit non-443 port rejected;
-8. redirect auto-follow disabled;
-9. allowed same-content-class redirect manually follows through a second request-start transition;
-10. redirect to bad host/path/query blocked;
-11. redirect >3 blocked;
-12. 10s connect / 10s header-send / 30s read / 120s logical deadline behavior is bounded;
-13. connection preparation occurs before the shared send gate and emits no HTTP request bytes;
-14. each JSON content class cap enforced by Content-Length and streaming count;
-15. malformed/conflicting Content-Length and declared-vs-actual mismatch fail closed;
-16. wrong/missing content type blocked;
-17. non-identity Content-Encoding blocked;
-18. invalid UTF-8/BOM/malformed JSON blocked;
-19. 403 no retry;
-20. 404 no retry storm;
-21. 5xx max three retries with exact 1/2/4 schedule;
-22. 429 Retry-After seconds;
-23. 429 Retry-After HTTP-date with no downward rounding;
-24. Retry-After >60s fails without early retry;
-25. total emitted HTTP outbound-start cap =8;
-26. every retry/redirect that emits request bytes passes through shared gate;
-27. two-process shared-root gate observes >=125ms between actual simulated HTTP header-send starts and <=8 starts in every half-open one-second window;
-28. crash-holder OS lock release recovery;
-29. malformed/missing/RESERVED state takes full 125ms conservative recovery before reset;
-30. a simulated sender delayed after reservation cannot collapse actual send spacing because the kernel lock is held through header emission and READY records a post-send safe timestamp;
-31. lock acquisition >5s blocks with `P11_RATE_LIMIT_SCOPE_UNSAFE`;
-32. connection-preparation failure consumes retry budget but not emitted-request count;
-33. current-only discovery;
-34. historical-shard discovery;
-35. non-overlapping historical shard not fetched;
-36. required parallel arrays must all exist and have equal lengths;
-37. `isXBRL`/`isInlineXBRL` accept integer 0/1 only;
-38. public `SecDiscoveryCandidate.is_xbrl` and `is_inline_xbrl` are non-null bool for every accepted row
-39. historical descriptor `filingCount` must equal shard row count;
-40. ticker `cik_str` accepts JSON integer only (bool/string/float rejected) and normalizes to 10-digit CIK;
-41. duplicate identical accession dedupes;
-42. same-accession semantic-equal current/history rows with different source URLs dedupe and produce one ASCII-sorted unique provenance tuple
-43. provenance tuple content/order is excluded from candidate equality/order and cannot create a semantic conflict
-44. duplicate conflicting accession => `P11_SUBMISSIONS_INVALID`;
-45. current/shard input order changes do not change canonical output;
-46. ticker rows sorted `(ticker,cik)` and ambiguity retained;
-47. target accession exact match / not-found behavior;
-48. no silent amendment supersession;
-49. no P11-E package/asset write or fetch occurs.
+5. rate-directory containment rejects symlink/junction/reparse escape and non-regular lock/state/temp paths before network
+6. initial http/file/bad host rejected before network;
+7. content-class URL grammar rejects arbitrary allowlisted-host paths, query strings and percent-encoded alternatives;
+8. explicit non-443 port rejected;
+9. redirect auto-follow disabled;
+10. allowed same-content-class redirect manually follows through a second request-start transition;
+11. redirect to bad host/path/query blocked;
+12. redirect >3 blocked;
+13. 10s connect / 10s header-send / 30s read / 120s logical deadline behavior is bounded;
+14. connection preparation occurs before the shared send gate and emits no HTTP request bytes;
+15. TLS uses verified default context/hostname checking with no proxy or unverified-context escape hatch
+16. a prepared HTTPS connection is closed when later rate-gate acquisition/validation fails
+17. each JSON content class cap enforced by Content-Length and streaming count;
+18. malformed/conflicting Content-Length and declared-vs-actual mismatch fail closed;
+19. wrong/missing content type blocked;
+20. non-identity Content-Encoding blocked;
+21. invalid UTF-8/BOM/malformed JSON blocked;
+22. 403 no retry;
+23. 404 no retry storm;
+24. 5xx max three retries with exact 1/2/4 schedule;
+25. 429 Retry-After seconds;
+26. 429 Retry-After HTTP-date with no downward rounding;
+27. Retry-After >60s fails without early retry;
+28. total emitted HTTP outbound-start cap =8;
+29. every retry/redirect that emits request bytes passes through shared gate;
+30. two-process shared-root gate observes >=125ms between actual simulated HTTP header-send starts and <=8 starts in every half-open one-second window;
+31. crash-holder OS lock release recovery;
+32. malformed/missing/RESERVED state takes full 125ms conservative recovery before reset;
+33. a simulated sender delayed after reservation cannot collapse actual send spacing because the kernel lock is held through header emission and READY records a post-send safe timestamp;
+34. lock acquisition >5s blocks with `P11_RATE_LIMIT_SCOPE_UNSAFE`;
+35. connection-preparation failure consumes retry budget but not emitted-request count;
+36. current-only discovery;
+37. historical-shard discovery;
+38. non-overlapping historical shard not fetched;
+39. required parallel arrays must all exist and have equal lengths;
+40. `isXBRL`/`isInlineXBRL` accept integer 0/1 only;
+41. public `SecDiscoveryCandidate.is_xbrl` and `is_inline_xbrl` are non-null bool for every accepted row
+42. `SecDiscoveryCandidate` exposes no generated rich ordering; canonical sort with mixed null/non-null optional fields uses only `(filing_date, accession_number)` and cannot raise cross-type comparison errors
+43. historical descriptor `filingCount` must equal shard row count;
+44. exact duplicate historical descriptors with the same required tuple collapse and fetch one shard even when ignored extra metadata differs
+45. same historical descriptor name with different filingFrom/filingTo/filingCount => `P11_SUBMISSIONS_INVALID` before overlap filtering
+46. historical descriptor input reorder yields identical canonical `(filingFrom, filingTo, name)` selected fetch order
+47. ticker `cik_str` accepts JSON integer only (bool/string/float rejected) and normalizes to 10-digit CIK;
+48. duplicate identical accession dedupes;
+49. same-accession semantic-equal current/history rows with different source URLs dedupe and produce one ASCII-sorted unique provenance tuple
+50. provenance tuple content/order is excluded from candidate equality/hash and cannot create a semantic conflict
+51. duplicate conflicting accession => `P11_SUBMISSIONS_INVALID`;
+52. current/shard input order changes do not change canonical output;
+53. ticker rows sorted `(ticker,cik)` and ambiguity retained;
+54. target accession exact match / not-found behavior;
+55. no silent amendment supersession;
+56. no P11-E package/asset write or fetch occurs.
 
 ## 22. Implementation authorization gate
 
