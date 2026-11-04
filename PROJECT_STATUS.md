@@ -520,7 +520,7 @@ P10-N authorization:
 
 `development/137-p10-n-independent-acceptance-authorization.md`
 
-Only exact candidate `183ca5dc89a606715a3e352bf92a235f7aa31fad` is eligible. Closeout remains closed.
+Only exact candidate `183ca5dc89a606715a3e352bf92a235f7aa31fad` is eligible. The first execution attempt stopped because the mutable live P9 submission metadata did not match the frozen acceptance/39 metadata. Stop record: `development/138-p10-n-execution-stop.md`. Fresh rerun authorization: `development/139-p10-n-rerun-authorization.md`. Candidate/package/design remain unchanged. Closeout remains closed.
 
 Required sequence:
 

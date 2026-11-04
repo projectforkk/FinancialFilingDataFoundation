@@ -416,6 +416,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 106. P10-M exact re-freeze commit = `183ca5dc89a606715a3e352bf92a235f7aa31fad`；
 107. P10-M = CLOSED；
 108. P10-N authorization = `development/137-p10-n-independent-acceptance-authorization.md`；
-109. P10-N = AUTHORIZED ONLY against exact candidate `183ca5dc...`；
-110. P10 closeout/main integration = STOPPED；
-111. P11 / Research MCP production / Semantic Resolver production remain closed。
+109. P10-N first execution stop = `development/138-p10-n-execution-stop.md`；
+110. P10-N fresh rerun authorization = `development/139-p10-n-rerun-authorization.md`；
+111. P10-N = AUTHORIZED FRESH RERUN ONLY against exact candidate `183ca5dc...`；
+112. P10 closeout/main integration = STOPPED；
+113. P11 / Research MCP production / Semantic Resolver production remain closed。
