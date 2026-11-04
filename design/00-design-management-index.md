@@ -389,5 +389,9 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 79. P10-M corrected re-freeze commit = `56cbe185e97e6e07dd354e03b98942d87f8e5787`；
 80. P10-M = CLOSED；
 81. P10-N authorization = `development/124-p10-n-independent-acceptance-authorization.md`；
-82. P10-N = AUTHORIZED ON EXACT DETACHED CANDIDATE `56cbe185...`；
-83. P11 / Research MCP production / Semantic Resolver production remain closed。
+82. P10-N result = `acceptance/40-p10-independent-acceptance-result.md` = PASS；
+83. P10-N accepted detached candidate = `56cbe185e97e6e07dd354e03b98942d87f8e5787`；
+84. P10-N = CLOSED / PASS；
+85. P10 closeout authorization = `development/125-p10-closeout-authorization.md`；
+86. P10 closeout = AUTHORIZED INTEGRATION ONLY；
+87. P11 / Research MCP production / Semantic Resolver production remain closed。

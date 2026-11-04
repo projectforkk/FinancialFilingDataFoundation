@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-M CLOSED / P10-N AUTHORIZED ON EXACT REFREEZE 56cbe185...`
+`AUTHORIZED — P10 CLOSEOUT INTEGRATION ONLY`
 
 P10-C is closed:
 
@@ -402,7 +402,34 @@ P10-N Independent Acceptance authorization:
 
 `development/124-p10-n-independent-acceptance-authorization.md`
 
-P10-N must use a detached worktree at exactly `56cbe185...`; the authorization commit itself is not the acceptance candidate.
+P10-N Independent Acceptance result:
+
+`acceptance/40-p10-independent-acceptance-result.md = PASS`
+
+Accepted detached candidate:
+
+`56cbe185e97e6e07dd354e03b98942d87f8e5787`
+
+Fresh acceptance verified:
+
+- harness precheck PASS;
+- research unit `136 passed`;
+- full unit `444 passed`;
+- dynamic Spec A/B hashes/toolsets differ and both ledgers PASS;
+- live CN 600519 run = COMPLETE;
+- isolated P9 period resolution validated;
+- K1–K5 negative capability gates PASS;
+- immutable 47-file base before/after PASS;
+- harness postcheck PASS;
+- detached acceptance worktree clean.
+
+P10-N is closed.
+
+P10 closeout authorization:
+
+`development/125-p10-closeout-authorization.md`
+
+Only project-local integration/main closeout is authorized. P10 production/design remain frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
 
 Still not authorized:
 
