@@ -386,6 +386,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 76. P10-M historical freeze attempt = `42e39c971a360ca4e0ee09761221cc8da7ddbaa9` = INVALID；
 77. P10-M stop record = `development/122-p10-m-freeze-stop.md`；
 78. P10-M corrected re-freeze evidence = `development/123-p10-m-refreeze-evidence.md` = PASS；
-79. P10-M corrected re-freeze package = READY；
-80. P10-N remains closed pending exact corrected re-freeze commit；
-81. P11 / Research MCP production / Semantic Resolver production remain closed。
+79. P10-M corrected re-freeze commit = `56cbe185e97e6e07dd354e03b98942d87f8e5787`；
+80. P10-M = CLOSED；
+81. P10-N authorization = `development/124-p10-n-independent-acceptance-authorization.md`；
+82. P10-N = AUTHORIZED ON EXACT DETACHED CANDIDATE `56cbe185...`；
+83. P11 / Research MCP production / Semantic Resolver production remain closed。

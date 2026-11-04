@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-M CORRECTED REFREEZE READY / P10-N CLOSED PENDING EXACT REFREEZE COMMIT`
+`P10-M CLOSED / P10-N AUTHORIZED ON EXACT REFREEZE 56cbe185...`
 
 P10-C is closed:
 
@@ -392,7 +392,17 @@ Corrected `acceptance/39` SHA256:
 
 `92889cc508c8d62e3fa8f36044fdde8dd81131970df54e615b1967b936603b94`
 
-P10-N remains closed pending the exact guarded re-freeze commit.
+Valid corrected P10-M re-freeze commit:
+
+`56cbe185e97e6e07dd354e03b98942d87f8e5787`
+
+P10-M is closed.
+
+P10-N Independent Acceptance authorization:
+
+`development/124-p10-n-independent-acceptance-authorization.md`
+
+P10-N must use a detached worktree at exactly `56cbe185...`; the authorization commit itself is not the acceptance candidate.
 
 Still not authorized:
 
