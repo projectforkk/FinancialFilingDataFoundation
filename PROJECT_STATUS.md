@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-C REAUTHORIZED — MODELS / SPEC FREEZE ONLY`
+`P10-C CANDIDATE PASS / DETACHED REVIEW AUTHORIZED — P10-D CLOSED`
 
 Design baseline:
 
@@ -186,7 +186,13 @@ P10-C historical authorization `development/81-p10-c-spec-freeze-instruction.md`
 
 Stop record: `development/82-p10-c-preimplementation-design-stop.md`.
 
-Current P10-C authorization: `development/83-p10-c-spec-freeze-reauthorization.md`. Scope is Models / Spec Freeze only; P10-D and later remain closed.
+P10-C reauthorization: `development/83-p10-c-spec-freeze-reauthorization.md`.
+
+Production candidate: `35553df23f58a7f539b7390f98c7f154e42c817e`.
+
+Development evidence: `development/84-p10-c-spec-freeze-evidence.md` = PASS.
+
+Detached review instruction: `development/85-p10-c-code-review-instruction.md`. P10-D remains closed until the review result is committed/pushed.
 
 Still not authorized:
 
