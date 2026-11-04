@@ -363,6 +363,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 53. P10-G detached review rerun result = `development/107-p10-g-detached-review-result.md` = PASS；
 54. P10-G = CLOSED；
 55. P10-H authorization = `development/108-p10-h-full-regression-authorization.md`；
-56. P10-H = AUTHORIZED VALIDATION ONLY / NO PRODUCTION CHANGES；
-57. P10-I and later remain closed；
-58. P11 / Research MCP production / Semantic Resolver production remain closed。
+56. P10-H evidence = `development/109-p10-h-full-regression-scope-evidence.md` = PASS；
+57. P10-H = CLOSED；
+58. P10-I and later remain closed pending separate authorization；
+59. P11 / Research MCP production / Semantic Resolver production remain closed。

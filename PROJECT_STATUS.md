@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-H VALIDATION ONLY / NO PRODUCTION CHANGES`
+`P10-H CLOSED / P10-I CLOSED PENDING SEPARATE AUTHORIZATION`
 
 P10-C is closed:
 
@@ -290,7 +290,11 @@ P10-H validation authorization:
 
 `development/108-p10-h-full-regression-authorization.md`
 
-Only validation/evidence is authorized; production changes remain forbidden.
+P10-H evidence:
+
+`development/109-p10-h-full-regression-scope-evidence.md = PASS`
+
+P10-H is closed. P10-I remains closed until a separate explicit authorization.
 
 Still not authorized:
 
