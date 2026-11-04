@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-B PASS / EVIDENCE PENDING GITHUB REVIEW — P10-C CLOSED`
+`P10-B REVIEW PASS / CLOSED — P10-C NOT YET AUTHORIZED`
 
 Design baseline:
 
@@ -176,7 +176,9 @@ Rerun evidence:
 
 P10-ISSUE-001 exact-candidate source binding is verified. No install/upgrade is required; P8/P9 accepted interfaces and runtime boundaries remain valid.
 
-P10-C remains CLOSED until the rerun evidence is committed/pushed and independently reviewed by the design owner.
+Design-owner review: `development/80-p10-b-github-review.md` = `PASS — P10-B CLOSED`.
+
+P10-C remains CLOSED until a separate explicit development instruction is committed/pushed.
 
 Still not authorized:
 

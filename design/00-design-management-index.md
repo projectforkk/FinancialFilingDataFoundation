@@ -310,7 +310,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 当前：
 1. P10-B rerun = `PASS — P10_ENVIRONMENT_READY`；
 2. evidence = `development/79-p10-environment-interface-audit-rerun.md`；
-3. P10-ISSUE-001 exact-candidate source binding = PASS；
-4. no install/upgrade required；
-5. P10-C 继续关闭，直到 evidence commit/push + design-owner review；
-6. P11 / Research MCP production / Semantic Resolver production继续关闭。
+3. design-owner review = `development/80-p10-b-github-review.md` = PASS；
+4. P10-ISSUE-001 exact-candidate source binding = CLOSED / PASS；
+5. no install/upgrade required；
+6. P10-C 仍未授权，需 separate explicit development instruction；
+7. P11 / Research MCP production / Semantic Resolver production继续关闭。
