@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-M STOPPED — FIRST FREEZE COMMIT 42e39c9 INVALID / P10-N CLOSED`
+`P10-M CORRECTED REFREEZE READY / P10-N CLOSED PENDING EXACT REFREEZE COMMIT`
 
 P10-C is closed:
 
@@ -382,7 +382,17 @@ Stop record:
 
 `development/122-p10-m-freeze-stop.md`
 
-Reason: staged `git diff --cached --check` found trailing whitespace in `acceptance/39`, but PowerShell continued to commit/push. This commit is ineligible for P10-N and will remain as historical evidence. P10-N remains closed pending a corrected re-freeze commit.
+Reason: staged `git diff --cached --check` found trailing whitespace in `acceptance/39`, but PowerShell continued to commit/push. This commit is ineligible for P10-N and remains historical evidence.
+
+Corrected re-freeze evidence:
+
+`development/123-p10-m-refreeze-evidence.md = PASS`
+
+Corrected `acceptance/39` SHA256:
+
+`92889cc508c8d62e3fa8f36044fdde8dd81131970df54e615b1967b936603b94`
+
+P10-N remains closed pending the exact guarded re-freeze commit.
 
 Still not authorized:
 

@@ -2,7 +2,7 @@
 
 Status: **FROZEN — P10-N INDEPENDENT ACCEPTANCE ONLY**
 
-Phase: P10 — Codex Dynamic Research Integration  
+Phase: P10 — Codex Dynamic Research Integration
 Gate: P10-M — Acceptance Freeze
 
 P10-N must use the exact P10-M freeze commit recorded by the subsequent P10-N authorization. No P10-N command may execute source from main, active, or another worktree.
