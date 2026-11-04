@@ -493,6 +493,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 172. invalidation record = `development/179-p11-b042462-stale-pass-result-invalid.md`；
 173. P11-ISSUE-032 = REMEDIATED / FRESH REVIEW REQUIRED；
 174. amendment evidence = `development/180-p11-validation-finalization-amendment-evidence.md` = PASS；
-175. amended exact candidate = PENDING FREEZE；
-176. P11 production = CLOSED；
-177. Research MCP production / Semantic Resolver production remain closed / not authorized。
+175. amended exact candidate = `992583b87af8f8c682dc434cc134317f4db35522`；
+176. review authorization = `development/181-p11-validation-finalization-final-review-authorization.md`；
+177. P11 production = CLOSED；
+178. Research MCP production / Semantic Resolver production remain closed / not authorized。
