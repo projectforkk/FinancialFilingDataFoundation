@@ -22,8 +22,10 @@ Exact public surface:
 - SecAssetRole values: FILING_INDEX, PRIMARY_DOCUMENT, XBRL_INSTANCE, TAXONOMY_SCHEMA, CALCULATION_LINKBASE, DEFINITION_LINKBASE, LABEL_LINKBASE, PRESENTATION_LINKBASE, REQUESTED_EXHIBIT, OTHER_REQUIRED_DEPENDENCY.
 - SecPackageOutcome values: ACQUIRED_NEW, REUSED_EXACT, SOURCE_CONTENT_DRIFT.
 - frozen/slots SecPackageAsset fields in order: role, asset_sha256, file_name, source_url, byte_size, primary, dependency_depth, referring_asset_sha256.
-- frozen/slots SecSourcePackage fields in order: cik, accession_number, base_form, amended, filing_date, report_date, primary_document, assets, source_package_sha256, document_sha256, manifest_path, receipt_id.
-- frozen/slots SecPackageAcquisitionResult fields in order: package, outcome, reason_code, prior_source_package_sha256s.
+- frozen/slots SecSourcePackage fields in order: cik, accession_number, base_form, amended, filing_date, report_date, primary_document, assets, source_package_sha256, document_sha256, manifest_path.
+- frozen/slots SecPackageAcquisitionResult fields in order: package, outcome, reason_code, prior_source_package_sha256s, receipt_id.
+
+`SecSourcePackage` is immutable package state and deliberately contains no receipt field. `SecPackageStore.load_package(source_package_sha256)` reconstructs only manifest/blob package state. Receipt provenance belongs to an acquisition event/result; one immutable package may have multiple valid receipt identities over time without changing `source_package_sha256`.
 - SecPackageStore(project_root: Path), with load_package(source_package_sha256: str) -> SecSourcePackage.
 - acquire_sec_package(candidate: SecDiscoveryCandidate, project_root: Path, requested_exhibits: tuple[str, ...] = (), registry: SQLiteRegistry | None = None) -> SecPackageAcquisitionResult.
 
@@ -35,6 +37,7 @@ Before any P11-E request:
 - candidate must be a SecDiscoveryCandidate and all identity fields are revalidated through accepted P11-C/P11-D normalization.
 - project_root is expanduser().resolve(strict=True) and must be a directory.
 - requested_exhibits must be a tuple.
+- registry must be either `None` or an instance of the accepted `SQLiteRegistry`; any other value raises `ValueError("registry must be SQLiteRegistry or None")` before network.
 - maximum requested exhibit entries before dedupe = 128.
 - every requested exhibit must satisfy Section 5 safe-basename grammar.
 - exhibit names are exact-case deduped and ASCII-sorted.
@@ -71,6 +74,8 @@ Package limits:
 - raw directory.item count <= 4096.
 - selected logical asset count including FILING_INDEX <= 1024.
 - exact selected package bytes including index.json <= 512 MiB = 536,870,912.
+- final/staged `manifest.json` bytes <=16 MiB = 16,777,216.
+- acquisition receipt JSON bytes <=16 MiB = 16,777,216.
 - requested exhibit entries before dedupe <= 128.
 
 Declared selected sizes are preflighted before asset downloads. Declared sum plus exact index bytes >512 MiB blocks before selected asset downloads. Actual streamed aggregate is counted again and >512 MiB blocks immediately.
@@ -101,7 +106,7 @@ Extra directory keys ignored.
 
 Every item is an object requiring string fields name, size, type and last-modified. Extra item keys ignored. type is SEC directory-UI metadata, not MIME. last-modified is provider metadata only. Neither enters package identity.
 
-size is either empty string or ASCII decimal digits. Decimal value has grammar ^[0-9]+$ and is parsed as a non-negative integer; unselected items are not rejected solely because that integer exceeds the per-asset cap. A selected package asset must have decimal size <=134,217,728. Selected item with size empty => P11_PACKAGE_INVALID before asset download. Unselected helper rows with empty size are permitted. Provider-declared size never substitutes for captured actual bytes.
+size is either empty string or an ASCII decimal string matching `^[0-9]{1,20}$`. No integer conversion occurs before this lexical bound passes. The bounded decimal is parsed as a non-negative integer; unselected items are not rejected solely because that integer exceeds the selected per-asset cap. A selected package asset must have decimal size <=134,217,728. Selected item with size empty => P11_PACKAGE_INVALID before asset download. Unselected helper rows with empty size are permitted. Any non-empty size outside the 1..20-digit grammar => P11_PACKAGE_INVALID. Provider-declared size never substitutes for captured actual bytes.
 
 Every item name is validated before selection. Duplicate exact item names make the index P11_PACKAGE_INVALID. First/last wins is forbidden. An item named index.json is P11_PACKAGE_INVALID because it collides with the synthetic required FILING_INDEX logical asset.
 
@@ -221,7 +226,7 @@ Normal cleanup removes only the current attempt staging. Foreign-attempt staging
 load_package(sha) validates:
 - sha is 64 lowercase hex.
 - exact final layout/project containment.
-- manifest UTF-8/no-BOM/LF-only/exactly one final LF.
+- manifest byte size <=16 MiB, UTF-8/no-BOM/LF-only/exactly one final LF.
 - exact final manifest key set.
 - recomputed canonical identity after removing only source_package_sha256 equals directory/hash value.
 - source_package_sha256 field equals directory/hash.
@@ -245,6 +250,8 @@ Receipt identity object exact keys:
 - source_package_sha256
 - responses
 
+Receipt `responses` contains exactly one identity row for each successfully captured logical requested resource used by the package: one row for accession `index.json` plus one row for every selected filing asset. Retry attempts and redirect hops never add extra response identity rows; they contribute only to diagnostics. Each row describes the final successful response for that logical requested resource.
+
 Each response identity row exact keys: requested_url, final_url, status, declared_content_type (string/null), etag (string/null), last_modified (string/null), asset_sha256, byte_size.
 Rows sort by (requested_url, asset_sha256, byte_size, final_url).
 
@@ -258,18 +265,20 @@ Final receipt exact keys:
 
 diagnostics exact keys:
 - acquired_at UTC ISO-8601 string
-- request_count non-negative int
-- retry_count non-negative int
-- redirect_count non-negative int
-- bytes_downloaded non-negative int
+- request_count non-negative int = sum of actual emitted HTTP request starts across all logical index/asset fetches in this acquisition attempt
+- retry_count non-negative int = sum of scheduled retries across all logical resource fetches
+- redirect_count non-negative int = sum of followed redirects across all logical resource fetches
+- bytes_downloaded non-negative int = sum of final successful entity bytes used by the package, including index.json, counted once per logical resource rather than per retry/redirect attempt
 - download_ms non-negative int
 - package_commit_ms non-negative int
 
-Timing/acquired_at never enter receipt_id/package identity. Receipt bytes are canonical JSON plus exactly one LF.
+Timing/acquired_at never enter receipt_id/package identity. Receipt bytes are canonical JSON plus exactly one LF and MUST be <=16 MiB before receipt commit.
 
 Receipt commit is atomic non-replacing under receipts/<rr>/<receipt_id>.json.
 
-If destination exists, load/validate it. Existing receipt_id and identity must equal current identity. Diagnostics may differ and are ignored for idempotency; existing bytes remain unchanged. Identity mismatch/corruption under the same ID => P11_PACKAGE_INVALID.
+If destination exists, load/validate it. Existing receipt_id and identity must equal current identity. Diagnostics may differ and are ignored for idempotency; existing receipt bytes, including their original diagnostics/acquired_at, remain authoritative and unchanged. Identity mismatch/corruption under the same ID => P11_PACKAGE_INVALID.
+
+After commit/reuse, P11-E reloads the committed receipt and returns that exact `receipt_id` in `SecPackageAcquisitionResult`. If registry persistence follows, `SourceMetadata.acquired_at` comes from this committed/reused receipt file, never from diagnostics of a discarded current attempt.
 
 Receipt commit failure never mutates an already committed package.
 
@@ -277,14 +286,19 @@ Receipt commit failure never mutates an already committed package.
 
 Stable provider identity = (cik, accession_number). Immutable content identity = source_package_sha256.
 
-Before outcome classification P11-E scans valid committed package manifests under packages/<64hex>/manifest.json and selects those with the same cik/accession.
+Before outcome classification P11-E performs a two-stage committed-package scan under `packages/`.
 
-- no prior same-accession package => ACQUIRED_NEW, reason_code null.
-- prior exact current package only => REUSED_EXACT, reason_code null.
-- any valid prior same-accession package with a different hash => SOURCE_CONTENT_DRIFT, reason_code P11_SOURCE_CONTENT_DRIFT, prior_source_package_sha256s = ASCII-sorted unique other hashes.
+Stage 1 is a minimal identity peek only. Consider only child directories whose name is exactly 64 lowercase hex and whose `manifest.json` is a regular non-reparse file inside the raw root. Read at most the frozen 16 MiB manifest cap plus one sentinel byte; over-cap input cannot establish drift identity and is not fully loaded unless it is already the exact current package path verified by Section 13. For in-cap input require strict UTF-8/no-BOM/valid JSON object and inspect only `cik` and `accession_number`. A manifest that cannot establish both as valid normalized strings equal to the current `(cik, accession_number)` is not a drift candidate and does not block an unrelated filing acquisition. Stage 1 never treats unverified package fields as reusable/valid package state.
+
+Stage 2 fully loads every Stage-1 same-accession candidate through `SecPackageStore.load_package()`. A manifest that claims the current valid cik/accession but fails full package/hash/blob/layout validation blocks with the loader's package failure; it MUST NOT be ignored as unrelated corruption.
+
+Classification uses the current package-directory commit outcome plus fully verified same-accession packages. Let `other_hashes` be the ASCII-sorted unique verified same-accession package hashes excluding the current `source_package_sha256`:
+- if `other_hashes` is non-empty => SOURCE_CONTENT_DRIFT, reason_code P11_SOURCE_CONTENT_DRIFT, prior_source_package_sha256s = other_hashes, regardless of whether the current package directory was newly committed or exactly reused.
+- else if the current package-directory commit outcome was COMMITTED_NEW => ACQUIRED_NEW, reason_code null, prior_source_package_sha256s = ().
+- else if the current package-directory outcome was exact verified DESTINATION_EXISTS reuse => REUSED_EXACT, reason_code null, prior_source_package_sha256s = ().
+- COMMIT_ERROR never reaches outcome classification.
 - current new package is committed/preserved before drift is surfaced.
 - prior packages/blobs/receipts are never overwritten/deleted.
-- corrupted existing package encountered during same-accession scan blocks rather than being ignored.
 - drift never rewrites discovery metadata or guesses authority.
 
 A later exact reacquisition with known historical different versions continues surfacing SOURCE_CONTENT_DRIFT.
@@ -305,7 +319,7 @@ Exact SourceMetadata:
 - filing_date = candidate.filing_date
 - report_date = candidate.report_date
 - provider_company_id = candidate.cik
-- acquired_at = receipt diagnostics acquired_at
+- acquired_at = `acquired_at` read from the committed/reused receipt file after receipt verification (never a discarded current-attempt timestamp)
 
 expected_identity=None is mandatory because periodic binding is not yet filing-native confirmed and supplemental filings must never receive a synthetic slot.
 
@@ -348,7 +362,7 @@ No silent fallback or guessed asset/period/role.
 ## 20. Mandatory focused implementation matrix
 
 Before P11-E implementation can close, tests must directly trace these exact 60 numbered cases:
-1. invalid root/candidate/exhibits fail before network.
+1. invalid root/candidate/exhibits or non-None non-SQLiteRegistry registry fail ValueError before network.
 2. requested exhibit tuple >128 fails before network.
 3. invalid exhibit basename SP/control/non-ASCII/%/slash/query/fragment fails before network.
 4. P11-E uses same rate directory as P11-D.
@@ -371,13 +385,13 @@ Before P11-E implementation can close, tests must directly trace these exact 60 
 21. directory.name exact accession path.
 22. parent-dir exact filer path.
 23. item array and <=4096.
-24. item requires string name/size/type/last-modified; extras ignored.
+24. item requires string name/size/type/last-modified; size is empty or 1..20 ASCII digits before integer conversion; extras ignored.
 25. every item name safe grammar before selection.
 26. duplicate item name fails.
 27. item named index.json fails.
 28. unselected helper size empty accepted.
 29. selected size empty fails before asset download.
-30. decimal size leading zero accepted/numeric comparison.
+30. bounded decimal size leading zero accepted/numeric comparison; >20 decimal digits fails without integer conversion while an unselected <=20-digit value may exceed 128 MiB.
 31. declared selected asset >128 MiB blocks pre-download.
 32. selected logical count >1024 blocks.
 33. declared selected total + index >512 MiB blocks pre-download.
@@ -401,12 +415,12 @@ Before P11-E implementation can close, tests must directly trace these exact 60 
 51. package new non-replacing directory commit reloads.
 52. concurrent exact package writers: one new, loser exact-verifies.
 53. existing package difference/corruption blocks without mutation.
-54. loader rejects wrong hash/key/order/primary/count/path/blob semantics.
-55. receipt ID excludes diagnostics but includes stable response identity.
-56. same receipt identity/different diagnostics idempotently reuses; identity collision blocks.
-57. no prior => ACQUIRED_NEW; exact prior only => REUSED_EXACT.
-58. same accession different package preserved and surfaced drift with sorted prior hashes.
-59. registry occurs only after package+receipt verification, exact SourceMetadata, expected_identity=None; failure leaves package immutable.
+54. loader rejects wrong hash/key/order/primary/count/path/blob semantics and returns immutable package state without any receipt selection.
+55. receipt ID excludes diagnostics but includes exactly one stable final response row per logical index/selected-asset resource; retries/redirects affect diagnostics only and aggregate counters exactly.
+56. same receipt identity/different current diagnostics reuses existing authoritative receipt bytes/acquired_at without overwrite; identity collision blocks and acquisition result carries the committed receipt_id.
+57. two-stage drift scan enforces the 16 MiB peek cap, ignores unrelated/unidentifiable corruption, but a parseable same-cik/accession manifest that fails full loader blocks; with no other hashes COMMITTED_NEW => ACQUIRED_NEW and exact verified DESTINATION_EXISTS => REUSED_EXACT, both with empty prior tuple.
+58. same accession different verified package is preserved and surfaced as drift with ASCII-sorted unique other hashes, including later exact reacquisition when historical drift exists.
+59. registry occurs only after package+receipt verification, exact SourceMetadata uses committed receipt acquired_at and expected_identity=None; failure leaves package immutable.
 60. no P11-F parser/taxonomy-cache behavior and no P2 RawDocumentStore mutation/substitution.
 
 ## 21. Design probes/evidence required before implementation authorization

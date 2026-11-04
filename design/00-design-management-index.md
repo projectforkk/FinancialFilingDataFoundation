@@ -121,7 +121,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
-| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | P11-D CLOSED / PASS |\n| 32-p11-e-acquisition-package-contract.md | P11-E SEC acquisition / immutable source-package contract | DESIGN CANDIDATE READY / DETACHED REVIEW PENDING / IMPLEMENTATION CLOSED / PROVIDER PRODUCTION CLOSED |
+| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | P11-D CLOSED / PASS |\n| 32-p11-e-acquisition-package-contract.md | P11-E SEC acquisition / immutable source-package contract | ISSUE-046 REMEDIATED / AMENDED CANDIDATE READY / REVIEW AUTHORIZATION PENDING / IMPLEMENTATION CLOSED / PROVIDER PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -330,7 +330,7 @@ P11 latest reviewed candidate：
 - P11-D ISSUE-041/042 amendment evidence = `development/220-p11-d-issues041042-amendment-evidence.md` = PASS；
 - P11-D ISSUE-043 stop = `development/222-p11-d-response-framing-review-stop.md`；
 - P11-D ISSUE-043 amendment evidence = `development/223-p11-d-response-framing-amendment-evidence.md` = PASS；
-- next action = fresh detached exact-candidate review of design/32 + development/246; no P11-E implementation or provider-production authorization yet；
+- next action = freeze new ISSUE-046-remediated exact design/32 candidate with development/248, then authorize fresh detached design review; no P11-E implementation or provider-production authorization yet；
 - P11-B = CLOSED / PASS；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
