@@ -422,6 +422,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 112. P10-N accepted detached candidate = `183ca5dc89a606715a3e352bf92a235f7aa31fad`；
 113. P10-N = CLOSED / PASS；
 114. P10-O v2 closeout authorization = `development/140-p10-o-closeout-authorization-v2.md`；
-115. P10-O = AUTHORIZED FRESH V2 INTEGRATION ONLY；
-116. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
-117. P11 / Research MCP production / Semantic Resolver production remain closed。
+115. P10-O v2 integration evidence = `development/141-p10-o-v2-integration-evidence.md` = PASS / MAIN FAST-FORWARD READY；
+116. P10-O v2 merge commit = `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`；
+117. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
+118. P10 final DONE remains pending final main verification；
+119. P11 / Research MCP production / Semantic Resolver production remain closed。

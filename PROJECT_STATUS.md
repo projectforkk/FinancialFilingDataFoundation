@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-O CLOSEOUT INTEGRATION ONLY / FRESH V2 INTEGRATION`
+`P10-O V2 INTEGRATION GATE PASS / MAIN FAST-FORWARD READY`
 
 P10-C is closed:
 
@@ -544,7 +544,11 @@ P10-O closeout authorization:
 
 `development/140-p10-o-closeout-authorization-v2.md`
 
-Only fresh v2 closeout integration is authorized. Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and must not be reused.
+Fresh v2 integration gate evidence:
+
+`development/141-p10-o-v2-integration-evidence.md = PASS / MAIN FAST-FORWARD READY`
+
+Fresh v2 integration merge: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`. Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and must not be reused. P10 is not declared DONE until final main verification passes.
 
 P10 production remains frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
 
