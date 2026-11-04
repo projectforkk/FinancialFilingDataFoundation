@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-E ONLY / P10-F CLOSED`
+`P10-E CANDIDATE READY / DETACHED REVIEW AUTHORIZED / P10-F CLOSED`
 
 Current P10-E design baseline:
 
@@ -199,7 +199,14 @@ The amendment freezes:
 The amended P10-E design/plan/acceptance contract is GitHub truth at
 `d6b34d84d1eeae6b0f2009895a14c5956217a18f`.
 
-P10-E provenance implementation is authorized only within development/93 scope.
+P10-E implementation candidate:
+
+- candidate `802a395247e490a83acaef744c1641188fbf704e`;
+- evidence `development/94-p10-e-provenance-evidence.md = PASS`;
+- evidence commit `164f1aa8b97cdcdf5a8e43bffe4f604175d480ef`;
+- detached review instruction `development/95-p10-e-code-review-instruction.md`.
+
+P10-E production is frozen for review. No further P10-E code changes are authorized in the active worktree during review.
 
 Still not authorized:
 

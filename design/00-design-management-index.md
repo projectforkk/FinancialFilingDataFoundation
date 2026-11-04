@@ -337,4 +337,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 27. P10-E reauthorization = `development/93-p10-e-provenance-reauthorization.md`；
 28. P10-E = AUTHORIZED ONLY within provenance gate scope；
 29. P10-F and later remain closed；
-30. P11 / Research MCP production / Semantic Resolver production remain closed。
+30. P10-E production candidate = `802a395247e490a83acaef744c1641188fbf704e`；
+31. P10-E evidence = `development/94-p10-e-provenance-evidence.md` = PASS；
+32. P10-E detached review instruction = `development/95-p10-e-code-review-instruction.md`；
+33. P10-E = REVIEW AUTHORIZED / P10-F CLOSED；
+34. P11 / Research MCP production / Semantic Resolver production remain closed。
