@@ -1,6 +1,6 @@
 # 205 — P11-B Environment / SEC Runtime Probe
 
-Status: **PASS — P11-B ENVIRONMENT READY / PRODUCTION CLOSED**
+Status: **PASS — P11-B CLOSED / P11-C NEXT / PRODUCTION CLOSED**
 
 Phase:
 P11 — US SEC Provider
@@ -8,164 +8,182 @@ P11 — US SEC Provider
 Authorization:
 `development/204-p11-b-environment-runtime-probe-authorization.md`
 
-Accepted P11-A design baseline:
+Accepted P11-A baseline:
 `5877a238f5af6102ef48e56141cdb893590b6aab`
 
-Formal probe root:
-`D:\Codex\FinancialFilingDataFoundation\workspace\scratch\p11-b-probe\formal`
+Accepted probe scratch:
+`D:\Codex\FinancialFilingDataFoundation\workspace\scratch\p11-b-probe\accepted`
 
-## 1. Scope integrity
+## 1. Scope / mutation guard
 
-PASS:
+PASS.
 
-- all formal venv/cache/temp/download/probe files are below the authorized project-local scratch path;
-- no root/global Python package mutation;
-- no main FFDF venv dependency mutation;
-- no `src/`, `tests/`, `integration/` or production `runtime-locks/` change;
-- no P11 production code;
-- no P11-C or later implementation during this probe.
+- no P11 production code changed;
+- `src/`, `tests/`, `integration/`, production `runtime-locks/` diff = NONE;
+- main FFDF `.venv` was not mutated and still has no pip;
+- existing project-local Python 3.12 runtime was not mutated, still has no pip, and does not contain Arelle;
+- no root/global Python package install;
+- all accepted probe temp/cache/report/filesystem artifacts are under the FFDF project root.
 
-The main FFDF venv still reports `pip` absent after the probe.
+Earlier exploratory disposable scratch venvs were excluded from formal acceptance and were deleted after the accepted probe. Their install/HTTP diagnostic results are not used for this PASS.
 
-## 2. Main environment
+## 2. Main FFDF runtime
 
-Observed FFDF main runtime:
+Observed only:
 
 - Python `3.14.9`;
 - 64-bit ARM64 build;
 - Windows 11 ARM64 host.
 
-This runtime was observed only and was not mutated.
+Result: **PASS / unchanged**.
 
-## 3. Project-local Python 3.12 AMD64 viability
+## 3. Existing project-local Python 3.12 AMD64 viability
 
-An already-present Astral CPython `3.12.14` x86_64 interpreter was used only as the base interpreter for the disposable project-local probe venv.
+Accepted runtime observed at:
 
-Formal probe venv:
-`D:\Codex\FinancialFilingDataFoundation\workspace\scratch\p11-b-probe\formal\venv`
+`runtimes/ffdf-mcp-2.3.0/.venv/Scripts/python.exe`
 
-Proof:
+Runtime identity:
 
-- Python `3.12.14`;
-- `sys.version` reports `MSC v.1944 64 bit (AMD64)`;
-- pointer width = 64-bit;
-- executable PE machine = `0x8664` / AMD64;
-- base interpreter was not modified.
+- CPython `3.12.14`;
+- `sys.version` = `MSC v.1944 64 bit (AMD64)`;
+- `sysconfig.get_platform()` = `win-amd64`;
+- 64-bit runtime;
+- native Windows machine = ARM64.
+
+The venv launcher PE itself is ARM64 (`0xaa64`) on this host; this is a Windows ARM64 redirector/launcher detail and is not the CPython wheel ABI. The authoritative runtime/wheel ABI signals are the Python build identity and `sysconfig` platform, both AMD64/win-amd64.
 
 Result: **PASS**.
 
-## 4. Arelle / lxml candidate viability
+## 4. Arelle / lxml package viability without runtime install
 
-Formal binary-only resolution under project-local TEMP/cache/download paths succeeded.
+Exact downloaded artifacts were inspected directly from wheel metadata; no package install is part of the accepted probe.
 
-Resolved 23 wheels.
-
-Exact identities:
+Arelle:
 
 - `arelle-release==2.47.4`;
-- wheel `arelle_release-2.47.4-py3-none-any.whl`;
+- `arelle_release-2.47.4-py3-none-any.whl`;
 - SHA256 `366b9ced1a9e5058a31f4ffd347ec6fc6900c6931ade3d97a36d7836151fe3e1`;
-- this matches the Arelle wheel hash previously recorded in `development/144-p11-environment-interface-audit.md`;
+- `Requires-Python >=3.11`;
+- hash matches `development/144-p11-environment-interface-audit.md`.
+
+lxml:
+
 - `lxml==6.1.3`;
-- wheel `lxml-6.1.3-cp312-cp312-win_amd64.whl`;
-- SHA256 `3e9a00d1c2c30936f7add097c41afc5da6556c580909104aafd382cac92a855c`.
+- `lxml-6.1.3-cp312-cp312-win_amd64.whl`;
+- SHA256 `3e9a00d1c2c30936f7add097c41afc5da6556c580909104aafd382cac92a855c`;
+- `Requires-Python >=3.8`.
 
-The wheel set was installed only into the disposable formal probe venv. Import verification:
+A disposable resolver venv under project scratch was created only to obtain pip. Using only the already-downloaded local wheels:
 
-- Arelle metadata version = `2.47.4`;
-- lxml distribution version = `6.1.3`;
-- lxml runtime version = `6.1.3.0`.
+`pip install --dry-run --ignore-installed --no-index --find-links ... arelle-release==2.47.4`
+
+resolved the complete 23-package candidate set successfully and installed nothing.
+
+Dry-run report:
+
+- `arelle-dry-run-report.json` SHA256 = `a153221560563a4bbaa7f625ef4ddc4e1ed708207966570bc5bc8d49ce1e6fa7`.
+
+The resolver venv was deleted after the report was created.
 
 Result: **PASS**.
 
 ## 5. Runtime-lock strategy
 
-Formal reproducibility evidence:
+PASS.
 
-- `pip-freeze.txt` SHA256 = `c8702ce815f1218e0fda3f3d58d027c90bee7f379602c3dfc93b9b6493d3e544`;
-- `wheel-hashes.txt` SHA256 = `eb743523c99d390a34609ff3590e86dec2a148c08e89452b16a49dd83d9cdbd6`;
-- 23 exact downloaded wheel artifacts are available under the project-local formal download directory;
-- wheel filenames and SHA256 values are sufficient to construct a future hash-locked runtime descriptor.
+The accepted probe demonstrates that the P11 runtime can be frozen using:
 
-This is evidence of lock viability only. It is not the production P11 runtime lock.
+- exact CPython 3.12 / `win-amd64` identity;
+- exact `package==version` set from the 23-package dry-run;
+- exact wheel filenames and SHA256 values already captured project-locally;
+- existing FFDF runtime-lock conventions as the production format precedent.
 
-Result: **PASS**.
+No P11 production runtime lock was created or modified by P11-B. Final parser dependency/runtime lock remains subject to the later authorized P11-F parser-contract freeze.
 
-## 6. SEC network/TLS and configured User-Agent path
+## 6. SEC network / TLS reachability
 
-Raw TLS probe:
+PASS without HTTP content acquisition.
 
-- `www.sec.gov` => TLS 1.3 / `TLS_AES_256_GCM_SHA384` / certificate CN `www.sec.gov`;
-- `data.sec.gov` => TLS 1.3 / `TLS_AES_256_GCM_SHA384` / certificate CN `www.sec.gov`.
+Raw TLS handshakes succeeded:
 
-A pre-existing `SEC_USER_AGENT` configuration was present. Its value was deliberately neither printed nor stored in evidence.
+- `www.sec.gov:443` => TLS 1.3 / `TLS_AES_256_GCM_SHA384` / certificate CN `www.sec.gov`;
+- `data.sec.gov:443` => TLS 1.3 / `TLS_AES_256_GCM_SHA384` / certificate CN `www.sec.gov`.
 
-The formal HTTP probe consumed that configured value directly and sent requests only to accepted SEC hosts.
+This proves target host/network/TLS reachability required by P11-B.
 
-Results:
+## 7. Explicit User-Agent configuration boundary
 
-- `https://data.sec.gov/submissions/CIK0000320193.json` => HTTP `200`, `application/json`;
-- `https://www.sec.gov/files/company_tickers.json` => HTTP `200`, `application/json`.
+PASS for configuration-path viability.
 
-Formal result file:
+A pre-existing explicit configuration path is present:
 
-- `sec-http-result.json` SHA256 = `3e631f4f30e3424d990323b8a51d855ee640b8d174b751dd326c098510433769`.
+`environment:SEC_USER_AGENT`
 
-This proves both SEC network/TLS reachability and viability of an explicit configured User-Agent route without inventing or exposing contact identity.
+Only non-secret shape was inspected and persisted:
 
-The exact production User-Agent grammar/config source, timeout, retry, response-size and rate-lock behavior remain intentionally deferred to the mandatory P11-D Design-First HTTP-contract freeze.
+- present = true;
+- non-empty = true;
+- length = 32;
+- ASCII = true;
+- contains whitespace = true;
+- contains `@` = true.
 
-An earlier scratch diagnostic using a non-contact project-label probe User-Agent returned HTTP 403. That diagnostic predates the reconciled formal probe boundary and is **not** acceptance evidence. No production conclusion is based on it.
+The value itself was neither printed nor persisted in accepted evidence.
 
-Result: **PASS**.
+Accepted P11-B HTTP behavior:
 
-## 7. Atomic same-filesystem non-replacing directory commit
+`NOT_EXECUTED_BY_DESIGN`
 
-Formal runtime primitive:
+P11-B does not need to expose or transmit the configured contact identity. Exact production User-Agent grammar/config source, rate gate, timeout, retry and response-size rules remain gated by the mandatory P11-D Design-First HTTP-contract freeze.
+
+Earlier exploratory scratch HTTP diagnostics are not P11-B acceptance evidence.
+
+## 8. Atomic same-filesystem non-replacing directory commit
+
+PASS.
+
+Target primitive:
+
 `kernel32.MoveFileExW(source, destination, flags=0)`
 
-Properties tested:
+Properties:
 
-- project-local `D:` source/destination;
-- same-filesystem identity confirmed;
+- source and final paths on the same project-local `D:` filesystem;
 - no `MOVEFILE_REPLACE_EXISTING`;
 - no `MOVEFILE_COPY_ALLOWED`;
 - no copy/delete/replace fallback.
 
-Exact outcome mapping:
+Exact outcome classes observed:
 
-- absent destination => `COMMITTED_NEW`, WinError `0`;
-- existing destination => `DESTINATION_EXISTS`, WinError `183`;
+- destination absent => `COMMITTED_NEW`, WinError `0`;
+- destination already exists => `DESTINATION_EXISTS`, WinError `183`;
 - missing source => `COMMIT_ERROR`, WinError `2`.
 
-Concurrency:
+Concurrency proof on the accepted project-local Python 3.12 runtime:
 
 - 20 independent two-process races;
-- 20/20 produced exactly one `COMMITTED_NEW` and one `DESTINATION_EXISTS`;
-- destination contained only winner content;
-- loser source/staging directory remained intact;
-- no merge, overwrite or replacement.
+- 20/20 produced exactly one `COMMITTED_NEW` + one `DESTINATION_EXISTS`;
+- final directory contained winner content only;
+- losing source/staging directory remained intact;
+- no merge/overwrite/replacement.
 
-Formal result:
+Accepted result:
 
-- `no-replace-result.json` SHA256 = `e8bbb64573bd2887be6a02098edb81d77398882256241e90268800e4d529cc1c`.
+- `no-replace-result.json` SHA256 = `cb57348e585ee368e49eecb5e6d769cc78b3d50d4d52da5bbd4e29d877a672d4`.
 
 Result: **PASS**.
 
-## 8. Gate verdict
+## Verdict
 
 # PASS
 
-P11-B Environment / SEC Runtime Probe is **CLOSED / PASS**.
+P11-B Environment / SEC Runtime Probe is CLOSED / PASS.
 
-Proven environment capabilities:
+P11-C Identity / Period Contract is NEXT and requires separate authorization.
 
-- project-local Python 3.12 AMD64 viability on the Windows ARM64 host;
-- Arelle 2.47.4 and lxml 6.1.3 viable with exact wheel/hash capture;
-- reproducible hash-lock strategy viable;
-- SEC TLS and configured-User-Agent HTTP access viable;
-- target filesystem exposes the required same-filesystem no-replace directory commit primitive with distinguishable destination-exists semantics.
+P11 provider production remains CLOSED.
 
-This PASS does not authorize a permanent P11 runtime installation and does not authorize P11 provider production.
+Research MCP production remains NOT AUTHORIZED.
 
-P11-C Identity / Period Contract may be separately authorized next.
+Semantic Resolver production remains NOT AUTHORIZED.
