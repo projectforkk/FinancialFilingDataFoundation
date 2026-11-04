@@ -411,7 +411,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 101. harness v2 evidence = `development/132-p10-acceptance-harness-v2-evidence.md` = PASS；
 102. targeted formal review authorization = `development/133-p10-acceptance-package-formal-review-authorization.md`；
 103. targeted formal review result = `development/134-p10-acceptance-package-formal-review-result.md` = PASS；
-104. P10-M re-freeze pending separate authorization；
-105. P10-N remains CLOSED；
-106. P10 closeout/main integration = STOPPED；
-107. P11 / Research MCP production / Semantic Resolver production remain closed。
+104. P10-M re-freeze authorization = `development/135-p10-m-issue008009-refreeze-authorization.md`；
+105. P10-M re-freeze = AUTHORIZED ONLY；
+106. P10-N remains CLOSED；
+107. P10 closeout/main integration = STOPPED；
+108. P11 / Research MCP production / Semantic Resolver production remain closed。

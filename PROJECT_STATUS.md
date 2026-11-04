@@ -156,7 +156,7 @@
 
 Status:
 
-`TARGETED FORMAL REVIEW PASS / P10-M RE-FREEZE PENDING / P10-N CLOSED`
+`AUTHORIZED — P10-M ISSUE-008/009 RE-FREEZE ONLY / P10-N CLOSED`
 
 P10-C is closed:
 
@@ -500,7 +500,11 @@ Targeted formal review result:
 
 `development/134-p10-acceptance-package-formal-review-result.md = PASS`
 
-P10-M re-freeze remains closed pending separate authorization. P10-N remains closed.
+P10-M re-freeze authorization:
+
+`development/135-p10-m-issue008009-refreeze-authorization.md`
+
+Only freeze-document/evidence/status updates are authorized. P10-N remains closed.
 
 Required sequence:
 
