@@ -96,15 +96,15 @@ _FORBIDDEN_RESOLUTION_TEXT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(
         r"(?:^|[\r\n;&|])\s*(?:"
         r"cmd(?:\.exe)?\s+/[ck]\b|"
-        r"powershell(?:\.exe)?\s+-\w+|"
-        r"pwsh(?:\.exe)?\s+-\w+|"
-        r"bash(?:\.exe)?\s+-(?:lc|cl|l|c)\b|"
+        r"powershell(?:\.exe)?(?=\s|$|[\r\n;&|])|"
+        r"pwsh(?:\.exe)?(?=\s|$|[\r\n;&|])|"
+        r"bash(?:\.exe)?(?=\s|$|[\r\n;&|])|"
         r"sh\s+-c\b|"
         r"invoke-expression\b|"
         r"rm\s+-rf\b|"
         r"del\s+/[qsf]\b|"
-        r"curl(?:\.exe)?\s+\S+|"
-        r"wget(?:\.exe)?\s+\S+"
+        r"curl(?:\.exe)?(?=\s|$|[\r\n;&|])|"
+        r"wget(?:\.exe)?(?=\s|$|[\r\n;&|])"
         r")",
         re.IGNORECASE | re.MULTILINE,
     ),

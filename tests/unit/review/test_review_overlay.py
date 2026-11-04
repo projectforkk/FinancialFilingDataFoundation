@@ -1174,8 +1174,17 @@ def test_justification_uses_raw_4000_character_boundary(review_fixture) -> None:
         ("justification", "/tmp"),
         ("justification", "/etc/passwd"),
         ("justification", "../secret"),
+        ("justification", "powershell"),
+        ("justification", "pwsh"),
+        ("justification", "bash"),
+        ("justification", "curl"),
+        ("justification", "wget"),
+        ("justification", "curl.exe"),
+        ("justification", "powershell; echo safe"),
         ("justification", "powershell -Command Get-ChildItem"),
         ("justification", "bash -lc id"),
+        ("justification", "curl example.invalid"),
+        ("justification", "wget example.invalid"),
         ("justification", "PRAGMA"),
         ("justification", "import os\nos.system('whoami')"),
         ("justification", "token=super-secret-value"),
@@ -1253,7 +1262,8 @@ def test_resolution_payload_security_allows_benign_slashes_and_keywords(
             justification=(
                 "P5/P6 evidence checked; SQL review completed. "
                 "Select revenue from the annual report evidence. "
-                "Update guidance set by management."
+                "Update guidance set by management. "
+                "Reviewer confirmed powershell was not used."
             ),
         ),
     )
