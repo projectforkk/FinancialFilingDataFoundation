@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-F ONLY / P10-ISSUE-005 AMENDED BASELINE`
+`P10-F CANDIDATE READY / DETACHED REVIEW AUTHORIZED / P10-G CLOSED`
 
 P10-C is closed:
 
@@ -190,9 +190,25 @@ Current P10-F design baseline:
 
 `860e628ecf9f804734c9d343b3f2a9894928c9e9`
 
-Current authorization:
+Development authorization:
 
 `development/98-p10-f-cli-reauthorization.md`
+
+P10-F production candidate:
+
+`d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
+
+Development evidence:
+
+`development/99-p10-f-cli-evidence.md = PASS`
+
+Evidence commit:
+
+`fad7f84`
+
+Detached review instruction:
+
+`development/100-p10-f-code-review-instruction.md`
 
 The amended baseline freezes:
 
@@ -207,11 +223,11 @@ The amended baseline freezes:
 - deterministic context rebuild for validate-ledger;
 - no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
 
-Only P10-F CLI adapter/tests are authorized under development/98. P10-G remains closed.
+P10-F production is frozen during detached review. No further P10-F code changes are authorized in the active worktree.
 
 Still not authorized:
 
-- P10-F work outside development/98 scope;
+- further P10-F production changes during review;
 - P10-G and later production;
 - Research MCP production;
 - Semantic Resolver production;

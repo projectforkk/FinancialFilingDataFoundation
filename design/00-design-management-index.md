@@ -345,6 +345,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 35. P10-F stop record = `development/97-p10-f-preimplementation-design-stop.md`；
 36. P10-F amended design baseline = `860e628ecf9f804734c9d343b3f2a9894928c9e9`；
 37. P10-F reauthorization = `development/98-p10-f-cli-reauthorization.md`；
-38. P10-F = AUTHORIZED ONLY within deterministic CLI gate scope；
-39. P10-G and later remain closed；
-40. P11 / Research MCP production / Semantic Resolver production remain closed。
+38. P10-F production candidate = `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`；
+39. P10-F evidence = `development/99-p10-f-cli-evidence.md` = PASS；
+40. P10-F detached review instruction = `development/100-p10-f-code-review-instruction.md`；
+41. P10-F = REVIEW AUTHORIZED / P10-G CLOSED；
+42. P11 / Research MCP production / Semantic Resolver production remain closed。
