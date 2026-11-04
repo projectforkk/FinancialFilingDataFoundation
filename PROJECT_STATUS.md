@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-M ACCEPTANCE PACKAGE ONLY / NO DESIGN OR PRODUCTION CHANGES`
+`P10-M ACCEPTANCE FREEZE READY / P10-N CLOSED PENDING EXACT FREEZE COMMIT`
 
 P10-C is closed:
 
@@ -361,7 +361,18 @@ P10-M acceptance-freeze authorization:
 
 `development/120-p10-m-acceptance-freeze-authorization.md`
 
-Only acceptance-package authoring/freeze is authorized; core design and production remain frozen.
+P10-M freeze evidence:
+
+`development/121-p10-m-acceptance-freeze-evidence.md = PASS`
+
+Frozen package:
+
+- `acceptance/39-p10-final-acceptance-freeze.md`
+- `acceptance/p10_independent_acceptance_harness.py`
+- `acceptance/p10-base-immutability-manifest.json`
+- `acceptance/p10-fixtures/**`
+
+Core design and production remain frozen. P10-N remains closed until a separate authorization records the exact P10-M freeze commit.
 
 Still not authorized:
 
