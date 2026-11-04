@@ -328,7 +328,13 @@ At least one live or frozen official SEC case:
 
 - accession-bound supplemental ingestion;
 - primary document captured;
+- `fiscal_year=null` when no exact filing-native fiscal-year evidence exists;
+- `raw_fiscal_period=null` always for supplemental v1;
+- `report_date=null` when SEC reportDate is empty/not valid;
+- filing_date is not used to infer fiscal_year/report_date;
 - no Q1/Q2/Q3/FY slot forced;
+- no existing periodic SQLiteRegistry / ParsedDataRecord write;
+- v2 writer/loader round-trips the null supplemental fields exactly;
 - unrelated exhibits not downloaded by default;
 - explicitly requested allowed exhibit can be captured;
 - exact exhibit asset SHA/evidence retained.

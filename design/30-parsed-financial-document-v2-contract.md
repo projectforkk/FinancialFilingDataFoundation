@@ -108,12 +108,12 @@ Required:
 - company_id;
 - ticker;
 - filing_type;
-- fiscal_year;
-- raw_fiscal_period nullable for supplemental filings;
+- fiscal_year nullable only for supplemental filings;
+- raw_fiscal_period nullable only for supplemental filings;
 - amended;
 - filing_role = PERIODIC | SUPPLEMENTAL;
 - filing_date;
-- report_date;
+- report_date nullable only for supplemental filings;
 - source_provider;
 - source_id;
 - source_url;
@@ -127,6 +127,25 @@ Required:
 - accession_number nullable outside SEC.
 
 For SEC, `company_id` and `provider_company_id` are canonical normalized CIK unless a later design explicitly changes this rule.
+
+Filing-role nullability:
+
+### PERIODIC
+
+- `fiscal_year` MUST be a confirmed integer;
+- `raw_fiscal_period` MUST be one of the confirmed periodic values allowed by market/form;
+- `report_date` MUST be a valid official filing report date;
+- provisional/null periodic identity is invalid.
+
+### SUPPLEMENTAL
+
+- `fiscal_year` is null unless exact filing-native evidence explicitly establishes a fiscal year;
+- `raw_fiscal_period` MUST be null;
+- `report_date` is the official SEC reportDate only when non-empty and valid, otherwise null;
+- filing_date MUST NOT be used to infer fiscal_year or report_date;
+- no calendar-year inference is allowed merely to populate a field.
+
+P11 v1 supplemental identity remains accession-bound even when all three periodic/date fields above are null except filing_date.
 
 ## 6. source_assets.jsonl
 

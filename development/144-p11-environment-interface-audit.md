@@ -333,3 +333,22 @@ Resolution in current amendment:
 - P11-K performs registry/ParsedData persistence only after validation/reuse gate.
 
 P11-ISSUE-020 is closed in the amended design, pending fresh detached review.
+
+
+## 12. Final manual review finding — P11-ISSUE-021
+
+Review of `a223d44d766609190806d1d349dab1d5d673423b` passed the automated design matrix but manual semantic review found supplemental identity nullability was incomplete.
+
+Stop:
+`development/157-p11-final-design-review-stop.md`
+
+Resolution in current amendment:
+
+- periodic v2 retains required confirmed fiscal_year/raw_fiscal_period/report_date;
+- supplemental fiscal_year is nullable unless filing-native evidence explicitly establishes it;
+- supplemental raw_fiscal_period is always null;
+- supplemental report_date is official non-empty valid SEC reportDate or null;
+- filing_date/calendar year is never used to guess missing supplemental fiscal metadata;
+- P11 v1 supplemental filings stay outside existing periodic SQLiteRegistry/ParsedDataRecord and remain authoritative in source package + v2 + supplemental export.
+
+No production/test/runtime change was made.

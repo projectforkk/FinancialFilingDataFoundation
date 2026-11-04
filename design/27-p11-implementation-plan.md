@@ -295,6 +295,17 @@ Implement accession-bound supplemental ingest.
 
 No periodic slot forcing.
 
+P11 v1 supplemental persistence is limited to source package + ParsedFinancialDocument v2 + supplemental export.
+
+Do NOT write 8-K/6-K into the existing periodic SQLiteRegistry / ParsedDataRecord path.
+
+Supplemental identity fields:
+
+- fiscal_year null unless exact filing-native evidence supplies it;
+- raw_fiscal_period always null;
+- report_date official non-empty valid reportDate or null;
+- no filing-date/calendar inference.
+
 Primary document mandatory.
 
 Requested exhibit acquisition is explicit and allowlisted by filing directory metadata.
@@ -310,7 +321,9 @@ Tests:
 
 ## P11-K — Registry / Parsed Data / Incremental Reuse
 
-Integrate periodic SEC v2 results into existing registry with additive compatibility.
+Integrate **periodic SEC v2 results only** into existing registry with additive compatibility.
+
+Supplemental 8-K/6-K remain outside the existing SQLiteRegistry / ParsedDataRecord path in P11 v1.
 
 Registry/ParsedData persistence occurs only after P11-I validation has produced the final status and P11-G identity is confirmed.
 

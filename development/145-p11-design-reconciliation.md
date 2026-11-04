@@ -243,3 +243,15 @@ P11-E package assembly
 ```
 
 This satisfies design/30 periodic document identity without provisional/null field fabrication and preserves registry validation-before-reuse semantics.
+
+
+## 17. Supplemental identity / registry reconciliation
+
+P11-ISSUE-021 is resolved additively:
+
+- periodic SEC filings continue into the existing periodic registry only after confirmed identity + v2 + validation;
+- supplemental 8-K/6-K do not enter the periodic registry in P11 v1;
+- v2 supports nullable supplemental fiscal_year/report_date/raw_fiscal_period without placeholder or calendar-derived inference;
+- accession remains the supplemental source identity.
+
+A generic supplemental registry, if needed later, is a separate additive design rather than a silent widening of accepted periodic registry semantics.

@@ -527,7 +527,21 @@ For non-PDF primary assets:
 - source metadata records accession/URL/CIK;
 - expected identity is attached only after periodic binding is confirmed.
 
-Supplemental accession-bound documents may be registered without a periodic FilingSlotKey binding in P11 v1; the supplemental manifest remains authoritative for their filing identity.
+P11 v1 supplemental accession-bound filings MUST NOT be persisted into the existing periodic SQLiteRegistry / ParsedDataRecord path.
+
+Reason:
+
+- current registry parsed-data identity is periodic-slot oriented;
+- current SourceMetadata/report-date contract is not a source-neutral supplemental identity contract;
+- forcing supplemental filings into it would require placeholder/guessed period metadata.
+
+For P11 v1, supplemental authority is limited to:
+
+- immutable SEC source package;
+- ParsedFinancialDocument v2;
+- supplemental export identity keyed by CIK + accession + base form + filing date.
+
+A future generic supplemental registry is a separate additive contract and requires separate design/review/acceptance.
 
 ## 18. Parser architecture
 
