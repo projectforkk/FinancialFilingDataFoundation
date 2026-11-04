@@ -58,6 +58,8 @@ def test_invalid_year_range_is_rejected() -> None:
         build_required_slots(company, 2025, 2024, policy)
 
 
-def test_p1_market_is_limited_to_cn_hk() -> None:
+def test_market_support_is_additive_for_us() -> None:
+    company = CompanyRef("US", "320193", None)
+    assert company.company_id == "0000320193"
     with pytest.raises(ValueError, match="unsupported P1 market"):
-        CompanyRef("US", "x", "AAPL")
+        CompanyRef("JP", "x", "7203")

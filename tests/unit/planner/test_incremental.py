@@ -4,6 +4,7 @@ import inspect
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from financial_filing_data_foundation.identity import (
     CompanyRef,
@@ -14,6 +15,8 @@ from financial_filing_data_foundation.identity import (
 )
 from financial_filing_data_foundation.planner import (
     IncrementalPlanner,
+    PackageAwarePlannerRequired,
+    PackageAwarePlannerRequired,
     PlannerAction,
     PlannerReusePolicy,
     ReasonCode,
@@ -395,3 +398,97 @@ def test_planner_has_no_network_dayu_or_heavy_imports() -> None:
         "from openai",
     )
     assert not any(token in source for token in forbidden)
+
+
+def test_p11c_20_package_aware_planner_required_exact_contract() -> None:
+    exc = PackageAwarePlannerRequired("market US requires P11 package-aware SEC planning")
+    assert isinstance(exc, RuntimeError)
+    assert PackageAwarePlannerRequired.reason_code == "P11_PACKAGE_AWARE_PLANNER_REQUIRED"
+    assert str(exc) == "market US requires P11 package-aware SEC planning"
+
+
+def test_p11c_21_us_guard_precedes_slot_construction_and_registry(monkeypatch) -> None:
+    import financial_filing_data_foundation.planner.incremental as incremental
+
+    class ExplodingRegistry:
+        def __getattr__(self, name):
+            raise AssertionError(f"registry access before US guard: {name}")
+
+    def explode_slots(*args, **kwargs):
+        raise AssertionError("build_required_slots called before US guard")
+
+    monkeypatch.setattr(incremental, "build_required_slots", explode_slots)
+    planner = IncrementalPlanner(ExplodingRegistry(), _reuse_policy())
+    company = CompanyRef("US", "320193", None)
+    policy = FilingPolicy((FilingRequirement("10-Q", "Q2"),))
+    with pytest.raises(PackageAwarePlannerRequired) as exc_info:
+        planner.build_plan(company, 2025, 2025, policy)
+    assert str(exc_info.value) == "market US requires P11 package-aware SEC planning"
+
+
+def test_p11c_22_cn_incremental_planner_behavior_remains_unchanged(tmp_path: Path) -> None:
+    registry = SQLiteRegistry(tmp_path / "registry.sqlite")
+    plan = _planner(registry).build_plan(_company(), 2025, 2025, _policy())
+    assert len(plan.items) == 1
+    assert plan.items[0].action == PlannerAction.DOWNLOAD_AND_PARSE
+    assert plan.items[0].reason_code == ReasonCode.NO_REUSABLE_DATA_OR_LOCAL_RAW
+
+
+def test_p11_c_package_aware_planner_required_contract_and_guard_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = object()
+    planner = IncrementalPlanner(registry, _reuse_policy())
+    company = CompanyRef("US", "320193", None)
+    policy = FilingPolicy((FilingRequirement("10-K", "FY"),))
+
+    def fail_build_required_slots(*args, **kwargs):
+        raise AssertionError("US guard must execute before build_required_slots")
+
+    monkeypatch.setattr(
+        "financial_filing_data_foundation.planner.incremental.build_required_slots",
+        fail_build_required_slots,
+    )
+
+    with pytest.raises(PackageAwarePlannerRequired) as exc_info:
+        planner.build_plan(company, 2024, 2024, policy)
+
+    exc = exc_info.value
+    assert issubclass(PackageAwarePlannerRequired, RuntimeError)
+    assert PackageAwarePlannerRequired.reason_code == "P11_PACKAGE_AWARE_PLANNER_REQUIRED"
+    assert str(exc) == "market US requires P11 package-aware SEC planning"
+    assert not hasattr(ReasonCode, "P11_PACKAGE_AWARE_PLANNER_REQUIRED")
+
+
+@pytest.mark.parametrize(
+    ("market", "company_id", "ticker"),
+    [
+        ("CN", "CN:600519", "600519"),
+        ("HK", "HK:00005", "00005"),
+    ],
+)
+def test_p11_c_existing_market_planner_behavior_is_unchanged(
+    tmp_path: Path,
+    market: str,
+    company_id: str,
+    ticker: str,
+) -> None:
+    registry = SQLiteRegistry(tmp_path / f"{market.lower()}-registry.sqlite")
+    planner = IncrementalPlanner(registry, _reuse_policy())
+    company = CompanyRef(market, company_id, ticker)
+    policy = FilingPolicy((FilingRequirement("ANNUAL_REPORT", "FY"),))
+
+    plan = planner.build_plan(company, 2024, 2024, policy)
+
+    assert plan.company == company
+    assert plan.start_year == 2024
+    assert plan.end_year == 2024
+    assert len(plan.items) == 1
+    item = plan.items[0]
+    assert item.slot.market == market
+    assert item.slot.company_id == company_id
+    assert item.slot.filing_type == "ANNUAL_REPORT"
+    assert item.slot.raw_fiscal_period == "FY"
+    assert item.ticker == ticker
+    assert item.action == PlannerAction.DOWNLOAD_AND_PARSE
+    assert item.reason_code == ReasonCode.NO_REUSABLE_DATA_OR_LOCAL_RAW

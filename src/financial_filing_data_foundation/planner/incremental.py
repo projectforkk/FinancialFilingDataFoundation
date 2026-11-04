@@ -6,6 +6,7 @@ from financial_filing_data_foundation.identity import (
     FilingSlotKey,
     build_required_slots,
 )
+from financial_filing_data_foundation.planner.errors import PackageAwarePlannerRequired
 from financial_filing_data_foundation.planner.models import (
     FilingPlan,
     PlannerAction,
@@ -69,6 +70,10 @@ class IncrementalPlanner:
         end_year: int,
         policy: FilingPolicy,
     ) -> FilingPlan:
+        if company.market == "US":
+            raise PackageAwarePlannerRequired(
+                "market US requires P11 package-aware SEC planning"
+            )
         slots = build_required_slots(company, start_year, end_year, policy)
         items = tuple(self._plan_slot(company, slot) for slot in slots)
         return FilingPlan(
