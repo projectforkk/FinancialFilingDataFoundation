@@ -386,12 +386,15 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 76. P10-M historical freeze attempt = `42e39c971a360ca4e0ee09761221cc8da7ddbaa9` = INVALID；
 77. P10-M stop record = `development/122-p10-m-freeze-stop.md`；
 78. P10-M corrected re-freeze evidence = `development/123-p10-m-refreeze-evidence.md` = PASS；
-79. P10-M corrected re-freeze commit = `56cbe185e97e6e07dd354e03b98942d87f8e5787`；
-80. P10-M = CLOSED；
-81. P10-N authorization = `development/124-p10-n-independent-acceptance-authorization.md`；
-82. P10-N result = `acceptance/40-p10-independent-acceptance-result.md` = PASS；
-83. P10-N accepted detached candidate = `56cbe185e97e6e07dd354e03b98942d87f8e5787`；
-84. P10-N = CLOSED / PASS；
-85. P10 closeout authorization = `development/125-p10-closeout-authorization.md`；
-86. P10 closeout = AUTHORIZED INTEGRATION ONLY；
-87. P11 / Research MCP production / Semantic Resolver production remain closed。
+79. P10-M actual corrected re-freeze commit = `4d1ab46f11d1d7b88934309ce32319e2200f0d8f`；
+80. historical later-recorded candidate `56cbe185e97e6e07dd354e03b98942d87f8e5787` = INVALID / NON-EXISTENT；
+81. P10-M = CLOSED on actual candidate `4d1ab46f...`；
+82. historical P10-N authorization = `development/124-p10-n-independent-acceptance-authorization.md` = INVALID；
+83. historical closeout authorization = `development/125-p10-closeout-authorization.md` = INVALID；
+84. closeout stop = `development/126-p10-closeout-stop.md`；
+85. historical integration merge `b560f49a78316fa59a4183de326d2dee0a80ebb6` = INELIGIBLE；
+86. corrected P10-N authorization = `development/127-p10-n-corrected-reauthorization.md`；
+87. corrected P10-N candidate = `4d1ab46f11d1d7b88934309ce32319e2200f0d8f`；
+88. P10-N = AUTHORIZED / NOT YET EXECUTED；
+89. P10 closeout/main integration = STOPPED pending actual P10-N result；
+90. P11 / Research MCP production / Semantic Resolver production remain closed。

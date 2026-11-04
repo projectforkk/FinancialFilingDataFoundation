@@ -392,44 +392,52 @@ Corrected `acceptance/39` SHA256:
 
 `92889cc508c8d62e3fa8f36044fdde8dd81131970df54e615b1967b936603b94`
 
-Valid corrected P10-M re-freeze commit:
+Corrected P10-M re-freeze evidence:
 
-`56cbe185e97e6e07dd354e03b98942d87f8e5787`
+`development/123-p10-m-refreeze-evidence.md = PASS`
 
-P10-M is closed.
+Actual eligible corrected P10-M re-freeze commit:
 
-P10-N Independent Acceptance authorization:
+`4d1ab46f11d1d7b88934309ce32319e2200f0d8f`
+
+The historical SHA recorded later as `56cbe185e97e6e07dd354e03b98942d87f8e5787` does not exist in Git and is invalid.
+
+P10-M remains closed on the actual corrected candidate above.
+
+Historical invalid P10-N authorization:
 
 `development/124-p10-n-independent-acceptance-authorization.md`
 
-P10-N Independent Acceptance result:
-
-`acceptance/40-p10-independent-acceptance-result.md = PASS`
-
-Accepted detached candidate:
-
-`56cbe185e97e6e07dd354e03b98942d87f8e5787`
-
-Fresh acceptance verified:
-
-- harness precheck PASS;
-- research unit `136 passed`;
-- full unit `444 passed`;
-- dynamic Spec A/B hashes/toolsets differ and both ledgers PASS;
-- live CN 600519 run = COMPLETE;
-- isolated P9 period resolution validated;
-- K1–K5 negative capability gates PASS;
-- immutable 47-file base before/after PASS;
-- harness postcheck PASS;
-- detached acceptance worktree clean.
-
-P10-N is closed.
-
-P10 closeout authorization:
+Historical invalid closeout authorization:
 
 `development/125-p10-closeout-authorization.md`
 
-Only project-local integration/main closeout is authorized. P10 production/design remain frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
+Closeout stop:
+
+`development/126-p10-closeout-stop.md`
+
+Facts:
+
+- no `acceptance/40-p10-independent-acceptance-result.md` existed;
+- no `workspace/p10-n` execution root existed;
+- no P10-N detached acceptance worktree existed;
+- therefore P10-N had not actually executed;
+- historical integration merge `b560f49a78316fa59a4183de326d2dee0a80ebb6` is ineligible for main integration;
+- `origin/main` remains the accepted P9 baseline `e9b30626f2b88ac5527d42bd76d0b682efbeef0e`.
+
+Corrected P10-N authorization:
+
+`development/127-p10-n-corrected-reauthorization.md`
+
+Exact acceptance candidate:
+
+`4d1ab46f11d1d7b88934309ce32319e2200f0d8f`
+
+P10-N is now authorized but not yet executed.
+
+P10 closeout/main integration remains STOPPED until an actual Independent Acceptance result is committed.
+
+P10 production/design remain frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
 
 Still not authorized:
 
