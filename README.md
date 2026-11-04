@@ -48,8 +48,11 @@ All FFDF-owned code, runtimes, worktrees, workspace data and temporary test path
 
 - Markdown: [`docs/FFDF_CN_HK_Usage_Manual.md`](docs/FFDF_CN_HK_Usage_Manual.md)
 - Word: [`docs/FFDF_CN_HK_Usage_Manual.docx`](docs/FFDF_CN_HK_Usage_Manual.docx)
+- User CLI: [`docs/FFDF_User_CLI.md`](docs/FFDF_User_CLI.md)
 
 The manual covers local runtimes, deployment health checks, CN/HK data preparation, P8 MCP, P9 Review Overlay, P10 Research Integration, testing, troubleshooting, backup boundaries, and day-to-day operating workflows.
+
+The user CLI provides `ffdf acquire`, `ffdf ingest`, and `ffdf status` for self-service filing download, parsing, Registry persistence, and non-blocking P8 catalog publication.
 
 ## Accepted phase baseline
 

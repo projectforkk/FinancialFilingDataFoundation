@@ -14,6 +14,8 @@ P11 US SEC Provider is superseded by the final scope decision and is `OUT_OF_SCO
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
+Post-closeout operational user CLI (2026-11-05): `ffdf acquire`, `ffdf ingest`, and `ffdf status` are available for CN/HK self-service operation. This is an orchestration surface over the accepted P0-P10 components and does not reopen market/provider scope. CLI focused tests: `5 passed`; current full unit regression: `450 passed / 0 failed`; design: `design/31-user-cli-design.md`; implementation record: `development/146-user-cli-implementation.md`.
+
 ## Accepted baseline
 
 - phase: `P10_DONE`

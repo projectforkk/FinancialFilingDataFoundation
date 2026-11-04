@@ -1,0 +1,610 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import tempfile
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from financial_filing_data_foundation.acquisition import (
+    AcquisitionError,
+    AcquisitionRequest,
+    AcquisitionStatus,
+    DAYU_PACKAGE_VERSION,
+    DAYU_PINNED_COMMIT,
+    DAYU_REPOSITORY,
+    DayuRuntimeDescriptor,
+    DayuSubprocessAdapter,
+    RawDocumentStore,
+    acquire_slot,
+)
+from financial_filing_data_foundation.candidates import detect_table_candidates
+from financial_filing_data_foundation.facts import extract_raw_facts
+from financial_filing_data_foundation.identity import CompanyRef, FilingSlotKey
+from financial_filing_data_foundation.mcp.catalog import McpCatalog
+from financial_filing_data_foundation.mcp.service import McpQueryService
+from financial_filing_data_foundation.native import parse_native_document
+from financial_filing_data_foundation.registry import SQLiteRegistry
+from financial_filing_data_foundation.tables import reconstruct_tables
+from financial_filing_data_foundation.validation import (
+    build_parsed_data_record,
+    validate_document_artifacts,
+)
+
+
+_PERIODS = ("Q1", "H1", "Q3", "FY")
+_IDENTITY_FILING_TYPE = {
+    "Q1": "QUARTERLY_REPORT",
+    "H1": "INTERIM_REPORT",
+    "Q3": "QUARTERLY_REPORT",
+    "FY": "ANNUAL_REPORT",
+}
+_CATALOG_FILING_TYPE = {
+    "Q1": "Q1",
+    "H1": "H1",
+    "Q3": "Q3",
+    "FY": "ANNUAL",
+}
+
+
+@dataclass(frozen=True)
+class RuntimePaths:
+    root: Path
+    ingest_root: Path
+    raw_store: Path
+    registry: Path
+    acquisition_workspace: Path
+    catalog: Path
+    dayu_python: Path
+    dayu_source: Path
+    dayu_runner: Path
+
+
+def _project_root() -> Path:
+    env = os.environ.get("FFDF_ROOT")
+    if env:
+        return Path(env).expanduser().resolve()
+    return Path(__file__).resolve().parents[2]
+
+
+def _runtime_paths(root: Path) -> RuntimePaths:
+    ingest = root / "workspace" / "ingest"
+    return RuntimePaths(
+        root=root,
+        ingest_root=ingest,
+        raw_store=ingest / "raw-store",
+        registry=ingest / "registry.sqlite",
+        acquisition_workspace=ingest / "acquisition-workspace",
+        catalog=root / "workspace" / "mcp" / "p8-live-catalog.json",
+        dayu_python=(
+            root
+            / "runtimes"
+            / "ffdf-dayu-2115c86"
+            / ".venv"
+            / "Scripts"
+            / "python.exe"
+        ),
+        dayu_source=root / "dependencies" / "dayu-agent",
+        dayu_runner=(
+            root
+            / "src"
+            / "financial_filing_data_foundation"
+            / "acquisition"
+            / "dayu_runner.py"
+        ),
+    )
+
+
+def _period(value: str) -> str:
+    period = value.strip().upper()
+    if period not in _PERIODS:
+        raise argparse.ArgumentTypeError(
+            f"period must be one of {', '.join(_PERIODS)}"
+        )
+    return period
+
+
+def _default_window(year: int, period: str) -> tuple[str, str]:
+    if period == "Q1":
+        start = date(year, 3, 1)
+        end = date(year, 5, 31)
+    elif period == "H1":
+        start = date(year, 6, 1)
+        end = date(year, 9, 30)
+    elif period == "Q3":
+        start = date(year, 9, 1)
+        end = date(year, 11, 30)
+    else:
+        start = date(year + 1, 1, 1)
+        end = date(year + 1, 6, 30)
+
+    today = date.today()
+    if start > today:
+        raise ValueError(
+            "default publication search window has not started yet; "
+            "use --window-start/--window-end only when you intentionally "
+            "need a different official-publication window"
+        )
+    if end > today:
+        end = today
+    return start.isoformat(), end.isoformat()
+
+
+def _window(args: argparse.Namespace) -> tuple[str, str]:
+    if bool(args.window_start) != bool(args.window_end):
+        raise ValueError("--window-start and --window-end must be supplied together")
+    if args.window_start:
+        start = date.fromisoformat(args.window_start)
+        end = date.fromisoformat(args.window_end)
+        if start > end:
+            raise ValueError("--window-start must be <= --window-end")
+        return start.isoformat(), end.isoformat()
+    return _default_window(args.year, args.period)
+
+
+def _request(args: argparse.Namespace) -> AcquisitionRequest:
+    market = args.market.upper()
+    ticker = args.ticker.strip()
+    company_id = args.company_id or f"{market}:{ticker}"
+    filing_type = args.filing_type or _IDENTITY_FILING_TYPE[args.period]
+    window_start, window_end = _window(args)
+
+    company = CompanyRef(
+        market=market,
+        company_id=company_id,
+        ticker=ticker,
+    )
+    slot = FilingSlotKey(
+        market=market,
+        company_id=company_id,
+        filing_type=filing_type,
+        fiscal_year=args.year,
+        raw_fiscal_period=args.period,
+    )
+    return AcquisitionRequest(
+        company=company,
+        slot=slot,
+        window_start=window_start,
+        window_end=window_end,
+    )
+
+
+def _provider(paths: RuntimePaths) -> DayuSubprocessAdapter:
+    for required in (paths.dayu_python, paths.dayu_source, paths.dayu_runner):
+        if not required.exists():
+            raise FileNotFoundError(required)
+    runtime = DayuRuntimeDescriptor(
+        dayu_repository=DAYU_REPOSITORY,
+        dayu_commit=DAYU_PINNED_COMMIT,
+        dayu_package_version=DAYU_PACKAGE_VERSION,
+        dayu_source_path=paths.dayu_source,
+        dayu_python_executable=paths.dayu_python,
+    )
+    return DayuSubprocessAdapter(
+        runtime=runtime,
+        runner_script=paths.dayu_runner,
+        workspace_root=paths.acquisition_workspace,
+        doctor_timeout_seconds=60.0,
+        operation_timeout_seconds=300.0,
+    )
+
+
+def _relative(root: Path, path: Path) -> str:
+    return path.resolve().relative_to(root.resolve()).as_posix()
+
+
+def _catalog_document(
+    root: Path,
+    request: AcquisitionRequest,
+    sha: str,
+    p3: Path,
+    p5: Path,
+    p6: Path,
+    p7: Path,
+) -> dict[str, Any]:
+    return {
+        "document_sha256": sha,
+        "market": request.slot.market,
+        "ticker": request.company.ticker,
+        "fiscal_year": request.slot.fiscal_year,
+        "filing_type": _CATALOG_FILING_TYPE[request.slot.raw_fiscal_period],
+        "p3_artifact_dir": _relative(root, p3),
+        "p5_artifact_dir": _relative(root, p5),
+        "p6_artifact_dir": _relative(root, p6),
+        "p7_artifact_dir": _relative(root, p7),
+    }
+
+
+def _upsert_catalog(
+    paths: RuntimePaths,
+    document: dict[str, Any],
+    *,
+    verify_document: bool = True,
+) -> str:
+    paths.catalog.parent.mkdir(parents=True, exist_ok=True)
+    if paths.catalog.exists():
+        payload = json.loads(paths.catalog.read_text(encoding="utf-8"))
+    else:
+        payload = {"schema_version": "p8-mcp-catalog-v1", "documents": []}
+
+    if payload.get("schema_version") != "p8-mcp-catalog-v1":
+        raise RuntimeError("P8 catalog schema_version mismatch")
+    documents = payload.get("documents")
+    if not isinstance(documents, list):
+        raise RuntimeError("P8 catalog documents must be a list")
+
+    identity = (
+        document["market"].upper(),
+        document["ticker"].upper(),
+        int(document["fiscal_year"]),
+        document["filing_type"].upper(),
+    )
+    sha = document["document_sha256"].lower()
+
+    replacement_index: int | None = None
+    for index, existing in enumerate(documents):
+        existing_sha = str(existing.get("document_sha256", "")).lower()
+        existing_identity = (
+            str(existing.get("market", "")).upper(),
+            str(existing.get("ticker", "")).upper(),
+            int(existing.get("fiscal_year", 0)),
+            str(existing.get("filing_type", "")).upper(),
+        )
+        if existing_sha == sha and existing_identity != identity:
+            raise RuntimeError(
+                "P8 catalog SHA is already bound to a different filing identity"
+            )
+        if existing_identity == identity:
+            if existing_sha != sha:
+                raise RuntimeError(
+                    "P8 catalog filing identity already points to a different SHA; "
+                    "manual review is required"
+                )
+            replacement_index = index
+            break
+
+    if replacement_index is None:
+        documents.append(document)
+        action = "ADDED"
+    else:
+        documents[replacement_index] = document
+        action = "ALREADY_REGISTERED"
+
+    documents.sort(
+        key=lambda row: (
+            str(row["market"]).upper(),
+            str(row["ticker"]).upper(),
+            int(row["fiscal_year"]),
+            str(row["filing_type"]).upper(),
+            str(row["document_sha256"]).lower(),
+        )
+    )
+
+    candidate = {
+        "schema_version": "p8-mcp-catalog-v1",
+        "documents": documents,
+    }
+    text = json.dumps(candidate, ensure_ascii=False, indent=2) + "\n"
+
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        newline="\n",
+        dir=paths.catalog.parent,
+        prefix=".p8-live-catalog.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        temp = Path(handle.name)
+        handle.write(text)
+
+    try:
+        catalog = McpCatalog.load(paths.root, temp)
+        if verify_document:
+            McpQueryService(catalog).get_document(sha)
+        os.replace(temp, paths.catalog)
+    finally:
+        if temp.exists():
+            temp.unlink()
+    return action
+
+
+def _common_payload(request: AcquisitionRequest) -> dict[str, Any]:
+    return {
+        "market": request.slot.market,
+        "ticker": request.company.ticker,
+        "company_id": request.company.company_id,
+        "filing_type": request.slot.filing_type,
+        "fiscal_year": request.slot.fiscal_year,
+        "period": request.slot.raw_fiscal_period,
+        "window_start": request.window_start,
+        "window_end": request.window_end,
+    }
+
+
+def _print(payload: dict[str, Any]) -> None:
+    print(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
+
+
+def _acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, dict[str, Any], AcquisitionRequest, RuntimePaths, SQLiteRegistry]:
+    root = _project_root()
+    paths = _runtime_paths(root)
+    request = _request(args)
+    paths.ingest_root.mkdir(parents=True, exist_ok=True)
+
+    registry = SQLiteRegistry(paths.registry)
+    provider = _provider(paths)
+    doctor = provider.doctor()
+
+    result = acquire_slot(
+        request=request,
+        provider=provider,
+        raw_store=RawDocumentStore(paths.raw_store),
+        registry=registry,
+    )
+
+    payload = {
+        "command": "acquire",
+        **_common_payload(request),
+        "dayu_doctor": doctor.get("status", "OK"),
+        "status": result.status.value,
+        "reason_code": result.reason_code,
+        "document_sha256": result.document_sha256,
+        "raw_path": None if result.raw_path is None else str(result.raw_path),
+        "receipt_path": (
+            None if result.receipt_path is None else str(result.receipt_path)
+        ),
+        "provider": result.provider,
+        "source_id": result.source_id,
+    }
+
+    if result.status in {AcquisitionStatus.DOWNLOADED, AcquisitionStatus.REUSED_LOCAL}:
+        code = 0
+    elif result.status == AcquisitionStatus.NOT_FOUND:
+        code = 2
+    elif result.status == AcquisitionStatus.REVIEW_REQUIRED:
+        code = 3
+    else:
+        code = 4
+
+    if not quiet:
+        _print(payload)
+    return code, payload, request, paths, registry
+
+
+def _ingest(args: argparse.Namespace) -> int:
+    code, acquire_payload, request, paths, registry = _acquire(args, quiet=True)
+    if code != 0:
+        _print(
+            {
+                "command": "ingest",
+                **_common_payload(request),
+                "stage": "ACQUISITION",
+                **{k: v for k, v in acquire_payload.items() if k not in {"command"}},
+                "research_ready": False,
+            }
+        )
+        return code
+
+    raw_path = Path(str(acquire_payload["raw_path"])).resolve()
+    sha = str(acquire_payload["document_sha256"])
+    market_dir = request.slot.market.lower()
+    base = paths.ingest_root / market_dir
+
+    p3_artifact = parse_native_document(raw_path, base / "p3")
+    p4_artifact = detect_table_candidates(
+        p3_artifact.artifact_dir,
+        base / "p4",
+    )
+    p5_artifact = reconstruct_tables(
+        p3_artifact.artifact_dir,
+        p4_artifact.artifact_dir,
+        base / "p5",
+    )
+    p6_artifact = extract_raw_facts(
+        p3_artifact.artifact_dir,
+        p5_artifact.artifact_dir,
+        base / "p6",
+    )
+    p7_artifact = validate_document_artifacts(
+        p3_artifact.artifact_dir,
+        p5_artifact.artifact_dir,
+        p6_artifact.artifact_dir,
+        base / "p7",
+    )
+
+    record = build_parsed_data_record(
+        p7_artifact,
+        request.slot,
+        _relative(paths.root, p7_artifact.artifact_dir),
+    )
+    registry.register_parsed_data(record)
+
+    catalog_status = "NOT_REGISTERED_BLOCKING_VALIDATION"
+    research_ready = False
+    if p7_artifact.blocking_issue_count == 0:
+        document = _catalog_document(
+            paths.root,
+            request,
+            sha,
+            p3_artifact.artifact_dir,
+            p5_artifact.artifact_dir,
+            p6_artifact.artifact_dir,
+            p7_artifact.artifact_dir,
+        )
+        catalog_status = _upsert_catalog(paths, document)
+        research_ready = True
+
+    payload = {
+        "command": "ingest",
+        **_common_payload(request),
+        "acquisition_status": acquire_payload["status"],
+        "document_sha256": sha,
+        "raw_path": str(raw_path),
+        "p3": {
+            "status": "PASS",
+            "page_count": p3_artifact.page_count,
+            "artifact_dir": str(p3_artifact.artifact_dir),
+        },
+        "p4": {
+            "status": "PASS",
+            "candidate_count": p4_artifact.candidate_count,
+            "artifact_dir": str(p4_artifact.artifact_dir),
+        },
+        "p5": {
+            "status": "PASS",
+            "table_count": p5_artifact.table_count,
+            "group_count": p5_artifact.group_count,
+            "artifact_dir": str(p5_artifact.artifact_dir),
+        },
+        "p6": {
+            "status": "PASS",
+            "fact_count": p6_artifact.fact_count,
+            "evidence_count": p6_artifact.evidence_count,
+            "artifact_dir": str(p6_artifact.artifact_dir),
+        },
+        "p7": {
+            "validation_status": p7_artifact.validation_status.value,
+            "compatibility_status": p7_artifact.compatibility_status.value,
+            "blocking_issue_count": p7_artifact.blocking_issue_count,
+            "review_issue_count": p7_artifact.review_issue_count,
+            "warning_issue_count": p7_artifact.warning_issue_count,
+            "reuse_eligible": p7_artifact.reuse_eligible,
+            "artifact_dir": str(p7_artifact.artifact_dir),
+        },
+        "registry": "REGISTERED",
+        "p8_catalog": catalog_status,
+        "catalog_path": str(paths.catalog),
+        "research_ready": research_ready,
+    }
+    _print(payload)
+    return 0 if research_ready else 6
+
+
+def _status(args: argparse.Namespace) -> int:
+    root = _project_root()
+    paths = _runtime_paths(root)
+    request = _request(args)
+    registry = SQLiteRegistry(paths.registry)
+
+    local = registry.resolve_local_document(request.slot)
+    parsed = registry.list_parsed_data(request.slot)
+
+    catalog_match: dict[str, Any] | None = None
+    if paths.catalog.exists():
+        payload = json.loads(paths.catalog.read_text(encoding="utf-8"))
+        expected_type = _CATALOG_FILING_TYPE[request.slot.raw_fiscal_period]
+        for document in payload.get("documents", []):
+            if (
+                str(document.get("market", "")).upper() == request.slot.market
+                and str(document.get("ticker", "")).upper()
+                == request.company.ticker.upper()
+                and int(document.get("fiscal_year", 0)) == request.slot.fiscal_year
+                and str(document.get("filing_type", "")).upper() == expected_type
+            ):
+                catalog_match = document
+                break
+
+    _print(
+        {
+            "command": "status",
+            **_common_payload(request),
+            "local_document_status": local.status.value,
+            "document_sha256": local.document_sha256,
+            "raw_path": (
+                None if local.canonical_path is None else str(local.canonical_path)
+            ),
+            "parsed_runs": [
+                {
+                    "parse_run_id": row.parse_run_id,
+                    "document_sha256": row.document_sha256,
+                    "validation_status": row.validation_status.value,
+                    "compatibility_status": row.compatibility_status.value,
+                    "blocking_issue_count": row.blocking_issue_count,
+                    "artifact_path": row.artifact_path,
+                }
+                for row in parsed
+            ],
+            "p8_catalog_registered": catalog_match is not None,
+            "p8_catalog_document": catalog_match,
+        }
+    )
+    return 0
+
+
+def _add_filing_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--market", required=True, choices=("CN", "HK"))
+    parser.add_argument("--ticker", required=True)
+    parser.add_argument("--year", required=True, type=int)
+    parser.add_argument("--period", required=True, type=_period)
+    parser.add_argument("--window-start")
+    parser.add_argument("--window-end")
+    parser.add_argument("--company-id")
+    parser.add_argument(
+        "--filing-type",
+        help=(
+            "Advanced override. Defaults: Q1/Q3=QUARTERLY_REPORT, "
+            "H1=INTERIM_REPORT, FY=ANNUAL_REPORT."
+        ),
+    )
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="ffdf",
+        description=(
+            "Financial Filing Data Foundation user CLI for CN/HK official filings."
+        ),
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    acquire = sub.add_parser(
+        "acquire",
+        help="Download/reuse one official filing and register Raw/Registry.",
+    )
+    _add_filing_arguments(acquire)
+    acquire.set_defaults(func=lambda args: _acquire(args)[0])
+
+    ingest = sub.add_parser(
+        "ingest",
+        help=(
+            "Acquire, parse P3-P7, register parsed data, and publish to P8 MCP "
+            "catalog when validation is non-blocking."
+        ),
+    )
+    _add_filing_arguments(ingest)
+    ingest.set_defaults(func=_ingest)
+
+    status = sub.add_parser(
+        "status",
+        help="Show Raw/parsed/P8 registration status for one filing period.",
+    )
+    _add_filing_arguments(status)
+    status.set_defaults(func=_status)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _parser()
+    args = parser.parse_args(argv)
+    try:
+        return int(args.func(args))
+    except (AcquisitionError, FileNotFoundError, RuntimeError, ValueError) as exc:
+        payload = {
+            "command": getattr(args, "command", None),
+            "status": "ERROR",
+            "error_type": type(exc).__name__,
+            "reason_code": getattr(exc, "reason_code", None),
+            "message": str(exc),
+        }
+        _print(payload)
+        return 10
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

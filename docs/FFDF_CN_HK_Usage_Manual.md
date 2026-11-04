@@ -418,7 +418,7 @@ from financial_filing_data_foundation.acquisition import (
 )
 ```
 
-重要：当前最终基线没有“万能的一条 acquisition CLI”。上游 ingestion 由库 API/编排流程调用；不要直接把 Dayu runner 当作业务 CLI 使用。
+当前已提供正式用户 CLI。只下载使用 `ffdf acquire --market CN --ticker 600519 --year 2026 --period Q3`；下载并完成 P3-P7、Parsed Registry 与 P8 MCP Catalog 入库使用 `ffdf ingest --market CN --ticker 600519 --year 2026 --period Q3`；状态检查使用 `ffdf status ...`。首次启用和完整参数说明见 `docs/FFDF_User_CLI.md`。Dayu runner 仍然只是内部窄协议，不应被用户直接当作业务 CLI 使用。
 
 ### 8.3 Dayu runner 只负责窄协议
 
