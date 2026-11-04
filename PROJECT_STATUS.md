@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 AMENDED DESIGN CANDIDATE READY FOR FRESH DETACHED REVIEW / PRODUCTION CLOSED`
+`P11 AMENDED DESIGN RE-REVIEW STOPPED — P11-ISSUE-017..019 / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Detached design review of candidate `3ccaedc14a4c0f3f222cd192c8b7e1479d787ccd` stopped with material design findings P11-ISSUE-010 through P11-ISSUE-016. Stop record: `development/147-p11-detached-design-review-stop.md`. That candidate remains INELIGIBLE. The Design-First remediation is documented in `development/148-p11-design-amendment-evidence.md = PASS`. Production remains CLOSED until the amended candidate is committed/pushed and a fresh detached review passes, followed by a separate development authorization.
+Detached design review of candidate `3ccaedc14a4c0f3f222cd192c8b7e1479d787ccd` stopped with material design findings P11-ISSUE-010 through P11-ISSUE-016. Stop record: `development/147-p11-detached-design-review-stop.md`. That candidate remains INELIGIBLE. The Design-First remediation of P11-ISSUE-010..016 is documented in `development/148-p11-design-amendment-evidence.md = PASS`, but fresh re-review of candidate `11648b22bfe97d88048c2dcf079034c37b3854af` found P11-ISSUE-017..019. Stop record: `development/150-p11-amended-design-review-stop.md`. Production remains CLOSED.
 
 P10-C is closed:
 

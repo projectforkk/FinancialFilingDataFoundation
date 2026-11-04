@@ -442,6 +442,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 126. review stop = `development/147-p11-detached-design-review-stop.md`；
 127. P11-ISSUE-010..016 = REMEDIATED IN AMENDED DESIGN / FRESH REVIEW REQUIRED；
 128. amendment evidence = `development/148-p11-design-amendment-evidence.md` = PASS；
-129. P11 amended design candidate = READY FOR FRESH DETACHED REVIEW；
-130. P11 production = CLOSED；
-131. Research MCP production / Semantic Resolver production remain closed / not authorized。
+129. P11 amended candidate `11648b22bfe97d88048c2dcf079034c37b3854af` = INELIGIBLE after fresh review；
+130. second review stop = `development/150-p11-amended-design-review-stop.md`；
+131. P11-ISSUE-017..019 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
+132. P11 production = CLOSED；
+133. Research MCP production / Semantic Resolver production remain closed / not authorized。
