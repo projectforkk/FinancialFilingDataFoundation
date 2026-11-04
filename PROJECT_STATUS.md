@@ -156,7 +156,7 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-005 DESIGN AMENDMENT PENDING PUSH`
+`AUTHORIZED — P10-F ONLY / P10-ISSUE-005 AMENDED BASELINE`
 
 P10-C is closed:
 
@@ -186,7 +186,15 @@ Stop record:
 
 `development/97-p10-f-preimplementation-design-stop.md`
 
-The pending amendment freezes:
+Current P10-F design baseline:
+
+`860e628ecf9f804734c9d343b3f2a9894928c9e9`
+
+Current authorization:
+
+`development/98-p10-f-cli-reauthorization.md`
+
+The amended baseline freezes:
 
 - exact four CLI argv contracts;
 - stdin-only JSON request transport;
@@ -199,11 +207,11 @@ The pending amendment freezes:
 - deterministic context rebuild for validate-ledger;
 - no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
 
-P10-F production remains closed until this amended design/plan/acceptance contract is committed/pushed and a new explicit P10-F authorization exists.
+Only P10-F CLI adapter/tests are authorized under development/98. P10-G remains closed.
 
 Still not authorized:
 
-- P10-F production before reauthorization;
+- P10-F work outside development/98 scope;
 - P10-G and later production;
 - Research MCP production;
 - Semantic Resolver production;
