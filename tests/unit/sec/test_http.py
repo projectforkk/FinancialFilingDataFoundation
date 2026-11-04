@@ -179,7 +179,10 @@ def test_p11d_06_initial_bad_scheme_or_host_rejected_before_network(url: str) ->
 
 
 def test_p11d_07_content_class_url_grammar_rejects_arbitrary_paths_queries_percent() -> None:
-    assert http_mod._safe_history_basename(" leading.json")
+    assert not http_mod._safe_history_basename(" leading.json")
+    assert not http_mod._safe_history_basename("in terior.json")
+    assert not http_mod._safe_history_basename("x%.json")
+    assert http_mod._safe_history_basename("a+b;=@.json")
     bad = [
         "https://data.sec.gov/other.json",
         CURRENT + "?x=1",
@@ -472,3 +475,22 @@ def test_retry_after_malformed_falls_back_to_deterministic_backoff(monkeypatch: 
     monkeypatch.setattr(http_mod,"_sleep_bounded",lambda seconds,*a,**k:waits.append(seconds))
     bare_client()._schedule_retry(1,http_mod.time.monotonic_ns()+100_000_000_000,retry_after_values=["not-a-date"])
     assert waits==[2.0]
+
+
+def test_p11d_70_direct_history_url_invalid_basename_blocks_before_connection() -> None:
+    for name in (" leading.json", "x%.json", "x y.json"):
+        client=bare_client(); prepared=[]
+        client._prepare_connection=MethodType(lambda self,parsed,deadline: prepared.append(True),client)
+        with pytest.raises(SecHttpError) as exc:
+            client.get_json(f"https://data.sec.gov/submissions/{name}",SecContentClass.SUBMISSIONS_HISTORY_JSON)
+        assert_reason(exc,"P11_SOURCE_HOST_NOT_ALLOWED")
+        assert prepared==[]
+
+
+def test_p11d_71_canonical_equivalent_redirect_loop_blocks_before_second_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    first=FakeResponse(302,b"",{"Location":["HTTPS://DATA.SEC.GOV:443/submissions/CIK0000320193.json"]})
+    client,prepared,starts=scripted_client(monkeypatch,[first])
+    with pytest.raises(SecHttpError) as exc:
+        client.get_json(CURRENT,SecContentClass.SUBMISSIONS_CURRENT_JSON)
+    assert_reason(exc,"P11_REDIRECT_NOT_ALLOWED")
+    assert len(prepared)==1 and len(starts)==1

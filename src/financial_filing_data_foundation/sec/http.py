@@ -64,9 +64,9 @@ def _safe_history_basename(value: str) -> bool:
     return (
         bool(value)
         and value.endswith(".json")
-        and all(0x20 <= ord(ch) <= 0x7E for ch in value)
+        and all(0x21 <= ord(ch) <= 0x7E for ch in value)
         and value not in {".", ".."}
-        and not any(ch in value for ch in "/\\?#")
+        and not any(ch in value for ch in "/\\%?#")
     )
 
 
@@ -107,6 +107,13 @@ def _validate_url(url: str, content_class: SecContentClass, *, redirect: bool) -
     if not path_ok or (not redirect and host != initial_host):
         raise _http_error(reason, "SEC URL does not match the required content-class endpoint")
     return parsed
+
+
+def _redirect_identity(parsed: SplitResult) -> tuple[str, str, int, str]:
+    host = parsed.hostname
+    if host is None:  # validated callers cannot reach this branch.
+        raise _http_error("P11_REDIRECT_NOT_ALLOWED", "validated SEC URL is missing a host")
+    return ("https", host.lower(), 443, parsed.path)
 
 
 def _remaining_seconds(deadline_ns: int) -> float:
@@ -328,7 +335,7 @@ class SecHttpClient:
         retry_count = 0
         redirect_count = 0
         outbound_start_count = 0
-        visited = {current_url}
+        visited = {_redirect_identity(parsed)}
         while True:
             if outbound_start_count >= 7:
                 raise _http_error(
@@ -369,9 +376,10 @@ class SecHttpClient:
                     raise _http_error("P11_REDIRECT_NOT_ALLOWED", "SEC redirect limit exceeded")
                 next_url = urljoin(current_url, locations[0].strip(" \t"))
                 next_parsed = _validate_url(next_url, content_class, redirect=True)
-                if next_url in visited:
+                next_identity = _redirect_identity(next_parsed)
+                if next_identity in visited:
                     raise _http_error("P11_REDIRECT_NOT_ALLOWED", "SEC redirect loop detected")
-                visited.add(next_url)
+                visited.add(next_identity)
                 redirect_count += 1
                 current_url = next_url
                 parsed = next_parsed

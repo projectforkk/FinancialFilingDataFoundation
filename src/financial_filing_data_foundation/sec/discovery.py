@@ -215,9 +215,9 @@ def _validate_shard_name(value: object) -> str:
         raise _error("P11_SUBMISSIONS_INVALID", "historical shard name must be a string")
     if not value.endswith(".json"):
         raise _error("P11_SUBMISSIONS_INVALID", "historical shard name is invalid")
-    if not value or value in {".", ".."} or any(ch in value for ch in "/\\?#"):
+    if not value or value in {".", ".."} or any(ch in value for ch in "/\\%?#"):
         raise _error("P11_SUBMISSIONS_INVALID", "historical shard name is invalid")
-    if any(not 0x20 <= ord(ch) <= 0x7E for ch in value):
+    if any(not 0x21 <= ord(ch) <= 0x7E for ch in value):
         raise _error("P11_SUBMISSIONS_INVALID", "historical shard name is invalid")
     return value
 

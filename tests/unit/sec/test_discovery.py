@@ -65,7 +65,7 @@ def test_p11d_48_current_only_discovery() -> None:
 
 
 def test_p11d_49_historical_shard_discovery() -> None:
-    name=" CIK0000320193-submissions-001.json"; url=f"https://data.sec.gov/submissions/{name}"
+    name="CIK0000320193-submissions-001.json"; url=f"https://data.sec.gov/submissions/{name}"
     files=[{"name":name,"filingFrom":"2023-01-01","filingTo":"2024-12-31","filingCount":1}]
     old=row("0000320193-24-000001","2024-02-01","2023-12-31")
     client=FakeClient({CURRENT:current([],files),url:arrays([old])})
@@ -241,3 +241,20 @@ def test_primary_document_safe_basename_rejects_paths_controls_query_fragment() 
     for primary in ("../x.htm","dir/x.htm","x\\y.htm","x.htm?y=1","x.htm#f","x\x00.htm",".",".."):
         with pytest.raises(SecDiscoveryError):
             discover(FakeClient({CURRENT:current([row(primary=primary)])}))
+
+
+def test_p11d_69_historical_shard_provider_basename_exact_grammar_before_fetch() -> None:
+    invalid=(" leading.json","in terior.json","x%.json","x/y.json","x\\y.json","x?.json","x#.json","x.JSON","é.json")
+    for name in invalid:
+        files=[{"name":name,"filingFrom":"2024-01-01","filingTo":"2025-12-31","filingCount":0}]
+        client=FakeClient({CURRENT:current([],files)})
+        with pytest.raises(SecDiscoveryError) as exc:
+            discover(client)
+        assert_reason(exc,"P11_SUBMISSIONS_INVALID")
+        assert [u for u,_ in client.calls]==[CURRENT]
+    valid="a+b;=@.json"
+    url=f"https://data.sec.gov/submissions/{valid}"
+    files=[{"name":valid,"filingFrom":"2024-01-01","filingTo":"2025-12-31","filingCount":0}]
+    client=FakeClient({CURRENT:current([],files),url:arrays([])})
+    assert discover(client)==()
+    assert [u for u,_ in client.calls]==[CURRENT,url]
