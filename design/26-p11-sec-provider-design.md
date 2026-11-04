@@ -646,9 +646,167 @@ Accepted generic `IncrementalPlanner` reuse is document-SHA oriented. That is in
 P11 v1 therefore freezes this boundary:
 
 - `IncrementalPlanner.build_plan` remains the accepted CN/HK planner;
-- after `CompanyRef` gains US support, generic `IncrementalPlanner.build_plan(company.market == "US", ...)` MUST reject with explicit `P11_PACKAGE_AWARE_PLANNER_REQUIRED`;
 - P11 orchestration uses the shared identity/slot primitives but a dedicated package-aware SEC reuse selector;
 - no US path may silently fall back to generic document-SHA-only reuse.
+
+### Generic planner fail-fast API
+
+P11-C adds this exact public exception in:
+`financial_filing_data_foundation.planner.errors`
+
+and re-exports it from:
+`financial_filing_data_foundation.planner`.
+
+```python
+class PackageAwarePlannerRequired(RuntimeError):
+    reason_code = "P11_PACKAGE_AWARE_PLANNER_REQUIRED"
+```
+
+After `CompanyRef` supports US, `IncrementalPlanner.build_plan(...)` MUST perform this guard before any slot construction or registry access:
+
+```python
+if company.market == "US":
+    raise PackageAwarePlannerRequired(
+        "market US requires P11 package-aware SEC planning"
+    )
+```
+
+Exact contract:
+
+- exception type = `PackageAwarePlannerRequired`;
+- base class = `RuntimeError`;
+- class attribute `reason_code` exactly `P11_PACKAGE_AWARE_PLANNER_REQUIRED`;
+- exact `str(exc)` = `market US requires P11 package-aware SEC planning`;
+- guard occurs before `build_required_slots`;
+- guard occurs before any SQLiteRegistry method call;
+- no `FilingPlan` or synthetic `PlannerItem` is returned for US;
+- CN/HK behavior, result shape and existing `ReasonCode` enum remain unchanged.
+
+### SEC reuse public result API
+
+P11-K adds:
+`financial_filing_data_foundation.sec.reuse`
+
+with exact public types:
+
+```python
+class SecReuseAction(StrEnum):
+    REUSE_DATA = "REUSE_DATA"
+    PARSE_CURRENT_PACKAGE = "PARSE_CURRENT_PACKAGE"
+
+class SecReuseReason(StrEnum):
+    EXACT_PACKAGE_REUSE = "P11_EXACT_PACKAGE_REUSE"
+    NO_REUSABLE_EXACT_PACKAGE = "P11_NO_REUSABLE_EXACT_PACKAGE"
+    SOURCE_DOCUMENT_CHANGE = "P11_SOURCE_DOCUMENT_CHANGE"
+    SOURCE_PACKAGE_CHANGE = "P11_SOURCE_PACKAGE_CHANGE"
+    REUSE_ARTIFACT_MISSING = "P11_REUSE_ARTIFACT_MISSING"
+    REUSE_ARTIFACT_PATH_INVALID = "P11_REUSE_ARTIFACT_PATH_INVALID"
+    REUSE_ARTIFACT_INVALID = "P11_REUSE_ARTIFACT_INVALID"
+    REUSE_VALIDATION_NOT_PASS = "P11_REUSE_VALIDATION_NOT_PASS"
+    REUSE_BLOCKING_ISSUES = "P11_REUSE_BLOCKING_ISSUES"
+    REUSE_SCHEMA_INCOMPATIBLE = "P11_REUSE_SCHEMA_INCOMPATIBLE"
+    REUSE_COMPATIBILITY_UNKNOWN = "P11_REUSE_COMPATIBILITY_UNKNOWN"
+    REUSE_PARSER_INVALIDATED = "P11_REUSE_PARSER_INVALIDATED"
+```
+
+`SecReuseDecision` is a frozen/slots dataclass with exact fields in this order:
+
+```text
+action: SecReuseAction
+reason_code: SecReuseReason
+rejection_reasons: tuple[SecReuseReason, ...]
+slot_key: str
+document_sha256: str
+source_package_sha256: str
+parse_run_id: str | None
+artifact_path: str | None
+```
+
+The selector public function is exactly:
+
+```python
+def select_sec_reuse(
+    registry: SQLiteRegistry,
+    slot: FilingSlotKey,
+    document_sha256: str,
+    source_package_sha256: str,
+    reuse_policy: PlannerReusePolicy,
+    project_root: Path,
+    parsed_root: Path,
+) -> SecReuseDecision:
+    ...
+```
+
+Parameter contract:
+
+- `registry` is read-only during selection;
+- `slot.market` MUST equal `US`; otherwise raise `ValueError("select_sec_reuse requires market US")`;
+- `document_sha256` must match `^[0-9a-f]{64}$` or raise `ValueError("document_sha256 must be 64 lowercase hex")`;
+- `source_package_sha256` must match `^[0-9a-f]{64}$` or raise `ValueError("source_package_sha256 must be 64 lowercase hex")`;
+- `project_root` is resolved canonical project root;
+- `parsed_root` must resolve inside `project_root`; otherwise raise `ValueError("parsed_root must be inside project_root")`;
+- registry `artifact_path` values are interpreted relative to `project_root`, then must resolve inside `parsed_root`;
+- the function performs no network access;
+- the function performs no writes.
+
+Invariants:
+
+- `slot_key` equals the requested target `FilingSlotKey.serialize()`;
+- `document_sha256` and `source_package_sha256` echo the current package inputs;
+- `REUSE_DATA` requires:
+  - reason_code = `EXACT_PACKAGE_REUSE`;
+  - rejection_reasons = empty tuple;
+  - parse_run_id non-null;
+  - artifact_path non-null and normalized project-root-relative POSIX;
+- `PARSE_CURRENT_PACKAGE` requires:
+  - parse_run_id = null;
+  - artifact_path = null;
+  - reason_code != `EXACT_PACKAGE_REUSE`;
+- selector returns `SecReuseDecision`, never an arbitrary `ParsedDataRecord`;
+- selector is read-only: it never mutates registry, artifact files or package files.
+
+If at least one exact-package candidate is reusable, rejected candidates do not leak into the successful decision; the selected decision has empty `rejection_reasons`.
+
+If no candidate is reusable, `rejection_reasons` is the ordered unique set of observed reasons using this exact priority:
+
+```text
+P11_REUSE_ARTIFACT_PATH_INVALID
+P11_REUSE_ARTIFACT_INVALID
+P11_REUSE_ARTIFACT_MISSING
+P11_SOURCE_PACKAGE_CHANGE
+P11_SOURCE_DOCUMENT_CHANGE
+P11_REUSE_VALIDATION_NOT_PASS
+P11_REUSE_BLOCKING_ISSUES
+P11_REUSE_SCHEMA_INCOMPATIBLE
+P11_REUSE_COMPATIBILITY_UNKNOWN
+P11_REUSE_PARSER_INVALIDATED
+P11_NO_REUSABLE_EXACT_PACKAGE
+```
+
+The decision `reason_code` is the first item in that tuple.
+
+If `list_parsed_data(slot)` returns zero rows, or rows exist but no more-specific rejection reason is observed, return:
+
+```text
+action = PARSE_CURRENT_PACKAGE
+reason_code = P11_NO_REUSABLE_EXACT_PACKAGE
+rejection_reasons = (P11_NO_REUSABLE_EXACT_PACKAGE,)
+parse_run_id = null
+artifact_path = null
+```
+
+Candidate classification:
+
+- record.document_sha256 != current document SHA => `P11_SOURCE_DOCUMENT_CHANGE`; do not load that artifact;
+- null/missing artifact_path => `P11_REUSE_ARTIFACT_MISSING`;
+- unsafe artifact path => `P11_REUSE_ARTIFACT_PATH_INVALID`;
+- v2 load/hash/source-reference/parse-run/document/slot identity failure => `P11_REUSE_ARTIFACT_INVALID`;
+- exact document but loaded package != current package => `P11_SOURCE_PACKAGE_CHANGE`;
+- validation != PASS => `P11_REUSE_VALIDATION_NOT_PASS`;
+- blocking issue count > 0 => `P11_REUSE_BLOCKING_ISSUES`;
+- schema not accepted / compatibility INCOMPATIBLE => `P11_REUSE_SCHEMA_INCOMPATIBLE`;
+- compatibility UNKNOWN => `P11_REUSE_COMPATIBILITY_UNKNOWN`;
+- parser version invalidated => `P11_REUSE_PARSER_INVALIDATED`.
 
 Runtime position:
 
@@ -908,10 +1066,18 @@ Package:
 
 Planner/reuse:
 - P11_PACKAGE_AWARE_PLANNER_REQUIRED
+- P11_EXACT_PACKAGE_REUSE
+- P11_NO_REUSABLE_EXACT_PACKAGE
+- P11_SOURCE_DOCUMENT_CHANGE
 - P11_SOURCE_PACKAGE_CHANGE
 - P11_REUSE_ARTIFACT_MISSING
 - P11_REUSE_ARTIFACT_PATH_INVALID
 - P11_REUSE_ARTIFACT_INVALID
+- P11_REUSE_VALIDATION_NOT_PASS
+- P11_REUSE_BLOCKING_ISSUES
+- P11_REUSE_SCHEMA_INCOMPATIBLE
+- P11_REUSE_COMPATIBILITY_UNKNOWN
+- P11_REUSE_PARSER_INVALIDATED
 
 Parse:
 - P11_HTML_PARSE_FAILED
@@ -1043,7 +1209,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-028 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/165`. The current amended design contains explicit resolutions for ISSUE-010..028; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-029 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/168`. The current amended design contains explicit resolutions for ISSUE-010..029; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 

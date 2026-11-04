@@ -485,3 +485,21 @@ Resolution:
 - no exact reusable package proceeds through parser → final identity → v2 → validation → persistence.
 
 No production/test/runtime change was made.
+
+
+## 19. Public API review finding — P11-ISSUE-029
+
+Fresh review of `dc1c59e1ec19e8cf3e75624643d045a9f954fd16` passed the ISSUE-010..028 automated matrix, but manual review of the accepted planner API found the US fail-closed surface and the SEC reuse selector return contract were not exact enough for implementation.
+
+Stop:
+`development/167-p11-reuse-api-review-stop.md`
+
+Resolution in the current amendment:
+
+- generic IncrementalPlanner US guard uses exact public `PackageAwarePlannerRequired(RuntimeError)` with fixed reason_code and message, raised before slot construction or registry access;
+- package-aware reuse public module is fixed to `financial_filing_data_foundation.sec.reuse`;
+- exact `SecReuseAction`, `SecReuseReason`, frozen/slots `SecReuseDecision` field order and invariants are frozen;
+- exact `select_sec_reuse(...)` signature and input validation are frozen;
+- no-candidate behavior, failure reason priority, exact-package success behavior and read-only semantics are frozen.
+
+No production/test/runtime change was made.

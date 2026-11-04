@@ -361,8 +361,43 @@ Periodic filing:
 
 Generic planner boundary:
 
-- IncrementalPlanner.build_plan with market=US returns/raises explicit P11_PACKAGE_AWARE_PLANNER_REQUIRED and does not perform document-SHA-only reuse;
+- exact exception class = `PackageAwarePlannerRequired(RuntimeError)`;
+- class attribute `reason_code == "P11_PACKAGE_AWARE_PLANNER_REQUIRED"`;
+- exact `str(exc) == "market US requires P11 package-aware SEC planning"`;
+- IncrementalPlanner.build_plan with market=US raises that exception before `build_required_slots`;
+- no registry method is called before the exception;
+- no FilingPlan/PlannerItem is returned for US;
 - existing CN/HK IncrementalPlanner behavior remains unchanged.
+
+Package-aware SEC result API:
+
+- public module = `financial_filing_data_foundation.sec.reuse`;
+- exact public function signature = `select_sec_reuse(registry, slot, document_sha256, source_package_sha256, reuse_policy, project_root, parsed_root) -> SecReuseDecision`;
+- non-US slot => exact `ValueError("select_sec_reuse requires market US")`;
+- invalid document SHA => exact `ValueError("document_sha256 must be 64 lowercase hex")`;
+- invalid package SHA => exact `ValueError("source_package_sha256 must be 64 lowercase hex")`;
+- parsed_root outside project_root => exact `ValueError("parsed_root must be inside project_root")`;
+- exact `SecReuseAction` values:
+  - REUSE_DATA;
+  - PARSE_CURRENT_PACKAGE;
+- exact `SecReuseReason` values/strings follow design/26 Section 17.1;
+- exact frozen/slots `SecReuseDecision` field order:
+  1. action;
+  2. reason_code;
+  3. rejection_reasons;
+  4. slot_key;
+  5. document_sha256;
+  6. source_package_sha256;
+  7. parse_run_id;
+  8. artifact_path;
+- REUSE_DATA decision requires exact success reason, empty rejection_reasons, non-null parse_run_id/artifact_path;
+- PARSE_CURRENT_PACKAGE requires null parse_run_id/artifact_path and non-success reason;
+- zero parsed candidates => exact P11_NO_REUSABLE_EXACT_PACKAGE decision;
+- mixed failure candidates produce ordered unique rejection_reasons using the exact design/26 priority;
+- reason_code equals first rejection_reasons item on parse decisions;
+- successful exact-package decision does not retain rejected-candidate reasons;
+- selector returns SecReuseDecision, not ParsedDataRecord;
+- selector performs no registry/artifact/package mutation.
 
 Package-aware SEC selector acceptance cases:
 

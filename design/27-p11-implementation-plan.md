@@ -90,7 +90,10 @@ Focused tests:
 16. 20-F/A normalization;
 17. 40-F/A normalization;
 18. 8-K/6-K supplemental identity;
-19. no forced 8-K/6-K periodic slot.
+19. no forced 8-K/6-K periodic slot;
+20. `PackageAwarePlannerRequired` exact class/base/reason_code/message;
+21. generic IncrementalPlanner US guard executes before `build_required_slots` and before any registry method call;
+22. CN/HK IncrementalPlanner return behavior remains unchanged.
 
 STOP before acquisition changes if identity design assumption fails.
 
@@ -379,6 +382,37 @@ For periodic filings:
 - persist ParsedDataRecord only after the v2 artifact has been written/loaded and validation completed;
 - artifact_path is mandatory for P11 periodic records and is project-root-relative POSIX under the configured P11 parsed-artifact root;
 - no P11 registry schema migration is required solely to store source_package_sha256.
+
+### Package-aware reuse public API
+
+Implement exact types from design/26 Section 17.1:
+
+- `SecReuseAction`;
+- `SecReuseReason`;
+- frozen/slots `SecReuseDecision`.
+
+Public module:
+`financial_filing_data_foundation.sec.reuse`
+
+Exact decision invariants, reason priority and candidate classification come from design/26 and are not implementation choices.
+
+Focused API tests:
+
+- exact `PackageAwarePlannerRequired` module/export/class/base/reason_code/message;
+- generic US guard before build_required_slots/registry access;
+- exact `select_sec_reuse(registry, slot, document_sha256, source_package_sha256, reuse_policy, project_root, parsed_root)` signature;
+- non-US slot exact ValueError;
+- invalid document/package SHA exact ValueError messages;
+- parsed_root outside project_root exact ValueError;
+- exact enum values;
+- exact dataclass field order;
+- REUSE_DATA invariant enforcement;
+- PARSE_CURRENT_PACKAGE invariant enforcement;
+- zero-candidate decision = P11_NO_REUSABLE_EXACT_PACKAGE;
+- mixed candidate failure reasons use the exact priority order;
+- selector is read-only;
+- successful decision has empty rejection_reasons;
+- selector returns SecReuseDecision, never ParsedDataRecord.
 
 ### Package-aware reuse selector
 

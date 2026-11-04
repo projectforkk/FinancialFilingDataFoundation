@@ -317,3 +317,14 @@ This avoids an additive registry migration solely for package identity while pre
 P11-ISSUE-028 distinguishes implementation-gate order from runtime orchestration order.
 
 Implementation still develops components through E/F/G/H/I/K, but runtime reuse is checked immediately after current source-package assembly and before parser execution. A previously validated exact-package artifact can therefore satisfy the requested slot without redundant parsing.
+
+
+## 23. Package-aware reuse public API reconciliation
+
+P11-ISSUE-029 closes the final API ambiguity between accepted P1 planner behavior and P11 SEC package-aware reuse.
+
+- CN/HK retain the existing FilingPlan/PlannerItem planner result contract.
+- US calls to the generic planner fail fast with one exact exception before any planning/registry side effect.
+- the SEC-specific reuse layer returns a dedicated deterministic SecReuseDecision rather than overloading P1 PlannerItem or exposing raw ParsedDataRecord selection.
+
+This keeps the accepted P1 API stable for CN/HK while giving P11 one exact package-aware contract.
