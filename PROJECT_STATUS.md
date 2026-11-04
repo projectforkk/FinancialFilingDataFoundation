@@ -152,11 +152,11 @@
 
 ## Approved next phase
 
-**P10-N — Independent Acceptance**
+**P10-O — Closeout**
 
 Status:
 
-`AUTHORIZED — P10-N INDEPENDENT ACCEPTANCE ONLY / EXACT CANDIDATE 183ca5dc...`
+`AUTHORIZED — P10-O CLOSEOUT INTEGRATION ONLY / FRESH V2 INTEGRATION`
 
 P10-C is closed:
 
@@ -540,7 +540,11 @@ Verified in the fresh rerun:
 
 P10-N is CLOSED / PASS.
 
-P10-O closeout/main integration remains CLOSED until a separate explicit authorization.
+P10-O closeout authorization:
+
+`development/140-p10-o-closeout-authorization-v2.md`
+
+Only fresh v2 closeout integration is authorized. Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and must not be reused.
 
 P10 production remains frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
 
