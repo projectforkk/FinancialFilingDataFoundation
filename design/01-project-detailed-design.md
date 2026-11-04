@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P8 DONE / P9 DESIGN READY**
+状态：**DESIGN BASELINE — P9 DONE / P10 DESIGN AUTHORIZED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -990,23 +990,59 @@ P8 accepted capabilities：
 - MCP AI API calls strictly FORBIDDEN；
 - no acquisition / parse / mutation / arbitrary filesystem / SQL / shell / remote AI surface。
 
-当前批准进入：
+P9 已完成 Independent Acceptance 并收口为 `P9_DONE`。
 
-**P9 — Codex Review Overlay（DESIGN READY）**
+P9 accepted capabilities：
+- deterministic REVIEW-only queue over P7 `REVIEW_REQUIRED` issues；
+- evidence-grounded immutable resolution records；
+- explicit prior-overlay identity / deterministic history recomputation；
+- raw P3/P5/P6/P7 and source PDF remain immutable；
+- effective period/unit/scope and statement-class overlay remain separate from raw；
+- deterministic resolved snapshot / status / reuse eligibility；
+- local six-command JSON-only CLI；
+- deterministic payload security boundary for URL/path/shell/SQL/Python/credential content；
+- no network / AI / external MCP SDK / Registry mutation；
+- CN/HK live acceptance, synthetic golden, base immutability and performance gates PASS。
 
-P9 detailed design、implementation plan、development instruction 与 acceptance baseline 已完成。
+P9 accepted identity：
+- final production candidate = `66308627d1dd1f0af2f02ff3f18d3e91f33dcc8d`；
+- final formal review = `development/74-p9-jr3-formal-rereview-result.md` = PASS；
+- frozen acceptance candidate = `926c665f5dd667765781630638c62239b267ceb7`；
+- acceptance evidence = `acceptance/37-p9-acceptance-result.md` = PASS；
+- accepted merge = `58a1d2236b68a56fc66ddf8b97603e7232c87265`；
+- post-merge full regression = `308 passed`。
 
-**只有在本次 P9 design baseline commit/push 成为 GitHub 真源后，才授权按照 design/23 的顺序进入 production development。**
+当前仅批准进入：
 
-P9 设计保证：
-- `RAW` / `LOCAL_EXTRACTED` 永不被 review 结果覆盖；
-- review 只针对 deterministic pipeline 已明确标记的 unresolved / REVIEW_REQUIRED 语义；
-- overlay 必须绑定 base parse/validation identity、target、reason、evidence 与 before/after；
-- resolution 与 raw extraction 分层存储；
-- re-validation 必须能判断 overlay 是否解决原 issue；
-- 不得在 P9 内提前实现 P10 Codex Dynamic Research Integration；
-- 不得在 P9 内提前接入 P11 US SEC provider。
+**P10 — Codex Dynamic Research Integration（DESIGN AUTHORIZED）**
 
-P9 production implementation 必须绑定本次 committed design baseline；任何后续设计问题继续执行 design-first amendment。
+P10 当前只允许：
+- 读取最新 accepted main / P8 / P9 真源；
+- 完成 detailed design、implementation plan、acceptance instruction；
+- 将既有 research-consumption / PDF visual fallback / semantic resolver 草案与 P9 accepted boundary 逐项 reconcile；
+- commit/push P10 design baseline。
 
-US SEC provider 仍属于 P11，不得提前进入 P9。
+P10 production 在 DESIGN_READY 之前不得开始。
+
+继续保持职责边界：
+
+```text
+P8
+= Raw Data & Evidence
+
+Codex
+= 财务理解 / 当前研究
+
+P9
+= Durable Reviewed Decision Store
+
+Research MCP
+= future Resolved Query + PDF Visual Evidence
+
+Semantic Resolver
+= future deterministic semantic automation
+```
+
+P9 不是 `REVIEW_REQUIRED` 的强制修复器；不得用 overlay 掩盖 raw extraction defect。
+
+P11 US SEC provider、Research MCP production 与 Semantic Resolver production 均未获授权，不得提前进入。

@@ -6,21 +6,27 @@
 
 ## Current state
 
-**P8_DONE / P9_J_AUTHORIZED**
+**P9_DONE / P10_DESIGN_AUTHORIZED**
 
 ## Accepted baseline
 
-- phase: `P8_DONE`
-- frozen acceptance candidate: `31525235a44c8576d22fba542438b491e15e653b`
-- reviewed production candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
+- phase: `P9_DONE`
+- frozen acceptance candidate: `926c665f5dd667765781630638c62239b267ceb7`
+- reviewed production candidate: `66308627d1dd1f0af2f02ff3f18d3e91f33dcc8d`
+- reviewed/evidence candidate: `e7822438c80964f29960c3dafa278a5ede8cdc44`
+- final formal review verdict: `PASS`
+- final formal review evidence: `development/74-p9-jr3-formal-rereview-result.md`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/33-p8-issue006-acceptance-result.md`
-- accepted merge commit: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
-- accepted_baseline_sha: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
-- full regression: `235 passed`
-- official MCP protocol: `2026-07-28`
-- exact MCP tools: `11 / 11 PASS`
-- runtime lock SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
+- acceptance evidence: `acceptance/37-p9-acceptance-result.md`
+- accepted merge commit: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
+- accepted_baseline_sha: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
+- acceptance focused P9: `73 passed`
+- acceptance synthetic golden: `2 passed, 71 deselected`
+- acceptance full unit: `308 passed`
+- post-merge full regression: `308 passed in 23.74s`
+- live CN/HK: `PASS`
+- accepted base immutability: `23 / 23 files unchanged`
+- blocker: `NONE`
 
 ## Phase history
 
@@ -114,74 +120,53 @@
 - P8-ISSUE-006 dual-runtime test boundary: `PASS`
 - accepted merge: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
 
+### P9 — Codex Review Overlay
+
+- status: `DONE / PASS`
+- final production candidate: `66308627d1dd1f0af2f02ff3f18d3e91f33dcc8d`
+- final reviewed/evidence candidate: `e7822438c80964f29960c3dafa278a5ede8cdc44`
+- final formal review: `development/74-p9-jr3-formal-rereview-result.md` = `PASS`
+- frozen acceptance candidate: `926c665f5dd667765781630638c62239b267ceb7`
+- acceptance evidence: `acceptance/37-p9-acceptance-result.md`
+- acceptance focused: `73 passed`
+- acceptance synthetic: `2 passed, 71 deselected`
+- acceptance full unit: `308 passed`
+- CN 600519 FY2024 live acceptance: `PASS`
+- HK 00700 FY2024 live acceptance: `PASS`
+- base immutability: `23 / 23 files unchanged`
+- post-merge full regression: `308 passed in 23.74s`
+- accepted merge: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
+
 ## Approved next phase
 
-**P9 — Codex Review Overlay**
+**P10 — Codex Dynamic Research Integration**
 
 Status:
 
-`P9-G / P9-H / P9-I PASS — P9-J FORMAL REVIEW AUTHORIZED`
+`DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
 
-Planned branch:
+Authorization basis:
 
-`task/p9-review-overlay`
+- P9 Independent Acceptance: `PASS`
+- acceptance evidence: `acceptance/37-p9-acceptance-result.md`
+- accepted P9 merge: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
+- post-merge full regression: `308 passed in 23.74s`
+- P9 blocker: `NONE`
 
-P8 Independent Acceptance:
+Authorized now:
 
-- verdict: `PASS`
-- evidence: `acceptance/33-p8-issue006-acceptance-result.md`
-- frozen candidate: `31525235a44c8576d22fba542438b491e15e653b`
-- reviewed candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
-- full suite: `235 passed`
-- official SDK protocol: `2026-07-28`
-- exact tools: `11 / 11 PASS`
-- live CN/HK: `PASS`
-- runtime lock/package/byte reproducibility: `PASS`
-- dual-runtime test boundary: `PASS`
-- read-only immutability: `25 / 25 files unchanged`
-- blocker: `NONE`
-- accepted merge: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
+- read the latest accepted `main` design and P8/P9 contracts；
+- prepare P10 detailed design / implementation plan / acceptance instruction；
+- reconcile any prior cross-phase research-consumption / visual / semantic design drafts against the accepted P9 baseline before adopting them；
+- commit/push a new P10 design baseline before any P10 production implementation。
 
-P8 final Code Review:
+Not authorized yet:
 
-- final verdict: `PASS`
-- final evidence: `development/48-p8-issue006-code-review.md`
-- reviewed candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
-- full regression: `235 passed`
-- runtime package lock: `MATCH`
-- runtime lock blob/worktree SHA: `MATCH`
-- lock SHA256: `8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
-- official SDK protocol: `2026-07-28`
-- exact tools: `11 / 11 PASS`
-- live CN/HK: `PASS`
-- blocker: `NONE`
-
-Historical review `development/45-p8-code-review.md` and freeze `acceptance/28-p8-acceptance-run-instruction.md` were invalidated by `P8-ISSUE-005`.
-
-P8 final Independent Acceptance freeze:
-
-- instruction: `acceptance/32-p8-issue006-refreeze.md`
-- frozen candidate: `31525235a44c8576d22fba542438b491e15e653b`
-- result: `acceptance/33-p8-issue006-acceptance-result.md`
-- prior freeze/result `acceptance/30` / `acceptance/31`: historical after P8-ISSUE-006
-
-P9 detailed design, implementation plan, development instruction and acceptance baseline are complete.
-
-The P9 production/test candidate has been corrected, re-reviewed, and live-validated.
-
-Corrective implementation commit: `f3b6dcd1b243c7a77734a1cdfa7459f38d91c842`.
-
-Corrective evidence: `development/56-p9-g-corrective-evidence.md` records focused `40 passed`, full unit regression `275 passed`, compile/import/diff/scope/immutability PASS, and synthetic REVIEW_REQUIRED → PASS.
-
-GitHub corrective re-review is recorded in `development/57-p9-g-corrective-github-rereview.md` with verdict `PASS`; F1-F5 are closed and P9-H is satisfied.
-
-P9-I live evidence is recorded in `development/59-p9-i-live-evidence.md`; GitHub live-evidence review in `development/60-p9-i-github-live-review.md` records verdict `PASS`. CN/HK exact queues, honest resolved states, dual-root determinism, performance gates, and catalog/P3/P5/P6/P7 immutability all passed.
-
-Current instruction: `development/61-p9-j-formal-code-review-instruction.md`.
-
-Current gate: `P9-J — Formal Detached Code Review`.
-
-P9-K/L/M, main merge, P10 and P11 remain closed until the formal detached review result is pushed and reviewed.
+- P10 production code；
+- P11 production；
+- Research MCP production；
+- Semantic Resolver production；
+- any change that weakens P8 read-only or P9 durable-review boundaries。
 
 ## Project directory consolidation
 
@@ -284,6 +269,6 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P6 — Raw Facts / Evidence: `DONE`
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
-- P9 — Codex Review Overlay: `P9-G PASS / P9-H PASS / P9-I PASS / P9-J AUTHORIZED`
-- P10 — Codex Dynamic Research Integration: `NOT STARTED`
+- P9 — Codex Review Overlay: `DONE`
+- P10 — Codex Dynamic Research Integration: `DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`
