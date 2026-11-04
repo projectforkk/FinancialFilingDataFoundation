@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-M ACCEPTANCE FREEZE READY / P10-N CLOSED PENDING EXACT FREEZE COMMIT`
+`P10-M STOPPED — FIRST FREEZE COMMIT 42e39c9 INVALID / P10-N CLOSED`
 
 P10-C is closed:
 
@@ -372,7 +372,17 @@ Frozen package:
 - `acceptance/p10-base-immutability-manifest.json`
 - `acceptance/p10-fixtures/**`
 
-Core design and production remain frozen. P10-N remains closed until a separate authorization records the exact P10-M freeze commit.
+Core design and production remain frozen.
+
+Historical invalid freeze attempt:
+
+`42e39c971a360ca4e0ee09761221cc8da7ddbaa9`
+
+Stop record:
+
+`development/122-p10-m-freeze-stop.md`
+
+Reason: staged `git diff --cached --check` found trailing whitespace in `acceptance/39`, but PowerShell continued to commit/push. This commit is ineligible for P10-N and will remain as historical evidence. P10-N remains closed pending a corrected re-freeze commit.
 
 Still not authorized:
 
