@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-G CANDIDATE READY / DETACHED DOCUMENTATION REVIEW AUTHORIZED / P10-H CLOSED`
+`STOPPED — P10-ISSUE-006 DESIGN AMENDMENT PENDING PUSH`
 
 P10-C is closed:
 
@@ -248,6 +248,17 @@ Detached documentation review instruction:
 
 `development/104-p10-g-documentation-review-instruction.md`
 
+Detached review stop:
+
+`development/105-p10-g-detached-review-stop.md`
+
+P10-ISSUE-006:
+
+- same exact Git candidate produced LF active-worktree bytes and CRLF fresh-detached bytes under `core.autocrlf=true`;
+- candidate Git blob itself is LF and has SHA256 `ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`;
+- worktree-byte SHA is therefore not the cross-worktree identity;
+- amended contract uses exact candidate Git blob bytes as P10-G artifact identity.
+
 The amended P10-F baseline freezes:
 
 - exact four CLI argv contracts;
@@ -261,7 +272,7 @@ The amended P10-F baseline freezes:
 - deterministic context rebuild for validate-ledger;
 - no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
 
-P10-G candidate is frozen for detached documentation/scope review. No further P10-G artifact change is authorized during review.
+P10-G detached review is STOPPED pending the P10-ISSUE-006 design amendment push. Candidate content remains frozen; no artifact change is authorized.
 
 Still not authorized:
 

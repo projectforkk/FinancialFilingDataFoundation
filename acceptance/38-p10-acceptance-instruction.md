@@ -103,7 +103,8 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 66. performance gates PASS；
 67. all temp/basetemp/workspace remain under project root；
 68. no hidden chain-of-thought stored as project artifact；
-69. every P10 Python command binds `PYTHONPATH` to the exact frozen candidate worktree `src`; detached review/acceptance must not execute source from shared main/another worktree, and FFDF must not be editable/installed into main `.venv` merely for P10。
+69. every P10 Python command binds `PYTHONPATH` to the exact frozen candidate worktree `src`; detached review/acceptance must not execute source from shared main/another worktree, and FFDF must not be editable/installed into main `.venv` merely for P10；
+70. P10-G integration instruction identity is verified from the exact frozen candidate Git blob bytes, not arbitrary checkout bytes; candidate commit and Git-blob SHA256 must match the acceptance freeze。
 
 ### 2.1 P10-F CLI acceptance matrix
 
@@ -142,6 +143,24 @@ Mandatory CLI matrix：
 - no P9 mutation；
 - no implicit artifact write；
 - exact-candidate source binding preserved。
+
+### 2.2 P10-G tracked artifact identity
+
+Acceptance must freeze:
+
+- exact P10 candidate commit；
+- `integration/p10/FFDF_RESEARCH_INTEGRATION.md` exact Git blob object/content；
+- SHA256 of the Git blob content bytes。
+
+For candidate `3a805a8f333ac20770d6aec1c8285d93993d18fc`, known Git-blob SHA256 is:
+
+`ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`
+
+Independent Acceptance must calculate this from exact Git blob bytes, not from arbitrary checked-out worktree bytes. Blob extraction must be binary-safe; do not use a text/object pipeline that decodes/re-encodes `git cat-file` output before hashing.
+
+If the detached worktree uses CRLF due Git checkout policy, record that representation separately; it is not an identity mismatch when LF-normalized content equals the frozen Git blob and the Git blob SHA matches.
+
+The Git blob must decode as UTF-8 and contain no BOM.
 
 ---
 
@@ -435,7 +454,7 @@ Independent Acceptance executor不得修改：
 
 PASS 要求：
 
-- Mandatory 69 项全部有 credible evidence；
+- Mandatory 70 项全部有 credible evidence；
 - fresh focused/full PASS；
 - dynamic Spec A/B PASS；
 - live COMPLETE run PASS；

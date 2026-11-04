@@ -398,8 +398,22 @@ STOP P10-F → separate detached Code Review before P10-G。
 - 固定公司/期间；
 - 固定估值规则。
 
+P10-ISSUE-006 artifact identity：
+
+- freeze exact candidate commit SHA；
+- compute SHA256 from exact Git blob content bytes for `integration/p10/FFDF_RESEARCH_INTEGRATION.md`；
+- do not use arbitrary checked-out worktree bytes as the cross-worktree identity；
+- Git blob must decode UTF-8 and contain no BOM；
+- record worktree EOL representation separately if relevant；
+- extract Git blob bytes with a binary-safe method; do not hash a PowerShell text/object pipeline representation；
+- candidate `3a805a8...` known Git-blob SHA256 =
+  `ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`。
+
 Gate：
-instruction scope review PASS。
+
+- instruction scope review PASS；
+- exact Git-blob SHA identity PASS；
+- detached review distinguishes checkout EOL from Git blob identity。
 
 ---
 

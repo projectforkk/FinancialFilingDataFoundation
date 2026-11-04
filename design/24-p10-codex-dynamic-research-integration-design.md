@@ -1279,6 +1279,43 @@ P10 允许新增：
 - 固定估值方法；
 - 固定投资规则正文。
 
+### 29.1 Tracked integration artifact identity
+
+P10-G 的 tracked Markdown artifact identity 不使用任意 checked-out worktree bytes。
+
+原因：
+
+- repository 在 Windows 可启用 `core.autocrlf=true`；
+- tracked Markdown 未必有 `eol=lf` attribute；
+- 同一个 exact Git candidate 的工作树 bytes 可能因 checkout EOL smudge 变成 LF 或 CRLF；
+- 因此 `SHA256(worktree bytes)` 不是稳定的 cross-worktree artifact identity。
+
+P10-G v1 identity 固定为：
+
+```text
+integration_instruction_git_blob_sha256
+= SHA256(
+    exact Git blob content bytes
+    for integration/p10/FFDF_RESEARCH_INTEGRATION.md
+    at the frozen candidate commit
+  )
+```
+
+要求：
+
+1. candidate commit SHA必须冻结；
+2. Git blob content bytes必须可 UTF-8 decode；
+3. Git blob不得包含 UTF-8 BOM；
+4. development/review/acceptance记录的 artifact SHA256都指 **Git blob bytes**；
+5. detached worktree可因 Git EOL checkout policy出现 CRLF，不因此改变 artifact identity；
+6. review/acceptance若比较工作树内容，必须明确区分 checkout representation 与 Git blob identity；
+7. P10-G 不要求为此修改全仓库 `.gitattributes`；
+8. 若 integration artifact 的 Git blob内容变化，必须产生新的 candidate SHA和新的 blob SHA256。
+
+Candidate `3a805a8f333ac20770d6aec1c8285d93993d18fc` 的 exact Git blob SHA256：
+
+`ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`
+
 ---
 
 ## 30. No fixed question mapping
@@ -2173,6 +2210,62 @@ Approved solution：
 No P10-F production code existed when this issue was identified.
 
 Affected gates: P10-F / P10-H / P10-M / P10-N.
+
+### P10-ISSUE-006 — P10-G Markdown worktree SHA is not stable under Windows EOL checkout
+
+P10-G detached documentation review found that the frozen artifact SHA was calculated from active-worktree bytes without defining the identity byte source.
+
+Observed on the same exact candidate `3a805a8f333ac20770d6aec1c8285d93993d18fc`：
+
+```text
+active worktree:
+  sha256=ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296
+  length=10383
+  CRLF=0
+  LF=364
+
+fresh detached worktree:
+  sha256=4b78fef289f1ba4471240d884127c844cbb36bb1954a7df5d31a05cb06e19c01
+  length=10747
+  CRLF=364
+  LF=364
+
+exact Git blob:
+  sha256=ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296
+  length=10383
+  CRLF=0
+  LF=364
+```
+
+Environment：
+
+`core.autocrlf=true`
+
+and no explicit `eol` attribute applies to the integration Markdown.
+
+Root cause：
+
+Git text checkout may materialize CRLF worktree bytes from the same LF Git blob. Therefore arbitrary checkout bytes are not a stable cross-worktree artifact identity.
+
+Impact：
+
+- integration instruction semantic content is unchanged；
+- P10 production is unaffected；
+- Code Review / Acceptance can falsely report SHA mismatch if it hashes checked-out bytes；
+- artifact identity needed an exact Git-truth byte source。
+
+Approved solution：
+
+1. Section 29.1 defines P10-G identity as SHA256 of exact candidate Git blob content bytes；
+2. candidate commit SHA and blob SHA are frozen together；
+3. blob must be UTF-8/no-BOM；
+4. checkout EOL representation is recorded separately and never used as identity；
+5. detached review/acceptance calculates the hash from Git blob bytes；
+6. no `.gitattributes` change is required for P10-G；
+7. candidate content remains `3a805a8...` with Git-blob SHA256 `ef10406c...`；
+8. P10-G review must be reauthorized/rerun after this amendment。
+
+Affected gates: P10-G / P10-M / P10-N.
 
 任何问题必须：
 
