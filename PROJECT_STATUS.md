@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-M ISSUE-008/009 RE-FREEZE ONLY / P10-N CLOSED`
+`P10-M ISSUE-008/009 RE-FREEZE PACKAGE READY / GUARDED COMMIT PENDING / P10-N CLOSED`
 
 P10-C is closed:
 
@@ -504,7 +504,13 @@ P10-M re-freeze authorization:
 
 `development/135-p10-m-issue008009-refreeze-authorization.md`
 
-Only freeze-document/evidence/status updates are authorized. P10-N remains closed.
+Re-freeze evidence:
+
+`development/136-p10-m-issue008009-refreeze-evidence.md = PASS / PACKAGE READY`
+
+Fresh precheck preview = PASS; base and fixture manifest identities are both `GIT_BLOB`.
+
+The exact P10-M candidate SHA will be the actual guarded re-freeze commit result and is not prewritten. P10-N remains closed.
 
 Required sequence:
 

@@ -11,7 +11,7 @@ P10-N must use the exact P10-M freeze commit recorded by the subsequent P10-N au
 
 Core design baseline:
 
-668269e87774730ade03afb4b7564256671eb31f
+ad78cbeaccfd444f1c5fcd31708b1300f6ad67a7
 
 P10 production source/test candidate:
 
@@ -25,15 +25,23 @@ Integration exact Git-blob SHA256:
 
 ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296
 
-Formal Code Review:
+Production Formal Code Review:
 
 development/119-p10-l-formal-code-review-result.md = PASS
 
-Formal review result commit:
+Production formal review result commit:
 
 157c9309a9e1c78baab08a0ab77bd3e7408facd8
 
-Any later change to design/24, design/25, acceptance/38, P10 production/tests, integration instruction, or this frozen acceptance package invalidates the freeze.
+Acceptance-package targeted formal review:
+
+development/134-p10-acceptance-package-formal-review-result.md = PASS
+
+Targeted formal review result commit:
+
+5a411b04aac66cf6b12c8642dfd70707a72e1aa0
+
+Any later change to design/24, design/25, acceptance/38, P10 production/tests, integration instruction, acceptance harness, fixture/base manifests, or this frozen acceptance package invalidates the freeze.
 
 ## 2. Frozen runtime identity
 
@@ -117,19 +125,21 @@ Harness:
 
 acceptance/p10_independent_acceptance_harness.py
 
-Pre-freeze SHA256:
+Exact Git-blob SHA256:
 
-d2504b73f951069d0fa5320fe1bd7296b95083c8f123481574f4a7935e811b3e
+dba3e7b0cc2e85e9eb65f003421ecd0a19229632b93905d9669421e74d36b9e7
 
-Size: 24005 bytes.
+Exact Git-blob size: 24625 bytes.
 
 Immutable-base manifest:
 
 acceptance/p10-base-immutability-manifest.json
 
-SHA256:
+Exact Git-blob SHA256:
 
 ae176a49858caabb45e525fbeb9b99eec23e4b5f649dfa584ebe4656c2dba003
+
+Exact Git-blob size: 12413 bytes.
 
 Entry count: 47.
 
@@ -137,13 +147,32 @@ Fixture manifest:
 
 acceptance/p10-fixtures/manifest.json
 
-SHA256:
+Exact Git-blob SHA256:
 
 345a00660a5e6150d2c1e547133cb9eb28aa39987d77010ce57f8f70f3d6cc3a
 
+Exact Git-blob size: 1227 bytes.
+
 Fixture count: 8.
 
-The P10-M freeze commit must contain exactly these acceptance-package bytes. P10-N must independently rehash them before execution.
+All tracked frozen acceptance-package identities are exact candidate Git blob bytes. Detached checkout bytes are diagnostic only and must not be used as frozen identity.
+
+The P10-M freeze commit must contain exactly these Git-truth package objects/content. P10-N must independently rehash the exact candidate Git blobs before execution.
+
+### 4.1 P10-ISSUE-008 / P10-ISSUE-009 closure rule
+
+Independent Acceptance must prove:
+
+- fixture manifest identity source = `GIT_BLOB`;
+- all 8 frozen fixture identities/bytes come from exact candidate Git blobs;
+- acceptance workspace fixture copies equal those validated Git blobs;
+- base immutability manifest identity source = `GIT_BLOB`;
+- base manifest SHA = `ae176a49858caabb45e525fbeb9b99eec23e4b5f649dfa584ebe4656c2dba003`;
+- the 47 referenced immutable project files are still validated from actual project filesystem bytes;
+- checkout EOL/filter transformations do not become frozen identity;
+- no `.gitattributes` workaround is used.
+
+Historical re-freeze candidate `4d1ab46f11d1d7b88934309ce32319e2200f0d8f` is invalidated for P10-N by P10-ISSUE-008/009 and must not be reused.
 
 ## 5. Frozen runtime spec fixtures
 
