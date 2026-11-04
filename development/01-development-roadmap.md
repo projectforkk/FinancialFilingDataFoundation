@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P10 DONE / P11 NOT STARTED**
+状态：**P10 DONE / P11 DESIGN AUTHORIZED**
 
 ## 总原则
 
@@ -117,7 +117,7 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`NOT STARTED`
+状态：`DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
 
 目标：
 SEC HTML / iXBRL / XBRL first acquisition and extraction path。

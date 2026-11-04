@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P10 DONE / P11 NOT STARTED**
+状态：**DESIGN BASELINE — P10 DONE / P11 DESIGN AUTHORIZED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 

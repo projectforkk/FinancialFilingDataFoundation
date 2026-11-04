@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P10_DONE / P11_NOT_STARTED**
+**P10_DONE / P11_DESIGN_AUTHORIZED**
 
 ## Accepted baseline
 
@@ -157,11 +157,15 @@
 
 ## Approved next phase
 
-**No next production phase authorized**
+**P11 — US SEC Provider (DESIGN ONLY)**
 
 Status:
 
-`P10 DONE / PASS — P11 NOT STARTED / NOT AUTHORIZED`
+`P11 DESIGN AUTHORIZED / PRODUCTION NOT AUTHORIZED`
+
+Authorization:
+
+`development/143-p11-design-authorization.md`
 
 P10-C is closed:
 
@@ -683,4 +687,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `NOT STARTED`
+- P11 — US SEC Provider: `DESIGN AUTHORIZED / PRODUCTION NOT STARTED`

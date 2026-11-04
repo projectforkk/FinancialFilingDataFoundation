@@ -161,7 +161,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 | 27 | TBD | NOT STARTED |
+| P11 | 26 | 27 | TBD | DESIGN AUTHORIZED |
 
 ---
 
@@ -292,7 +292,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_NOT_STARTED`
+`P10_DONE / P11_DESIGN_AUTHORIZED`
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
@@ -428,4 +428,6 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 118. final closeout = `development/142-p10-closeout.md` = DONE / PASS；
 119. P10 = DONE / PASS；
 120. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
-121. P11 / Research MCP production / Semantic Resolver production remain closed / not authorized。
+121. P11 design authorization = `development/143-p11-design-authorization.md`；
+122. P11 = DESIGN AUTHORIZED / PRODUCTION CLOSED；
+123. Research MCP production / Semantic Resolver production remain closed / not authorized。
