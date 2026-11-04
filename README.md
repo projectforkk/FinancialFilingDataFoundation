@@ -44,6 +44,13 @@ All FFDF-owned code, runtimes, worktrees, workspace data and temporary test path
 
 `D:\Codex\FinancialFilingDataFoundation`
 
+## Detailed usage manual
+
+- Markdown: [`docs/FFDF_CN_HK_Usage_Manual.md`](docs/FFDF_CN_HK_Usage_Manual.md)
+- Word: [`docs/FFDF_CN_HK_Usage_Manual.docx`](docs/FFDF_CN_HK_Usage_Manual.docx)
+
+The manual covers local runtimes, deployment health checks, CN/HK data preparation, P8 MCP, P9 Review Overlay, P10 Research Integration, testing, troubleshooting, backup boundaries, and day-to-day operating workflows.
+
 ## Accepted phase baseline
 
 P0 through P10 are `DONE / PASS`. The final planned development sequence ends at P10.
