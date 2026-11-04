@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-C CANDIDATE PASS / DETACHED REVIEW AUTHORIZED — P10-D CLOSED`
+`P10-C REVIEW PASS / CLOSED — P10-D NOT YET AUTHORIZED`
 
 Design baseline:
 
@@ -192,7 +192,11 @@ Production candidate: `35553df23f58a7f539b7390f98c7f154e42c817e`.
 
 Development evidence: `development/84-p10-c-spec-freeze-evidence.md` = PASS.
 
-Detached review instruction: `development/85-p10-c-code-review-instruction.md`. P10-D remains closed until the review result is committed/pushed.
+Detached review instruction: `development/85-p10-c-code-review-instruction.md`.
+
+Detached review result: `development/86-p10-c-detached-code-review-result.md` = PASS.
+
+P10-C is closed. P10-D remains closed until a separate explicit development instruction is committed/pushed.
 
 Still not authorized:
 
