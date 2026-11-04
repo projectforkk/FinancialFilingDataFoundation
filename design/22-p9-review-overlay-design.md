@@ -1645,7 +1645,11 @@ validator 必须使用固定、可测试、无网络/AI 的 deterministic rules�
    - POSIX absolute path 必须包含 single-segment 与 multi-segment，因此 `/tmp`、`/secret.txt`、`/etc/passwd` 都必须拒绝；
    - 显式 `../` / `..\\` traversal 必须拒绝；
    - slash 位于字母数字 token 内部时不得仅凭 slash 判定为 path，因此 `2024/2025`、`P5/P6` 不得误拒；
-3. shell command：明确的 command-launch / execution syntax，例如 `cmd /c`、`powershell` / `pwsh`、`bash`、`sh -c`、`Invoke-Expression`、`curl`、`wget`、destructive shell forms；
+3. shell command：明确的 command-launch / execution syntax：
+   - command segment boundary 定义为 string start 或 newline / `;` / `&` / `|` 后的首个 token；
+   - `powershell` / `powershell.exe`、`pwsh` / `pwsh.exe`、`bash` / `bash.exe`、`curl` / `curl.exe`、`wget` / `wget.exe` 作为完整 command segment 或 command-segment 起始 executable token 时必须拒绝，即使没有参数；
+   - `cmd /c` / `cmd /k`、`sh -c`、`Invoke-Expression`、destructive shell forms 同样拒绝；
+   - executable 名称仅出现在普通句子中间、且不是 command-segment 起点时，不因关键词本身拒绝；
 4. SQL：必须按 **statement grammar** 识别，而不是仅凭 `SELECT` / `FROM` 等自然语言关键字：
    - `SELECT * FROM <sql_object>` 必须拒绝；
    - `SELECT <projection> FROM <sql_object>` 在 `<sql_object>` 后为 string end、semicolon 或 SQL clause（`WHERE/JOIN/GROUP BY/ORDER BY/HAVING/LIMIT/OFFSET/UNION`）时必须拒绝；
@@ -1862,6 +1866,23 @@ Approved solution:
 5. no text usage/help output is permitted。
 
 Affected gates: P9-JR2 / P9-K / P9-L.
+
+### P9-ISSUE-010 — Bare shell executable token was not classified as command launch
+
+Formal detached re-review `development/70-p9-jr2-formal-rereview-result.md` found that exact payload strings `powershell`, `pwsh`, `bash`, `curl`, and `wget` were allowed even though Section 49 explicitly lists those shell command surfaces.
+
+Root cause:
+the implementation only recognized selected argument forms and did not treat a bare executable token at command-segment boundary as a command launch.
+
+Approved solution:
+1. define command-segment boundary explicitly；
+2. reject the five executable tokens when they are the first token of a command segment, including bare exact forms；
+3. retain existing argument-form detection；
+4. do not reject the same keyword solely because it appears mid-sentence outside a command segment；
+5. freeze bare-token probes in acceptance item 55 and direct unit tests；
+6. perform a fresh detached review before P9-K。
+
+Affected gates: P9-JR3 / P9-K / P9-L.
 
 发现问题必须：
 

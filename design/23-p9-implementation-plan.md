@@ -240,6 +240,30 @@ P9-JR2 PASS 前 P9-K 继续关闭。
 
 ---
 
+## P9-JR3 — Shell-Token Corrective Gate
+
+Trigger：
+`development/70-p9-jr2-formal-rereview-result.md` = FAIL / CHANGES REQUIRED。
+
+Authorized scope：
+
+- reject bare command-segment executable tokens `powershell/pwsh/bash/curl/wget` plus existing argument forms；
+- add direct regression tests；
+- focused/full/contract probe；
+- fresh detached formal review。
+
+Gate：
+
+- all five bare executable probes reject with `P9_RESOLUTION_CONTENT_FORBIDDEN`；
+- argument forms continue rejecting；
+- benign finance/natural-language probes remain allowed；
+- focused/full PASS；
+- detached re-review PASS。
+
+P9-JR3 PASS 前 P9-K 关闭。
+
+---
+
 ## P9-K — Acceptance Freeze
 
 固定：
