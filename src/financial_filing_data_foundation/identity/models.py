@@ -6,7 +6,8 @@ from .sec import normalize_cik, normalize_sec_form, normalize_us_ticker
 
 
 _ALLOWED_MARKETS = frozenset({"CN", "HK", "US"})
-_ALLOWED_PERIODS = frozenset({"Q1", "Q2", "H1", "Q3", "FY"})
+_ALLOWED_PERIODS = frozenset({"Q1", "H1", "Q3", "FY"})
+_ALLOWED_SLOT_PERIODS = frozenset({"Q1", "Q2", "H1", "Q3", "FY"})
 
 
 def _clean_text(value: str, field: str) -> str:
@@ -87,7 +88,7 @@ class FilingSlotKey:
         if self.fiscal_year < 1900 or self.fiscal_year > 2200:
             raise ValueError(f"fiscal_year out of supported range: {self.fiscal_year}")
         period = self.raw_fiscal_period.strip().upper()
-        if period not in _ALLOWED_PERIODS:
+        if period not in _ALLOWED_SLOT_PERIODS:
             raise ValueError(f"unsupported P1 fiscal period: {period!r}")
 
         filing_type = _clean_text(self.filing_type, "filing_type").upper()
@@ -110,7 +111,7 @@ class FilingSlotKey:
         else:
             company_id = _clean_text(self.company_id, "company_id")
             if period == "Q2":
-                raise ValueError("Q2 is supported only for US")
+                raise ValueError(f"unsupported P1 fiscal period: {period!r}")
 
         object.__setattr__(self, "market", market)
         object.__setattr__(self, "company_id", company_id)

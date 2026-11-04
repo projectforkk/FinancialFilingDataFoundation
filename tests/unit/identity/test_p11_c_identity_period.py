@@ -83,12 +83,14 @@ def test_p11c_10_us_q2_is_valid() -> None:
 
 
 def test_p11c_11_cn_q2_is_rejected() -> None:
-    with pytest.raises(ValueError, match="Q2 is supported only for US"):
+    with pytest.raises(ValueError, match="unsupported P1 fiscal period"):
         FilingSlotKey("CN", "company-1", "QUARTERLY_REPORT", 2025, "Q2")
+    with pytest.raises(ValueError, match="unsupported P1 fiscal period"):
+        FilingRequirement("QUARTERLY_REPORT", "Q2")
 
 
 def test_p11c_12_hk_q2_is_rejected() -> None:
-    with pytest.raises(ValueError, match="Q2 is supported only for US"):
+    with pytest.raises(ValueError, match="unsupported P1 fiscal period"):
         FilingSlotKey("HK", "company-1", "INTERIM_REPORT", 2025, "Q2")
 
 

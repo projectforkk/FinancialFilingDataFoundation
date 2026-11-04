@@ -420,7 +420,7 @@ def test_p11c_21_us_guard_precedes_slot_construction_and_registry(monkeypatch) -
     monkeypatch.setattr(incremental, "build_required_slots", explode_slots)
     planner = IncrementalPlanner(ExplodingRegistry(), _reuse_policy())
     company = CompanyRef("US", "320193", None)
-    policy = FilingPolicy((FilingRequirement("10-Q", "Q2"),))
+    policy = FilingPolicy((FilingRequirement("10-Q", "Q1"),))
     with pytest.raises(PackageAwarePlannerRequired) as exc_info:
         planner.build_plan(company, 2025, 2025, policy)
     assert str(exc_info.value) == "market US requires P11 package-aware SEC planning"
