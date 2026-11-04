@@ -376,6 +376,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 66. P10-J evidence = `development/115-p10-j-live-research-evidence.md` = PASS / COMPLETE；
 67. P10-J = CLOSED；
 68. P10-K authorization = `development/116-p10-k-negative-gates-authorization.md`；
-69. P10-K = AUTHORIZED NEGATIVE VALIDATION ONLY / NO PRODUCTION CHANGES；
-70. P10-L and later remain closed；
-71. P11 / Research MCP production / Semantic Resolver production remain closed。
+69. P10-K evidence = `development/117-p10-k-negative-gates-evidence.md` = PASS；
+70. P10-K = CLOSED；
+71. P10-L and later remain closed pending separate authorization；
+72. P11 / Research MCP production / Semantic Resolver production remain closed。

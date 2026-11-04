@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-K NEGATIVE VALIDATION ONLY / NO PRODUCTION CHANGES`
+`P10-K CLOSED / P10-L CLOSED PENDING SEPARATE AUTHORIZATION`
 
 P10-C is closed:
 
@@ -341,7 +341,11 @@ P10-K authorization:
 
 `development/116-p10-k-negative-gates-authorization.md`
 
-Only isolated negative validation/workspace evidence is authorized; production/tests/design changes remain forbidden.
+P10-K evidence:
+
+`development/117-p10-k-negative-gates-evidence.md = PASS`
+
+P10-K is closed. P10-L remains closed until a separate explicit authorization.
 
 Still not authorized:
 
