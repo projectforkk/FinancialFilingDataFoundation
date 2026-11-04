@@ -133,6 +133,37 @@ Canonical form normalization examples:
 
 `provider_company_id` = 10-digit CIK.
 
+Exact input grammar:
+
+### CIK
+
+- caller/provider CIK is a string after surrounding ASCII whitespace trim;
+- accepted lexical grammar = `^[0-9]{1,10}$`;
+- numeric value must be > 0;
+- normalized CIK = left-zero-padded to exactly 10 ASCII digits;
+- signs, decimal points, separators, Unicode digits and embedded whitespace are rejected.
+
+### accession_number
+
+- exact accepted grammar = `^[0-9]{10}-[0-9]{2}-[0-9]{6}$`;
+- normalized accession preserves this dashed form;
+- archive directory form = remove the two dashes, yielding exactly 18 ASCII digits;
+- no caller-supplied alternative separator or path form is accepted.
+
+### primaryDocument
+
+The value comes only from validated SEC submission/index metadata.
+
+It MUST:
+
+- be a non-empty basename, not a caller path;
+- contain no `/`, `\\`, NUL or ASCII control characters;
+- not equal `.` or `..`;
+- not contain a query or fragment;
+- be joined to the frozen Archives directory as a single URL path segment after validation.
+
+Any violation is `P11_SUBMISSIONS_INVALID` or `P11_PATH_OUTSIDE_PROJECT` according to whether the defect is provider metadata or a local path computation.
+
 ## 7. Period binding
 
 Discovery metadata is provisional.
@@ -206,8 +237,12 @@ Every request MUST:
 - use HTTPS;
 - use explicit configured User-Agent;
 - never use a fabricated/default contact identity;
-- obey a hard per-process ceiling <=10 requests/sec;
-- default implementation target = <=8 requests/sec for headroom;
+- obey SEC's aggregate fair-access ceiling, not merely a per-process ceiling;
+- all FFDF P11 processes under the same canonical project root share one cross-process SEC rate gate;
+- the frozen standalone implementation ceiling is 8 requests/sec aggregate with no burst: minimum 125 ms between starts of outbound SEC requests;
+- the gate state/lock lives under the canonical project-root `workspace/sec/rate/` and is shared by main/worktree executions that use that root;
+- if aggregate coordination cannot be obtained safely, the request is blocked with `P11_RATE_LIMIT_SCOPE_UNSAFE`;
+- independent installations/machines are not auto-coordinated; concurrent use of the same automation identity across installations is unsupported unless an explicitly designed shared limiter is supplied, and MUST NOT be assumed safe;
 - revalidate redirect destination;
 - use allowlisted hosts only;
 - enforce response-size cap;
@@ -223,7 +258,8 @@ Retry policy:
 - 5xx: bounded exponential retry;
 - 404: no blind retry loop;
 - 403/access denied: block and surface reason;
-- max retry count is frozen before implementation.
+- retries also pass through the same aggregate rate gate;
+- exact timeout, response-size caps, retry count/backoff and User-Agent grammar MUST be frozen by a Design-First P11-D HTTP-contract amendment before any P11-D production code is authorized; P11-D code may not choose these values ad hoc.
 
 ## 11. Host allowlist
 
@@ -299,7 +335,9 @@ Required assets:
 
 Do not download every exhibit by default.
 
-Package manifest contains:
+Package `manifest.json` is the immutable identity manifest, not an HTTP receipt.
+
+It contains:
 
 - schema_version;
 - CIK;
@@ -309,17 +347,84 @@ Package manifest contains:
 - filing_date;
 - report_date;
 - primary_document;
-- assets sorted by canonical role/name/url;
-- each asset SHA256/size/media type;
+- assets using the exact Section 15 identity rows/sort;
 - package hash.
+
+Acquisition-specific diagnostics are stored only in separate receipt records:
+
+- final redirect URL;
+- HTTP status;
+- declared Content-Type;
+- ETag / Last-Modified;
+- request/retry timing;
+- acquired_at.
+
+A receipt never changes package identity or immutable package-manifest bytes.
 
 ## 15. Package identity
 
 Primary `document_sha256`:
 SHA256(exact primary document bytes).
 
-`source_package_sha256`:
-SHA256(canonical package manifest identity payload).
+`source_package_sha256` is SHA256 of the exact canonical JSON bytes of this identity object:
+
+```json
+{
+  "schema_version": "p11-sec-source-package-identity-v1",
+  "cik": "##########",
+  "accession_number": "##########-##-######",
+  "base_form": "10-K",
+  "amended": false,
+  "filing_date": "YYYY-MM-DD",
+  "report_date": null,
+  "primary_document": "basename.ext",
+  "assets": [
+    {
+      "role": "PRIMARY_DOCUMENT",
+      "asset_sha256": "<lowercase sha256>",
+      "file_name": "basename.ext",
+      "source_url": "https://www.sec.gov/Archives/...",
+      "byte_size": 0,
+      "primary": true,
+      "dependency_depth": 0,
+      "referring_asset_sha256": null
+    }
+  ]
+}
+```
+
+Asset identity rows are sorted lexicographically by:
+`(role, file_name, source_url, asset_sha256, byte_size, primary, dependency_depth, referring_asset_sha256-or-empty)`.
+
+`source_url` in the identity row is the canonical requested URL before redirects: absolute HTTPS, lowercase host, no fragment, no dot-segment traversal, and otherwise the validated resolved path/query. Redirect final URL belongs only to the acquisition receipt.
+
+Canonical JSON uses the Section 28 canonical encoder exactly.
+
+Excluded from package identity:
+
+- redirect final URL;
+- declared HTTP media/content type;
+- ETag / Last-Modified;
+- downloaded/acquired timestamps;
+- request IDs;
+- local paths;
+- retry/HTTP diagnostics.
+
+Those excluded fields remain provenance/diagnostic metadata but cannot change the package hash by themselves.
+
+`source_package_sha256` itself is not included in its own identity payload.
+
+Known canonical fixture:
+
+```json
+{"accession_number":"0000320193-24-000123","amended":false,"assets":[{"asset_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","byte_size":123,"dependency_depth":0,"file_name":"example.htm","primary":true,"referring_asset_sha256":null,"role":"PRIMARY_DOCUMENT","source_url":"https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/example.htm"}],"base_form":"10-K","cik":"0000320193","filing_date":"2024-10-31","primary_document":"example.htm","report_date":"2024-09-28","schema_version":"p11-sec-source-package-identity-v1"}
+```
+
+Exact UTF-8 canonical bytes SHA256:
+
+`16e76f846fcdccf44216816148ba346ae5c100f3fcdf6fa170a6f954267bae78`
+
+Implementation tests must independently reproduce this hash.
 
 Downloaded timestamps, local absolute paths and transient HTTP headers do not participate in package identity.
 
@@ -464,6 +569,25 @@ For each fact:
 - compute parsed numeric only with explicit transform rules;
 - link to exact source asset/DOM/XML node.
 
+Normative `raw_value` rule for Inline XBRL/XBRL v2:
+
+- resolve the fact element plus its valid `continuedAt` chain in source order;
+- ignore descendants covered by `ix:exclude`;
+- concatenate descendant character data in document order after standards-required entity decoding;
+- normalize each Unicode whitespace run to one U+0020 SPACE and trim leading/trailing U+0020;
+- do NOT apply Inline XBRL `format`, `scale`, `sign`, unit conversion or canonical metric semantics to `raw_value`;
+- `nil=true` preserves the lexical text (normally empty) and forces `parsed_numeric_value=null`;
+- source asset SHA + canonical source locators remain the proof of the original lexical source.
+
+Numeric transformation boundary:
+
+- `parsed_numeric_value` may apply only standards-defined iXBRL/XBRL lexical transformation, format, sign and base-10 scale;
+- transformed output is a canonical decimal string or null;
+- no currency/unit conversion, period inference, concept canonicalization or rounding beyond the filing's transform semantics;
+- unsupported/invalid transform => parsed value null + explicit validation issue, never guess.
+
+Because the exact standards transformation implementation may depend on the runtime/parser selected by P11-B, **P11-G parser production is CLOSED until a Design-First parser-contract freeze records the exact runtime version, transformation registry behavior, continuation/exclude handling golden fixtures and canonical decimal cases.** P11-G implementation may not choose these semantics ad hoc.
+
 Companyfacts may confirm a standard fact but cannot replace filing evidence.
 
 ## 23. Custom taxonomy
@@ -533,6 +657,7 @@ Identity/discovery:
 HTTP/security:
 - P11_USER_AGENT_REQUIRED
 - P11_RATE_LIMITED
+- P11_RATE_LIMIT_SCOPE_UNSAFE
 - P11_SOURCE_HOST_NOT_ALLOWED
 - P11_REDIRECT_NOT_ALLOWED
 - P11_HTTP_FAILED
@@ -676,7 +801,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in development/144.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in development/144. P11-ISSUE-010 through P11-ISSUE-016 were found by detached review of candidate `3ccaedc...` and are recorded in `development/147-p11-detached-design-review-stop.md`. The current amended design contains explicit resolutions for ISSUE-010..016; those resolutions are not accepted until a fresh detached design review passes.
 
 Any new material issue:
 

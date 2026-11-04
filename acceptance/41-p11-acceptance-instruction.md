@@ -50,20 +50,24 @@ Any unexplained drift => STOP.
 Mandatory:
 
 1. market US accepted;
-2. 10-digit CIK normalization deterministic;
-3. invalid CIK rejected;
-4. ticker is not canonical identity;
-5. exact caller CIK wins after validation;
-6. ticker lookup ambiguity blocks;
-7. ticker/CIK mismatch blocks/reviews;
-8. Q2 supported;
-9. US Q2 not mapped to H1;
-10. CN/HK period behavior unchanged;
-11. 10-K/A normalized to base 10-K + amended;
-12. 10-Q/A normalized;
-13. 20-F/A normalized;
-14. 40-F/A normalized;
-15. 8-K/6-K supplemental identity is accession-bound, not periodic-slot-forced.
+2. CIK input grammar exactly `^[0-9]{1,10}$` after surrounding ASCII whitespace trim;
+3. normalized CIK exactly 10 digits / numeric value > 0;
+4. signs, Unicode digits, separators and embedded whitespace rejected;
+5. accession grammar exactly `^[0-9]{10}-[0-9]{2}-[0-9]{6}$`;
+6. accession no-dash archive form exactly 18 digits;
+7. primaryDocument must be a safe single basename with no slash/backslash/control/query/fragment;
+8. ticker is not canonical identity;
+9. exact caller CIK wins after validation;
+10. ticker lookup ambiguity blocks;
+11. ticker/CIK mismatch blocks/reviews;
+12. Q2 supported;
+13. US Q2 not mapped to H1;
+14. CN/HK period behavior unchanged;
+15. 10-K/A normalized to base 10-K + amended;
+16. 10-Q/A normalized;
+17. 20-F/A normalized;
+18. 40-F/A normalized;
+19. 8-K/6-K supplemental identity is accession-bound, not periodic-slot-forced.
 
 ## 5. Official SEC discovery acceptance
 
@@ -91,8 +95,12 @@ Mandatory:
 
 - explicit User-Agent required;
 - no fake default contact identity;
-- observed request rate <=10 requests/sec;
-- acceptance target <=8 requests/sec implementation ceiling;
+- SEC policy is treated as aggregate, not per-process;
+- supported single-installation aggregate implementation ceiling <=8 requests/sec;
+- no-burst minimum 125 ms between outbound SEC request starts;
+- concurrent two-process probe under the same canonical project root still observes aggregate <=8 requests/sec;
+- all retries pass through the same cross-process rate gate;
+- unavailable/unsafe shared coordination => `P11_RATE_LIMIT_SCOPE_UNSAFE`;
 - HTTPS only;
 - SEC allowlist only;
 - redirect target revalidated;
@@ -126,9 +134,16 @@ Mandatory:
 - exact primary source bytes preserved;
 - primary document SHA256 independently recomputed;
 - source package manifest canonical;
+- exact `p11-sec-source-package-identity-v1` payload from design/26 Section 15 enforced;
+- known package identity fixture produces an independently precomputed SHA256;
 - package hash deterministic;
-- asset ordering does not change package hash;
-- timestamps/local absolute paths excluded from identity;
+- caller/asset ordering does not change package hash after canonical sort;
+- changing role/hash/file_name/canonical requested source_url/byte_size/primary/dependency topology changes package hash;
+- changing redirect final URL/declared HTTP media type/local path/timestamp/request-id/ETag/Last-Modified does not change package hash;
+- same package hash always maps to byte-identical immutable package manifest identity bytes; acquisition receipts may differ without rewriting that manifest;
+- `local_content_path` persists as project-root-relative POSIX only;
+- absolute/drive-relative/UNC/traversal local paths rejected;
+- resolved local content must remain inside configured P11 SEC raw-assets root;
 - duplicate asset SHA reused safely;
 - package asset hash mismatch blocks;
 - partial commit never becomes accepted package;
@@ -193,11 +208,24 @@ At least one accepted evidence item each for applicable types:
 - XBRL_FACT when fixture provides separate instance;
 - SOURCE_ASSET metadata evidence.
 
+Mandatory locator/identity fixtures:
+
+- HTML path uses lowercase tag + 1-based same-tag sibling index exactly;
+- XML/iXBRL path uses expanded Clark QName + 1-based same-QName sibling index exactly;
+- namespace-prefix changes do not change XML locator identity;
+- source locator object keys are exact and optional values appear as JSON null;
+- locator resolves to exactly one node;
+- known `evidence_id`, `raw_fact_id`, `segment_id`, `section_id`, `table_id`, `cell_id`, `config_hash` and `parse_run_id` fixtures match independently precomputed hashes;
+- caller order and local paths do not change those IDs;
+- parser/config semantic change does change `parser_version` or `config_hash`.
+
 Explicitly reject:
 
 - synthetic physical page_no for HTML;
 - fabricated bbox;
-- evidence locator pointing outside captured package.
+- evidence locator pointing outside captured package;
+- ambiguous/zero-match locator;
+- noncanonical namespace-prefix-based XML identity.
 
 ## 12. Inline XBRL raw facts
 
@@ -209,8 +237,12 @@ For selected live facts verify:
 - dimensions;
 - decimals/precision where present;
 - scale/sign/format where present;
-- exact lexical/raw value;
-- deterministic parsed numeric;
+- `continuedAt` chain and `ix:exclude` handling follows the frozen rule;
+- raw_value is character content with Unicode whitespace-run -> one U+0020 and outer-space trim, before format/scale/sign;
+- raw_value is unchanged by unit conversion/canonicalization because those are forbidden;
+- deterministic parsed numeric applies only the frozen standards transform/format/sign/scale contract;
+- nil => parsed numeric null;
+- invalid/unsupported transform => parsed numeric null + explicit issue;
 - period context;
 - entity identifier;
 - evidence locator to exact fact source node.
@@ -318,6 +350,7 @@ Exact mandatory results:
 - ambiguous ticker/CIK -> P11_COMPANY_IDENTITY_AMBIGUOUS
 - missing filing -> P11_FILING_NOT_FOUND
 - missing User-Agent -> P11_USER_AGENT_REQUIRED
+- unavailable cross-process aggregate rate coordination -> P11_RATE_LIMIT_SCOPE_UNSAFE
 - bad host -> P11_SOURCE_HOST_NOT_ALLOWED
 - hostile redirect -> P11_REDIRECT_NOT_ALLOWED
 - oversized response -> P11_RESPONSE_TOO_LARGE

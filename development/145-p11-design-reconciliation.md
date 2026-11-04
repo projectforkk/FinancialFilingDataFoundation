@@ -185,3 +185,28 @@ Candidate set:
 `CLOSED`
 
 No P11 production/test/runtime change is authorized until detached design review PASS + design-ready baseline + separate development authorization.
+
+
+## 14. Detached review remediation reconciliation
+
+Candidate `3ccaedc...` is historical/ineligible because detached review exposed P11-ISSUE-010..016 before any production authorization.
+
+The amended design reconciles those findings without changing accepted P0-P10 production:
+
+1. SEC fair access is aggregate: one project-root-shared cross-process gate, <=8 req/s no-burst supported boundary; no per-process-only interpretation.
+2. source-package hash now has an exact identity schema/sort/exclusion contract.
+3. persisted asset paths are project-root-relative POSIX storage metadata and do not enter identity.
+4. HTML/XML/iXBRL locators now have exact canonical path algorithms and locator object shapes.
+5. v2 deterministic IDs now have exact canonical input objects.
+6. Inline XBRL raw_value has a frozen whitespace/continuation/exclude boundary; parser-specific transform implementation requires a P11-G pre-code Design-First freeze after the runtime probe.
+7. CIK/accession/primaryDocument input grammar is exact.
+8. P11-D exact network tuning is explicitly a pre-code Design-First freeze, not an implementation choice.
+
+The amended candidate remains additive:
+
+- CN/HK P1/P2 behavior unchanged;
+- PDF ParsedFinancialDocument v1 unchanged;
+- P8/P9/P10 accepted contracts unchanged;
+- no source/test/runtime file changed.
+
+Fresh detached design review is required before `P11_READY_FOR_DEVELOPMENT`.

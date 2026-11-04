@@ -32,6 +32,22 @@ For SEC:
 
 The package hash MUST NOT replace `document_sha256`.
 
+For SEC, `source_package_sha256` uses the exact `p11-sec-source-package-identity-v1` payload frozen in design/26 Section 15. That payload is normative for v2 as well.
+
+The package identity includes the canonical requested `source_url` for each asset as frozen in design/26 Section 15.
+
+The package identity excludes only acquisition/runtime diagnostics:
+
+- redirect final URL;
+- declared HTTP media/content type;
+- local paths;
+- timestamps;
+- request IDs;
+- ETag/Last-Modified;
+- retry/status diagnostics.
+
+Those excluded values belong to acquisition receipts and do not affect `source_package_sha256`.
+
 ## 3. Export layout
 
 ```text
@@ -50,6 +66,14 @@ export-v2/
 `tables.jsonl` may be empty when the source contains no reliable table structure.
 
 ## 4. manifest.json
+
+Allowed `source_kind` values for P11 v1:
+
+- `SEC_INLINE_XBRL` — primary HTML contains Inline XBRL facts;
+- `SEC_HTML` — primary HTML without Inline XBRL facts;
+- `SEC_XBRL` — XML/XBRL primary structured source when explicitly supported by the filing/package.
+
+No caller-defined source_kind is allowed.
 
 Required fields:
 
@@ -135,6 +159,22 @@ Allowed SEC roles include:
 
 Every stored row is exact-byte-addressed.
 
+`source_url` is the canonical requested URL from the immutable package identity, not a redirect-final URL.
+
+`media_type` is a deterministic parser classification from the captured asset bytes/name under the frozen parser version. The HTTP-declared Content-Type is acquisition receipt metadata and MUST NOT be copied into this field merely because the server sent it.
+
+`local_content_path` contract:
+
+- persisted value is project-root-relative POSIX text only;
+- absolute, drive-relative, UNC, empty, `.`, `..` and traversal-containing paths are rejected;
+- loader resolves `project_root / local_content_path`, then requires the resolved file to remain inside the configured P11 SEC raw-assets root;
+- the file's SHA256/size must match the row;
+- `local_content_path` is storage metadata only and is excluded from package identity, fact/evidence IDs, semantic equality and cross-machine identity.
+
+Example:
+
+`workspace/sec/raw/assets/sha256/ab/<sha>.htm`
+
 ## 7. source_segments.jsonl
 
 A segment is a source-native text/navigation unit, not a fake PDF page.
@@ -145,15 +185,13 @@ Required:
 - document_sha256;
 - ordinal;
 - locator_type;
+- source_locator;
 - raw_text;
 - normalized_text;
 - source_asset_sha256;
-- dom_path nullable;
-- html_id nullable;
-- xml_id nullable;
-- start_offset nullable;
-- end_offset nullable;
 - section_hint nullable.
+
+The canonical locator object is stored only in `source_locator`; duplicate top-level DOM/XML locator fields are forbidden.
 
 Allowed locator types:
 
@@ -175,7 +213,7 @@ Required:
 - segment_end;
 - source_asset_sha256;
 - locator_type;
-- locator;
+- source_locator;
 - quality_signals.
 
 No page_start/page_end is required for HTML/XML sources.
@@ -187,8 +225,8 @@ For HTML-origin tables:
 - table_id;
 - raw_title nullable;
 - source_asset_sha256;
-- dom_path;
-- html_id nullable;
+- locator_type = HTML_DOM;
+- source_locator;
 - raw_unit nullable;
 - raw_scope nullable;
 - header_tree;
@@ -205,8 +243,10 @@ Each raw cell:
 - column_index;
 - rowspan;
 - colspan;
-- dom_path;
-- html_id nullable.
+- locator_type = HTML_DOM;
+- source_locator.
+
+The table/cell `source_locator` objects use Section 11.1 exactly.
 
 No bbox is required for non-visual sources.
 
@@ -249,11 +289,19 @@ SEC/XBRL optional fields:
 
 `raw_metric_name` is source truth and MUST NOT be replaced by a canonical metric name.
 
-For Inline XBRL:
+For Inline XBRL/XBRL:
 
-- `raw_value` preserves the filing-visible lexical text or exact source lexical content according to the parser rule frozen by P11;
-- any transformed XBRL value must be separately represented or used only to derive `parsed_numeric_value`;
-- scale/sign/format transformations must be auditable.
+- `raw_value` follows design/26 Section 22 exactly;
+- resolve a valid `continuedAt` chain in source order and exclude `ix:exclude` descendants;
+- concatenate descendant character data after standards-required entity decoding;
+- normalize every Unicode whitespace run to one U+0020 SPACE and trim leading/trailing U+0020;
+- do not apply `format`, `scale`, `sign`, unit conversion, period inference or canonical metric semantics to `raw_value`;
+- `parsed_numeric_value` is the only field allowed to carry standards-defined numeric transformation;
+- `nil=true` forces `parsed_numeric_value=null`;
+- scale/sign/format/continuation locators remain auditable source metadata;
+- invalid/unsupported transformation => parsed value null + explicit validation issue, never guess.
+
+The exact parser/runtime transformation registry implementation MUST be frozen by the required P11-G preimplementation Design-First parser-contract amendment after P11-B; P11-G production cannot begin before that freeze.
 
 ## 11. evidence.jsonl
 
@@ -302,16 +350,110 @@ Same logical fields, pointing to the exact XBRL instance node.
 
 Used only for whole-asset metadata claims, never to substitute for a fact locator.
 
+## 11.1 Canonical source locator contract
+
+Locator identity is parser-independent at the contract level.
+
+### HTML_DOM path
+
+Canonical HTML path:
+
+- start at the document element;
+- each step is `lowercase-ascii-tag-name[index]`;
+- `index` is 1-based among element siblings having the same lowercase ASCII tag name;
+- only element nodes participate in sibling indexing;
+- root is included;
+- no CSS selector shorthand, class name or volatile presentation attribute participates.
+
+Example:
+
+`/html[1]/body[1]/div[3]/table[1]/tr[2]/td[4]`
+
+### XML / Inline XBRL path
+
+Canonical XML/iXBRL path:
+
+- each element name uses expanded Clark QName `{namespace-uri}local-name[index]`;
+- empty namespace is `{}local-name[index]`;
+- index is 1-based among element siblings with the exact same expanded QName;
+- root is included;
+- namespace prefixes are never identity inputs.
+
+Example:
+
+`/{http://www.w3.org/1999/xhtml}html[1]/{http://www.w3.org/1999/xhtml}body[1]/{http://www.xbrl.org/2013/inlineXBRL}nonFraction[2]`
+
+### Canonical locator objects
+
+`HTML_DOM`:
+
+```json
+{
+  "dom_path": "/html[1]/body[1]/...",
+  "html_id": null,
+  "start_offset": null,
+  "end_offset": null
+}
+```
+
+`IXBRL_DOM` and `XML_NODE`:
+
+```json
+{
+  "dom_path": "/{uri}root[1]/.../{uri}node[2]",
+  "xml_id": null,
+  "start_offset": null,
+  "end_offset": null
+}
+```
+
+`IXBRL_FACT`:
+
+```json
+{
+  "dom_path": "/{uri}html[1]/.../{ix-uri}nonFraction[2]",
+  "xml_id": null,
+  "concept_qname": "{namespace-uri}LocalName",
+  "context_ref": "ctx",
+  "unit_ref": null
+}
+```
+
+`XBRL_FACT` uses the same exact keys and XML path rule.
+
+`SOURCE_ASSET`:
+
+```json
+{
+  "asset_sha256": "<lowercase sha256>"
+}
+```
+
+Rules:
+
+- optional values are present as explicit JSON null, not omitted;
+- QName identity uses expanded Clark form, never source prefix spelling;
+- source locator keys are exact; extra keys are invalid;
+- `html_id`/`xml_id` are corroborating source attributes and do not replace `dom_path`;
+- locator resolution must produce exactly one node in the captured source asset;
+- zero or multiple matches => artifact invalid;
+- canonical source-node identity is the canonical JSON object:
+  `{"locator_type": <type>, "source_locator": <exact-object>}`.
+
 ## 12. evidence_id
 
-`evidence_id` is SHA256 of canonical JSON containing:
+`evidence_id` is SHA256 of canonical JSON of this exact object and no extra keys:
 
-- document_sha256;
-- source_asset_sha256;
-- locator_type;
-- canonical source_locator;
-- raw_fact_id nullable;
-- extraction_version.
+```json
+{
+  "document_sha256": "<lowercase sha256>",
+  "source_asset_sha256": "<lowercase sha256>",
+  "locator_type": "IXBRL_FACT",
+  "source_locator": {},
+  "raw_fact_id": "<lowercase sha256 or null>",
+  "extraction_version": "..."
+}
+```
 
 Canonical JSON:
 
@@ -327,19 +469,110 @@ json.dumps(
 
 ## 13. raw_fact_id
 
-For XBRL/iXBRL facts:
+For XBRL/iXBRL facts, `raw_fact_id` is SHA256 of canonical JSON of this exact object and no extra keys:
 
-SHA256 of canonical JSON containing at minimum:
+```json
+{
+  "document_sha256": "<lowercase sha256>",
+  "source_asset_sha256": "<lowercase sha256>",
+  "concept_qname": "{namespace-uri}LocalName",
+  "context_ref": "ctx",
+  "unit_ref": null,
+  "locator_type": "IXBRL_FACT",
+  "source_locator": {},
+  "extractor_version": "..."
+}
+```
 
-- document_sha256;
-- source_asset_sha256;
-- concept_qname;
-- context_ref;
-- unit_ref nullable;
-- exact source node identity;
-- extractor_version.
+`source_locator` is the exact canonical object from Section 11.1.
 
-Two facts with the same concept/value but different contexts MUST remain different raw facts.
+Two facts with the same concept/value but different contexts or different source nodes MUST remain different raw facts.
+
+## 13.1 Other deterministic IDs
+
+All IDs below use the Section 12 canonical JSON encoder and SHA256 of the exact object shown.
+
+### config_hash
+
+```json
+{
+  "schema_version": "p11-parser-config-v1",
+  "options": {}
+}
+```
+
+`options` is the explicitly frozen parser configuration object. Absolute paths, timestamps, environment-specific executable paths and secrets are forbidden. Unknown keys are invalid.
+
+### parse_run_id
+
+```json
+{
+  "document_sha256": "<sha>",
+  "source_package_sha256": "<sha>",
+  "schema_version": "parsed-financial-document-v2",
+  "parser_version": "...",
+  "config_hash": "<sha>"
+}
+```
+
+### segment_id
+
+```json
+{
+  "document_sha256": "<sha>",
+  "source_asset_sha256": "<sha>",
+  "locator_type": "HTML_DOM",
+  "source_locator": {},
+  "ordinal": 0,
+  "parser_version": "..."
+}
+```
+
+### section_id
+
+```json
+{
+  "document_sha256": "<sha>",
+  "source_asset_sha256": "<sha>",
+  "locator_type": "HTML_DOM",
+  "source_locator": {},
+  "level": 1,
+  "raw_title": "...",
+  "parser_version": "..."
+}
+```
+
+### table_id
+
+```json
+{
+  "document_sha256": "<sha>",
+  "source_asset_sha256": "<sha>",
+  "locator_type": "HTML_DOM",
+  "source_locator": {},
+  "parser_version": "..."
+}
+```
+
+### cell_id
+
+```json
+{
+  "table_id": "<sha>",
+  "row_index": 0,
+  "column_index": 0,
+  "locator_type": "HTML_DOM",
+  "source_locator": {},
+  "parser_version": "..."
+}
+```
+
+Rules:
+
+- integer ordinals/indices are zero-based in artifact data and ID payloads;
+- no local path, URL, timestamp, random value, HTTP header or parser-process identity participates;
+- the same exact source package + parser/config produces identical IDs;
+- any parser/config change that can change semantic artifact output must change `parser_version` or `config_hash`.
 
 ## 14. validation.json
 

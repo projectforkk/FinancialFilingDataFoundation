@@ -275,3 +275,25 @@ Next design outputs:
 - `acceptance/41-p11-acceptance-instruction.md`.
 
 Only after design review + design baseline commit/push may a separate P11 development authorization be considered.
+
+
+## 9. Detached review amendment findings (P11-ISSUE-010..016)
+
+Detached review of candidate `3ccaedc14a4c0f3f222cd192c8b7e1479d787ccd` stopped before development authorization.
+
+Stop record:
+`development/147-p11-detached-design-review-stop.md`
+
+Findings and amended resolution:
+
+- **P11-ISSUE-010 — aggregate SEC rate scope**: CLOSED IN AMENDED DESIGN. Replace per-process interpretation with one project-root-shared cross-process no-burst gate, >=125 ms between outbound SEC request starts, <=8 req/s aggregate in the supported single-installation boundary. Unsafe/unavailable coordination => `P11_RATE_LIMIT_SCOPE_UNSAFE`.
+- **P11-ISSUE-011 — package identity payload**: CLOSED IN AMENDED DESIGN. `p11-sec-source-package-identity-v1` exact object, exact asset identity fields/sort and exclusion list frozen in design/26 Section 15.
+- **P11-ISSUE-012 — local content path semantics**: CLOSED IN AMENDED DESIGN. Persist project-root-relative POSIX only, resolve inside configured SEC raw-assets root, exclude from deterministic identities.
+- **P11-ISSUE-013 — canonical source-node locator**: CLOSED IN AMENDED DESIGN. HTML same-tag sibling-index path and XML/iXBRL Clark-QName sibling-index path plus exact locator objects frozen in design/30 Section 11.1.
+- **P11-ISSUE-014 — v2 deterministic ID formulas**: CLOSED IN AMENDED DESIGN. Exact objects for evidence/raw fact/config/parse run/segment/section/table/cell IDs frozen in design/30.
+- **P11-ISSUE-015 — Inline XBRL raw/transformed value rule**: CLOSED AT BASE CONTRACT + PREIMPLEMENTATION FREEZE. Normative raw_value/transform boundary frozen now; exact parser/runtime transformation implementation must be Design-First frozen after P11-B and before any P11-G code.
+- **P11-ISSUE-016 — CIK/accession/path grammar**: CLOSED IN AMENDED DESIGN. Exact CIK/accession grammar and primaryDocument basename rules frozen in design/26 Section 6.
+
+P11-D also receives a mandatory preimplementation HTTP-contract freeze for exact timeout/size/retry/User-Agent and rate-lock recovery parameters.
+
+No production/test/runtime change was made while resolving these design issues.

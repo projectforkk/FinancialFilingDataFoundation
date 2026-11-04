@@ -88,6 +88,20 @@ STOP before acquisition changes if identity design assumption fails.
 
 ## P11-D — SEC HTTP / Discovery Client
 
+**Preimplementation Design-First freeze required before any P11-D code.**
+
+That amendment must freeze exact:
+
+- User-Agent grammar/config source;
+- timeout values;
+- response-size limits by endpoint/content class;
+- retry counts/backoff ceilings;
+- redirect count;
+- cross-process aggregate rate-gate lock/state format;
+- failure recovery for stale/crashed lock holder.
+
+The implementation must use one project-root-shared no-burst limiter with >=125 ms between outbound SEC request starts, giving <=8 requests/sec aggregate inside the supported single-installation boundary. If shared coordination is unavailable, block with `P11_RATE_LIMIT_SCOPE_UNSAFE`.
+
 Implement dedicated SEC client contract:
 
 - Submissions API;
@@ -134,6 +148,12 @@ Do not modify P2 RawDocumentStore behavior.
 Focused tests:
 
 - exact-byte identity;
+- exact known `p11-sec-source-package-identity-v1` hash fixture;
+- asset caller/order independence under canonical sort;
+- excluded URL/media/local-path/timestamp/HTTP metadata does not change package identity;
+- changed role/hash/file_name/size/dependency topology does change package identity;
+- project-root-relative POSIX `local_content_path` round-trip;
+- absolute/drive-relative/traversal local path reject;
 - duplicate asset SHA reuse;
 - same accession/new bytes => new package;
 - existing package collision mismatch blocked;
@@ -166,6 +186,20 @@ Rules tested:
 ## P11-G — SEC Runtime / Parser
 
 Create isolated P11 runtime only after P11-B PASS.
+
+**Before any P11-G parser production code, perform a Design-First parser-contract freeze.**
+
+It must record:
+
+- exact runtime Python/version/architecture;
+- exact Arelle/parser version and dependency lock;
+- exact Inline XBRL transformation registry behavior;
+- `continuedAt` and `ix:exclude` behavior;
+- canonical QName/DOM/XML locator golden fixtures;
+- exact raw_value whitespace rule fixtures;
+- exact parsed-decimal golden cases for format/scale/sign/nil;
+- external taxonomy resolution/cache behavior;
+- proof that deterministic parse performs no unrecorded network.
 
 Candidate:
 
