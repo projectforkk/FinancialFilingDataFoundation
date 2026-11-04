@@ -156,7 +156,7 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-008 ACCEPTANCE PACKAGE AMENDMENT REQUIRED / CLOSEOUT CLOSED`
+`AUTHORIZED — P10-ISSUE-008 ACCEPTANCE HARNESS AMENDMENT ONLY / P10-N CLOSED`
 
 P10-C is closed:
 
@@ -448,6 +448,16 @@ P10-ISSUE-008 facts:
 - no P10 production/test change or fixture semantic drift occurred.
 
 The prior P10-M freeze and corrected P10-N authorization are invalidated by the acceptance-package identity defect.
+
+Current ISSUE-008 design baseline:
+
+`f8bffca`
+
+Acceptance harness amendment authorization:
+
+`development/129-p10-acceptance-harness-amendment-authorization.md`
+
+Only the harness path is authorized; P10-N remains closed.
 
 Required sequence:
 

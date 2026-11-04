@@ -398,6 +398,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 88. P10-N precheck stop = `development/128-p10-n-precheck-stop.md`；
 89. P10-N found `P10-ISSUE-008`: frozen fixture identity was checkout-EOL-sensitive；
 90. prior P10-M freeze + corrected P10-N authorization are INVALIDATED；
-91. P10 acceptance-package amendment required before any new P10-N；
-92. P10 closeout/main integration = STOPPED；
-93. P11 / Research MCP production / Semantic Resolver production remain closed。
+91. P10-ISSUE-008 design baseline = `f8bffca`；
+92. acceptance harness amendment authorization = `development/129-p10-acceptance-harness-amendment-authorization.md`；
+93. P10-N remains CLOSED pending harness amendment review + re-freeze；
+94. P10 closeout/main integration = STOPPED；
+95. P11 / Research MCP production / Semantic Resolver production remain closed。
