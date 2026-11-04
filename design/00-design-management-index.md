@@ -405,6 +405,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 95. preview stop = `development/130-p10-acceptance-harness-preview-stop.md`；
 96. preview found `P10-ISSUE-009`: base manifest identity still checkout-filter-sensitive；
 97. partial harness candidate is INELIGIBLE；
-98. P10-N remains CLOSED pending harness v2 + targeted review + re-freeze；
-99. P10 closeout/main integration = STOPPED；
-100. P11 / Research MCP production / Semantic Resolver production remain closed。
+98. P10-ISSUE-009 design baseline = `ad78cbe`；
+99. harness v2 authorization = `development/131-p10-acceptance-harness-v2-authorization.md`；
+100. P10-N remains CLOSED pending harness v2 + targeted review + re-freeze；
+101. P10 closeout/main integration = STOPPED；
+102. P11 / Research MCP production / Semantic Resolver production remain closed。

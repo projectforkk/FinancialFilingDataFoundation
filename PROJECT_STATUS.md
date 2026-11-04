@@ -156,7 +156,7 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-009 BASE MANIFEST IDENTITY AMENDMENT REQUIRED / P10-N CLOSED`
+`AUTHORIZED — P10-ISSUE-009 ACCEPTANCE HARNESS V2 ONLY / P10-N CLOSED`
 
 P10-C is closed:
 
@@ -474,7 +474,15 @@ Preview stop:
 
 The partial harness candidate is not eligible for formal review/freeze.
 
-A second design amendment is required before harness v2. P10-N remains closed.
+P10-ISSUE-009 design baseline:
+
+`ad78cbe`
+
+Harness v2 authorization:
+
+`development/131-p10-acceptance-harness-v2-authorization.md`
+
+Only harness v2 is authorized. P10-N remains closed.
 
 Required sequence:
 
