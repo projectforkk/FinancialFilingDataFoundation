@@ -868,7 +868,7 @@ P10 acceptance 必须包含至少一个完整 live research run，证明 Codex �
 
 ### P11 — US SEC Provider
 
-状态：**P11-A DESIGN BASELINE PASS / P11-B NOT AUTHORIZED / PRODUCTION CLOSED**
+状态：**P11-A PASS / P11-B ISOLATED PROBE AUTHORIZED / PRODUCTION CLOSED**
 
 P11 通过官方 SEC/EDGAR 入口接入 HTML / Inline XBRL / XBRL。
 
