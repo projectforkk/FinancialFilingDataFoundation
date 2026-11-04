@@ -15,15 +15,17 @@ P11-E does not own discovery/Submissions semantics, HTML/iXBRL/XBRL parsing, ext
 
 ## 2. Public module and API
 
-Additive public module: financial_filing_data_foundation.sec.package
+Additive public module: `financial_filing_data_foundation.sec.package`.
+
+The accepted P11-D root `financial_filing_data_foundation.sec.__all__` remains unchanged at its existing eight symbols. P11-E names are not re-exported from the root `sec` package. `financial_filing_data_foundation.sec.package.__all__` is exactly: `SecPackageError`, `SecAssetRole`, `SecPackageOutcome`, `SecPackageAsset`, `SecSourcePackage`, `SecPackageAcquisitionResult`, `SecPackageStore`, `acquire_sec_package`.
 
 Exact public surface:
-- SecPackageError(RuntimeError), storing exact reason_code.
-- SecAssetRole values: FILING_INDEX, PRIMARY_DOCUMENT, XBRL_INSTANCE, TAXONOMY_SCHEMA, CALCULATION_LINKBASE, DEFINITION_LINKBASE, LABEL_LINKBASE, PRESENTATION_LINKBASE, REQUESTED_EXHIBIT, OTHER_REQUIRED_DEPENDENCY.
-- SecPackageOutcome values: ACQUIRED_NEW, REUSED_EXACT, SOURCE_CONTENT_DRIFT.
-- frozen/slots SecPackageAsset fields in order: role, asset_sha256, file_name, source_url, byte_size, primary, dependency_depth, referring_asset_sha256.
-- frozen/slots SecSourcePackage fields in order: cik, accession_number, base_form, amended, filing_date, report_date, primary_document, assets, source_package_sha256, document_sha256, manifest_path.
-- frozen/slots SecPackageAcquisitionResult fields in order: package, outcome, reason_code, prior_source_package_sha256s, receipt_id.
+- `SecPackageError(RuntimeError)`: `reason_code: str`; constructor `(reason_code: str, message: str)`, passes exact message to RuntimeError so `str(exc) == message`. Except for caller-validation ValueError explicitly frozen by this contract, all operational failures exposed by P11-E public package APIs are SecPackageError. Internal/shared SecHttpError is translated once at the P11-E boundary with the same reason_code and sanitized message; P11-D public exception behavior is unchanged. No raw User-Agent/contact text may appear in SecPackageError.
+- `SecAssetRole(StrEnum)` exact values: FILING_INDEX, PRIMARY_DOCUMENT, XBRL_INSTANCE, TAXONOMY_SCHEMA, CALCULATION_LINKBASE, DEFINITION_LINKBASE, LABEL_LINKBASE, PRESENTATION_LINKBASE, REQUESTED_EXHIBIT, OTHER_REQUIRED_DEPENDENCY.
+- `SecPackageOutcome(StrEnum)` exact values: ACQUIRED_NEW, REUSED_EXACT, SOURCE_CONTENT_DRIFT.
+- `@dataclass(frozen=True, slots=True) SecPackageAsset` fields in exact order/types: `role: SecAssetRole`, `asset_sha256: str`, `file_name: str`, `source_url: str`, `byte_size: int`, `primary: bool`, `dependency_depth: int`, `referring_asset_sha256: str | None`.
+- `@dataclass(frozen=True, slots=True) SecSourcePackage` fields in exact order/types: `cik: str`, `accession_number: str`, `base_form: str`, `amended: bool`, `filing_date: str`, `report_date: str | None`, `primary_document: str`, `assets: tuple[SecPackageAsset, ...]`, `source_package_sha256: str`, `document_sha256: str`, `manifest_path: Path`.
+- `@dataclass(frozen=True, slots=True) SecPackageAcquisitionResult` fields in exact order/types: `package: SecSourcePackage`, `outcome: SecPackageOutcome`, `reason_code: str | None`, `prior_source_package_sha256s: tuple[str, ...]`, `receipt_id: str`.
 
 `SecSourcePackage` is immutable package state and deliberately contains no receipt field. `SecPackageStore.load_package(source_package_sha256)` reconstructs only manifest/blob package state. Receipt provenance belongs to an acquisition event/result; one immutable package may have multiple valid receipt identities over time without changing `source_package_sha256`.
 - SecPackageStore(project_root: Path), with load_package(source_package_sha256: str) -> SecSourcePackage.
@@ -33,11 +35,13 @@ No caller-supplied arbitrary host, URL, HTTP header, raw root, package/blob path
 
 ## 3. Caller validation before network
 
-Before any P11-E request:
-- candidate must be a SecDiscoveryCandidate and all identity fields are revalidated through accepted P11-C/P11-D normalization.
+Before any P11-E network request **or** creation/mutation of `workspace/sec/raw` or an attempt staging directory, validate all caller arguments:
+- candidate must be a SecDiscoveryCandidate. `cik`, `accession_number`, `filing_date`, non-null `report_date`, and `primary_document` are revalidated through the accepted P11-C/P11-D date/identity rules and the normalized values must equal the candidate's stored canonical values; `primary_document` must additionally satisfy the stricter P11-E Section 5 raw-request-target safe-basename grammar before network.
+- `candidate.form` and `candidate.base_form` must be exact `str` and `candidate.amended` exact `bool` (bool/int interchange is forbidden). `normalize_sec_form(candidate.form)` must reproduce exactly `candidate.base_form` and `candidate.amended`; `candidate.form` itself must equal the canonical `base_form` plus `"/A"` iff amended, with no alternate spelling.
+- `primary_doc_description`, `is_xbrl`, `is_inline_xbrl`, and `submission_source_urls` remain P11-D discovery/provenance metadata; P11-E does not promote them into package identity, role selection or registry source identity.
 - project_root is expanduser().resolve(strict=True) and must be a directory.
-- requested_exhibits must be a tuple.
-- registry must be either `None` or an instance of the accepted `SQLiteRegistry`; any other value raises `ValueError("registry must be SQLiteRegistry or None")` before network.
+- requested_exhibits must be a tuple and every entry must be exact `str` before basename validation.
+- registry must be either `None` or an instance of the accepted `SQLiteRegistry`; any other value raises `ValueError("registry must be SQLiteRegistry or None")` before network/filesystem mutation.
 - maximum requested exhibit entries before dedupe = 128.
 - every requested exhibit must satisfy Section 5 safe-basename grammar.
 - exhibit names are exact-case deduped and ASCII-sorted.
@@ -96,15 +100,15 @@ For ACCESSION_ASSET:
 
 Live SEC probes on domestic 10-K, 10-Q and 8-K freeze required-field validation while allowing ignored forward-compatible extra metadata.
 
-Top level: JSON object with required directory object. Extra top-level keys ignored.
+Top level: JSON object with required directory object. Extra top-level keys are ignored for parsed schema/selection decisions, but the exact index response bytes are preserved as FILING_INDEX; therefore any byte change in ignored metadata may still change the FILING_INDEX SHA and source_package_sha256.
 
 directory required fields:
 - name: string exactly /Archives/edgar/data/<cik_int>/<accession_no_dashes>.
 - parent-dir: string exactly /Archives/edgar/data/<cik_int>.
 - item: array length <=4096.
-Extra directory keys ignored.
+Extra directory keys are ignored as parsed semantic fields but remain part of the exact FILING_INDEX bytes.
 
-Every item is an object requiring string fields name, size, type and last-modified. Extra item keys ignored. type is SEC directory-UI metadata, not MIME. last-modified is provider metadata only. Neither enters package identity.
+Every item is an object requiring string fields name, size, type and last-modified. Extra item keys are ignored for selection/role logic. type is SEC directory-UI metadata, not MIME; last-modified is provider metadata only. Neither is promoted as a separate parsed identity field, but both plus all ignored item metadata remain in the exact FILING_INDEX bytes and can therefore affect package identity through the index asset SHA.
 
 size is either empty string or an ASCII decimal string matching `^[0-9]{1,20}$`. No integer conversion occurs before this lexical bound passes. The bounded decimal is parsed as a non-negative integer; unselected items are not rejected solely because that integer exceeds the selected per-asset cap. A selected package asset must have decimal size <=134,217,728. Selected item with size empty => P11_PACKAGE_INVALID before asset download. Unselected helper rows with empty size are permitted. Any non-empty size outside the 1..20-digit grammar => P11_PACKAGE_INVALID. Provider-declared size never substitutes for captured actual bytes.
 
@@ -135,7 +139,7 @@ Final role precedence remains:
 4. explicit requested exhibit => REQUESTED_EXHIBIT
 5. otherwise excluded
 
-Requested exhibit name exactly `index.json` is satisfied by the synthetic `FILING_INDEX` asset and requires no provider index item. Every other requested exhibit must match exactly one validated index item; zero match => P11_PACKAGE_ASSET_MISSING before selected asset downloads. If a requested item is already the primary or a structured asset, the request is satisfied by that existing logical row, no duplicate is added, and the higher-precedence role is retained.
+Every requested exhibit, including the literal basename `index.json`, must match exactly one validated provider index item; zero match => P11_PACKAGE_ASSET_MISSING before selected asset downloads. Because any provider item named `index.json` is independently invalid under Section 7, a caller request for `index.json` cannot be satisfied by the synthetic FILING_INDEX and therefore resolves to P11_PACKAGE_ASSET_MISSING after index validation. If a requested provider item is already the primary or a structured asset, the request is satisfied by that existing logical row, no duplicate is added, and the higher-precedence role is retained.
 
 No unrelated HTML/text/image exhibits are auto-selected. No recursive link following. No external taxonomy resource is added by P11-E.
 
@@ -193,6 +197,8 @@ aa/rr are first two lowercase hex characters. Blob filename is exact 64 lowercas
 
 All paths are internally derived and must resolve inside canonical project root. Symlink/junction/reparse/non-regular final components fail closed. Staging and final are under the same raw root/filesystem. Local paths never enter package identity.
 
+Provider/caller `file_name` is URL/package metadata only and MUST NEVER be joined as a local filesystem path component. Per-resource staged download filenames use only implementation-internal safe ASCII ordinals/tokens under the current `.staging/<attempt_token>` tree; final blob/package/receipt components use only fixed internal names and validated lowercase hashes. This rule is mandatory even when a provider basename contains a character legal in an HTTP path but illegal/reserved in Windows filenames.
+
 ## 12. Staging and blob commit
 
 One attempt writes only inside its own staging directory until each object is validated. Every selected asset is fully written, flushed, closed, size-checked and SHA-checked before blob commit.
@@ -201,7 +207,7 @@ Blob final commit uses the P11-B-proven Windows same-filesystem atomic non-repla
 
 COMMITTED_NEW: reload/re-hash final blob and require expected SHA/size; mismatch => P11_PACKAGE_HASH_MISMATCH.
 
-DESTINATION_EXISTS: existing destination must be regular non-reparse; re-hash/re-size it. Exact SHA/size => idempotent reuse and only this attempt's staged duplicate may be removed. Mismatch/non-regular => P11_PACKAGE_HASH_MISMATCH. Existing blob is never overwritten/deleted/replaced.
+DESTINATION_EXISTS: if the destination or any traversed final-path component is a symlink/junction/reparse point, fail `P11_PATH_OUTSIDE_PROJECT`. Otherwise the destination must be a regular file; non-regular layout or SHA/size mismatch => P11_PACKAGE_HASH_MISMATCH. Exact SHA/size => idempotent reuse and only this attempt's staged duplicate may be removed. Existing blob is never overwritten/deleted/replaced.
 
 COMMIT_ERROR => P11_PACKAGE_INVALID. Later destination existence never converts an unknown commit failure to success.
 
@@ -217,7 +223,7 @@ After all selected blobs are committed/reused:
 
 COMMITTED_NEW: reload final through SecPackageStore.load_package() and verify identity/hash/blob semantics.
 
-DESTINATION_EXISTS: never mutate existing final. It must be a non-reparse directory containing exactly one regular manifest.json. Full loader verification must pass; final manifest bytes must equal current staged manifest bytes exactly; referenced blobs must verify. Exact match => idempotent reuse. Any difference/corruption => P11_PACKAGE_HASH_MISMATCH.
+DESTINATION_EXISTS: never mutate existing final. If the package directory, manifest path, or any traversed final-path component is a symlink/junction/reparse point, fail `P11_PATH_OUTSIDE_PROJECT`. Otherwise final must be a directory containing exactly one regular manifest.json. Full loader verification must pass; final manifest bytes must equal current staged manifest bytes exactly; referenced blobs must verify. Exact match => idempotent reuse. Any non-reparse layout/content/hash difference or corruption => P11_PACKAGE_HASH_MISMATCH.
 
 COMMIT_ERROR => P11_PACKAGE_INVALID and cannot be reclassified from later existence observation.
 
@@ -231,19 +237,27 @@ For valid SHA, load_package validates:
 - sha is 64 lowercase hex.
 - exact final layout/project containment.
 - manifest byte size <=16 MiB, UTF-8/no-BOM/LF-only/exactly one final LF.
-- exact final manifest key set.
+- exact final manifest key set and exact schema_version `p11-sec-source-package-identity-v1`.
+- exact JSON types matching the Section 10 identity contract: strings remain strings, `amended`/`primary` are JSON bool, `byte_size`/`dependency_depth` are JSON integers with bool explicitly rejected, nullable fields are string-or-null as frozen, assets is an array, and all numeric bounds/invariants are checked before object construction.
+- after parsing and type validation, reconstruct the complete final manifest object, canonical-serialize it under Section 10 plus exactly one LF, and require those bytes to equal the stored manifest bytes exactly; semantically equal noncanonical whitespace/key-order/number encoding is invalid.
 - recomputed canonical identity after removing only source_package_sha256 equals directory/hash value.
 - source_package_sha256 field equals directory/hash.
 - accepted P11 identity validation.
 - exact asset row keys/types/roles and canonical row order.
-- exactly one FILING_INDEX and one PRIMARY_DOCUMENT.
+- exactly one FILING_INDEX and one PRIMARY_DOCUMENT; FILING_INDEX file_name is exactly `index.json` and its primary flag is false.
 - primary filename equals top-level primary_document; primary=true iff PRIMARY_DOCUMENT.
 - every row depth=0/referring=null.
-- every source_url is exact canonical requested accession URL.
+- every source_url is exact canonical requested accession URL: FILING_INDEX uses the exact index URL; every other row uses the exact asset URL formed from that row's file_name.
+- file_name/logical source keys are unique; equal SHA across different logical rows remains allowed.
 - every blob is regular non-reparse and exact SHA/size.
-- count and aggregate caps still hold.
+- the FILING_INDEX blob is independently parsed under the complete Section 7 index schema with no network; its directory identity must equal the package cik/accession.
+- the primary manifest row must correspond to the exact primary_document index item and its byte_size must equal that item's bounded decimal declared size.
+- every validated index .xsd/.xml automatic structured item other than the exact primary_document item must appear exactly once in manifest assets with the exact Section 8 derived structured role and declared byte_size; none may be omitted. If primary_document itself has a structured suffix, PRIMARY_DOCUMENT role wins and there is no duplicate structured row.
+- every manifest REQUESTED_EXHIBIT row must correspond to exactly one otherwise-nonprimary/nonstructured index item with matching declared byte_size; loader need not know the historical caller request list, but it MUST reject a REQUESTED_EXHIBIT role on index/primary/structured items.
+- no manifest non-index row may name an asset absent from the index.
+- FILING_INDEX byte_size <=16 MiB; every non-index asset byte_size <=128 MiB; selected logical count <=1024; exact aggregate asset byte_size <=512 MiB; manifest bytes <=16 MiB.
 
-On success `manifest_path` is the resolved final `<project_root>/workspace/sec/raw/packages/<sha>/manifest.json` path; it is storage metadata only and never enters package identity. Manifest/blob/hash/layout mismatch => P11_PACKAGE_HASH_MISMATCH, except explicit root escape => P11_PATH_OUTSIDE_PROJECT.
+On success `manifest_path` is the resolved final `<project_root>/workspace/sec/raw/packages/<sha>/manifest.json` path; it is storage metadata only and never enters package identity. Manifest/blob/hash/layout mismatch => P11_PACKAGE_HASH_MISMATCH, except project-root escape or any symlink/junction/reparse containment violation => P11_PATH_OUTSIDE_PROJECT.
 
 ## 15. Receipt identity, schema and collision behavior
 
@@ -258,7 +272,7 @@ Receipt `responses` contains exactly one identity row for each successfully capt
 
 Response identity normalization is exact:
 - `requested_url` = exact canonical initial `https://www.sec.gov/Archives/...` URL constructed by Section 5.
-- `final_url` = accepted canonical SEC URL identity form after redirects: scheme `https`, lowercase host, default port 443 omitted, exact validated path, empty query and fragment.
+- `final_url` = accepted canonical SEC URL identity form after redirects: scheme `https`, lowercase allowed SEC host, default port 443 omitted, exact validated path equal to the requested resource path, empty query and fragment.
 - `status` = integer 200.
 - index `declared_content_type` = canonical string `application/json`.
 - asset `declared_content_type` = null when absent; otherwise the single validated header value after outer ASCII SP/HTAB trim, preserving case and interior visible-ASCII bytes.
@@ -287,34 +301,62 @@ diagnostics exact keys:
 
 Timing/acquired_at never enter receipt_id/package identity. Receipt bytes are canonical JSON plus exactly one LF and MUST be <=16 MiB before receipt commit.
 
-Receipt commit is atomic non-replacing under receipts/<rr>/<receipt_id>.json.
+Before receipt commit, build the complete receipt as a regular file under this attempt's `.staging/<attempt_token>/receipt/<receipt_id>.json`, enforce the 16 MiB local cap, flush/fsync, then reload and validate it against the already verified current package.
 
-If destination exists, load/validate it. Existing receipt_id and identity must equal current identity. Diagnostics may differ and are ignored for idempotency; existing receipt bytes, including their original diagnostics/acquired_at, remain authoritative and unchanged. Identity mismatch/corruption under the same ID => P11_PACKAGE_INVALID.
+Before any receipt final-path access, the receipt parent/path components are containment-checked; any symlink/junction/reparse violation => `P11_PATH_OUTSIDE_PROJECT`, while an existing non-reparse nonregular receipt destination => `P11_PACKAGE_INVALID`. Receipt final commit then uses the same P11-B-proven same-filesystem atomic non-replacing file primitive under `receipts/<rr>/<receipt_id>.json`, with exact outcomes COMMITTED_NEW, DESTINATION_EXISTS, COMMIT_ERROR.
+
+COMMITTED_NEW => reload and fully validate the final receipt before continuing.
+
+DESTINATION_EXISTS => load/validate the existing receipt. Existing receipt_id and identity must equal current identity. Diagnostics may differ and are ignored for idempotency; existing receipt bytes, including their original diagnostics/acquired_at, remain authoritative and unchanged. Identity mismatch/corruption under the same ID => P11_PACKAGE_INVALID. The staged duplicate may be removed only after existing-final verification succeeds.
+
+COMMIT_ERROR => P11_PACKAGE_INVALID / BLOCKED. It MUST NOT be converted to idempotent success merely because the final receipt path is later observed to exist.
+
+Receipt validation requires: byte size <=16 MiB; strict UTF-8/no-BOM/LF-only/exactly one final LF; exact final/identity/response/diagnostics key sets and types; exact response canonical order; identity.source_package_sha256 equal to the verified package; exactly one response row per package asset with requested_url/asset_sha256/byte_size equal to that asset row; status exactly 200; URL/header normalization from this section; recomputed receipt_id from canonical identity bytes equal to stored receipt_id; bytes_downloaded equal to the sum of package asset byte_size; request_count >= response count and request_count <= response count + retry_count + redirect_count; acquired_at exact UTC grammar and valid timestamp; and exact stored receipt bytes equal to canonical serialization of the complete validated final receipt object plus one LF.
+
+Receipt validation requires: byte size <=16 MiB; strict UTF-8/no-BOM/LF-only/exactly one final LF; exact final/identity/response/diagnostics key sets and types; exact response canonical order; identity.source_package_sha256 equal to the verified package; exactly one response row per package asset with requested_url/asset_sha256/byte_size equal to that asset row; status exactly 200; URL/header normalization from this section; recomputed receipt_id from canonical identity bytes equal to stored receipt_id; bytes_downloaded equal to the sum of package asset byte_size; request_count >= response count and request_count <= response count + retry_count + redirect_count; acquired_at exact UTC grammar and valid timestamp; and exact stored receipt bytes equal to canonical serialization of the complete validated final receipt object plus one LF.
 
 After commit/reuse, P11-E reloads the committed receipt and returns that exact `receipt_id` in `SecPackageAcquisitionResult`. If registry persistence follows, `SourceMetadata.acquired_at` comes from this committed/reused receipt file, never from diagnostics of a discarded current attempt.
 
-Receipt commit failure never mutates an already committed package.
+Receipt commit failure never mutates an already committed package. Normal cleanup removes only this attempt's staged receipt; foreign-attempt staging is never removed. Normal cleanup removes only this attempt's staged receipt; foreign-attempt staging is never removed.
 
 ## 16. Source-content drift and idempotency
 
 Stable provider identity = (cik, accession_number). Immutable content identity = source_package_sha256.
 
-Before outcome classification P11-E performs a two-stage committed-package scan under `packages/`.
+After the current package and authoritative receipt have both been committed/reused and reloaded successfully, outcome classification performs a two-stage committed-package scan under `packages/`.
 
-Stage 1 is a minimal identity peek only. Consider only child directories whose name is exactly 64 lowercase hex, whose hash is different from the current `source_package_sha256`, and whose `manifest.json` is a regular non-reparse file inside the raw root. Read at most the frozen 16 MiB manifest cap plus one sentinel byte; over-cap input cannot establish drift identity and is not a Stage-2 candidate. For in-cap input require strict UTF-8/no-BOM/valid JSON object and inspect only `cik` and `accession_number`. A manifest that cannot establish both as valid normalized strings equal to the current `(cik, accession_number)` is not a drift candidate and does not block an unrelated filing acquisition. Stage 1 never treats unverified package fields as reusable/valid package state.
+At scan start, enumerate the direct child names of `packages/` exactly once and freeze an ASCII-sorted snapshot. Package directories committed after this snapshot are intentionally outside the current attempt's outcome; immutable preservation is strong while cross-process drift notification is snapshot-based/eventually complete rather than globally linearizable. A later acquisition MUST observe later-committed package directories and surface drift when applicable.
+
+Stage 1 is a minimal identity peek only over the frozen snapshot. Consider only snapshot names that are exactly 64 lowercase hex, differ from the current `source_package_sha256`, and currently expose a regular non-reparse `manifest.json` inside the raw root. Read at most the frozen 16 MiB manifest cap plus one sentinel byte; over-cap input cannot establish drift identity and is not a Stage-2 candidate. For in-cap input require strict UTF-8/no-BOM/valid JSON object and inspect only `cik` and `accession_number`. A manifest that cannot establish both as valid normalized strings equal to the current `(cik, accession_number)` is not a drift candidate and does not block an unrelated filing acquisition. Stage 1 never treats unverified package fields as reusable/valid package state.
 
 Stage 2 fully loads every Stage-1 same-accession candidate through `SecPackageStore.load_package()`. A manifest that claims the current valid cik/accession but fails full package/hash/blob/layout validation blocks with the loader's package failure; it MUST NOT be ignored as unrelated corruption.
 
-Classification uses the current package-directory commit outcome plus fully verified same-accession packages. Let `other_hashes` be the ASCII-sorted unique verified same-accession package hashes excluding the current `source_package_sha256`:
-- if `other_hashes` is non-empty => SOURCE_CONTENT_DRIFT, reason_code P11_SOURCE_CONTENT_DRIFT, prior_source_package_sha256s = other_hashes, regardless of whether the current package directory was newly committed or exactly reused.
-- else if the current package-directory commit outcome was COMMITTED_NEW => ACQUIRED_NEW, reason_code null, prior_source_package_sha256s = ().
+Classification uses the current package-directory commit outcome plus fully verified same-accession packages, but caller-driven optional exhibit selection is not provider drift.
+
+For each verified package derive an in-memory comparison view only; this view is never persisted and never changes source_package_sha256:
+- `provider_core` = the exact package identity top-level fields (`schema_version`, `cik`, `accession_number`, `base_form`, `amended`, `filing_date`, `report_date`, `primary_document`) plus the already canonical-sorted asset identity rows whose role is not REQUESTED_EXHIBIT.
+- `requested_exhibit_map` = exact REQUESTED_EXHIBIT asset identity rows keyed by case-sensitive file_name; duplicate file_name is already forbidden by loader invariants.
+
+A verified prior same-accession package is a `drift_evidence_package` iff either:
+1. its `provider_core` differs from the current package provider_core; or
+2. at least one case-sensitive requested-exhibit file_name exists in both requested_exhibit_map values and the full asset identity row for that shared name differs.
+
+A difference caused only by REQUESTED_EXHIBIT file_names present on one side and absent on the other is caller selection-profile variation and is NOT provider source drift. This rule means adding/removing an optional exhibit alone may create a different immutable source_package_sha256 without producing P11_SOURCE_CONTENT_DRIFT.
+
+Let `drift_hashes` be the ASCII-sorted unique source_package_sha256 values of drift_evidence_package rows:
+- if `drift_hashes` is non-empty => SOURCE_CONTENT_DRIFT, reason_code P11_SOURCE_CONTENT_DRIFT, prior_source_package_sha256s = drift_hashes, regardless of whether the current package directory was newly committed or exactly reused.
+- else if the current package-directory commit outcome was COMMITTED_NEW => ACQUIRED_NEW, reason_code null, prior_source_package_sha256s = (), including a new package caused only by a different optional-exhibit selection profile.
 - else if the current package-directory outcome was exact verified DESTINATION_EXISTS reuse => REUSED_EXACT, reason_code null, prior_source_package_sha256s = ().
 - COMMIT_ERROR never reaches outcome classification.
 - current new package is committed/preserved before drift is surfaced.
 - prior packages/blobs/receipts are never overwritten/deleted.
 - drift never rewrites discovery metadata or guesses authority.
 
-A later exact reacquisition with known historical different versions continues surfacing SOURCE_CONTENT_DRIFT.
+A later exact reacquisition continues surfacing SOURCE_CONTENT_DRIFT whenever at least one then-visible prior package remains drift evidence under the provider-core/shared-requested-exhibit rule. Selection-profile-only historical variants do not by themselves force drift.
+
+Missing-current-source drift is a separate no-current-package path required by design/26 Section 25. If current acquisition cannot produce a package because (a) the accession `index.json` returns HTTP 404, (b) an otherwise valid current index has no exact `primary_document` item, or (c) the indexed PRIMARY_DOCUMENT or automatically selected structured asset returns HTTP 404, P11-E captures one ASCII-sorted snapshot of committed package directory names and runs the same safe Stage-1/Stage-2 validation without a current-hash exclusion. If at least one fully verified package with the same `(cik, accession_number)` exists, raise `SecPackageError("P11_SOURCE_CONTENT_DRIFT", "current SEC source is missing relative to a prior verified package")`; no `SecPackageAcquisitionResult` exists because there is no valid current package. Prior immutable packages/receipts/blobs remain unchanged. If no verified prior same-accession package exists, preserve the original 404/asset-missing mapping.
+
+Caller-specific requested exhibit absence is not upgraded to source drift: an exhibit absent from the index remains `P11_PACKAGE_ASSET_MISSING`, and an otherwise optional requested exhibit URL that returns 404 retains the ordinary HTTP failure mapping. 403/access denial, TLS/DNS/timeout, malformed index/schema/framing/content, size mismatch/cap, hash mismatch and local storage failures likewise retain their specific non-drift reason codes. If the missing-source prior scan finds a parseable same-cik/accession package that fails full loader validation, that package failure blocks rather than being converted to drift.
 
 ## 17. Registry ordering and failure boundary
 
@@ -322,7 +364,7 @@ P11-E never changes registry schema/API and never calls P2 RawDocumentStore.
 
 If registry is supplied, registration occurs only after blobs, final package loader, and receipt all pass.
 
-Call existing SQLiteRegistry.register_document(primary_blob_path, source=SourceMetadata(...), expected_identity=None).
+Call existing `SQLiteRegistry.register_document(primary_blob_path, source=SourceMetadata(...), expected_identity=None)` using the verified final extensionless content-addressed primary blob path. P11-E MUST NOT create an extension-bearing alias/hardlink/copy solely for registry registration.
 
 Exact SourceMetadata:
 - provider = sec-edgar
@@ -336,7 +378,17 @@ Exact SourceMetadata:
 
 expected_identity=None is mandatory because periodic binding is not yet filing-native confirmed and supplemental filings must never receive a synthetic slot.
 
-Returned document SHA must equal package document_sha256. Any registry exception/mismatch maps P11_REGISTRY_PERSISTENCE_FAILED. Immutable package/blob/receipt bytes remain unchanged. Outer retry reloads/verifies package/receipt then retries register_document. No hidden registry retry. registry=None performs no registry mutation.
+Returned document SHA must equal package document_sha256. P11-E does not require, rewrite or reinterpret the returned registry `file_path` or `page_count`: a newly created record from an extensionless SEC blob may have page_count=None, while an already-existing same-SHA document record may retain its earlier accepted file_path/page_count. P11-F uses the source-package manifest/file_name/blob identity rather than registry path suffix for SEC parsing. Any registry exception/mismatch maps P11_REGISTRY_PERSISTENCE_FAILED. Immutable package/blob/receipt bytes remain unchanged. Outer retry reloads/verifies package/receipt then retries register_document. No hidden registry retry. registry=None performs no registry mutation.
+
+Exact post-download finalization order is normative:
+1. commit/reuse and verify every selected content-addressed blob.
+2. build, commit/reuse and reload the final immutable package directory.
+3. build, commit/reuse and reload the authoritative acquisition receipt.
+4. capture the one drift directory-name snapshot, run Stage 1/Stage 2, and classify SecPackageOutcome/reason/prior hashes.
+5. if registry is supplied, register the primary document using the committed receipt acquired_at.
+6. return SecPackageAcquisitionResult containing the verified package, classified outcome/reason/prior hashes, and committed receipt_id.
+
+Failure at any step stops later steps. Already committed immutable objects from earlier steps remain unchanged and are safely re-verified by an outer retry; no later step retroactively mutates an earlier blob/package/receipt.
 
 ## 18. Security and containment
 
@@ -361,21 +413,24 @@ Mandatory:
 - rate coordination unavailable => P11_RATE_LIMIT_SCOPE_UNSAFE.
 - exhausted 429 => P11_RATE_LIMITED.
 - other transport/status/framing/header/UTF-8/JSON failure => P11_HTTP_FAILED.
-- response/per-asset/aggregate size cap => P11_RESPONSE_TOO_LARGE.
+- remote response/per-asset/streamed aggregate response-byte cap => P11_RESPONSE_TOO_LARGE.
+- locally generated staged/final manifest or receipt exceeding its frozen 16 MiB local JSON cap => P11_PACKAGE_INVALID.
 - bad/missing index JSON Content-Type => P11_CONTENT_TYPE_INVALID.
 - invalid index schema/item/name/size/duplicate/declared-size mismatch => P11_PACKAGE_INVALID.
 - required primary/requested exhibit missing => P11_PACKAGE_ASSET_MISSING.
 - manifest/package/blob/hash/idempotent-existing mismatch => P11_PACKAGE_HASH_MISMATCH.
-- project-root escape => P11_PATH_OUTSIDE_PROJECT.
-- same-accession different immutable package => result reason P11_SOURCE_CONTENT_DRIFT.
+- project-root escape or unsafe reparse/junction/symlink containment violation => P11_PATH_OUTSIDE_PROJECT.
+- other local raw-root/directory/staging/file creation, write, flush, fsync, close or atomic-commit I/O failure not already classified above => P11_PACKAGE_INVALID; later destination existence never reclassifies an unknown commit error as success.
+- same-accession prior package that is drift evidence under the exact provider-core/shared-requested-exhibit comparison => result reason P11_SOURCE_CONTENT_DRIFT; selection-profile-only package differences are not drift.
+- current index/primary/automatic-structured source missing under the exact Section 16 conditions with at least one verified prior same-accession package => raised P11_SOURCE_CONTENT_DRIFT; without such prior package preserve the underlying ordinary failure.
 - registry failure => P11_REGISTRY_PERSISTENCE_FAILED.
 
 No silent fallback or guessed asset/period/role.
 
 ## 20. Mandatory focused implementation matrix
 
-Before P11-E implementation can close, tests must directly trace these exact 60 numbered cases:
-1. invalid root/candidate/exhibits or non-None non-SQLiteRegistry registry fail ValueError before network.
+Before P11-E implementation can close, tests must directly trace these exact 60 numbered cases. Except where a case explicitly requires caller-validation `ValueError`, every operational failure reason in this matrix is asserted on `SecPackageError`; P11-E tests MUST NOT accept leaked `SecHttpError` as equivalent:
+1. invalid root/candidate or candidate form/base/amended/date/primary cross-field inconsistency, invalid exhibits, or non-None non-SQLiteRegistry registry fail ValueError before network.
 2. requested exhibit tuple >128 fails before network.
 3. invalid exhibit basename SP/control/non-ASCII/%/slash/query/fragment fails before network.
 4. P11-E uses same rate directory as P11-D.
@@ -411,10 +466,10 @@ Before P11-E implementation can close, tests must directly trace these exact 60 
 34. synthetic FILING_INDEX exact bytes/hash/source_url.
 35. primary exact match and missing primary reason.
 36. .xsd role.
-37. specific XML linkbase/instance precedence.
+37. specific XML linkbase/instance precedence is exact and PRIMARY_DOCUMENT wins if the primary file itself has a structured suffix.
 38. generic .xml role.
 39. unrelated HTML/text/image not auto-selected.
-40. requested exhibit role; requested `index.json` is satisfied by synthetic FILING_INDEX without a provider item.
+40. requested exhibit role requires an exact validated provider item; literal requested `index.json` is never satisfied by synthetic FILING_INDEX and maps P11_PACKAGE_ASSET_MISSING.
 41. requested primary/structured exhibit already higher-role adds no duplicate.
 42. requested exhibit absent blocks pre-download.
 43. actual size equals declared.
@@ -422,19 +477,19 @@ Before P11-E implementation can close, tests must directly trace these exact 60 
 45. equal bytes different logical rows share one blob but multiple manifest rows.
 46. blob new commit reload/hash/size.
 47. concurrent exact blob writers converge without overwrite.
-48. existing wrong/nonregular/reparse blob blocks hash mismatch.
+48. existing wrong bytes or nonregular non-reparse blob blocks P11_PACKAGE_HASH_MISMATCH; blob/path symlink/junction/reparse blocks P11_PATH_OUTSIDE_PROJECT.
 49. design/26 identity fixture reproduces 16e76f...ae78.
-50. manifest exact canonical bytes + one LF.
+50. manifest exact canonical bytes + one LF; loader rejects semantically equal noncanonical JSON bytes and independently revalidates FILING_INDEX schema, automatic selection completeness, roles, index-declared sizes and source URLs.
 51. package new non-replacing directory commit reloads.
 52. concurrent exact package writers: one new, loser exact-verifies.
 53. existing package difference/corruption blocks without mutation.
-54. store/root and loader public validation has exact ValueErrors; loader rejects wrong hash/key/order/primary/count/path/blob semantics, returns resolved final manifest_path, and returns immutable package state without any receipt selection.
+54. store/root and loader public validation has exact ValueErrors; loader rejects wrong hash/key/order/primary/count/path/blob/index-selection semantics and any per-asset/aggregate/manifest cap violation, returns resolved final manifest_path, and returns immutable package state without receipt selection.
 55. receipt ID excludes diagnostics but includes exactly one stable final response row per logical index/selected-asset resource; requested/final URL and header values follow exact canonical/trim rules, retries/redirects affect diagnostics only, and aggregate counters exactly.
-56. same receipt identity/different current diagnostics reuses existing authoritative receipt bytes/acquired_at without overwrite; identity collision blocks and acquisition result carries the committed receipt_id.
+56. receipt staging/non-replacing COMMITTED_NEW/DESTINATION_EXISTS/COMMIT_ERROR paths are exact; loader recomputes receipt_id, requires canonical final bytes and package-response bijection; same identity/different current diagnostics reuses existing authoritative bytes/acquired_at without overwrite.
 57. two-stage drift scan skips the already verified current package hash, enforces the 16 MiB peek cap on other hashes, ignores unrelated/unidentifiable corruption, but a parseable same-cik/accession manifest that fails full loader blocks; with no other hashes COMMITTED_NEW => ACQUIRED_NEW and exact verified DESTINATION_EXISTS => REUSED_EXACT, both with empty prior tuple.
-58. same accession different verified package is preserved and surfaced as drift with ASCII-sorted unique other hashes, including later exact reacquisition when historical drift exists.
-59. registry occurs only after package+receipt verification, exact SourceMetadata uses committed receipt acquired_at and expected_identity=None; failure leaves package immutable.
-60. no P11-F parser/taxonomy-cache behavior and no P2 RawDocumentStore mutation/substitution.
+58. drift snapshot is captured once after package+receipt verification; later concurrent commits become visible on later acquisition; provider-core change or shared requested-exhibit row change yields drift hashes, optional-exhibit presence/absence alone is selection variation (new package may be ACQUIRED_NEW), and exact missing-current index/primary/automatic-structured conditions raise P11_SOURCE_CONTENT_DRIFT only when a verified prior same-accession package exists.
+59. exact finalization order is blobs -> package -> authoritative receipt -> drift snapshot/classification -> optional registry -> result; registry receives the final extensionless primary blob with no extension alias, uses committed receipt acquired_at and expected_identity=None, validates only returned SHA, and any later failure leaves earlier immutable objects unchanged.
+60. P11-D root sec.__all__ remains unchanged, sec.package exposes exactly its eight frozen symbols, provider file_name is never a local path component, and there is no P11-F parser/taxonomy-cache behavior or P2 RawDocumentStore mutation/substitution.
 
 ## 21. Design probes/evidence required before implementation authorization
 
