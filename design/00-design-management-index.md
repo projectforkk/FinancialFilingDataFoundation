@@ -316,7 +316,7 @@ P11 latest reviewed candidate：
 - accepted P11-A design baseline = `5877a238f5af6102ef48e56141cdb893590b6aab`；
 - P11-B authorization = `development/204-p11-b-environment-runtime-probe-authorization.md`；
 - next action = execute isolated P11-B Environment / SEC Runtime Probe；
-- P11-B = NOT AUTHORIZED；
+- P11-B = AUTHORIZED / ISOLATED PROBE ONLY；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
@@ -544,6 +544,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 216. formal review authorization = `development/202-p11-phase-banner-final-review-authorization.md`；
 217. P11-A formal review result = `development/203-p11-final-detached-design-review-result.md` = PASS；
 218. P11-A = CLOSED / PASS；
-219. P11-B = NOT AUTHORIZED / separate authorization required；
-220. P11 production = CLOSED；
-221. Research MCP production / Semantic Resolver production remain closed / not authorized。
+219. P11-B authorization = `development/204-p11-b-environment-runtime-probe-authorization.md`；
+220. P11-B = AUTHORIZED / ISOLATED PROBE ONLY；
+221. P11 production = CLOSED；
+222. Research MCP production / Semantic Resolver production remain closed / not authorized。

@@ -184,7 +184,7 @@ Design candidate:
 
 Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-039. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`, `182`, `185`, `188`, `191`, `194`, `197`, `200`); amendment evidence through ISSUE-039 is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`, `183`, `186`, `189`, `192`, `195`, `198`, `201`). Exact candidate `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` passed automated ISSUE-010..037 guards and technical cross-gate review, but final governance review found P11-ISSUE-038: `design/00` still marked P11 design documents as `DESIGN AMENDMENT REQUIRED` while Current Next Action said ISSUE-037 was remediated/review-pending, and design/26 Section 35 still logged only ISSUE-010..034. Stop: `development/197-p11-governance-status-review-stop.md`. Candidate `c3a2f84...` remains INELIGIBLE. ISSUE-038 is now remediated as governance-only reconciliation: design/00 current P11 document statuses are `AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED`, design/26 Section 35 records ISSUE-010..038, and no technical P11 contract changed. Evidence: `development/198-p11-governance-status-amendment-evidence.md = PASS`. Exact candidate `cd2fa0b01d23c0e3f75945c5cce5120738f51077` passed automated ISSUE-010..038 guards but final current-state review found P11-ISSUE-039: the unqualified top-level P11 phase banner still claimed `CANDIDATE FROZEN / FRESH DETACHED REVIEW AUTHORIZED` from a prior candidate. Stop: `development/200-p11-phase-banner-review-stop.md`. Candidate `cd2fa0b...` remains INELIGIBLE. ISSUE-039 is now remediated as governance-only normalization: candidate-internal P11 current state is `AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED`, authorization is represented only by a separate post-candidate authorization artifact, and no technical P11 contract changed. Evidence: `development/201-p11-phase-banner-amendment-evidence.md = PASS`. Exact amended candidate `5877a238f5af6102ef48e56141cdb893590b6aab` is frozen and fresh detached P11-A formal review is authorized by `development/202-p11-phase-banner-final-review-authorization.md`. P11-B is NOT AUTHORIZED, and P11 production remains CLOSED.
 
-P11-A formal detached review PASS: exact candidate `5877a238f5af6102ef48e56141cdb893590b6aab`; result `development/203-p11-final-detached-design-review-result.md = PASS`. P11-A is CLOSED. P11-B remains NOT AUTHORIZED pending a separate environment/runtime-probe authorization. P11 provider production remains CLOSED.
+P11-A formal detached review PASS: exact candidate `5877a238f5af6102ef48e56141cdb893590b6aab`; result `development/203-p11-final-detached-design-review-result.md = PASS`. P11-A is CLOSED. P11-B isolated Environment / SEC Runtime Probe is authorized by `development/204-p11-b-environment-runtime-probe-authorization.md`. P11 provider production remains CLOSED.
 
 P10-C is closed:
 
@@ -600,7 +600,7 @@ Still not authorized:
 
 - Research MCP production;
 - Semantic Resolver production;
-- P11 — US SEC Provider: `P11-A DESIGN BASELINE PASS / P11-B NOT AUTHORIZED / PRODUCTION NOT STARTED`
+- P11 provider production: `P11-A PASS / P11-B ISOLATED PROBE AUTHORIZED / PRODUCTION NOT STARTED`
 - any weakening of P8 read-only or P9 durable-review boundaries.
 
 ## Project directory consolidation
