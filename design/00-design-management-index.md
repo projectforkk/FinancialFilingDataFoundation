@@ -302,8 +302,8 @@ P10 design candidate：
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
-Current amended design baseline：
-`ee5ddb9798f45b9abac081fb4f7c2c999c131b6c`
+Last frozen design baseline before P10-E amendment：
+`ba962aef818d7a31731637a5cfef1f57020a7d1d`
 
 P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<worktree>\\src` source binding 已由 `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c` 冻结。
 
@@ -328,6 +328,12 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 18. P10-D reauthorization = `development/88-p10-d-context-reauthorization.md`；
 19. P10-D final production/test candidate = `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`；
 20. P10-D evidence = `development/89-p10-d-context-evidence.md` = PASS；
-21. P10-D detached review = AUTHORIZED by `development/90-p10-d-code-review-instruction.md`；
-22. P10-E 及以后继续关闭，直到 review result PASS + separate authorization；
-23. P11 / Research MCP production / Semantic Resolver production继续关闭。
+21. P10-D detached review instruction = `development/90-p10-d-code-review-instruction.md`；
+22. P10-D detached review result = `development/91-p10-d-detached-code-review-result.md` = PASS；
+23. P10-D = CLOSED；
+24. P10-E pre-implementation review found `P10-ISSUE-004` before production code；
+25. P10-E stop record = `development/92-p10-e-preimplementation-design-stop.md`；
+26. P10-E design/plan/acceptance amendment = pending commit/push；
+27. P10-E production remains BLOCKED until new baseline + separate reauthorization；
+28. P10-F and later remain closed；
+29. P11 / Research MCP production / Semantic Resolver production remain closed。

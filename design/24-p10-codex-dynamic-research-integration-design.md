@@ -366,12 +366,23 @@ P10 v1 capability manifest由 accepted baseline 固定，caller不得通过 `cap
 
 ```python
 validate_evidence_ledger(
-    context,
-    ledger,
+    context: ResearchContext,
+    ledger: EvidenceLedger,
+    spec_bundle: ResearchSpecBundle,
+    p8_catalog: McpCatalog,
 ) -> ProvenanceValidation
 ```
 
-只验证 provenance identity / existence / compatibility，不判断投资结论正确性。
+职责：
+
+- 重新验证 frozen spec bytes；
+- 验证 current catalog 与 frozen ResearchContext identity；
+- 验证 ledger/context/spec identity；
+- 通过 accepted P8/P9 loaders/services 验证 provenance refs；
+- 验证 use-class / derived graph compatibility；
+- 返回 deterministic PASS validation artifact。
+
+不判断投资结论、财务推理或外部事实真伪。
 
 ---
 
@@ -848,11 +859,35 @@ P10 不把这些 derived result 注册为 canonical reusable data。
 
 每个 research run 应产生 run-local evidence ledger。
 
-Schema：
+顶层 schema：
 
 `p10-research-evidence-ledger-v1`
 
-entry 至少：
+顶层对象固定为：
+
+```json
+{
+  "schema_version": "p10-research-evidence-ledger-v1",
+  "research_context_id": "...",
+  "spec_bundle_hash": "...",
+  "entries": []
+}
+```
+
+规则：
+
+- `research_context_id` 必须等于当前 frozen `ResearchContext.research_context_id`；
+- `spec_bundle_hash` 必须等于当前 frozen `ResearchContext.spec_bundle_hash`；
+- `entries` 可为空，但最多 1000 项；
+- `claim_key` 在一个 ledger 内必须唯一；
+- entry 顺序不参与语义；canonical serialization 按 `claim_key` 排序；
+- 每个 reference list 在 canonical serialization 中按字符串/数值自然序排序并去重；
+- 单一 entry 的显式 reference 总数不得超过 1000；
+- ledger 只记录 provenance，不记录 hidden reasoning。
+
+### 26.1 Entry schema
+
+entry 固定字段：
 
 ```json
 {
@@ -870,33 +905,334 @@ entry 至少：
 }
 ```
 
-ledger 是 provenance，不是 research rule。
+字段规则：
+
+- `claim_key`：非空、最大 256 字符；不 trim/casefold，精确字符串即 identity；
+- `document_sha256`：`64 lowercase hex` 或 `null`，nullability 由 use class 决定；
+- `page_nos`：正整数、唯一；
+- ID/ref lists：非空字符串、唯一；
+- `overlay_set_hash`：`64 lowercase hex` 或 `null`；
+- `semantic_assertions`：JSON-compatible object；P10 validator 将其视为 opaque provenance metadata，不解释财务含义；
+- 禁止 NaN/Infinity/non-JSON object；
+- `derived_from_claim_keys`：claim-key strings，唯一。
+
+### 26.2 Exact use classes
+
+P10 v1 FFDF evidence ledger 只允许：
+
+1. `P8_RAW_DIRECT`
+2. `RUN_LOCAL_STRUCTURED_VERIFIED`
+3. `P9_DURABLE_RESOLVED`
+4. `UNRESOLVED`
+
+`EXTERNAL_RUNTIME_SOURCE` **不是** FFDF ledger v1 的 use class；外部来源必须与 FFDF ledger 分层保存，见 Section 28。
+
+### 26.3 P8_RAW_DIRECT profile
+
+必须：
+
+- `document_sha256 != null`；
+- 至少一个 direct P8 ref：page/table/raw_fact/evidence；
+- `p9_resolution_ids = []`；
+- `overlay_set_hash = null`；
+- `semantic_assertions = {}`；
+- `derived_from_claim_keys = []`。
+
+该 class 只证明 raw/source provenance，不表示 period/unit/scope/value-role 已 canonical verified。
+
+### 26.4 RUN_LOCAL_STRUCTURED_VERIFIED profile
+
+只允许两种 mutually exclusive shape。
+
+#### Source-backed run-local claim
+
+必须：
+
+- `document_sha256 != null`；
+- 至少一个 direct P8 ref；
+- `p9_resolution_ids = []`；
+- `overlay_set_hash = null`；
+- `semantic_assertions` 非空；
+- `derived_from_claim_keys = []`。
+
+#### Derived run-local claim
+
+必须：
+
+- `document_sha256 = null`；
+- page/table/raw_fact/evidence/P9 refs 全部为空；
+- `overlay_set_hash = null`；
+- `semantic_assertions` 非空；
+- `derived_from_claim_keys` 非空。
+
+Derived result 永远是 run-local，不得变成 canonical reusable data。
+
+### 26.5 P9_DURABLE_RESOLVED profile
+
+必须：
+
+- `document_sha256 != null`；
+- `p9_resolution_ids` 非空；
+- `overlay_set_hash` 为有效 SHA256；
+- `derived_from_claim_keys = []`；
+- `semantic_assertions = {}`。
+
+Direct P8 refs 可以为空或存在；若存在，仍按 Section 27.4 验证。
+
+该 class 的 durable identity 由：
+
+- document；
+- exact P9 resolution IDs；
+- exact overlay snapshot hash
+
+共同定义。
+
+不得只给 resolution ID 而不绑定 overlay snapshot。
+
+### 26.6 UNRESOLVED profile
+
+允许：
+
+- `document_sha256` 为 null 或有效 document SHA；
+- direct P8 refs 可以为空或存在。
+
+必须：
+
+- `p9_resolution_ids = []`；
+- `overlay_set_hash = null`；
+- `semantic_assertions = {}`；
+- `derived_from_claim_keys = []`。
+
+`UNRESOLVED` 不得作为 derived operand。
 
 ---
 
 ## 27. Ledger validation
 
-P10 deterministic validator 至少验证：
+Public deterministic API 冻结为：
 
-- document exists in current catalog；
-- raw_fact belongs document；
-- evidence belongs document/fact where claimed；
-- table belongs document；
-- page bounds；
-- P9 resolution/snapshot identity valid；
-- use_class compatible with refs；
-- derived claim references existing operand claim keys；
-- spec/context identity matches。
+```python
+validate_evidence_ledger(
+    context: ResearchContext,
+    ledger: EvidenceLedger,
+    spec_bundle: ResearchSpecBundle,
+    p8_catalog: McpCatalog,
+) -> ProvenanceValidation
+```
 
-不验证：
+不得增加 caller-controlled capability policy、arbitrary path、SQL、shell 或 network 参数。
 
-- Codex自然语言结论是否“聪明”；
-- 投资建议是否正确；
-- 外部网页事实真伪。
+### 27.1 Validation result
+
+PASS-only result schema：
+
+`p10-provenance-validation-v1`
+
+```json
+{
+  "schema_version": "p10-provenance-validation-v1",
+  "status": "PASS",
+  "research_context_id": "...",
+  "spec_bundle_hash": "...",
+  "entry_count": 3,
+  "validated_claim_keys": ["a", "b", "c"]
+}
+```
+
+Invalid input 不返回 partial PASS；抛出 deterministic `P10Error`。
+
+不包含：
+
+- timestamp；
+- random UUID；
+- absolute path；
+- Codex output；
+- hidden reasoning。
+
+### 27.2 Deterministic validation order
+
+Validator 必须按以下高层顺序 fail closed：
+
+1. validate argument/model/schema shape；
+2. 从 accepted `McpCatalog.project_root` 确认 project root；
+3. `verify_research_spec(project_root, spec_bundle)`；
+4. 验证 `spec_bundle_hash == context.spec_bundle_hash`；
+5. 验证 current catalog raw SHA / accepted P8/P9/capability/context identity 与 frozen context 兼容；
+6. 验证 ledger top-level context/spec identity；
+7. 验证 claim-key uniqueness / use-class profile / derived graph；
+8. 验证 P8 direct refs；
+9. 验证 P9 durable refs/snapshot。
+
+因此 mid-run spec drift 继续返回既有：
+
+`P10_RESEARCH_SPEC_CHANGED`
+
+而不是被后续 provenance error 遮蔽。
+
+### 27.3 Context/catalog reuse rule
+
+P10-E 必须复用 P10-D frozen identity logic，不复制另一套 P8/P9 truth semantics。
+
+至少验证：
+
+- context schema/policy supported；
+- current raw catalog SHA 等于 `context.p8_catalog_sha256`；
+- P8 descriptor/fingerprint 仍是 accepted v1；
+- P9 descriptor/fingerprint 仍是 accepted v1；
+- capability mapping/hash 仍是 accepted P10 v1；
+- recomputed `research_context_id` 等于 context 中存储值。
+
+Current catalog/context mismatch：
+
+`P10_CONTEXT_INCOMPATIBLE`
+
+### 27.4 P8 direct-reference validation
+
+P10-E 通过 accepted `McpQueryService` / `McpCatalog` 验证，不直接解析 P3/P5/P6/P7 文件。
+
+对每个有 `document_sha256` 的 entry：
+
+- document 必须可由 accepted P8 service 读取；
+- page 必须在 `1..page_count`；
+- table ID 必须由该 document 的 `ffdf_get_table` 语义解析；
+- raw fact ID 必须由该 document 的 `ffdf_get_fact` 语义解析；
+- evidence ID 必须由该 document 的 `ffdf_get_evidence` 语义解析。
+
+Relation checks：
+
+- 若 entry 声明 `page_nos`，任何同时声明的 table/fact/evidence 的 page 必须属于该集合；
+- 若 entry 声明 `table_ids`，任何同时声明的 fact/evidence 的 `table_id` 必须属于该集合；
+- 若 entry 同时声明 raw facts 与 evidence，任何已声明 fact 的 `evidence_id` 必须包含在 entry 的 `evidence_ids` 中；
+- evidence-only/table-only/page-only provenance 合法，只要对应对象可验证；
+- validator 不重新实现 P6 的 fact/evidence hash 算法；P8 loader/service 已负责 artifact integrity。
+
+Explicit ref not found / relation mismatch：
+
+`P10_PROVENANCE_INVALID`
+
+Accepted P8 artifact 本身 corruption/invalid state：
+
+`P10_UPSTREAM_INVALID`
+
+### 27.5 P9 durable-reference validation
+
+对于 `P9_DURABLE_RESOLVED` entry：
+
+```text
+review_dir =
+  <p8_catalog.project_root>
+  / <context.p9_review_root>
+  / <document_sha256>
+
+snapshot_dir =
+  review_dir
+  / "snapshots"
+  / <overlay_set_hash>
+```
+
+要求：
+
+1. review_dir/snapshot_dir 必须位于 project root；
+2. claimed review/snapshot path 不存在 → `P10_PROVENANCE_INVALID`；
+3. 使用 accepted `load_resolved_snapshot(snapshot_dir, review_dir)` 验证，不复制 P9 hash/history semantics；
+4. snapshot document SHA 必须等于 entry document SHA；
+5. snapshot overlay hash 必须等于 entry `overlay_set_hash`；
+6. `p9_resolution_ids` 必须全部包含在 snapshot report 的 `active_resolution_ids`；
+7. resolution IDs 必须唯一；
+8. snapshot 可以是一个 validated historical overlay，不要求等于当前 latest active overlay；exact overlay identity 已经冻结历史 provenance。
+
+若 accepted P9 loader 判断 store/base/snapshot corrupt：
+
+`P10_UPSTREAM_INVALID`
+
+禁止：
+
+```text
+corrupt/missing claimed durable state
+→ silently ignore P9
+→ use raw as if durable provenance never existed
+```
+
+### 27.6 Derived graph
+
+Entry order 不影响 derived graph。
+
+必须：
+
+- 所有 `derived_from_claim_keys` 指向同一 ledger 内存在的 key；
+- 不允许 self-reference；
+- graph 必须 acyclic；
+- duplicate operand key invalid；
+- derived entry 必须是 `RUN_LOCAL_STRUCTURED_VERIFIED` 的 derived shape；
+- operand use class 只允许：
+  - `RUN_LOCAL_STRUCTURED_VERIFIED`
+  - `P9_DURABLE_RESOLVED`
+- `P8_RAW_DIRECT` 与 `UNRESOLVED` 不得作为 derived operand。
+
+这只验证 provenance readiness 的结构条件。
+
+P10-E **不**重新计算或判断：
+
+- numeric correctness；
+- period/unit/scope/value-role compatibility；
+- YoY/QoQ/TTM/margin financial validity；
+- investment conclusion quality。
+
+这些仍属于 Codex/run-local reasoning 与 Section 24/25 的上层 gate。
+
+### 27.7 semantic_assertions boundary
+
+`semantic_assertions` 只允许 JSON-compatible object。
+
+Validator：
+
+- 验证 shape/serializability；
+- 按 use-class profile 检查 empty/non-empty；
+- 不解释 key/value 的财务含义；
+- 不把 assertions 写入 Registry/P8/P9；
+- 不自动生成 Semantic Resolver rule。
+
+### 27.8 Error mapping
+
+Frozen P10-E mapping：
+
+- malformed ledger/schema/claim/ref/use-class/derived graph
+  → `P10_PROVENANCE_INVALID`
+- ledger/context/spec hash mismatch
+  → `P10_PROVENANCE_INVALID`
+- current research spec file drift
+  → `P10_RESEARCH_SPEC_CHANGED`
+- supplied current catalog incompatible with frozen ResearchContext
+  → `P10_CONTEXT_INCOMPATIBLE`
+- accepted P8/P9 loader reports corrupt/changed upstream artifact/state
+  → `P10_UPSTREAM_INVALID`
+
+Normal client output不得包含 traceback。
+
+### 27.9 External source exclusion
+
+P10-E validator只验证 FFDF/P9 provenance。
+
+`EXTERNAL_RUNTIME_SOURCE`：
+
+- 不进入 `p10-research-evidence-ledger-v1`；
+- 必须作为 output-level separate external provenance 保存；
+- 不得引用 P8/P9 IDs；
+- 不得支持 P9 resolution；
+- P10-E 不验证外部事实真伪。
+
+Acceptance 可使用 FFDF-only spec；若使用 external source，必须证明与 FFDF ledger 分层。
 
 ---
 
 ## 28. External source boundary
+
+P10-E 的 `p10-research-evidence-ledger-v1` 只承载 FFDF/P9 provenance。
+`EXTERNAL_RUNTIME_SOURCE` 不属于该 ledger 的 accepted use classes。
+
+外部来源若由 runtime specification 要求，必须在 research output 中使用独立 external provenance 结构保存；
+不得伪装成 P8/P9 ref，也不得由 P10-E validator 证明其事实真伪。
+
 
 runtime specification 可以要求 FFDF 之外的信息。
 
@@ -1509,6 +1845,62 @@ Approved solution：
 No P10-D production code existed when this issue was identified.
 
 Affected gates：P10-D / P10-J / P10-M / P10-N.
+
+### P10-ISSUE-004 — Evidence-ledger/provenance contract was underspecified before P10-E
+
+P10-E pre-implementation contract review found that the initial design named a
+ledger schema and validator responsibilities but did not freeze enough identity,
+compatibility, and error semantics for deterministic implementation.
+
+Facts:
+
+- the original ledger example did not define the top-level context/spec envelope;
+- `validate_evidence_ledger(context, ledger)` had no spec bundle or P8 catalog
+  input, so it could not re-verify mid-run spec drift or current catalog identity;
+- use-class ref requirements/forbidden combinations were not frozen;
+- P8 fact/evidence/table/page cross-reference rules were not frozen;
+- P9 resolution IDs were not explicitly bound to an exact overlay snapshot;
+- derived-claim duplicate/self/cycle/order/operand-class rules were not frozen;
+- `ProvenanceValidation` output schema and error mapping were not frozen.
+
+Accepted upstream facts:
+
+- accepted P8 `McpQueryService` already validates local document/table/fact/evidence
+  identity and artifact integrity;
+- accepted P9 review layout is
+  `<review_root>/<document_sha256>/snapshots/<overlay_set_hash>`;
+- accepted `load_resolved_snapshot` validates resolution store, base fingerprint,
+  snapshot manifest/files, overlay identity, and resolution history.
+
+Risk:
+
+1. two implementations could accept different ledgers;
+2. run-local reasoning could be mislabeled durable;
+3. derived claims could depend on raw/unresolved operands;
+4. P9 resolution provenance could be detached from the claimed overlay state;
+5. spec/catalog drift could be missed by an API lacking the needed frozen inputs;
+6. corrupt P8/P9 state could be silently treated as a missing ref/fallback case.
+
+Approved solution:
+
+1. freeze top-level ledger schema/context/spec identity in Sections 26–27;
+2. freeze exact four FFDF use classes and compatibility profiles;
+3. exclude external-source provenance from FFDF ledger v1;
+4. freeze P8 relation checks through accepted `McpQueryService`;
+5. freeze P9 durable validation through exact overlay snapshot +
+   `load_resolved_snapshot`;
+6. allow validated historical P9 snapshots by exact overlay identity;
+7. freeze derived graph as order-independent/existing-key/no-self/acyclic and
+   disallow raw/unresolved operands;
+8. change validator API to receive `spec_bundle` and `p8_catalog`;
+9. freeze PASS-only `p10-provenance-validation-v1`;
+10. freeze error mapping between provenance invalid, spec drift,
+    context/catalog incompatibility, and corrupt upstream state;
+11. update P10-E focused tests and acceptance requirements before authorization.
+
+No P10-E production code existed when this issue was identified.
+
+Affected gates: P10-E / P10-F / P10-J / P10-M / P10-N.
 
 任何问题必须：
 

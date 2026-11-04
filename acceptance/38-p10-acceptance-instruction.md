@@ -62,18 +62,18 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 25. semantic resolver capability = UNAVAILABLE；
 26. canonical layer capability = UNAVAILABLE；
 27. missing capability never silent fallback；
-28. evidence ledger schema valid；
-29. document provenance resolves；
-30. fact provenance resolves；
-31. evidence provenance resolves；
-32. table/page provenance resolves；
-33. P9 resolution provenance resolves；
-34. corrupt P9 state blocks；
-35. raw/effective distinction preserved；
-36. run-local/durable distinction preserved；
-37. run-local data never Registry reusable；
-38. derived claim references explicit operand claims；
-39. invalid derived provenance rejected；
+28. evidence ledger top-level schema/context/spec identity valid and claim keys unique；
+29. document provenance resolves through accepted P8 service；
+30. fact provenance resolves to the claimed document and declared relations；
+31. evidence provenance resolves to the claimed document and declared fact/table/page scope；
+32. table/page provenance resolves and declared scope relations are consistent；
+33. P9 durable provenance resolves through exact resolution IDs + overlay snapshot using accepted P9 loader；
+34. corrupt P9/P8 upstream state blocks as UPSTREAM_INVALID; no silent raw fallback；
+35. raw/effective distinction is enforced by the frozen use-class compatibility profiles；
+36. run-local/durable/derived distinctions are enforced exactly；
+37. run-local and derived data never become Registry/canonical reusable data；
+38. derived graph uses existing claim keys, has no self/cycle, and only verified/durable operands；
+39. invalid ledger/ref/use-class/graph/context provenance is rejected deterministically；
 40. P10 CLI success JSON-only；
 41. P10 CLI handled failure JSON-only；
 42. P10 CLI parser failure deterministic JSON；
@@ -257,6 +257,46 @@ FFDF provenance可引用：
 external source若存在必须单独 source class。
 
 不得把自然语言“模型看到了”当 provenance。
+
+### 11.1 P10-E frozen FFDF ledger contract
+
+Independent Acceptance 必须按 design/24 Sections 26–27 验证：
+
+- top-level schema = `p10-research-evidence-ledger-v1`；
+- `research_context_id` / `spec_bundle_hash` exact match；
+- claim keys unique，entry order不改变 validation result；
+- only four FFDF use classes are accepted；
+- `EXTERNAL_RUNTIME_SOURCE` is rejected from FFDF ledger v1；
+- `P8_RAW_DIRECT` 不能携带 P9 refs、derived refs 或 semantic assertions；
+- source-backed `RUN_LOCAL_STRUCTURED_VERIFIED` 必须有 P8 refs + non-empty semantic assertions；
+- derived `RUN_LOCAL_STRUCTURED_VERIFIED` 必须只通过 operand claim keys 建 provenance；
+- `P9_DURABLE_RESOLVED` 必须绑定 exact document + resolution IDs + overlay snapshot hash；
+- `UNRESOLVED` 不能作为 derived operand；
+- derived graph 必须 existing-key / no-self / acyclic / order-independent；
+- operands 只能来自 `RUN_LOCAL_STRUCTURED_VERIFIED` 或 `P9_DURABLE_RESOLVED`；
+- P8 refs 通过 accepted `McpQueryService` 验证；
+- P9 durable refs 通过 accepted `load_resolved_snapshot` 验证；
+- historical P9 snapshot 可按 exact overlay identity 验证，不要求等于当前 latest overlay；
+- missing explicit ref/path = `P10_PROVENANCE_INVALID`；
+- corrupt accepted P8/P9 state = `P10_UPSTREAM_INVALID`；
+- current spec drift = `P10_RESEARCH_SPEC_CHANGED`；
+- current catalog/context mismatch = `P10_CONTEXT_INCOMPATIBLE`；
+- no corrupt-P9 -> raw silent fallback；
+- PASS output schema = `p10-provenance-validation-v1`；
+- validation artifact contains no absolute path/time/random/hidden reasoning。
+
+Acceptance 必须使用 exact API：
+
+```python
+validate_evidence_ledger(
+    context,
+    ledger,
+    spec_bundle,
+    p8_catalog,
+)
+```
+
+不得在 acceptance 中通过额外 arbitrary path 参数绕过 frozen context/catalog contract。
 
 ---
 

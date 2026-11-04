@@ -152,70 +152,56 @@
 
 ## Approved next phase
 
-**P10-D — Research Context / Capability Manifest**
+**P10-E — Evidence Ledger / Provenance Validator**
 
 Status:
 
-`P10-D CANDIDATE PASS / DETACHED REVIEW AUTHORIZED — P10-E CLOSED`
+`STOPPED — P10-ISSUE-004 DESIGN AMENDMENT PENDING PUSH`
 
-Design baseline:
+Last frozen design baseline before P10-E amendment:
 
 `ba962aef818d7a31731637a5cfef1f57020a7d1d`
 
-Current instruction:
+Current stop record:
 
-`development/90-p10-d-code-review-instruction.md`
+`development/92-p10-e-preimplementation-design-stop.md`
 
-Historical authorization:
+P10-C is closed:
 
-`development/81-p10-c-spec-freeze-instruction.md` (superseded before code by P10-ISSUE-002)
+- production candidate `35553df23f58a7f539b7390f98c7f154e42c817e`;
+- detached review `development/86-p10-c-detached-code-review-result.md = PASS`.
 
-Historical stopped attempt:
+P10-D is closed:
 
-`development/78-p10-environment-interface-audit.md`
+- amended design baseline `ba962aef818d7a31731637a5cfef1f57020a7d1d`;
+- final production/test candidate `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`;
+- development evidence `development/89-p10-d-context-evidence.md = PASS`;
+- detached review result `development/91-p10-d-detached-code-review-result.md = PASS`;
+- review result commit `109af3057942db62d80e8a39d0f18f68d0321fd8`.
 
-Rerun evidence:
+P10-E pre-implementation contract review found `P10-ISSUE-004` before any
+`research/provenance.py` or provenance-focused test existed.
 
-`development/79-p10-environment-interface-audit-rerun.md` = `PASS — P10_ENVIRONMENT_READY`
+The amendment freezes:
 
-P10-ISSUE-001 exact-candidate source binding is verified. No install/upgrade is required; P8/P9 accepted interfaces and runtime boundaries remain valid.
+- exact ledger top-level context/spec envelope;
+- exact use-class compatibility profiles;
+- P8 relation validation through accepted service;
+- P9 exact resolution + overlay snapshot validation;
+- derived DAG rules;
+- validator API with `spec_bundle` + `p8_catalog`;
+- validation result schema and error mapping.
 
-Design-owner review: `development/80-p10-b-github-review.md` = `PASS — P10-B CLOSED`.
-
-P10-C historical authorization `development/81-p10-c-spec-freeze-instruction.md` was stopped before code by `P10-ISSUE-002`. The amended design baseline is now `f20e4fd46c8d56e85dce80a16daf91abafd6323f`.
-
-Stop record: `development/82-p10-c-preimplementation-design-stop.md`.
-
-P10-C reauthorization: `development/83-p10-c-spec-freeze-reauthorization.md`.
-
-Production candidate: `35553df23f58a7f539b7390f98c7f154e42c817e`.
-
-Development evidence: `development/84-p10-c-spec-freeze-evidence.md` = PASS.
-
-Detached review instruction: `development/85-p10-c-code-review-instruction.md`.
-
-Detached review result: `development/86-p10-c-detached-code-review-result.md` = PASS.
-
-P10-C is closed.
-
-P10-D pre-implementation contract review found `P10-ISSUE-003`; the corrected context identity contract is now GitHub truth at `ba962aef818d7a31731637a5cfef1f57020a7d1d`.
-
-Stop record: `development/87-p10-d-preimplementation-design-stop.md`.
-
-P10-D reauthorization: `development/88-p10-d-context-reauthorization.md`.
-
-Final production/test candidate: `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`.
-
-Development evidence: `development/89-p10-d-context-evidence.md` = PASS; latest evidence commit `1033c5b779f1877172546d6e30d7ad204b28fd7e`.
-
-Detached review instruction: `development/90-p10-d-code-review-instruction.md`. P10-E and later remain closed until review result PASS and a separate explicit authorization.
+P10-E production remains blocked until this amended design/plan/acceptance
+contract is committed/pushed and a separate explicit reauthorization is created.
 
 Still not authorized:
 
-- Research MCP production；
-- Semantic Resolver production；
-- P11 production；
-- any weakening of P8 read-only or P9 durable-review boundaries。
+- P10-F and later production;
+- Research MCP production;
+- Semantic Resolver production;
+- P11 production;
+- any weakening of P8 read-only or P9 durable-review boundaries.
 
 ## Project directory consolidation
 

@@ -197,16 +197,92 @@ context determinism tests PASS。
 实现：
 
 - `research/provenance.py`
-- P8 document/table/fact/evidence/page identity validation；
-- P9 resolution/snapshot identity validation；
-- use-class checks；
-- derived operand reference checks；
-- no financial reasoning。
+- `EvidenceLedgerEntry`
+- `EvidenceLedger`
+- `ProvenanceValidation`
+- `validate_evidence_ledger(context, ledger, spec_bundle, p8_catalog)`
+- exact use-class compatibility profiles
+- P8 document/table/fact/evidence/page reference validation
+- P9 resolution/snapshot/overlay validation
+- derived claim DAG validation
+- deterministic error mapping
+- no financial reasoning
 
-必须复用 accepted P8/P9 loaders/services，禁止复制其 truth semantics。
+必须复用：
+
+- P10-C `verify_research_spec`
+- P10-D context/catalog identity rules
+- accepted `McpQueryService`
+- accepted P9 `load_resolved_snapshot` / public review API
+
+禁止：
+
+- 复制 P8 parser/fact/evidence truth semantics；
+- 复制 P9 resolution/history/hash semantics；
+- materialize P9 snapshot during validation；
+- 修改 P9 review state；
+- caller capability override；
+- arbitrary filesystem browse；
+- network/AI/subprocess/SQL；
+- external-source truth validation。
+
+### P10-E exact focused cases
+
+至少覆盖：
+
+1. valid empty ledger；
+2. top-level schema/context/spec identity；
+3. duplicate claim key reject；
+4. invalid/noncanonical document SHA reject；
+5. exact P8 raw-direct page provenance；
+6. exact P8 table provenance；
+7. exact P8 raw-fact provenance；
+8. exact P8 evidence provenance；
+9. fact/evidence relation mismatch reject；
+10. table/fact/evidence page-scope mismatch reject；
+11. table-scope mismatch reject；
+12. invalid document reject；
+13. invalid page reject；
+14. invalid table reject；
+15. invalid fact reject；
+16. invalid evidence reject；
+17. source-backed run-local profile PASS；
+18. raw-direct semantic assertions reject；
+19. run-local source without semantic assertions reject；
+20. valid P9 durable resolution/snapshot PASS；
+21. P9 durable without overlay hash reject；
+22. P9 resolution not in claimed snapshot reject；
+23. missing claimed review/snapshot path reject；
+24. corrupt P9 state -> `P10_UPSTREAM_INVALID`；
+25. historical validated P9 snapshot remains valid by exact overlay；
+26. valid unresolved entry；
+27. unresolved/P8 raw direct as derived operand reject；
+28. valid derived run-local claim；
+29. missing operand reject；
+30. self-reference reject；
+31. derived cycle reject；
+32. entry order does not change graph validity/result；
+33. spec drift -> `P10_RESEARCH_SPEC_CHANGED` before later provenance checks；
+34. ledger context/spec mismatch -> `P10_PROVENANCE_INVALID`；
+35. current catalog/context mismatch -> `P10_CONTEXT_INCOMPATIBLE`；
+36. malformed/corrupt P8 upstream state -> `P10_UPSTREAM_INVALID`；
+37. validation result exact schema/sorted claim keys；
+38. serialized validation contains no absolute path/time/random/hidden reasoning；
+39. external-source use class rejected from FFDF ledger v1；
+40. exact candidate source binding / main runtime no external MCP SDK。
 
 Gate：
-provenance focused tests PASS。
+
+- provenance focused tests PASS；
+- full `tests/unit` PASS；
+- compile/import PASS；
+- P8/P9 source/tests zero diff；
+- dependency/runtime zero diff；
+- forbidden surface scan NONE；
+- evidence committed/pushed；
+- separate detached P10-E Code Review required before P10-F。
+
+P10-F and later remain closed until review PASS + separate explicit authorization.
 
 ---
 
