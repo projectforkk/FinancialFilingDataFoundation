@@ -40,7 +40,7 @@ INTEGRATION_CANDIDATE = "3a805a8f333ac20770d6aec1c8285d93993d18fc"
 INTEGRATION_BLOB_SHA256 = (
     "ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296"
 )
-CORE_DESIGN_BASELINE = "f8bffca572a6580c0a1f2babc0cc3b0c9e494204"
+CORE_DESIGN_BASELINE = "ad78cbeaccfd444f1c5fcd31708b1300f6ad67a7"
 P8_LOCK_SHA256 = (
     "8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec"
 )
@@ -135,8 +135,18 @@ def validate_source_binding(source_root: Path) -> dict[str, Any]:
     return {name: str(path) for name, path in paths.items()}
 
 
-def validate_manifest(project_root: Path, manifest_path: Path) -> dict[str, Any]:
-    manifest = load_json(manifest_path)
+def validate_manifest(project_root: Path, source_root: Path) -> dict[str, Any]:
+    manifest_git_path = "acceptance/p10-base-immutability-manifest.json"
+    manifest_raw = run_git(
+        source_root,
+        "cat-file",
+        "blob",
+        f"HEAD:{manifest_git_path}",
+    )
+    try:
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HarnessFailure("base manifest Git blob is not valid UTF-8 JSON") from exc
     require(
         manifest.get("schema_version") == BASE_MANIFEST_SCHEMA,
         "base manifest schema mismatch",
@@ -155,7 +165,8 @@ def validate_manifest(project_root: Path, manifest_path: Path) -> dict[str, Any]
     require(checked > 0, "base manifest is empty")
     return {
         "entry_count": checked,
-        "manifest_sha256": sha256_bytes(manifest_path.read_bytes()),
+        "manifest_identity_source": "GIT_BLOB",
+        "manifest_sha256": sha256_bytes(manifest_raw),
     }
 
 
@@ -564,10 +575,7 @@ def precheck(
 
     source_binding = validate_source_binding(source_root)
     fixtures = validate_and_copy_fixtures(source_root, project_root, work_root)
-    base = validate_manifest(
-        project_root,
-        source_root / "acceptance" / "p10-base-immutability-manifest.json",
-    )
+    base = validate_manifest(project_root, source_root)
     git_freezes = validate_git_freezes(source_root)
     security = validate_security_scope(source_root)
     p8 = validate_p8_contract(project_root, source_root, mcp_python)
@@ -596,10 +604,7 @@ def postcheck(
     work_root: Path,
 ) -> dict[str, Any]:
     require(work_root.is_dir(), "acceptance work root missing")
-    base = validate_manifest(
-        project_root,
-        source_root / "acceptance" / "p10-base-immutability-manifest.json",
-    )
+    base = validate_manifest(project_root, source_root)
     results = work_root / "results"
     dynamic_a = load_json(results / "dynamic-a.json")
     dynamic_b = load_json(results / "dynamic-b.json")
