@@ -335,10 +335,15 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 25. P10-E stop record = `development/92-p10-e-preimplementation-design-stop.md`；
 26. P10-E amended design baseline = `d6b34d84d1eeae6b0f2009895a14c5956217a18f`；
 27. P10-E reauthorization = `development/93-p10-e-provenance-reauthorization.md`；
-28. P10-E = AUTHORIZED ONLY within provenance gate scope；
-29. P10-F and later remain closed；
-30. P10-E production candidate = `802a395247e490a83acaef744c1641188fbf704e`；
-31. P10-E evidence = `development/94-p10-e-provenance-evidence.md` = PASS；
-32. P10-E detached review instruction = `development/95-p10-e-code-review-instruction.md`；
-33. P10-E = REVIEW AUTHORIZED / P10-F CLOSED；
-34. P11 / Research MCP production / Semantic Resolver production remain closed。
+28. P10-E production candidate = `802a395247e490a83acaef744c1641188fbf704e`；
+29. P10-E evidence = `development/94-p10-e-provenance-evidence.md` = PASS；
+30. P10-E detached review instruction = `development/95-p10-e-code-review-instruction.md`；
+31. P10-E detached review result = `development/96-p10-e-detached-code-review-result.md` = PASS；
+32. P10-E review result commit = `af7295d740ecadeb9c17705c1e1048f3f742a8e6`；
+33. P10-E = CLOSED；
+34. P10-F pre-implementation review found `P10-ISSUE-005` before CLI code；
+35. P10-F stop record = `development/97-p10-f-preimplementation-design-stop.md`；
+36. P10-F design amendment = PENDING PUSH；
+37. P10-F production remains CLOSED until amendment push + explicit reauthorization；
+38. P10-G and later remain closed；
+39. P11 / Research MCP production / Semantic Resolver production remain closed。

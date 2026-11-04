@@ -292,28 +292,87 @@ P10-F and later remain closed until review PASS + separate explicit authorizatio
 
 ```powershell
 $env:PYTHONPATH="<exact-candidate-worktree>\src"
-D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m financial_filing_data_foundation.research.cli
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m financial_filing_data_foundation.research.cli <command> ...
 ```
 
 禁止以 editable/install 代替 exact-candidate source binding。
 
-commands：
+只允许新增：
 
-- freeze-spec；
-- verify-spec；
-- build-context；
-- validate-ledger。
+- `research/cli.py`；
+- minimal `research/__init__.py` export only if needed；
+- `tests/unit/research/test_research_cli.py`。
 
-要求：
+P10-ISSUE-005 exact contract：
 
-- success stdout exactly one JSON；
-- diagnostics stderr exactly one JSON；
-- parser failures deterministic JSON；
-- no argparse help prose；
-- no AI/network/subprocess。
+- commands exactly `freeze-spec / verify-spec / build-context / validate-ledger`；
+- argv exactly follows design/24 Section 31.1；
+- request transport = stdin JSON object only；
+- stdin max = 16 MiB；
+- no request-file option；
+- exact request object keys follow Section 31.3；
+- catalog argument must be project-root-relative；
+- P9 review-root remains project-root-relative existing directory；
+- `build-context` verifies spec before catalog/context semantic validation；
+- `validate-ledger` verifies spec, loads catalog, deterministically rebuilds context, then parses/validates ledger；
+- no `ResearchContext.from_dict` in P10-F；
+- success stdout exactly one canonical JSON line / stderr empty / exit 0；
+- handled failure stdout empty / stderr exactly one canonical JSON line / exit 1；
+- parser failure reason = `P10_CLI_ARGUMENT_ERROR`, exit 2；
+- transport/envelope failure reason = `P10_CLI_INPUT_INVALID`, exit 1；
+- unexpected failure = `P10_CLI_FAILED` + fixed message, exit 1；
+- no argparse usage/help prose；
+- no traceback；
+- no AI/network/external MCP SDK/subprocess/shell/SQL；
+- no P8 MCP business-call proxy；
+- no P9 mutation call；
+- no implicit artifact write。
+
+Focused subprocess matrix至少覆盖：
+
+1. `freeze-spec` success exact envelope；
+2. `verify-spec` success exact envelope；
+3. `build-context` success exact envelope；
+4. `validate-ledger` success exact envelope；
+5. success stdout one line / stderr empty / exit 0；
+6. missing command parser error；
+7. unknown command parser error；
+8. `--help` parser error without prose；
+9. missing required arg parser error；
+10. unknown arg parser error；
+11. empty stdin；
+12. malformed JSON；
+13. non-UTF8 stdin；
+14. non-object JSON root；
+15. extra request key；
+16. missing request key；
+17. >16 MiB stdin；
+18. malformed freeze files item；
+19. accepted P10-C domain error propagation；
+20. spec drift on verify；
+21. spec drift precedes invalid catalog on build-context；
+22. spec drift precedes invalid ledger on validate-ledger；
+23. absolute/drive-relative/outside catalog rejected；
+24. invalid catalog maps `P10_CATALOG_INVALID`；
+25. invalid review-root preserves P10-D reason code；
+26. malformed ledger preserves P10-E reason code；
+27. unexpected failure has fixed `P10_CLI_FAILED` envelope；
+28. no traceback/usage text on any error path；
+29. output JSON canonical/sorted/compact；
+30. exact candidate source binding；
+31. no forbidden production surface；
+32. no P8/P9 source/test/runtime modification。
 
 Gate：
-CLI matrix PASS。
+
+- CLI focused matrix PASS；
+- full unit regression PASS；
+- compile/import PASS；
+- scope/security scan PASS。
+
+After evidence commit/push：
+
+STOP P10-F → separate detached Code Review before P10-G。
 
 ---
 

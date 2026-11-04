@@ -1299,27 +1299,250 @@ Acceptance 必须用至少两个不同 runtime spec 证明这一点。
 
 ## 31. P10 local CLI
 
-建议 machine CLI：
+正式 machine CLI：
 
-`python -m financial_filing_data_foundation.research.cli`
+```powershell
+$env:PYTHONPATH="<exact-candidate-worktree>\src"
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m financial_filing_data_foundation.research.cli <command> ...
+```
 
-v1 commands：
+不得以 editable/install 代替 exact-candidate source binding。
 
-- `freeze-spec`
-- `verify-spec`
-- `build-context`
-- `validate-ledger`
+### 31.1 Exact commands / arguments
 
-CLI：
+v1 只允许四个 subcommand：
 
-- JSON stdout only；
-- diagnostic JSON stderr；
-- no argparse text help；
-- no network；
-- no AI；
-- no arbitrary command execution。
+```text
+freeze-spec
+verify-spec
+build-context
+validate-ledger
+```
 
-P10 CLI 不代理 P8/P9 business calls；Codex仍直接调用 P8 MCP / P9 CLI。
+Exact argv contract：
+
+```text
+freeze-spec
+  --project-root <path>
+
+verify-spec
+  --project-root <path>
+
+build-context
+  --project-root <path>
+  --catalog <project-root-relative-json-path>
+  --p9-review-root <project-root-relative-directory>
+
+validate-ledger
+  --project-root <path>
+  --catalog <project-root-relative-json-path>
+  --p9-review-root <project-root-relative-directory>
+```
+
+除以上参数外无其他 v1 machine options。
+
+`--help` / `-h` 不提供 prose help；其行为与其他未知参数一样进入 deterministic parser error。
+
+`--catalog` 必须是 non-empty project-root-relative path；absolute、drive-relative、rooted 或 resolve 后越出 project root 均失败为 `P10_CATALOG_INVALID`。实际 catalog semantics 继续由 accepted `McpCatalog.load` 验证。
+
+`--p9-review-root` 继续遵守 Section 13.5 exact contract，不由 CLI 创建目录。
+
+### 31.2 Request transport
+
+所有四个 command 的 machine request **只从 stdin 读取一个 JSON object**。
+
+禁止：
+
+- arbitrary request-file browse；
+- implicit directory discovery；
+- inline shell/Python execution；
+- network request。
+
+stdin raw-byte hard limit：
+
+`16 MiB = 16,777,216 bytes`
+
+实现读取最多 `16,777,217` bytes；超过 limit 立即返回 `P10_CLI_INPUT_INVALID`。
+
+以下 transport failure 均为 `P10_CLI_INPUT_INVALID`：
+
+- empty stdin；
+- >16 MiB；
+- non-UTF-8；
+- invalid JSON；
+- JSON root 非 object；
+- command request object keys 与下述 exact schema 不匹配。
+
+### 31.3 Exact request schemas
+
+#### freeze-spec
+
+stdin：
+
+```json
+{
+  "files": [
+    {
+      "logical_name": "rules",
+      "relative_path": "workspace/research-inputs/run-x/rules.md"
+    }
+  ]
+}
+```
+
+top-level exact keys = `{"files"}`。
+
+`files` 必须是 JSON array；每个 item exact keys = `{"logical_name","relative_path"}`。完成 transport/schema shape 后构造 accepted `ResearchSpecInput`，其 domain/path 错误继续使用 P10-C reason codes。
+
+#### verify-spec
+
+stdin：
+
+```json
+{
+  "spec_bundle": {
+    "schema_version": "p10-research-spec-bundle-v1",
+    "files": [],
+    "spec_bundle_hash": "..."
+  }
+}
+```
+
+top-level exact keys = `{"spec_bundle"}`。
+
+bundle 通过 accepted `ResearchSpecBundle.from_dict` 构造并由 `verify_research_spec` 验证。
+
+#### build-context
+
+stdin exact keys = `{"spec_bundle"}`，bundle schema同上。
+
+CLI execution order：
+
+```text
+parse exact request envelope
+→ ResearchSpecBundle.from_dict
+→ verify_research_spec(project_root, bundle)
+→ load accepted McpCatalog
+→ build_research_context(bundle, catalog, p9_review_root)
+```
+
+因此 current spec drift 在可解析 request envelope 下优先于 catalog/context semantic failure。
+
+#### validate-ledger
+
+stdin：
+
+```json
+{
+  "spec_bundle": { "...": "..." },
+  "ledger": { "...": "p10-research-evidence-ledger-v1" }
+}
+```
+
+top-level exact keys = `{"spec_bundle","ledger"}`。
+
+CLI execution order：
+
+```text
+parse exact request envelope
+→ ResearchSpecBundle.from_dict
+→ verify_research_spec(project_root, bundle)
+→ load accepted McpCatalog
+→ build_research_context(bundle, catalog, p9_review_root)
+→ EvidenceLedger.from_dict
+→ validate_evidence_ledger(context, ledger, bundle, catalog)
+```
+
+P10-F **不新增 ResearchContext.from_dict**。Context 永远由 frozen spec/catalog/review-root deterministic rebuild；ledger 中的 `research_context_id` 必须再由 P10-E validator 与 rebuilt context 匹配。
+
+### 31.4 Exact success envelopes
+
+Canonical JSON serializer：
+
+```python
+json.dumps(
+    value,
+    ensure_ascii=False,
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+)
+```
+
+success：
+
+- exit code = `0`；
+- stdout = exactly one canonical JSON line；
+- stderr = empty。
+
+Envelope exact keys：
+
+```json
+{
+  "command": "freeze-spec",
+  "data": {},
+  "status": "OK"
+}
+```
+
+`data`：
+
+- `freeze-spec` → `ResearchSpecBundle.to_dict()`；
+- `verify-spec` → `{"spec_bundle_hash":"...","verified":true}`；
+- `build-context` → `ResearchContext.to_dict()`；
+- `validate-ledger` → `ProvenanceValidation.to_dict()`。
+
+### 31.5 Exact error envelopes / exit codes
+
+error：
+
+- stdout = empty；
+- stderr = exactly one canonical JSON line；
+- no usage/help prose；
+- no traceback。
+
+Exact keys：
+
+```json
+{
+  "command": "freeze-spec",
+  "message": "deterministic diagnostic",
+  "reason_code": "P10_...",
+  "status": "ERROR"
+}
+```
+
+`command`：
+
+- recognized first subcommand → exact command string；
+- unknown/missing subcommand → `null`。
+
+Exit/reason rules：
+
+- parser/argv failure → `P10_CLI_ARGUMENT_ERROR`, exit `2`；
+- stdin transport/request-envelope failure → `P10_CLI_INPUT_INVALID`, exit `1`；
+- accepted domain `P10Error` → preserve its reason code, exit `1`；
+- catalog load failure → `P10_CATALOG_INVALID`, exit `1`；
+- unexpected implementation failure → fixed `P10_CLI_FAILED`, fixed message `"unexpected CLI failure"`, exit `1`。
+
+Normal machine client never receives Python traceback。
+
+### 31.6 CLI responsibility boundary
+
+P10 CLI is only a deterministic adapter over accepted P10-C/D/E APIs。
+
+It does not：
+
+- proxy P8 MCP business tools；
+- execute P9 prepare/submit/materialize；
+- call OpenAI/Codex/remote AI；
+- call network；
+- spawn subprocess/shell；
+- execute arbitrary SQL/Python；
+- write research artifacts implicitly；
+- modify P8/P9/Registry/source state。
+
+Output persistence, if desired, is caller-controlled redirection into project-local workspace。
 
 ---
 
@@ -1391,6 +1614,9 @@ P10 不声称：
 - `P10_UPSTREAM_INVALID`
 - `P10_REVIEW_UNRESOLVED`
 - `P10_CAPABILITY_UNAVAILABLE`
+- `P10_CLI_ARGUMENT_ERROR`
+- `P10_CLI_INPUT_INVALID`
+- `P10_CLI_FAILED`
 
 normal client 不输出 traceback。
 
@@ -1901,6 +2127,52 @@ Approved solution:
 No P10-E production code existed when this issue was identified.
 
 Affected gates: P10-E / P10-F / P10-J / P10-M / P10-N.
+
+### P10-ISSUE-005 — Deterministic CLI machine contract was underspecified before P10-F
+
+P10-F pre-implementation contract review found that the initial design fixed only the four command names and JSON-only intent, but did not freeze the machine transport or subprocess contract.
+
+Missing details included:
+
+- exact argv per command；
+- stdin/request transport；
+- request object schema；
+- catalog/review-root representation；
+- success/error envelopes；
+- parser/input/internal reason codes；
+- exit codes；
+- stdin size bound；
+- malformed request classification；
+- catalog-load mapping；
+- validate-ledger context reconstruction；
+- spec-drift precedence；
+- normal-client traceback behavior。
+
+Risk：
+
+1. incompatible CLI implementations could all appear design-compliant；
+2. one implementation could widen filesystem access through arbitrary request files；
+3. parser and domain failures could produce different JSON/exit behavior；
+4. validate-ledger could trust or deserialize stale context instead of rebuilding accepted identity；
+5. malformed ledger/catalog state could outrank spec drift inconsistently；
+6. Independent Acceptance could not freeze one exact subprocess matrix。
+
+Approved solution：
+
+1. freeze exact four argv contracts in Section 31.1；
+2. use stdin-only JSON request transport with 16 MiB raw-byte limit；
+3. freeze exact request object keys for every command；
+4. require project-root-relative catalog and existing project-relative P9 review root；
+5. freeze canonical one-line JSON success/error envelopes；
+6. freeze exit codes and CLI-specific reason codes；
+7. rebuild ResearchContext from spec/catalog/review-root for validate-ledger rather than add Context deserialization；
+8. verify spec before catalog/ledger semantic validation when request envelope is parseable；
+9. forbid request-file browse, implicit writes, P8/P9 business proxy, network/AI/subprocess/SQL；
+10. update P10-F implementation plan and acceptance CLI matrix before production authorization。
+
+No P10-F production code existed when this issue was identified.
+
+Affected gates: P10-F / P10-H / P10-M / P10-N.
 
 任何问题必须：
 

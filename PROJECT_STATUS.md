@@ -152,23 +152,11 @@
 
 ## Approved next phase
 
-**P10-E — Evidence Ledger / Provenance Validator**
+**P10-F — Deterministic CLI**
 
 Status:
 
-`P10-E CANDIDATE READY / DETACHED REVIEW AUTHORIZED / P10-F CLOSED`
-
-Current P10-E design baseline:
-
-`d6b34d84d1eeae6b0f2009895a14c5956217a18f`
-
-Current authorization:
-
-`development/93-p10-e-provenance-reauthorization.md`
-
-Historical stop record:
-
-`development/92-p10-e-preimplementation-design-stop.md`
+`STOPPED — P10-ISSUE-005 DESIGN AMENDMENT PENDING PUSH`
 
 P10-C is closed:
 
@@ -183,34 +171,40 @@ P10-D is closed:
 - detached review result `development/91-p10-d-detached-code-review-result.md = PASS`;
 - review result commit `109af3057942db62d80e8a39d0f18f68d0321fd8`.
 
-P10-E pre-implementation contract review found `P10-ISSUE-004` before any
-`research/provenance.py` or provenance-focused test existed.
+P10-E is closed:
 
-The amendment freezes:
+- amended design baseline `d6b34d84d1eeae6b0f2009895a14c5956217a18f`;
+- production candidate `802a395247e490a83acaef744c1641188fbf704e`;
+- development evidence `development/94-p10-e-provenance-evidence.md = PASS`;
+- detached review instruction `development/95-p10-e-code-review-instruction.md`;
+- detached review result `development/96-p10-e-detached-code-review-result.md = PASS`;
+- review result commit `af7295d740ecadeb9c17705c1e1048f3f742a8e6`.
 
-- exact ledger top-level context/spec envelope;
-- exact use-class compatibility profiles;
-- P8 relation validation through accepted service;
-- P9 exact resolution + overlay snapshot validation;
-- derived DAG rules;
-- validator API with `spec_bundle` + `p8_catalog`;
-- validation result schema and error mapping.
+P10-F pre-implementation review found `P10-ISSUE-005` before any CLI production code existed.
 
-The amended P10-E design/plan/acceptance contract is GitHub truth at
-`d6b34d84d1eeae6b0f2009895a14c5956217a18f`.
+Stop record:
 
-P10-E implementation candidate:
+`development/97-p10-f-preimplementation-design-stop.md`
 
-- candidate `802a395247e490a83acaef744c1641188fbf704e`;
-- evidence `development/94-p10-e-provenance-evidence.md = PASS`;
-- evidence commit `164f1aa8b97cdcdf5a8e43bffe4f604175d480ef`;
-- detached review instruction `development/95-p10-e-code-review-instruction.md`.
+The pending amendment freezes:
 
-P10-E production is frozen for review. No further P10-E code changes are authorized in the active worktree during review.
+- exact four CLI argv contracts;
+- stdin-only JSON request transport;
+- 16 MiB request limit;
+- exact request schemas;
+- project-relative catalog/review-root inputs;
+- exact canonical success/error envelopes;
+- exact CLI reason codes and exit codes;
+- spec-first error precedence;
+- deterministic context rebuild for validate-ledger;
+- no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
+
+P10-F production remains closed until this amended design/plan/acceptance contract is committed/pushed and a new explicit P10-F authorization exists.
 
 Still not authorized:
 
-- P10-F and later production;
+- P10-F production before reauthorization;
+- P10-G and later production;
 - Research MCP production;
 - Semantic Resolver production;
 - P11 production;

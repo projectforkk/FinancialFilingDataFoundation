@@ -74,9 +74,9 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 37. run-local and derived data never become Registry/canonical reusable data；
 38. derived graph uses existing claim keys, has no self/cycle, and only verified/durable operands；
 39. invalid ledger/ref/use-class/graph/context provenance is rejected deterministically；
-40. P10 CLI success JSON-only；
-41. P10 CLI handled failure JSON-only；
-42. P10 CLI parser failure deterministic JSON；
+40. P10 CLI success = exit 0, stdout exactly one canonical JSON line, stderr empty；
+41. P10 CLI handled/domain/input failure = exit 1, stdout empty, stderr exactly one canonical JSON error line；
+42. P10 CLI parser failure = `P10_CLI_ARGUMENT_ERROR`, exit 2, stdout empty, stderr exactly one JSON line with no argparse usage/help prose；
 43. thin integration instruction contains no fixed question mapping；
 44. thin integration instruction contains no fixed company/period/report schema；
 45. runtime research spec is primary instruction source；
@@ -104,6 +104,44 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 67. all temp/basetemp/workspace remain under project root；
 68. no hidden chain-of-thought stored as project artifact；
 69. every P10 Python command binds `PYTHONPATH` to the exact frozen candidate worktree `src`; detached review/acceptance must not execute source from shared main/another worktree, and FFDF must not be editable/installed into main `.venv` merely for P10。
+
+### 2.1 P10-F CLI acceptance matrix
+
+Independent Acceptance must use raw subprocess execution against the exact frozen candidate and verify design/24 Section 31 byte/exit behavior.
+
+Mandatory CLI matrix：
+
+- exactly four subcommands；
+- stdin JSON object only；
+- no request-file option；
+- stdin >16 MiB rejected as `P10_CLI_INPUT_INVALID`；
+- empty/non-UTF8/invalid/non-object request rejected deterministically；
+- extra/missing request envelope keys rejected；
+- `freeze-spec` success exact envelope/data；
+- `verify-spec` success exact envelope/data；
+- `build-context` success exact envelope/data；
+- `validate-ledger` success exact envelope/data；
+- success = exit 0 / one stdout JSON line / empty stderr；
+- handled failure = exit 1 / empty stdout / one stderr JSON line；
+- parser failure = exit 2 / `P10_CLI_ARGUMENT_ERROR` / no usage/help prose；
+- unknown/missing command gives `command=null`；
+- recognized command parser failure retains exact command string；
+- `--help` / `-h` is parser JSON error, not prose；
+- catalog path must be project-root-relative；
+- invalid catalog maps `P10_CATALOG_INVALID`；
+- build-context spec drift precedes catalog semantic failure；
+- validate-ledger spec drift precedes ledger semantic failure；
+- validate-ledger deterministically rebuilds ResearchContext from spec/catalog/review-root；
+- no `ResearchContext.from_dict` acceptance dependency；
+- accepted P10-C/D/E reason codes propagate unchanged；
+- unexpected internal failure = `P10_CLI_FAILED` with fixed message `unexpected CLI failure`；
+- no traceback；
+- canonical JSON is UTF-8, sorted-key, compact separator, `allow_nan=False`；
+- no network/AI/external MCP SDK/subprocess/shell/SQL；
+- no P8 business-call proxy；
+- no P9 mutation；
+- no implicit artifact write；
+- exact-candidate source binding preserved。
 
 ---
 
