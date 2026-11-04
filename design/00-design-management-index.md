@@ -295,7 +295,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_AUTHORIZED`
+`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_DESIGN_FREEZE_PENDING`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
@@ -317,7 +317,10 @@ P11 latest reviewed candidate：
 - P11-B authorization = `development/204-p11-b-environment-runtime-probe-authorization.md`；
 - P11-B result = `development/205-p11-environment-runtime-probe.md` = PASS；
 - P11-C authorization = `development/206-p11-c-identity-period-authorization.md`；
-- next action = implement P11-C Identity / Period Contract in `task/p11-c-identity-period`；
+- P11-C candidate = `027288f6d5bb064f82764b3dc19961996de1dab8`；
+- P11-C final review = `development/211-p11-c-final-detached-code-review-result.md` = PASS；
+- P11-C integration merge = `1a5b04f22e1821558337821c758f70a7458da9ae`；
+- next action = separately authorize P11-D Design-First SEC HTTP / Discovery contract freeze；
 - P11-B = CLOSED / PASS；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -550,6 +553,11 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 220. P11-B result = `development/205-p11-environment-runtime-probe.md` = PASS；
 221. P11-B = CLOSED / PASS；
 222. P11-C authorization = `development/206-p11-c-identity-period-authorization.md`；
-223. P11-C = AUTHORIZED / IMPLEMENTATION ONLY；
-224. P11 production = CLOSED；
-225. Research MCP production / Semantic Resolver production remain closed / not authorized。
+223. P11-C implementation candidate = `027288f6d5bb064f82764b3dc19961996de1dab8`；
+224. P11-C authoritative review authorization = `development/210-p11-c-final-review-authorization.md`；
+225. P11-C review result = `development/211-p11-c-final-detached-code-review-result.md` = PASS；
+226. P11-C integration merge = `1a5b04f22e1821558337821c758f70a7458da9ae`；
+227. P11-C = CLOSED / PASS；
+228. P11-D implementation = NOT AUTHORIZED / Design-First freeze required first；
+229. P11 production = CLOSED；
+230. Research MCP production / Semantic Resolver production remain closed / not authorized。
