@@ -1884,6 +1884,36 @@ Approved solution:
 
 Affected gates: P9-JR3 / P9-K / P9-L.
 
+### P9-ISSUE-011 — P9 acceptance freeze used a two-character pytest basetemp and hit Windows path length
+
+The first P9-L attempt at frozen candidate `3c5a632d6026dcb5e388b747d1e6972b15b7776e`
+failed before semantic acceptance because the frozen focused command used
+`D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\af`.
+
+A representative deep snapshot output path was exactly 260 characters and
+failed with `FileNotFoundError` / `P9_PERSIST_FAILED`.
+
+The same path shape with a one-character basetemp
+`D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\f`
+is 259 characters and had already passed repeatedly in development/formal review.
+
+Root cause:
+the acceptance freeze did not preserve the previously verified one-character
+Windows basetemp constraint and introduced a two-character suffix.
+
+Approved solution:
+1. all P9 focused/synthetic/full acceptance pytest basetemps must be exactly one
+   character below `D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\`；
+2. the acceptance refreeze must use distinct one-character roots；
+3. the blocked acceptance attempt remains historical evidence and is not
+   silently reinterpreted as a product failure；
+4. no production/test change is authorized；
+5. create a new P9-K refreeze and rerun P9-L from a fresh detached worktree；
+6. any 260-character-or-longer deep path observed under the frozen test shape
+   is an acceptance environment blocker, not a reason to patch P9 snapshot semantics。
+
+Affected gates: P9-K refreeze / P9-L only.
+
 发现问题必须：
 
 ```text

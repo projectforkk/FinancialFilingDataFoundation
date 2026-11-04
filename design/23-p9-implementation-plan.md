@@ -284,6 +284,13 @@ P9-JR3 PASS 前 P9-K 关闭。
 
 Detached project-root worktree。
 
+Windows pytest path hard constraint：
+- basetemp 必须位于 `D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\t\\<single-char>`；
+- `<single-char>` 必须恰好一个字符；
+- focused / synthetic / full 使用不同单字符目录；
+- 已实测 deep snapshot path：259 chars PASS；260 chars FAIL；
+- acceptance 不得自行换成更长 basetemp。
+
 不得修改：
 - production
 - tests
