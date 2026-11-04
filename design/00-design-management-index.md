@@ -121,7 +121,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
-| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | AMENDED DESIGN / FRESH REVIEW REQUIRED / IMPLEMENTATION CLOSED |
+| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | P11-D DESIGN BASELINE PASS / IMPLEMENTATION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -296,7 +296,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_ISSUE_043_REMEDIATED_REVIEW_REQUIRED`
+`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_DESIGN_PASS_IMPLEMENTATION_AUTH_PENDING`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
