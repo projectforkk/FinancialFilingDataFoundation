@@ -156,15 +156,19 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-002 DESIGN AMENDMENT PENDING PUSH`
+`P10-C REAUTHORIZED — MODELS / SPEC FREEZE ONLY`
 
 Design baseline:
 
-`ee5ddb9798f45b9abac081fb4f7c2c999c131b6c`
+`f20e4fd46c8d56e85dce80a16daf91abafd6323f`
 
 Current instruction:
 
-`development/81-p10-c-spec-freeze-instruction.md` (historical authorization; superseded before code by P10-ISSUE-002)
+`development/83-p10-c-spec-freeze-reauthorization.md`
+
+Historical authorization:
+
+`development/81-p10-c-spec-freeze-instruction.md` (superseded before code by P10-ISSUE-002)
 
 Historical stopped attempt:
 
@@ -178,9 +182,11 @@ P10-ISSUE-001 exact-candidate source binding is verified. No install/upgrade is 
 
 Design-owner review: `development/80-p10-b-github-review.md` = `PASS — P10-B CLOSED`.
 
-P10-C authorization `development/81-p10-c-spec-freeze-instruction.md` was committed before implementation started, but pre-implementation contract review found `P10-ISSUE-002`: spec bundle byte-level identity was underspecified. P10-C is STOPPED before any `src/` or `tests/` change. The design/plan/acceptance amendment must be committed/pushed before a new P10-C authorization may be issued.
+P10-C historical authorization `development/81-p10-c-spec-freeze-instruction.md` was stopped before code by `P10-ISSUE-002`. The amended design baseline is now `f20e4fd46c8d56e85dce80a16daf91abafd6323f`.
 
 Stop record: `development/82-p10-c-preimplementation-design-stop.md`.
+
+Current P10-C authorization: `development/83-p10-c-spec-freeze-reauthorization.md`. Scope is Models / Spec Freeze only; P10-D and later remain closed.
 
 Still not authorized:
 
