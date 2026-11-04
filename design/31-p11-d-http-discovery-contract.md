@@ -114,9 +114,9 @@ class SecDiscoveryCandidate:
     report_date: str | None
     primary_document: str
     primary_doc_description: str | None
-    is_xbrl: bool | None
-    is_inline_xbrl: bool | None
-    submission_source_url: str
+    is_xbrl: bool
+    is_inline_xbrl: bool
+    submission_source_urls: tuple[str, ...] = field(compare=False)
 
 
 def load_sec_ticker_rows(client: SecHttpClient) -> tuple[tuple[str, str], ...]: ...
@@ -134,6 +134,8 @@ def discover_sec_filings(
 ```
 
 Both exception classes store the exact `reason_code` string on the instance and pass the exact `message` to `RuntimeError`; `str(exc)` therefore equals `message`. No raw User-Agent value may appear in an exception message.
+
+`SecDiscoveryCandidate.submission_source_urls` requires `dataclasses.field(compare=False)`. It is provenance only: it is excluded from dataclass equality and ordering, excluded from filing semantic identity, and excluded from every downstream package/parsed deterministic identity unless a later reviewed contract explicitly promotes a provenance field.
 
 No caller-supplied arbitrary HTTP headers or User-Agent parameter exists in the public API.
 
@@ -600,14 +602,21 @@ Current rows and fetched historical rows are normalized through this same candid
 
 ## 17. Deterministic merge / duplicate accession
 
-Source array order and shard fetch order are never identity inputs.
+Source array order, shard fetch order and discovery provenance URL order are never filing semantic identity inputs.
 
 All normalized current + historical candidates merge by exact normalized `accession_number`.
 
+For each normalized source row, `submission_source_urls` initially contains exactly one canonical **requested** Submissions JSON URL: the current `CIK##########.json` URL or the validated historical-shard URL. Redirect final URLs and timing/receipt URLs do not enter this tuple.
+
 If the same accession appears more than once:
 
-- if every `SecDiscoveryCandidate` field is equal, keep one row;
-- if any field differs, fail closed with `P11_SUBMISSIONS_INVALID`.
+1. compare only semantic candidate fields (all dataclass fields with `compare=True`); `submission_source_urls` is excluded;
+2. if any semantic field differs, fail closed with `P11_SUBMISSIONS_INVALID`;
+3. if semantic fields are equal, keep one semantic row and set `submission_source_urls` to the ASCII-lexicographically sorted unique union of all contributing canonical requested source URLs;
+4. duplicate provenance URLs collapse to one entry; the tuple is always non-empty;
+5. current-vs-history source location, shard fetch order and duplicate source-row order therefore cannot create a false filing conflict or change semantic equality/order.
+
+`SecDiscoveryCandidate.__eq__` / ordering semantics follow the same rule because `submission_source_urls` is `field(compare=False)`. Code MUST NOT use `dataclasses.asdict()` or full serialized-object equality as the duplicate semantic comparator unless provenance is explicitly removed first.
 
 Canonical output sort:
 
@@ -717,15 +726,18 @@ Before P11-D implementation can close, focused tests must prove at least:
 35. non-overlapping historical shard not fetched;
 36. required parallel arrays must all exist and have equal lengths;
 37. `isXBRL`/`isInlineXBRL` accept integer 0/1 only;
-38. historical descriptor `filingCount` must equal shard row count;
-39. ticker `cik_str` accepts JSON integer only (bool/string/float rejected) and normalizes to 10-digit CIK;
-40. duplicate identical accession dedupes;
-41. duplicate conflicting accession => `P11_SUBMISSIONS_INVALID`;
-42. current/shard input order changes do not change canonical output;
-43. ticker rows sorted `(ticker,cik)` and ambiguity retained;
-44. target accession exact match / not-found behavior;
-45. no silent amendment supersession;
-46. no P11-E package/asset write or fetch occurs.
+38. public `SecDiscoveryCandidate.is_xbrl` and `is_inline_xbrl` are non-null bool for every accepted row
+39. historical descriptor `filingCount` must equal shard row count;
+40. ticker `cik_str` accepts JSON integer only (bool/string/float rejected) and normalizes to 10-digit CIK;
+41. duplicate identical accession dedupes;
+42. same-accession semantic-equal current/history rows with different source URLs dedupe and produce one ASCII-sorted unique provenance tuple
+43. provenance tuple content/order is excluded from candidate equality/order and cannot create a semantic conflict
+44. duplicate conflicting accession => `P11_SUBMISSIONS_INVALID`;
+45. current/shard input order changes do not change canonical output;
+46. ticker rows sorted `(ticker,cik)` and ambiguity retained;
+47. target accession exact match / not-found behavior;
+48. no silent amendment supersession;
+49. no P11-E package/asset write or fetch occurs.
 
 ## 22. Implementation authorization gate
 

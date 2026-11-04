@@ -94,7 +94,7 @@ Mandatory:
 
 Malformed/missing fields produce deterministic reason codes.
 
-Current + historical discovery merge MUST follow design/31: normalize through one candidate validator, dedupe exact-equal duplicate accessions, reject conflicting duplicate accessions with `P11_SUBMISSIONS_INVALID`, and canonical-sort by `(filing_date ASC, accession_number ASC)` independent of source/shard order.
+Current + historical discovery merge MUST follow design/31: normalize through one candidate validator; filing semantic equality excludes `submission_source_urls`; same-accession semantic-equal duplicates dedupe while provenance becomes an ASCII-sorted unique union; differing semantic fields reject with `P11_SUBMISSIONS_INVALID`; candidate XBRL flags are non-null bool; output canonical-sorts by `(filing_date ASC, accession_number ASC)` independent of source/shard/provenance order.
 
 No scraping of third-party filing mirrors.
 
