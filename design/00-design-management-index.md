@@ -295,21 +295,19 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_035_CANDIDATE_FROZEN_REVIEW_AUTHORIZED`
+`P10_DONE / P11_ISSUE_036_DESIGN_REVIEW_STOPPED`
 
 P11 latest reviewed candidate：
-- historical exact candidate = `00027be24be8e1c2ef3746600fa6e4f59ef641a5` = INELIGIBLE after P11-ISSUE-035；
-- authoritative stop = `development/188-p11-final-path-concurrency-review-stop.md`；
-- ISSUE-034 amendment evidence = `development/186-p11-final-export-byte-determinism-amendment-evidence.md` = PASS and remains valid；
-- ISSUE-035 amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS；
-- exact amended candidate = `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47`；
-- review authorization = `development/190-p11-final-path-concurrency-final-review-authorization.md`；
+- exact candidate = `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47` = INELIGIBLE after P11-ISSUE-036；
+- authoritative stop = `development/191-p11-registry-concurrency-review-stop.md`；
+- ISSUE-035 amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS and remains valid；
+- ISSUE-036 = concurrent P11-K registry persistence semantics not yet frozen；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
 - P11 production = CLOSED；
-- next action = run fresh detached P11-A review against exact candidate `2ef1e8c...`；
+- next action = Design-First amendment for ISSUE-036, then freeze a new exact candidate and run fresh detached P11-A review；
 - P11-B = NOT AUTHORIZED；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -512,5 +510,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 190. amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS；
 191. amended exact candidate = `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47`；
 192. review authorization = `development/190-p11-final-path-concurrency-final-review-authorization.md`；
-193. P11 production = CLOSED；
-194. Research MCP production / Semantic Resolver production remain closed / not authorized。
+193. candidate `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47` = INELIGIBLE after concurrent registry persistence review；
+194. review stop = `development/191-p11-registry-concurrency-review-stop.md`；
+195. P11-ISSUE-036 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
+196. P11 production = CLOSED；
+197. Research MCP production / Semantic Resolver production remain closed / not authorized。
