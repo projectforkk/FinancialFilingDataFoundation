@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-ISSUE-001 AMENDED / READ-ONLY AUDIT RERUN`
+`P10-B PASS / EVIDENCE PENDING GITHUB REVIEW — P10-C CLOSED`
 
 Design baseline:
 
@@ -170,13 +170,13 @@ Historical stopped attempt:
 
 `development/78-p10-environment-interface-audit.md`
 
-Authorized rerun output:
+Rerun evidence:
 
-`development/79-p10-environment-interface-audit-rerun.md`
+`development/79-p10-environment-interface-audit-rerun.md` = `PASS — P10_ENVIRONMENT_READY`
 
-P10-B first probe found the src-layout invocation gap recorded as `P10-ISSUE-001`. The amended design/plan/acceptance contract is now GitHub truth at `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c`; P10-B may rerun under the exact-candidate `PYTHONPATH` contract.
+P10-ISSUE-001 exact-candidate source binding is verified. No install/upgrade is required; P8/P9 accepted interfaces and runtime boundaries remain valid.
 
-P10 production/tests remain blocked during P10-B.
+P10-C remains CLOSED until the rerun evidence is committed/pushed and independently reviewed by the design owner.
 
 Still not authorized:
 

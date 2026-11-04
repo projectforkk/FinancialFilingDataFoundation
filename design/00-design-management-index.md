@@ -308,8 +308,9 @@ Current amended design baseline：
 P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<worktree>\\src` source binding 已由 `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c` 冻结。
 
 当前：
-1. P10-B = AUTHORIZED FOR READ-ONLY RERUN；
-2. instruction = `development/77-p10-environment-audit-instruction.md`；
-3. 不安装 package、不改 runtime；
-4. audit必须记录 bare import expected failure + exact-candidate source-bound import PASS；
-5. P10-C 及以后、P11、Research MCP production、Semantic Resolver production继续关闭。
+1. P10-B rerun = `PASS — P10_ENVIRONMENT_READY`；
+2. evidence = `development/79-p10-environment-interface-audit-rerun.md`；
+3. P10-ISSUE-001 exact-candidate source binding = PASS；
+4. no install/upgrade required；
+5. P10-C 继续关闭，直到 evidence commit/push + design-owner review；
+6. P11 / Research MCP production / Semantic Resolver production继续关闭。
