@@ -104,7 +104,8 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 67. all temp/basetemp/workspace remain under project root；
 68. no hidden chain-of-thought stored as project artifact；
 69. every P10 Python command binds `PYTHONPATH` to the exact frozen candidate worktree `src`; detached review/acceptance must not execute source from shared main/another worktree, and FFDF must not be editable/installed into main `.venv` merely for P10；
-70. P10-G integration instruction identity is verified from the exact frozen candidate Git blob bytes, not arbitrary checkout bytes; candidate commit and Git-blob SHA256 must match the acceptance freeze。
+70. P10-G integration instruction identity is verified from the exact frozen candidate Git blob bytes, not arbitrary checkout bytes; candidate commit and Git-blob SHA256 must match the acceptance freeze；
+71. frozen acceptance fixture manifest and all frozen runtime-spec fixture identities are verified from exact candidate Git blob bytes; detached checkout EOL representation must not be used as fixture identity or copied into the acceptance workspace。
 
 ### 2.1 P10-F CLI acceptance matrix
 
@@ -161,6 +162,31 @@ Independent Acceptance must calculate this from exact Git blob bytes, not from a
 If the detached worktree uses CRLF due Git checkout policy, record that representation separately; it is not an identity mismatch when LF-normalized content equals the frozen Git blob and the Git blob SHA matches.
 
 The Git blob must decode as UTF-8 and contain no BOM.
+
+### 2.3 Frozen acceptance fixture identity
+
+The frozen acceptance fixture package uses exact candidate Git blob bytes as the cross-worktree identity source.
+
+This applies to:
+
+- `acceptance/p10-fixtures/manifest.json`;
+- every fixture listed by that manifest.
+
+Independent Acceptance must:
+
+1. read the fixture manifest from `git cat-file blob HEAD:acceptance/p10-fixtures/manifest.json` using binary-safe subprocess bytes;
+2. parse that exact blob as UTF-8 JSON;
+3. read every listed fixture from `git cat-file blob HEAD:acceptance/p10-fixtures/<name>`;
+4. validate the manifest size/SHA against those exact blob bytes;
+5. copy those validated blob bytes into the mutable acceptance workspace;
+6. record checkout representation separately if useful, but never treat checkout CRLF/LF bytes as frozen fixture identity.
+
+Forbidden:
+
+- using arbitrary checked-out Markdown bytes as the manifest identity source;
+- copying CRLF-converted checkout bytes into the acceptance workspace when the frozen Git blob is LF;
+- editing the fixture manifest to accommodate checkout EOL conversion;
+- changing `.gitattributes` merely to make P10-N pass.
 
 ---
 

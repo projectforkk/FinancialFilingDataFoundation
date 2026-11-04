@@ -152,11 +152,11 @@
 
 ## Approved next phase
 
-**P10-J — Live P8/P9 Research Run**
+**P10-N — Independent Acceptance**
 
 Status:
 
-`AUTHORIZED — P10 CLOSEOUT INTEGRATION ONLY`
+`STOPPED — P10-ISSUE-008 ACCEPTANCE PACKAGE AMENDMENT REQUIRED / CLOSEOUT CLOSED`
 
 P10-C is closed:
 
@@ -433,11 +433,29 @@ Exact acceptance candidate:
 
 `4d1ab46f11d1d7b88934309ce32319e2200f0d8f`
 
-P10-N is now authorized but not yet executed.
+Corrected P10-N execution reached frozen harness precheck and STOPPED before any research acceptance run.
 
-P10 closeout/main integration remains STOPPED until an actual Independent Acceptance result is committed.
+Stop record:
 
-P10 production/design remain frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
+`development/128-p10-n-precheck-stop.md`
+
+P10-ISSUE-008 facts:
+
+- fixture manifest size/SHA matches exact candidate Git blob bytes;
+- all 8 frozen Markdown fixture Git blobs are LF;
+- detached Windows checkout under `core.autocrlf=true` materializes CRLF;
+- frozen harness incorrectly used checkout `Path.read_bytes()` as fixture identity;
+- no P10 production/test change or fixture semantic drift occurred.
+
+The prior P10-M freeze and corrected P10-N authorization are invalidated by the acceptance-package identity defect.
+
+Required sequence:
+
+`design amendment → acceptance harness amendment → targeted formal review → new P10-M freeze → new P10-N authorization → fresh Independent Acceptance`
+
+P10 closeout/main integration remains STOPPED.
+
+P10 production remains frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
 
 Still not authorized:
 

@@ -395,6 +395,9 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 85. historical integration merge `b560f49a78316fa59a4183de326d2dee0a80ebb6` = INELIGIBLE；
 86. corrected P10-N authorization = `development/127-p10-n-corrected-reauthorization.md`；
 87. corrected P10-N candidate = `4d1ab46f11d1d7b88934309ce32319e2200f0d8f`；
-88. P10-N = AUTHORIZED / NOT YET EXECUTED；
-89. P10 closeout/main integration = STOPPED pending actual P10-N result；
-90. P11 / Research MCP production / Semantic Resolver production remain closed。
+88. P10-N precheck stop = `development/128-p10-n-precheck-stop.md`；
+89. P10-N found `P10-ISSUE-008`: frozen fixture identity was checkout-EOL-sensitive；
+90. prior P10-M freeze + corrected P10-N authorization are INVALIDATED；
+91. P10 acceptance-package amendment required before any new P10-N；
+92. P10 closeout/main integration = STOPPED；
+93. P11 / Research MCP production / Semantic Resolver production remain closed。

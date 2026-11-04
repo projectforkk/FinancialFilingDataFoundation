@@ -2351,6 +2351,48 @@ No P10 production change is required.
 
 Affected gates: P10-J / P10-M / P10-N.
 
+### P10-ISSUE-008 — Frozen acceptance fixture identity was checkout-EOL-sensitive
+
+P10-N precheck on exact corrected candidate `4d1ab46f11d1d7b88934309ce32319e2200f0d8f` failed before any research acceptance execution with:
+
+`fixture size drift: corrupt-p9.md`
+
+Facts:
+
+- repository `core.autocrlf=true`;
+- all 8 frozen Markdown fixture manifest size/SHA values match exact candidate Git blob bytes;
+- those Git blobs use LF;
+- fresh detached Windows checkout materializes CRLF for all 8 Markdown fixtures;
+- `acceptance/p10_independent_acceptance_harness.py::validate_and_copy_fixtures` used checked-out `Path.read_bytes()` as the identity source;
+- therefore checkout bytes differ even though the exact candidate Git blob is unchanged;
+- no P10 production/test change or fixture semantic drift occurred.
+
+Root cause:
+
+Frozen acceptance fixture identity was defined by manifest SHA/size but the harness verified arbitrary checkout bytes instead of exact Git-truth bytes. This conflicts with the already accepted P10-G cross-worktree identity principle established by P10-ISSUE-006.
+
+Risk:
+
+1. valid frozen candidates can fail Independent Acceptance solely because of Windows checkout EOL conversion;
+2. two worktrees of the same candidate can produce different fixture bytes;
+3. copying checkout bytes into acceptance workspace can silently normalize the frozen runtime-spec input differently from the manifest;
+4. acceptance reproducibility becomes dependent on local Git checkout policy.
+
+Approved solution:
+
+1. `acceptance/p10-fixtures/manifest.json` identity is read from exact candidate Git blob bytes;
+2. all 8 frozen fixture payloads are read from exact candidate Git blob bytes using binary-safe `git cat-file blob HEAD:<path>`;
+3. manifest parsing occurs from those blob bytes;
+4. fixture size/SHA validation uses those blob bytes;
+5. acceptance workspace receives exact validated blob bytes;
+6. arbitrary checkout CRLF/LF representation is not a frozen identity source;
+7. checkout representation may be recorded diagnostically only;
+8. no `.gitattributes` change is required for P10;
+9. production source/tests remain unchanged;
+10. the amended acceptance harness/package requires targeted formal review, a new acceptance freeze, and a fresh P10-N run.
+
+Affected gates: P10-M / P10-N / P10-O closeout.
+
 任何问题必须：
 
 ```text
