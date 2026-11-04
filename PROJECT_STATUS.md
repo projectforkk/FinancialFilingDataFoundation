@@ -706,4 +706,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-039 REMEDIATED / EXACT CANDIDATE 5877a23 FORMAL REVIEW AUTHORIZED / PRODUCTION NOT STARTED`
+- P11 — US SEC Provider: `P11-A PASS / P11-B AUTHORIZATION PENDING / PRODUCTION NOT STARTED`
