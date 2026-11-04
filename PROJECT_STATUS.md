@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — READ-ONLY AUDIT ONLY`
+`STOPPED — P10-ISSUE-001 DESIGN AMENDMENT PENDING PUSH`
 
 Design baseline:
 
@@ -165,6 +165,8 @@ Design baseline:
 Current instruction:
 
 `development/77-p10-environment-audit-instruction.md`
+
+P10-B first probe found the src-layout invocation gap recorded as `P10-ISSUE-001`. The audit may resume only after the amended design/plan/acceptance contract is committed/pushed.
 
 P10 production/tests remain blocked during P10-B.
 

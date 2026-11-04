@@ -102,7 +102,8 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 65. partial/gap behavior follows runtime spec；
 66. performance gates PASS；
 67. all temp/basetemp/workspace remain under project root；
-68. no hidden chain-of-thought stored as project artifact。
+68. no hidden chain-of-thought stored as project artifact；
+69. every P10 Python command binds `PYTHONPATH` to the exact frozen candidate worktree `src`; detached review/acceptance must not execute source from shared main/another worktree, and FFDF must not be editable/installed into main `.venv` merely for P10。
 
 ---
 
@@ -320,6 +321,14 @@ P10 host-side Codex运行不等于 P10 production调用 AI API；二者必须在
 
 Windows path length在 freeze 时按当前 accepted path policy选择足够短的 project-local basetemp。
 
+每个 acceptance Python command 还必须先：
+
+```powershell
+$env:PYTHONPATH="<detached-p10-candidate-worktree>\src"
+```
+
+并记录实际值。禁止从 shared main / active development worktree 导入 candidate source。
+
 禁止使用 project root之外 sibling temp。
 
 ---
@@ -348,7 +357,7 @@ Independent Acceptance executor不得修改：
 
 PASS 要求：
 
-- Mandatory 68 项全部有 credible evidence；
+- Mandatory 69 项全部有 credible evidence；
 - fresh focused/full PASS；
 - dynamic Spec A/B PASS；
 - live COMPLETE run PASS；

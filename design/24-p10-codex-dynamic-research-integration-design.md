@@ -1141,9 +1141,31 @@ P8/P9调用继续使用各自 accepted performance gates。
 
 ## 48. Environment
 
-P10 deterministic package优先运行于 FFDF main runtime：
+P10 deterministic package运行于 FFDF main runtime：
 
 `D:\\Codex\\FinancialFilingDataFoundation\\.venv`
+
+### 48.1 Source-layout invocation contract
+
+P10-B 实测确认 FFDF repository 是 source checkout / `src/` layout，main runtime 当前**没有**把 `financial_filing_data_foundation` 安装进 site-packages。
+
+因此正式 Python invocation 必须绑定 exact candidate worktree：
+
+```powershell
+$env:PYTHONPATH="<exact-candidate-worktree>\src"
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m ...
+```
+
+要求：
+
+- `PYTHONPATH` 必须指向当前 exact candidate 的 `src`，不得指向共享 main 或另一 worktree；
+- Code Review / Acceptance detached worktree 必须使用各自 detached candidate 的 `src`；
+- 不得为了让 `python -m` 可用而把 FFDF editable/install 到 main `.venv`；
+- 不得依赖当前 PowerShell working directory 隐式发现 package；
+- main runtime 继续保持无 MCP SDK；
+- P8 dedicated runtime在调用 P8 server source时同样显式绑定对应 accepted/candidate `src`。
+
+裸 main-runtime import 在未设置 `PYTHONPATH` 时失败是当前 repository layout 的预期环境事实，不代表缺少第三方 dependency。
 
 不得为了 P10 安装 AI SDK。
 
@@ -1207,7 +1229,33 @@ P10 integration run至少支持：
 
 ## 52. P10 Issue Log
 
-初始：无。
+### P10-ISSUE-001 — Main runtime does not install the FFDF src-layout package
+
+P10-B read-only audit at design baseline `acb9009d4751bbe5f8f8acec32ea7ffe30ce4c2f` observed：
+
+- `D:\\Codex\\FinancialFilingDataFoundation\\.venv\\Scripts\\python.exe` = Python 3.14.9 ARM64；
+- direct `import financial_filing_data_foundation` without source-path binding fails with `ModuleNotFoundError`；
+- with `PYTHONPATH=<exact-worktree>\\src`, accepted P8 `McpCatalog/McpQueryService` and P9 public API import successfully；
+- main runtime intentionally has no `mcp` SDK；
+- P8 dedicated MCP runtime remains separate and valid。
+
+Root cause：
+
+Repository uses a source-checkout `src/` layout and does not install FFDF itself into the main virtual environment. Earlier P10 design named the runtime but did not freeze how candidate source is selected.
+
+Risk：
+
+Without an explicit source-path contract, Code Review / Acceptance could accidentally execute source from another worktree or tempt an unnecessary editable install into the accepted runtime.
+
+Approved solution：
+
+1. every P10 Python command explicitly sets `PYTHONPATH=<exact candidate worktree>\\src`；
+2. review/acceptance use the detached candidate's own `src`；
+3. no FFDF editable/install is added to main `.venv` merely for P10；
+4. no new dependency/runtime is required；
+5. P10-B must be rerun/completed after this amendment is pushed。
+
+Affected gates：P10-B / P10-F / P10-H / P10-L / P10-N.
 
 任何问题必须：
 

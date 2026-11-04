@@ -43,6 +43,8 @@ Gate：
 
 - main/P10 branch baseline identity；
 - FFDF main runtime；
+- exact-candidate `PYTHONPATH=<worktree>\\src` source binding；
+- bare main-runtime import is not used as package-discovery contract；
 - P8 MCP runtime lock unchanged；
 - exact P8 11 tools；
 - P9 CLI/public API；
@@ -58,6 +60,8 @@ Gate：
 
 若需要新增 dependency/runtime：
 STOP → design amendment。
+
+P10-ISSUE-001 已确认：当前不需要 install FFDF package 或新增 dependency；正式执行统一显式绑定 exact candidate `src`。
 
 ---
 
@@ -124,7 +128,12 @@ provenance focused tests PASS。
 
 实现：
 
-`python -m financial_filing_data_foundation.research.cli`
+```powershell
+$env:PYTHONPATH="<exact-candidate-worktree>\src"
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m financial_filing_data_foundation.research.cli
+```
+
+禁止以 editable/install 代替 exact-candidate source binding。
 
 commands：
 

@@ -56,6 +56,14 @@ If any dependency/runtime change appears necessary:
 
 `STOP → design amendment → commit/push → reassess`
 
+### P10-B observed stop — P10-ISSUE-001
+
+The first read-only probe observed that the FFDF main runtime does not install the repository package into site-packages; imports succeed only after binding the candidate `src` on `PYTHONPATH`.
+
+This is not permission to install anything.
+
+P10-B is STOPPED until design/24 + design/25 + acceptance/38 freeze the exact-candidate source-path invocation contract and that amendment is committed/pushed. After the amendment, rerun/complete P10-B using the amended contract.
+
 ## 4. Git / baseline checks
 
 Record:

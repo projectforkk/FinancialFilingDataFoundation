@@ -305,9 +305,11 @@ P10 design candidate：
 Design baseline 已形成：
 `acb9009d4751bbe5f8f8acec32ea7ffe30ce4c2f`
 
-当前仅授权：
-1. P10-B Environment / Accepted Interface Audit；
-2. instruction = `development/77-p10-environment-audit-instruction.md`；
-3. P10-B 只读，不修改 production/tests/runtime；
-4. P10-C 及以后继续关闭，直到 audit evidence push + 后续 explicit instruction；
-5. P11 / Research MCP production / Semantic Resolver production继续关闭。
+P10-B first probe发现 `P10-ISSUE-001`：main runtime不安装 repository package，必须冻结 exact-candidate `PYTHONPATH=<worktree>\\src` source binding。
+
+当前：
+1. P10-B = STOPPED pending Design-First amendment push；
+2. amendment涉及 design/24、design/25、acceptance/38 与 instruction/status；
+3. 不安装 package、不改 runtime；
+4. amendment push 后才允许按新 contract恢复 P10-B read-only audit；
+5. P10-C 及以后、P11、Research MCP production、Semantic Resolver production继续关闭。
