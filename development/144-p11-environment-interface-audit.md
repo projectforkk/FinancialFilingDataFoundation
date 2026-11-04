@@ -315,3 +315,21 @@ Resolution in the current amendment:
 Official SEC Accessing EDGAR Data documentation was rechecked: accession-number directories contain machine-readable index.json and all submitted filing component documents are stored in the accession directory.
 
 No production/test/runtime change was made.
+
+
+## 11. Third detached review finding — P11-ISSUE-020
+
+Fresh review of `ae0f2a1c4c1ac3c1586dba4fabee807f002af987` stopped because v2 writer preceded final periodic identity binding.
+
+Stop:
+`development/154-p11-corrected-design-review-stop.md`
+
+Resolution in current amendment:
+
+- P11-F parser extracts DEI/raw facts;
+- P11-G confirms final period/filing identity in memory, no registry write;
+- P11-H writes/loads v2 using confirmed identity;
+- P11-I validates;
+- P11-K performs registry/ParsedData persistence only after validation/reuse gate.
+
+P11-ISSUE-020 is closed in the amended design, pending fresh detached review.

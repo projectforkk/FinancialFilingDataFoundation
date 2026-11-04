@@ -211,9 +211,42 @@ No network during deterministic parse.
 
 Focused tests use local frozen fixtures.
 
-## P11-G — ParsedFinancialDocument v2 Writer/Loader
+## P11-G — Final Period / Filing Identity Binding
 
-Implement design/30 over P11-F parser outputs.
+Use P11-F parser outputs to confirm the final periodic identity in memory before any v2 document is written.
+
+Extract/confirm:
+
+- DocumentFiscalYearFocus;
+- DocumentFiscalPeriodFocus;
+- form/report date consistency.
+
+No registry write occurs in P11-G.
+
+Rules tested:
+
+- 10-K FY;
+- 10-Q Q1/Q2/Q3;
+- Q2 valid iff market=US;
+- CN Q2 rejected;
+- HK Q2 rejected;
+- Q2 never aliases H1;
+- 20-F/40-F FY;
+- unresolved DEI => P11_PERIOD_UNRESOLVED;
+- conflicting DEI/request => P11_PERIOD_CONFLICT;
+- amendment remains distinct accession variant;
+- multiple variants do not silently canonicalize.
+
+Output of P11-G is the confirmed filing identity consumed by the v2 writer.
+
+## P11-H — ParsedFinancialDocument v2 Writer/Loader
+
+Implement design/30 over:
+
+- P11-F parser outputs;
+- P11-G confirmed filing identity.
+
+For periodic filings, `document.json.fiscal_year` and `raw_fiscal_period` MUST come from the confirmed P11-G identity. No provisional/null periodic identity is permitted merely to allow writing.
 
 Required artifacts:
 
@@ -235,34 +268,11 @@ Loaders must verify:
 - IDs;
 - locator integrity;
 - asset references;
-- package/document identity.
+- package/document identity;
+- periodic document identity matches the confirmed binding.
 
+No registry write occurs in P11-H.
 No v1 masquerading.
-
-## P11-H — Period Binding / Registry Integration
-
-Implement provisional discovery -> final identity binding only after P11-F/G can produce verified DEI/raw-fact artifacts.
-
-Extract/confirm:
-
-- DocumentFiscalYearFocus;
-- DocumentFiscalPeriodFocus;
-- form/report date consistency.
-
-Register/bind the primary periodic asset only after final period confirmation.
-
-Rules tested:
-
-- 10-K FY;
-- 10-Q Q1/Q2/Q3;
-- Q2 valid iff market=US;
-- CN Q2 rejected;
-- HK Q2 rejected;
-- Q2 never aliases H1;
-- 20-F/40-F FY;
-- DEI conflict => review/block;
-- amendment remains distinct accession variant;
-- multiple variants do not silently canonicalize.
 
 ## P11-I — SEC Validation
 
@@ -301,6 +311,14 @@ Tests:
 ## P11-K — Registry / Parsed Data / Incremental Reuse
 
 Integrate periodic SEC v2 results into existing registry with additive compatibility.
+
+Registry/ParsedData persistence occurs only after P11-I validation has produced the final status and P11-G identity is confirmed.
+
+For periodic filings:
+
+- register the primary exact source asset with the confirmed filing identity;
+- persist ParsedDataRecord only after the v2 package has been written/loaded and validation completed;
+- canonical reuse eligibility requires the rules below.
 
 Reuse requires:
 

@@ -225,3 +225,21 @@ The current amendment reconciles them as follows:
 - Q2 is legal only for market US; CN/HK Q2 remains rejected.
 
 This resolves the circular dependency without changing accepted P0-P10 contracts.
+
+
+## 16. Period-binding / v2-writer reconciliation
+
+P11-ISSUE-020 is resolved by moving final period/identity binding before v2 serialization.
+
+The canonical implementation order is now:
+
+```text
+P11-E package assembly
+→ P11-F parser + DEI extraction
+→ P11-G confirmed filing identity
+→ P11-H ParsedFinancialDocument v2 writer/loader
+→ P11-I validation
+→ P11-K registry/reuse persistence
+```
+
+This satisfies design/30 periodic document identity without provisional/null field fabrication and preserves registry validation-before-reuse semantics.
