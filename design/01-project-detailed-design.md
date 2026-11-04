@@ -1053,7 +1053,7 @@ Accepted chain：
 - reconciled `design/28` remains future semantic reference only；
 - reconciled `design/29` remains future Research MCP reference only。
 
-P10 is closed. P11-A Design Baseline is CLOSED / PASS on exact candidate `5877a238f5af6102ef48e56141cdb893590b6aab`; formal review result: `development/203-p11-final-detached-design-review-result.md = PASS`. P11-B isolated Environment / SEC Runtime Probe is authorized by `development/204-p11-b-environment-runtime-probe-authorization.md`. P11 provider production remains closed. Research MCP production and Semantic Resolver production remain unauthorized.
+P10 is closed. P11-A Design Baseline is CLOSED / PASS on exact candidate `5877a238f5af6102ef48e56141cdb893590b6aab`; formal review result: `development/203-p11-final-detached-design-review-result.md = PASS`. P11-B Environment / SEC Runtime Probe is CLOSED / PASS (`development/205-p11-environment-runtime-probe.md`). P11-C requires separate authorization. P11 provider production remains closed. Research MCP production and Semantic Resolver production remain unauthorized.
 
 继续保持职责边界：
 
