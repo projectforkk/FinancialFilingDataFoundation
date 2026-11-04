@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-034. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`, `182`, `185`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`, `183`, `186`). Candidate `866e07025e53b2da852700d2e688b3a3af0bc39a` passed automated ISSUE-010..033 guards but manual byte-level review found P11-ISSUE-034: final export byte serialization/order and per-attempt diagnostic exclusion were not fully frozen, making ISSUE-033 idempotent byte comparison potentially nondeterministic. Stop: `development/185-p11-final-export-byte-determinism-review-stop.md`. ISSUE-034 is remediated in the current amended design with exact JSON/JSONL UTF-8/LF serialization, deterministic row/nested collection order, diagnostic isolation, and extensionless SHA-only raw blob paths. Evidence: `development/186-p11-final-export-byte-determinism-amendment-evidence.md = PASS`. A fresh exact-candidate detached design review is still required. P11 production remains CLOSED.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-035. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`, `182`, `185`, `188`); amendment evidence through ISSUE-034 is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`, `183`, `186`). Exact candidate `00027be24be8e1c2ef3746600fa6e4f59ef641a5` passed automated ISSUE-010..034 guards, but manual concurrency/race review found P11-ISSUE-035: when two processes for the same deterministic `parse_run_id` both observe the final path absent, the losing atomic commit has no frozen transition from destination-exists into exact existing-final verification. Stop: `development/188-p11-final-path-concurrency-review-stop.md`. Candidate `00027be...` is INELIGIBLE. ISSUE-035 requires a Design-First amendment and fresh detached review. P11-A remains STOPPED, P11-B is NOT AUTHORIZED, and P11 production remains CLOSED.
 
 P10-C is closed:
 
@@ -704,4 +704,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-034 REMEDIATED / CANDIDATE FREEZE PENDING / PRODUCTION NOT STARTED`
+- P11 — US SEC Provider: `ISSUE-035 OPEN / DESIGN-FIRST AMENDMENT REQUIRED / PRODUCTION NOT STARTED`
