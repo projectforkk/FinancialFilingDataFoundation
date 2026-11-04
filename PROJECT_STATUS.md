@@ -520,13 +520,27 @@ P10-N authorization:
 
 `development/137-p10-n-independent-acceptance-authorization.md`
 
-Only exact candidate `183ca5dc89a606715a3e352bf92a235f7aa31fad` is eligible. The first execution attempt stopped because the mutable live P9 submission metadata did not match the frozen acceptance/39 metadata. Stop record: `development/138-p10-n-execution-stop.md`. Fresh rerun authorization: `development/139-p10-n-rerun-authorization.md`. Candidate/package/design remain unchanged. Closeout remains closed.
+Only exact candidate `183ca5dc89a606715a3e352bf92a235f7aa31fad` was eligible. The first execution attempt stopped because the mutable live P9 submission metadata did not match the frozen acceptance/39 metadata. Stop record: `development/138-p10-n-execution-stop.md`. Fresh rerun authorization: `development/139-p10-n-rerun-authorization.md`. Candidate/package/design remained unchanged.
 
-Required sequence:
+Fresh Independent Acceptance result:
 
-`design amendment → acceptance harness amendment → targeted formal review → new P10-M freeze → new P10-N authorization → fresh Independent Acceptance`
+`acceptance/40-p10-independent-acceptance-result.md = PASS`
 
-P10 closeout/main integration remains STOPPED.
+Verified in the fresh rerun:
+
+- precheck PASS with Git-blob fixture/base identity;
+- research unit `136 passed`;
+- full unit `444 passed`;
+- dynamic Spec A/B hashes/toolsets differ and both ledgers PASS;
+- live CN 600519 run = COMPLETE;
+- fresh isolated P9 resolution/overlay validated;
+- K1–K5 exact negative capability gates PASS;
+- immutable 47-file base postcheck PASS;
+- detached candidate remained clean at `183ca5dc89a606715a3e352bf92a235f7aa31fad`.
+
+P10-N is CLOSED / PASS.
+
+P10-O closeout/main integration remains CLOSED until a separate explicit authorization.
 
 P10 production remains frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
 

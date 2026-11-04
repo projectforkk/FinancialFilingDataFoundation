@@ -418,6 +418,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 108. P10-N authorization = `development/137-p10-n-independent-acceptance-authorization.md`；
 109. P10-N first execution stop = `development/138-p10-n-execution-stop.md`；
 110. P10-N fresh rerun authorization = `development/139-p10-n-rerun-authorization.md`；
-111. P10-N = AUTHORIZED FRESH RERUN ONLY against exact candidate `183ca5dc...`；
-112. P10 closeout/main integration = STOPPED；
-113. P11 / Research MCP production / Semantic Resolver production remain closed。
+111. P10-N result = `acceptance/40-p10-independent-acceptance-result.md` = PASS；
+112. P10-N accepted detached candidate = `183ca5dc89a606715a3e352bf92a235f7aa31fad`；
+113. P10-N = CLOSED / PASS；
+114. P10-O closeout/main integration = CLOSED pending separate authorization；
+115. P11 / Research MCP production / Semantic Resolver production remain closed。
