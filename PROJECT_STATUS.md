@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-L CLOSED / P10-M CLOSED PENDING SEPARATE AUTHORIZATION`
+`AUTHORIZED — P10-M ACCEPTANCE PACKAGE ONLY / NO DESIGN OR PRODUCTION CHANGES`
 
 P10-C is closed:
 
@@ -355,7 +355,13 @@ P10-L formal review result:
 
 `development/119-p10-l-formal-code-review-result.md = PASS`
 
-P10-L is closed. P10-M remains closed until a separate explicit authorization.
+P10-L is closed.
+
+P10-M acceptance-freeze authorization:
+
+`development/120-p10-m-acceptance-freeze-authorization.md`
+
+Only acceptance-package authoring/freeze is authorized; core design and production remain frozen.
 
 Still not authorized:
 

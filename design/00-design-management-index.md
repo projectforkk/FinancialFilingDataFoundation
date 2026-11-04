@@ -381,5 +381,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 71. P10-L authorization = `development/118-p10-l-formal-review-authorization.md`；
 72. P10-L formal review result = `development/119-p10-l-formal-code-review-result.md` = PASS；
 73. P10-L = CLOSED；
-74. P10-M and later remain closed pending separate authorization；
-75. P11 / Research MCP production / Semantic Resolver production remain closed。
+74. P10-M authorization = `development/120-p10-m-acceptance-freeze-authorization.md`；
+75. P10-M = AUTHORIZED ACCEPTANCE PACKAGE ONLY / NO DESIGN OR PRODUCTION CHANGES；
+76. P10-N remains closed；
+77. P11 / Research MCP production / Semantic Resolver production remain closed。
