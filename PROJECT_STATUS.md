@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-G ONLY / DOCUMENTATION SCOPE`
+`P10-G CANDIDATE READY / DETACHED DOCUMENTATION REVIEW AUTHORIZED / P10-H CLOSED`
 
 P10-C is closed:
 
@@ -224,6 +224,30 @@ P10-G authorization:
 
 `development/102-p10-g-integration-instruction-authorization.md`
 
+P10-G candidate:
+
+`3a805a8f333ac20770d6aec1c8285d93993d18fc`
+
+Integration artifact:
+
+`integration/p10/FFDF_RESEARCH_INTEGRATION.md`
+
+Artifact SHA256:
+
+`ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`
+
+Development evidence:
+
+`development/103-p10-g-integration-instruction-evidence.md = PASS`
+
+Evidence commit:
+
+`241055f`
+
+Detached documentation review instruction:
+
+`development/104-p10-g-documentation-review-instruction.md`
+
 The amended P10-F baseline freezes:
 
 - exact four CLI argv contracts;
@@ -237,7 +261,7 @@ The amended P10-F baseline freezes:
 - deterministic context rebuild for validate-ledger;
 - no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
 
-P10-G is authorized only for `integration/p10/FFDF_RESEARCH_INTEGRATION.md`. No src/tests/runtime/dependency change is authorized in this gate.
+P10-G candidate is frozen for detached documentation/scope review. No further P10-G artifact change is authorized during review.
 
 Still not authorized:
 
