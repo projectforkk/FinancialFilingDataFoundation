@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-H CLOSED / P10-I CLOSED PENDING SEPARATE AUTHORIZATION`
+`AUTHORIZED — P10-I DYNAMIC SPEC VALIDATION ONLY / NO PRODUCTION CHANGES`
 
 P10-C is closed:
 
@@ -294,11 +294,17 @@ P10-H evidence:
 
 `development/109-p10-h-full-regression-scope-evidence.md = PASS`
 
-P10-H is closed. P10-I remains closed until a separate explicit authorization.
+P10-H is closed.
+
+P10-I authorization:
+
+`development/110-p10-i-dynamic-spec-authorization.md`
+
+Only dynamic-spec integration validation/workspace evidence is authorized; production/tests/design changes remain forbidden.
 
 Still not authorized:
 
-- P10-H and later production;
+- P10-J and later production;
 - Research MCP production;
 - Semantic Resolver production;
 - P11 production;
