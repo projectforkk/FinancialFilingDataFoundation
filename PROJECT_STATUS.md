@@ -156,15 +156,15 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-003 DESIGN AMENDMENT PENDING PUSH`
+`AUTHORIZED — P10-D ONLY / P10-ISSUE-003 AMENDED BASELINE`
 
 Design baseline:
 
-`f20e4fd46c8d56e85dce80a16daf91abafd6323f`
+`ba962aef818d7a31731637a5cfef1f57020a7d1d`
 
 Current instruction:
 
-`development/83-p10-c-spec-freeze-reauthorization.md`
+`development/88-p10-d-context-reauthorization.md`
 
 Historical authorization:
 
@@ -198,9 +198,11 @@ Detached review result: `development/86-p10-c-detached-code-review-result.md` = 
 
 P10-C is closed.
 
-P10-D pre-implementation contract review found `P10-ISSUE-003`: the P8/P9/capability fingerprint bytes were underspecified and `p9_review_root` was omitted from `research_context_id`. P10-D is STOPPED before any `context.py` / context test implementation. Design/24 + design/25 + acceptance/38 must be committed/pushed as a new baseline before P10-D can be authorized.
+P10-D pre-implementation contract review found `P10-ISSUE-003`; the corrected context identity contract is now GitHub truth at `ba962aef818d7a31731637a5cfef1f57020a7d1d`.
 
 Stop record: `development/87-p10-d-preimplementation-design-stop.md`.
+
+P10-D is reauthorized by `development/88-p10-d-context-reauthorization.md`. Scope is Research Context / Capability Manifest only; evidence must use `development/89-p10-d-context-evidence.md`. P10-E and later remain closed.
 
 Still not authorized:
 

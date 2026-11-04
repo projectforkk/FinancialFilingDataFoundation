@@ -323,7 +323,9 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 13. P10-C detached review result = `development/86-p10-c-detached-code-review-result.md` = PASS；
 14. P10-C = CLOSED；
 15. P10-D pre-implementation review found `P10-ISSUE-003`；
-16. P10-D = STOPPED before code pending design/24 + design/25 + acceptance/38 amendment push；
+16. P10-D amended design baseline = `ba962aef818d7a31731637a5cfef1f57020a7d1d`；
 17. stop record = `development/87-p10-d-preimplementation-design-stop.md`；
-18. P10-E 及以后继续关闭；
-19. P11 / Research MCP production / Semantic Resolver production继续关闭。
+18. P10-D reauthorization = `development/88-p10-d-context-reauthorization.md`；
+19. P10-D scope = Research Context / Capability Manifest only；
+20. P10-E 及以后继续关闭；
+21. P11 / Research MCP production / Semantic Resolver production继续关闭。
