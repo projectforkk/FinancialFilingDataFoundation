@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P9_DONE / P10_DESIGN_AUTHORIZED**
+**P9_DONE / P10_DESIGN_READY**
 
 ## Accepted baseline
 
@@ -137,36 +137,46 @@
 - post-merge full regression: `308 passed in 23.74s`
 - accepted merge: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
 
+### P10 — Codex Dynamic Research Integration
+
+- status: `DESIGN READY / PRODUCTION NOT STARTED`
+- branch: `design/p10-dynamic-research-integration`
+- starting main: `e9b30626f2b88ac5527d42bd76d0b682efbeef0e`
+- detailed design: `design/24-p10-codex-dynamic-research-integration-design.md`
+- implementation plan: `design/25-p10-implementation-plan.md`
+- acceptance baseline: `acceptance/38-p10-acceptance-instruction.md`
+- reconciliation: `development/76-p10-design-reconciliation.md`
+- design/28: future semantic reference / implementation not authorized
+- design/29: future Research MCP reference / production not authorized
+- production changes: `NONE`
+
 ## Approved next phase
 
-**P10 — Codex Dynamic Research Integration**
+**P10 — Design Baseline Finalization**
 
 Status:
 
-`DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
+`DESIGN READY / PRODUCTION BLOCKED UNTIL DEVELOPMENT INSTRUCTION`
 
-Authorization basis:
+Current actions authorized:
 
-- P9 Independent Acceptance: `PASS`
-- acceptance evidence: `acceptance/37-p9-acceptance-result.md`
-- accepted P9 merge: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
-- post-merge full regression: `308 passed in 23.74s`
-- P9 blocker: `NONE`
+- design consistency review；
+- UTF-8/no-BOM validation；
+- `git diff --check`；
+- commit/push P10 design baseline。
 
-Authorized now:
+After design baseline push：
 
-- read the latest accepted `main` design and P8/P9 contracts；
-- prepare P10 detailed design / implementation plan / acceptance instruction；
-- reconcile any prior cross-phase research-consumption / visual / semantic design drafts against the accepted P9 baseline before adopting them；
-- commit/push a new P10 design baseline before any P10 production implementation。
+- create a separate P10 development instruction；
+- first authorized execution gate is P10-B Environment / Accepted Interface Audit；
+- production implementation still must wait for that instruction。
 
-Not authorized yet:
+Still not authorized:
 
-- P10 production code；
-- P11 production；
 - Research MCP production；
 - Semantic Resolver production；
-- any change that weakens P8 read-only or P9 durable-review boundaries。
+- P11 production；
+- any weakening of P8 read-only or P9 durable-review boundaries。
 
 ## Project directory consolidation
 
@@ -270,5 +280,5 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
-- P10 — Codex Dynamic Research Integration: `DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
+- P10 — Codex Dynamic Research Integration: `DESIGN READY / PRODUCTION NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`

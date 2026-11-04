@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P8 DONE / P9 DESIGN READY**
+状态：**P9 DONE / P10 DESIGN READY**
 
 ## 总原则
 
@@ -103,17 +103,17 @@ deterministic validation、blocking issues、quality gates、reuse eligibility�
 
 ## P9 — Codex Review Overlay
 
-状态：`DESIGN READY`
+状态：`DONE / PASS`
 
 目标：
-仅对 ambiguous local structured data 启用 Codex text review，输出 REVIEW_OVERLAY，不覆盖 RAW/LOCAL_EXTRACTED。
+evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
-## P10 — Codex Skill
+## P10 — Codex Dynamic Research Integration
 
-状态：`NOT STARTED`
+状态：`DESIGN READY / PRODUCTION NOT STARTED`
 
 目标：
-把已验收 local data + review workflow 封装为 Codex Skill。
+让 Codex 每次读取当前 runtime research specification，动态使用 accepted P8/P9 完成当前研究；P10 不实现固定 Skill，不复制研究业务规则。
 
 ## P11 — US SEC Provider
 
@@ -137,7 +137,7 @@ P8 Local MCP
 ↓
 P9 Codex Review Overlay
 ↓
-P10 Codex Skill
+P10 Codex Dynamic Research Integration
 ↓
 P11 US SEC Provider
 ```

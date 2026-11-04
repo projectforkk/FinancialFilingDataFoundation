@@ -114,6 +114,10 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 21-p8-implementation-plan.md | P8 | ACCEPTED HISTORY |
 | 22-p9-review-overlay-design.md | P9 | ACCEPTED HISTORY |
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
+| 24-p10-codex-dynamic-research-integration-design.md | P10 | DESIGN READY |
+| 25-p10-implementation-plan.md | P10 | DESIGN READY |
+| 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
+| 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -156,7 +160,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P7 | 18 | 19 | acceptance/26 | DONE |
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
-| P10 | 24 | 25 | TBD | DESIGN AUTHORIZED |
+| P10 | 24 | 25 | acceptance/38 (baseline) | DESIGN READY |
 | P11 | 26 | 27 | TBD | NOT STARTED |
 
 ---
@@ -288,17 +292,19 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P9_DONE / P10_DESIGN_AUTHORIZED`
+`P9_DONE / P10_DESIGN_READY`
 
-P9 closeout baseline：
-- Independent Acceptance = `PASS`；
-- acceptance evidence = `acceptance/37-p9-acceptance-result.md`；
-- accepted merge = `58a1d2236b68a56fc66ddf8b97603e7232c87265`；
-- post-merge full regression = `308 passed`。
+P10 design candidate：
+- detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
+- implementation plan = `design/25-p10-implementation-plan.md`；
+- acceptance baseline = `acceptance/38-p10-acceptance-instruction.md`；
+- reconciliation = `development/76-p10-design-reconciliation.md`；
+- design/28 semantic architecture = reference only / implementation not authorized；
+- design/29 Research MCP = reference only / production not authorized。
 
-下一步仅授权 P10 DESIGN：
-1. 从最新 accepted `main` 重新读取跨阶段架构、P8、P9 真源；
-2. 形成 P10 detailed design、implementation plan、acceptance instruction；
-3. 将既有 research-consumption / visual / semantic 设计草案与 P9 accepted boundary 逐项 reconcile；
-4. commit/push P10 design baseline；
-5. 在 P10 DESIGN_READY 之前不得开始 P10 production；P11 / Research MCP production / Semantic Resolver production 继续关闭。
+下一步：
+1. 完成 design consistency / encoding / diff review；
+2. commit/push exact P10 design baseline；
+3. push 成功前 production 继续 BLOCKED；
+4. push 后由独立 development instruction授权 P10-B Environment / Accepted Interface Audit；
+5. P11 / Research MCP production / Semantic Resolver production继续关闭。
