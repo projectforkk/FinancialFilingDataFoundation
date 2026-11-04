@@ -232,6 +232,7 @@ Rules:
 - trailing-dot hostnames are rejected;
 - userinfo is rejected;
 - explicit port is permitted only when equal to `443`;
+- for redirect-loop identity only, accepted authority spellings are canonicalized as lowercase ASCII host plus effective port `443`; absence of an explicit port and explicit `:443` are the same loop identity;
 - fragments are rejected;
 - `file:`, `http:`, UNC/local paths and every non-HTTPS scheme are rejected before network access;
 - arbitrary caller hostnames are rejected;
@@ -345,11 +346,14 @@ Every redirect:
 - requires exactly one `Location` header field with a non-empty value; missing or repeated Location => `P11_REDIRECT_NOT_ALLOWED`;
 - resolves relative Location against the current URL;
 - revalidates scheme/host/port/userinfo/fragment under Section 7;
-- increments `redirect_count` exactly once when the validated follow is scheduled;
+- derives the exact loop-identity key `("https", ascii_lowercase_host, 443, exact_path)` after validation; query and fragment are already required empty and therefore are not key fields; path comparison is exact and case-sensitive;
+- compares that key against the initial request and every previously followed redirect key; an already-seen key is `P11_REDIRECT_NOT_ALLOWED`;
+- performs loop rejection before incrementing `redirect_count`, before next-hop connection preparation, before rate-gate acquisition and before any additional outbound start;
+- increments `redirect_count` exactly once only after the validated, unseen follow is scheduled;
 - obtains a new shared rate-gate reservation only after connection preparation for that hop succeeds;
 - increments `outbound_start_count` only if that followed hop reaches the Section 14.3 step-7 send transition.
 
-Invalid redirect, loop, disallowed target or missing Location => `P11_REDIRECT_NOT_ALLOWED`. If an otherwise valid redirect is received when `redirect_count == 3`, no fourth redirect is followed and the result is `P11_REDIRECT_NOT_ALLOWED`.
+Invalid redirect, canonical-equivalent loop, disallowed target or missing Location => `P11_REDIRECT_NOT_ALLOWED`. If an otherwise valid redirect is received when `redirect_count == 3`, no fourth redirect is followed and the result is `P11_REDIRECT_NOT_ALLOWED`. `SecHttpResponse.requested_url` and `final_url` preserve their existing external string semantics; the canonical key above is internal loop-detection identity only.
 
 Redirects do not reset retry counters or the 120-second logical deadline. A followed redirect increments `redirect_count` exactly once; it does not increment `retry_count`.
 
@@ -547,10 +551,13 @@ Historical shard URL is constructed only as:
 Historical shard basename:
 
 - comes only from current Submissions `filings.files[].name`;
-- non-empty visible ASCII basename;
-- no slash/backslash/control/query/fragment;
-- suffix `.json` case-sensitive;
+- non-empty raw ASCII basename whose every byte is in exact range `0x21..0x7e`; SP `0x20`, DEL and all controls are rejected;
+- no slash `/`, backslash `\`, percent `%`, query `?` or fragment `#` character;
+- suffix `.json` is case-sensitive;
+- exact accepted spelling is appended as one unescaped request-target path segment; P11-D does not percent-encode or otherwise rewrite shard names;
 - never caller supplied as a path/URL.
+
+This grammar is deliberately narrower than the User-Agent visible-ASCII rule. It guarantees every accepted shard name can be emitted by the required standard-library HTTP request-target without contradicting Section 7's ban on percent-encoded path alternatives. A provider `filings.files[].name` that violates this grammar => `P11_SUBMISSIONS_INVALID` before any shard fetch. A direct `get_json()` history URL whose basename violates the same grammar => `P11_SOURCE_HOST_NOT_ALLOWED` before network access.
 
 No arbitrary URL is accepted by discovery APIs.
 
@@ -803,7 +810,10 @@ Before P11-D implementation can close, focused tests must prove at least:
 65. ticker rows sorted `(ticker,cik)` and ambiguity retained;
 66. target accession exact match / not-found behavior;
 67. no silent amendment supersession;
-68. no P11-E package/asset write or fetch occurs.
+68. no P11-E package/asset write or fetch occurs;
+69. historical shard provider names containing SP, control, non-ASCII, `%`, slash/backslash, query/fragment, wrong-case suffix or other out-of-grammar bytes fail `P11_SUBMISSIONS_INVALID` before any shard fetch, while a valid `0x21..0x7e` safe basename is preserved exactly;
+70. direct `SUBMISSIONS_HISTORY_JSON` URLs with an out-of-grammar shard basename fail `P11_SOURCE_HOST_NOT_ALLOWED` before connection preparation; no percent-encoding fallback is attempted;
+71. a redirect to a canonical-equivalent already-seen endpoint (including host case variation and absent-vs-explicit `:443`) fails `P11_REDIRECT_NOT_ALLOWED` before redirect-count increment or any second connection/start; a distinct valid normalized key still follows under the existing redirect contract.
 
 ## 22. Implementation authorization gate
 
