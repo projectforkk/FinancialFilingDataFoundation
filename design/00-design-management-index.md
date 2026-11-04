@@ -116,11 +116,11 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
-| 26-p11-sec-provider-design.md | P11 | AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED |
-| 27-p11-implementation-plan.md | P11 | AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED |
+| 26-p11-sec-provider-design.md | P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
+| 27-p11-implementation-plan.md | P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
-| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED |
+| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -295,7 +295,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_039_CANDIDATE_FROZEN_FORMAL_REVIEW_AUTHORIZED`
+`P10_DONE / P11_A_DESIGN_BASELINE_PASS / P11_B_AUTHORIZATION_PENDING`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
@@ -312,7 +312,9 @@ P11 latest reviewed candidate：
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
 - P11 production = CLOSED；
-- next action = run fresh detached P11-A formal review against exact candidate `5877a23...`；
+- P11-A formal review result = `development/203-p11-final-detached-design-review-result.md` = PASS；
+- accepted P11-A design baseline = `5877a238f5af6102ef48e56141cdb893590b6aab`；
+- next action = authorize P11-B Environment / SEC Runtime Probe separately；
 - P11-B = NOT AUTHORIZED；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -539,5 +541,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 214. amendment evidence = `development/201-p11-phase-banner-amendment-evidence.md` = PASS；
 215. amended exact candidate = `5877a238f5af6102ef48e56141cdb893590b6aab`；
 216. formal review authorization = `development/202-p11-phase-banner-final-review-authorization.md`；
-217. P11 production = CLOSED；
-218. Research MCP production / Semantic Resolver production remain closed / not authorized。
+217. P11-A formal review result = `development/203-p11-final-detached-design-review-result.md` = PASS；
+218. P11-A = CLOSED / PASS；
+219. P11-B = NOT AUTHORIZED / separate authorization required；
+220. P11 production = CLOSED；
+221. Research MCP production / Semantic Resolver production remain closed / not authorized。

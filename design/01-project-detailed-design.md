@@ -868,7 +868,7 @@ P10 acceptance 必须包含至少一个完整 live research run，证明 Codex �
 
 ### P11 — US SEC Provider
 
-状态：**P11-ISSUE-039 REMEDIATED / FRESH DESIGN REVIEW REQUIRED / PRODUCTION CLOSED**
+状态：**P11-A DESIGN BASELINE PASS / P11-B NOT AUTHORIZED / PRODUCTION CLOSED**
 
 P11 通过官方 SEC/EDGAR 入口接入 HTML / Inline XBRL / XBRL。
 
@@ -879,6 +879,8 @@ P11 latest reviewed design candidate：
 - authoritative stop = `development/200-p11-phase-banner-review-stop.md`；
 - ISSUE-038 amendment evidence = `development/198-p11-governance-status-amendment-evidence.md` = PASS and remains valid；
 - ISSUE-039 amendment evidence = `development/201-p11-phase-banner-amendment-evidence.md` = PASS；
+- accepted P11-A design baseline = `5877a238f5af6102ef48e56141cdb893590b6aab`；
+- formal review result = `development/203-p11-final-detached-design-review-result.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral contract = `design/30-parsed-financial-document-v2-contract.md`；
@@ -1051,7 +1053,7 @@ Accepted chain：
 - reconciled `design/28` remains future semantic reference only；
 - reconciled `design/29` remains future Research MCP reference only。
 
-P10 is closed. P11-A final review remains reopened because exact candidate `cd2fa0b01d23c0e3f75945c5cce5120738f51077` was stopped by P11-ISSUE-039 after ISSUE-038 had been remediated. Authoritative stop: `development/200-p11-phase-banner-review-stop.md`. ISSUE-039 is now remediated as governance-only current-state normalization; evidence: `development/201-p11-phase-banner-amendment-evidence.md = PASS`. P11 production remains closed. P11-B is NOT authorized until the amended exact candidate passes a fresh detached design review. Research MCP production and Semantic Resolver production remain unauthorized.
+P10 is closed. P11-A Design Baseline is CLOSED / PASS on exact candidate `5877a238f5af6102ef48e56141cdb893590b6aab`; formal review result: `development/203-p11-final-detached-design-review-result.md = PASS`. P11-B remains NOT authorized until a separate Environment / SEC Runtime Probe authorization is issued. P11 provider production remains closed. Research MCP production and Semantic Resolver production remain unauthorized.
 
 继续保持职责边界：
 

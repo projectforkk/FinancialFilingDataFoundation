@@ -117,13 +117,15 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`P11-ISSUE-039 REMEDIATED / FRESH DESIGN REVIEW REQUIRED / PRODUCTION NOT STARTED`
+状态：`P11-A DESIGN BASELINE PASS / P11-B NOT AUTHORIZED / PRODUCTION NOT STARTED`
 
 Latest reviewed design candidate：
 - historical exact candidate = `cd2fa0b01d23c0e3f75945c5cce5120738f51077` = INELIGIBLE after P11-ISSUE-039；
 - authoritative stop = `development/200-p11-phase-banner-review-stop.md`；
 - ISSUE-038 amendment evidence = `development/198-p11-governance-status-amendment-evidence.md` = PASS and remains valid；
 - ISSUE-039 amendment evidence = `development/201-p11-phase-banner-amendment-evidence.md` = PASS；
+- accepted P11-A design baseline = `5877a238f5af6102ef48e56141cdb893590b6aab`；
+- formal review result = `development/203-p11-final-detached-design-review-result.md` = PASS；
 - `design/26-p11-sec-provider-design.md`；
 - `design/27-p11-implementation-plan.md`；
 - `design/30-parsed-financial-document-v2-contract.md`；
@@ -131,7 +133,7 @@ Latest reviewed design candidate：
 - `development/144-p11-environment-interface-audit.md`；
 - `development/145-p11-design-reconciliation.md`。
 
-Next action：freeze amended exact candidate → fresh detached design review. `P11-B Environment / SEC Runtime Probe` remains NOT AUTHORIZED until P11-A PASS；provider production remains CLOSED.
+Next action: authorize `P11-B Environment / SEC Runtime Probe` separately. P11 provider production remains CLOSED.
 
 目标：
 SEC HTML / iXBRL / XBRL first acquisition and extraction path。
