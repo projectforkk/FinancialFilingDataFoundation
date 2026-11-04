@@ -461,6 +461,8 @@ For periodic filings:
 - registry never points to manifest.json, another child file, or a staging/partial directory;
 - no trailing slash is stored;
 - P11-K MUST call additive `SQLiteRegistry.register_parsed_data_atomic(record)` rather than accepted `register_parsed_data(record)`;
+- canonical exception implementation = `financial_filing_data_foundation.registry.sqlite_registry.ParsedDataRecordConflict`;
+- canonical public exception import = `from financial_filing_data_foundation.registry import ParsedDataRecordConflict`; registry `__init__` re-exports the same class object, not an alias/wrapper/duplicate;
 - `register_parsed_data_atomic` starts `BEGIN IMMEDIATE` before the parse_run_id lookup, so exact concurrent P11 writers serialize before the existence check;
 - exact existing row across all persisted semantic fields except created_at => normal idempotent success;
 - missing row => insert once and commit;

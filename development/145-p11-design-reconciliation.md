@@ -449,3 +449,16 @@ The amended boundary is additive:
 This preserves accepted registry schema and existing caller behavior while making the new P11 concurrent path deterministic and retry-safe.
 
 The final artifact remains the immutable source of parse output; registry persistence is an index/reuse boundary that occurs only after final reload and cannot mutate final bytes.
+
+
+## 29. Registry API canonical-surface reconciliation — ISSUE-037
+
+P11-ISSUE-037 removes the last ambiguity between the legacy accepted registry write API and the new P11 concurrent-safe API.
+
+Authoritative P11 rule:
+
+- P11-K writes only through `SQLiteRegistry.register_parsed_data_atomic(record)`;
+- P0-P10/CN-HK continue using accepted `register_parsed_data(record)` unchanged;
+- `ParsedDataRecordConflict` has one canonical implementation class and one package-level public re-export of that exact class.
+
+No schema, transaction algorithm, final-artifact contract, reuse policy, or accepted historical behavior is changed by this amendment.

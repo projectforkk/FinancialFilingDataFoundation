@@ -654,3 +654,21 @@ Resolution in the amended design:
 No new external dependency or P11-B environment dependency is introduced by ISSUE-036. SQLite transaction semantics are part of the already accepted local registry runtime; P11-B remains reserved for the separately authorized SEC/runtime probe.
 
 No production/test/runtime change was made.
+
+
+## 25. Registry API canonical-surface finding — P11-ISSUE-037
+
+Fresh detached review of `cb35f537c75390d9b63b55af72c7278520ebd9be` passed automated ISSUE-010..036 guards, but manual normative-surface review found one stale legacy P11-K call-site and one unfrozen public exception path.
+
+Authoritative stop:
+`development/194-p11-registry-api-surface-review-stop.md`
+
+Resolution:
+
+- every normative P11-K write call now names `SQLiteRegistry.register_parsed_data_atomic(record)`;
+- references to accepted `register_parsed_data(record)` remain only where explicitly describing unchanged P0-P10/CN-HK behavior;
+- conflict exception implementation path is frozen to `financial_filing_data_foundation.registry.sqlite_registry.ParsedDataRecordConflict`;
+- canonical public import is `from financial_filing_data_foundation.registry import ParsedDataRecordConflict`;
+- registry package `__init__` must re-export the exact same class object.
+
+No environment/runtime dependency changes. No production/test/runtime change was made.

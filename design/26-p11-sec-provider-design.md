@@ -875,7 +875,7 @@ Reuse path classification:
 - directory exists but any required v2 file above is missing => `P11_REUSE_ARTIFACT_INVALID`;
 - otherwise the accepted v2 loader validates schema/hash/identity/source-reference integrity.
 
-P11-I MUST atomically commit the complete export directory at this final path and reload it successfully before P11-K may call `register_parsed_data`.
+P11-I MUST atomically commit the complete export directory at this final path and reload it successfully before P11-K may call `SQLiteRegistry.register_parsed_data_atomic(record)`.
 
 ### Final export idempotency / collision contract
 
@@ -1029,6 +1029,16 @@ P11-K MUST instead use this additive API:
 and the public conflict exception:
 
 `ParsedDataRecordConflict(ValueError)`
+
+Canonical implementation path:
+
+`financial_filing_data_foundation.registry.sqlite_registry.ParsedDataRecordConflict`
+
+Canonical public import:
+
+`from financial_filing_data_foundation.registry import ParsedDataRecordConflict`
+
+`financial_filing_data_foundation.registry.__init__` MUST re-export the exact class defined in `registry.sqlite_registry`; no alias/wrapper/duplicate class is allowed.
 
 Both are additive to the existing registry schema/API. `REGISTRY_SCHEMA_VERSION` remains `1`; no migration is allowed for ISSUE-036.
 

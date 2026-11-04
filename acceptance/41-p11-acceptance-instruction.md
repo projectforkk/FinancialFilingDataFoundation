@@ -422,6 +422,9 @@ P11-K concurrent registry persistence acceptance:
 - accepted `SQLiteRegistry.register_parsed_data(record)` remains unchanged and is not the P11-K write API;
 - additive exact API = `SQLiteRegistry.register_parsed_data_atomic(record: ParsedDataRecord) -> None`;
 - additive public conflict exception = `ParsedDataRecordConflict(ValueError)`;
+- canonical implementation path = `financial_filing_data_foundation.registry.sqlite_registry.ParsedDataRecordConflict`;
+- canonical public import = `from financial_filing_data_foundation.registry import ParsedDataRecordConflict`;
+- public import is the exact same class object as the implementation-path class; no alias/wrapper/duplicate class;
 - `REGISTRY_SCHEMA_VERSION == 1`; no schema migration;
 - `register_parsed_data_atomic` executes `BEGIN IMMEDIATE` before `SELECT * FROM parsed_data WHERE parse_run_id = ?`;
 - two concurrent exact writers for one parse_run_id both return normally, exactly one physical row exists, and the row equals the requested record across every persisted semantic field except created_at;
