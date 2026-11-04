@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 ARTIFACT-PATH AMENDED DESIGN READY FOR CANDIDATE FREEZE / PRODUCTION CLOSED`
+`P11 ARTIFACT-PATH CANDIDATE FROZEN / FRESH DETACHED REVIEW AUTHORIZED / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-031. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`). Detached review of exact candidate `85df002516d577531e68c303ad86c0903ca813c6` passed the ISSUE-010..030 matrix but manual P1 artifact-path review found P11-ISSUE-031. Stop: `development/174-p11-artifact-path-contract-review-stop.md`. Remediation evidence: `development/175-p11-artifact-path-amendment-evidence.md = PASS`. The premature d47a0b5 PASS artifact remains INVALID / NOT AUTHORITATIVE. Production remains CLOSED pending candidate freeze + fresh detached review PASS.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-031. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`). Detached review of exact candidate `85df002516d577531e68c303ad86c0903ca813c6` passed the ISSUE-010..030 matrix but manual P1 artifact-path review found P11-ISSUE-031. Stop: `development/174-p11-artifact-path-contract-review-stop.md`. Remediation evidence: `development/175-p11-artifact-path-amendment-evidence.md = PASS`. Exact candidate `b0424620f4b7e6fc0b898c657166b171fc35e7a7` is frozen for fresh detached review under `development/176-p11-artifact-path-final-review-authorization.md`. The premature d47a0b5 PASS artifact remains INVALID / NOT AUTHORITATIVE. Production remains CLOSED pending review PASS.
 
 P10-C is closed:
 
