@@ -121,7 +121,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
-| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | P11-D ISSUE-045 REMEDIATED / FRESH DETACHED DESIGN REVIEW PENDING / IMPLEMENTATION STOPPED / PRODUCTION CLOSED |
+| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | P11-D ISSUE-045 CLOSED / FINAL DESIGN REVIEW PASS / CORRECTIVE IMPLEMENTATION AUTHORIZATION PENDING / PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -330,7 +330,7 @@ P11 latest reviewed candidate：
 - P11-D ISSUE-041/042 amendment evidence = `development/220-p11-d-issues041042-amendment-evidence.md` = PASS；
 - P11-D ISSUE-043 stop = `development/222-p11-d-response-framing-review-stop.md`；
 - P11-D ISSUE-043 amendment evidence = `development/223-p11-d-response-framing-amendment-evidence.md` = PASS；
-- next action = run fresh detached review of ISSUE-045-remediated design candidate; implementation remains stopped until PASS；
+- next action = issue separate corrective implementation authorization for ISSUE-045; provider production remains closed；
 - P11-B = CLOSED / PASS；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -568,6 +568,6 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 225. P11-C review result = `development/211-p11-c-final-detached-code-review-result.md` = PASS；
 226. P11-C integration merge = `1a5b04f22e1821558337821c758f70a7458da9ae`；
 227. P11-C = CLOSED / PASS；
-228. P11-D candidate be5f332cb4f6839fa85e1f82ebd91ca7cae52e33 INELIGIBLE / ISSUE-045 remediated by b0db6f65dbe8b9b2e1baf084409a4d3b25c7aa65 / detached design review pending；
+228. P11-D candidate be5f332cb4f6839fa85e1f82ebd91ca7cae52e33 INELIGIBLE / ISSUE-045 remediated candidate 2e1f73aa92b259303aec0c5f195ce0ef63095256 final design review PASS / corrective authorization pending；
 229. P11 production = CLOSED；
 230. Research MCP production / Semantic Resolver production remain closed / not authorized。
