@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 REUSE-API FINAL REVIEW STOPPED — P11-ISSUE-030 / PRODUCTION CLOSED`
+`P11 REGISTRY-ARTIFACT PARITY AMENDED DESIGN READY FOR CANDIDATE FREEZE / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-029. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`). Detached review of exact candidate `d47a0b5de5c2b3e88a5df629476d05d26e7d83fb` passed the ISSUE-010..029 matrix but manual P1 registry comparison found P11-ISSUE-030 (registry/artifact metadata parity). Stop: `development/170-p11-registry-artifact-parity-review-stop.md`. That candidate is INELIGIBLE. Production remains CLOSED.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-029. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`). Detached review of exact candidate `d47a0b5de5c2b3e88a5df629476d05d26e7d83fb` passed the ISSUE-010..029 matrix but manual P1 registry comparison found P11-ISSUE-030. Stop: `development/170-p11-registry-artifact-parity-review-stop.md`. Remediation evidence: `development/171-p11-registry-artifact-parity-amendment-evidence.md = PASS`. A concurrently produced premature PASS artifact for d47a0b5 is retained as `development/172-p11-d47a0b5-stale-pass-result-invalid.md = INVALID / NOT AUTHORITATIVE`. Production remains CLOSED pending candidate freeze + fresh detached review PASS.
 
 P10-C is closed:
 

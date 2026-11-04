@@ -844,10 +844,16 @@ For each candidate record, the selector MUST load the v2 artifact through the ac
 4. loaded manifest/document `document_sha256 == current document_sha256 == ParsedDataRecord.document_sha256`;
 5. loaded manifest `source_package_sha256 == current source_package_sha256`;
 6. loaded document periodic identity equals the requested target slot; because the artifact is for the exact current package and previously passed validation, its confirmed identity may safely satisfy the current request without re-parsing;
-7. parser/schema versions satisfy the accepted reuse policy;
-8. validation status = PASS;
-9. blocking issue count = 0;
-10. compatibility status = COMPATIBLE.
+7. exact registry/artifact metadata parity:
+   - loaded manifest `parser_version == ParsedDataRecord.parser_version`;
+   - loaded manifest `schema_version == ParsedDataRecord.schema_version`;
+   - loaded manifest `validation_status == validation.json.status == ParsedDataRecord.validation_status.value`;
+   - loaded manifest `blocking_issue_count == len(validation.json.blocking_issues) == ParsedDataRecord.blocking_issue_count`;
+   - loaded validation `compatibility_status == ParsedDataRecord.compatibility_status.value`;
+8. parser/schema versions satisfy the accepted reuse policy only after parity passes;
+9. loaded/registry validation status = PASS;
+10. loaded/registry blocking issue count = 0;
+11. loaded/registry compatibility status = COMPATIBLE.
 
 A candidate failing any condition is not reusable.
 
@@ -857,7 +863,8 @@ Specific rules:
 - missing artifact_path => `P11_REUSE_ARTIFACT_MISSING`;
 - path outside configured parsed root => `P11_REUSE_ARTIFACT_PATH_INVALID`;
 - loader/hash/identity mismatch => `P11_REUSE_ARTIFACT_INVALID`;
-- exact-package candidates that otherwise fail validation/compatibility reuse the existing validation/reuse rejection semantics;
+- any parser_version/schema_version/validation_status/blocking_issue_count/compatibility_status mismatch between the loaded v2 artifact and ParsedDataRecord => `P11_REUSE_ARTIFACT_INVALID` before policy/validation classification;
+- exact-package candidates whose registry/artifact parity passes but whose verified values fail validation/compatibility reuse the existing validation/reuse rejection semantics;
 - if more than one candidate is fully reusable for the exact same package/document/slot, select the lexicographically smallest `parse_run_id` after all exact-package checks;
 - no candidate may be chosen merely because its `document_sha256` matches.
 

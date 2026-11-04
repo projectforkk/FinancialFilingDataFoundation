@@ -503,3 +503,22 @@ Resolution in the current amendment:
 - no-candidate behavior, failure reason priority, exact-package success behavior and read-only semantics are frozen.
 
 No production/test/runtime change was made.
+
+
+## 18. Reuse metadata parity finding — P11-ISSUE-030
+
+Fresh detached review of `d47a0b5de5c2b3e88a5df629476d05d26e7d83fb` passed the ISSUE-010..029 automated contract matrix but manual comparison against accepted P1 `ParsedDataRecord` found registry/artifact metadata parity was not frozen.
+
+Stop:
+`development/170-p11-registry-artifact-parity-review-stop.md`
+
+Resolution in the current amendment:
+
+- loaded manifest parser_version must equal ParsedDataRecord.parser_version;
+- loaded manifest schema_version must equal ParsedDataRecord.schema_version;
+- manifest validation_status, validation.json status and ParsedDataRecord.validation_status must agree;
+- manifest blocking_issue_count, len(validation.blocking_issues) and ParsedDataRecord.blocking_issue_count must agree;
+- validation compatibility_status must equal ParsedDataRecord.compatibility_status;
+- any mismatch is P11_REUSE_ARTIFACT_INVALID before reuse-policy classification.
+
+No production/test/runtime change was made.

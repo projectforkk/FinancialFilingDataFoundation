@@ -445,10 +445,17 @@ Algorithm:
 6. require loaded manifest/document document_sha256 == current document_sha256 == record.document_sha256;
 7. require loaded manifest source_package_sha256 == current source_package_sha256;
 8. require loaded document periodic identity == requested target slot;
-9. apply parser/schema reuse policy;
-10. require PASS, zero blockers and COMPATIBLE;
-11. only exact-package survivors are reusable;
-12. if multiple exact-package survivors remain, choose lexicographically smallest parse_run_id.
+9. require exact registry/artifact metadata parity before policy classification:
+   - manifest parser_version == record.parser_version;
+   - manifest schema_version == record.schema_version;
+   - manifest validation_status == validation.status == record.validation_status.value;
+   - manifest blocking_issue_count == len(validation.blocking_issues) == record.blocking_issue_count;
+   - validation compatibility_status == record.compatibility_status.value;
+10. any parity mismatch => P11_REUSE_ARTIFACT_INVALID;
+11. apply parser/schema reuse policy only to parity-verified values;
+12. require PASS, zero blockers and COMPATIBLE;
+13. only exact-package survivors are reusable;
+14. if multiple exact-package survivors remain, choose lexicographically smallest parse_run_id.
 
 Explicit results:
 
@@ -469,7 +476,12 @@ Focused tests:
 - manifest package mismatch => no reuse;
 - manifest document mismatch => no reuse;
 - manifest parse_run mismatch => no reuse;
-- validation/compatibility rejection preserved;
+- manifest/registry parser_version mismatch => P11_REUSE_ARTIFACT_INVALID;
+- manifest/registry schema_version mismatch => P11_REUSE_ARTIFACT_INVALID;
+- manifest/validation/registry validation_status mismatch => P11_REUSE_ARTIFACT_INVALID;
+- manifest/validation/registry blocking_issue_count mismatch => P11_REUSE_ARTIFACT_INVALID;
+- validation/registry compatibility_status mismatch => P11_REUSE_ARTIFACT_INVALID;
+- validation/compatibility rejection is applied only after registry/artifact parity passes;
 - generic IncrementalPlanner US call blocks;
 - existing CN/HK planner/reuse suite unchanged.
 

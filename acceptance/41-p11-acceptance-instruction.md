@@ -401,7 +401,7 @@ Package-aware SEC result API:
 
 Package-aware SEC selector acceptance cases:
 
-1. requested target slot + exact document SHA + exact package SHA + accepted parser/schema + PASS + 0 blockers + COMPATIBLE => reusable and P11-F/G/H/I parser/identity/v2/validation work is skipped;
+1. requested target slot + exact document SHA + exact package SHA + exact registry/artifact metadata parity + accepted parser/schema + PASS + 0 blockers + COMPATIBLE => reusable and P11-F/G/H/I parser/identity/v2/validation work is skipped;
 2. same document SHA but different current source_package_sha256 => P11_SOURCE_PACKAGE_CHANGE / no reuse;
 3. null or missing artifact_path => P11_REUSE_ARTIFACT_MISSING / no reuse;
 4. absolute/drive-relative/UNC/traversal/outside-root artifact path => P11_REUSE_ARTIFACT_PATH_INVALID / no reuse;
@@ -410,9 +410,14 @@ Package-aware SEC selector acceptance cases:
 7. loaded manifest/document document_sha256 mismatch => P11_REUSE_ARTIFACT_INVALID;
 8. loaded manifest source_package_sha256 mismatch => no reuse; exact source-package change reason retained;
 9. loaded periodic document identity != requested target slot => P11_REUSE_ARTIFACT_INVALID;
-10. exact-package REVIEW_REQUIRED/blocked/incompatible record => not reusable;
-11. multiple fully reusable runs for one exact package select lexicographically smallest parse_run_id only after all exact-package checks;
-12. document_sha256 equality alone is never sufficient for US reuse.
+10. loaded manifest parser_version != registry record parser_version => P11_REUSE_ARTIFACT_INVALID;
+11. loaded manifest schema_version != registry record schema_version => P11_REUSE_ARTIFACT_INVALID;
+12. loaded manifest validation_status != validation.status or either != registry record validation_status => P11_REUSE_ARTIFACT_INVALID;
+13. loaded manifest blocking_issue_count != len(validation.blocking_issues) or either != registry record blocking_issue_count => P11_REUSE_ARTIFACT_INVALID;
+14. loaded validation compatibility_status != registry record compatibility_status => P11_REUSE_ARTIFACT_INVALID;
+15. parity-passing exact-package REVIEW_REQUIRED/blocked/incompatible record => not reusable under the corresponding validation/reuse reason;
+16. multiple fully reusable runs for one exact package select lexicographically smallest parse_run_id only after all exact-package checks;
+17. document_sha256 equality alone is never sufficient for US reuse.
 
 Changed package/content blocks silent reuse.
 

@@ -328,3 +328,12 @@ P11-ISSUE-029 closes the final API ambiguity between accepted P1 planner behavio
 - the SEC-specific reuse layer returns a dedicated deterministic SecReuseDecision rather than overloading P1 PlannerItem or exposing raw ParsedDataRecord selection.
 
 This keeps the accepted P1 API stable for CN/HK while giving P11 one exact package-aware contract.
+
+
+## 22. Registry / artifact reuse metadata reconciliation
+
+P11-ISSUE-030 closes the remaining metadata-binding gap in package-aware reuse.
+
+P11-K may use existing ParsedDataRecord without adding source_package_sha256 to the registry only because every reuse decision now re-loads the v2 artifact and verifies both package identity and exact parity of parser/schema/validation/blocking/compatibility metadata against the registry row.
+
+A parity mismatch invalidates the registry/artifact binding itself and is classified as P11_REUSE_ARTIFACT_INVALID before ordinary validation/reuse reasons are considered.
