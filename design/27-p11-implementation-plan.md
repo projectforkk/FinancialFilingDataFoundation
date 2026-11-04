@@ -273,16 +273,51 @@ Rules tested:
 
 Output of P11-G is the confirmed filing identity consumed by the v2 writer.
 
-## P11-H — ParsedFinancialDocument v2 Writer/Loader
+## P11-H — SEC Validation
+
+Run deterministic validation over:
+
+- immutable P11-E source package;
+- P11-F parser outputs;
+- P11-G confirmed filing identity.
+
+Validation layers:
+
+1. source/package integrity;
+2. CIK/accession/form/report-date consistency;
+3. DEI identity/period consistency;
+4. fact/context/unit integrity;
+5. duplicate/conflicting facts;
+6. parser/Arelle validation mapping;
+7. completeness signals;
+8. compatibility/reuse status.
+
+P11-H produces the final deterministic validation model consumed by P11-I, including:
+
+- status = PASS | FAIL | REVIEW_REQUIRED | BLOCKED;
+- compatibility_status;
+- blocking_issues;
+- warnings;
+- structural/source/XBRL/financial/completeness check results;
+- validator_version.
+
+No `export-v2` directory, final `manifest.json`, or final `validation.json` is written in P11-H.
+
+No registry write occurs in P11-H.
+
+Companyfacts cross-check is optional/auxiliary and cannot turn invalid filing evidence into PASS.
+
+## P11-I — Final ParsedFinancialDocument v2 Writer / Loader / Commit
 
 Implement design/30 over:
 
 - P11-F parser outputs;
-- P11-G confirmed filing identity.
+- P11-G confirmed filing identity;
+- P11-H final validation model.
 
 For periodic filings, `document.json.fiscal_year` and `raw_fiscal_period` MUST come from the confirmed P11-G identity. No provisional/null periodic identity is permitted merely to allow writing.
 
-Required artifacts:
+Final required artifacts:
 
 - manifest;
 - document;
@@ -294,7 +329,17 @@ Required artifacts:
 - evidence;
 - validation.
 
-Loaders must verify:
+Finalization order:
+
+1. construct deterministic non-validation artifact bytes;
+2. serialize P11-H final `validation.json`;
+3. derive manifest `validation_status` and `blocking_issue_count` exactly from that validation model;
+4. serialize final `manifest.json`;
+5. verify all required files/counts/IDs/hashes/source references with the v2 loader in a project-local staging directory;
+6. atomically commit the complete directory to `<parsed_root>/<parse_run_id>/export-v2`;
+7. only after the final directory exists and reloads successfully may P11-K persist `ParsedDataRecord`.
+
+Final writer/loader must verify:
 
 - schema;
 - counts;
@@ -307,25 +352,14 @@ Loaders must verify:
 - `primary_source_asset_id` resolves to the unique PRIMARY_DOCUMENT row;
 - asset references;
 - package/document identity;
-- periodic document identity matches the confirmed binding.
+- periodic document identity matches the confirmed binding;
+- manifest validation_status/blocking_issue_count match validation.json;
+- no provisional validation placeholder exists.
 
-No registry write occurs in P11-H.
+P11-I is the only gate that creates a registry-eligible final `export-v2` directory.
+
+No registry write occurs in P11-I.
 No v1 masquerading.
-
-## P11-I — SEC Validation
-
-Implement deterministic validation layers:
-
-1. source/package integrity;
-2. CIK/accession/form/report-date consistency;
-3. DEI identity/period consistency;
-4. fact/context/unit integrity;
-5. duplicate/conflicting facts;
-6. parser/Arelle validation mapping;
-7. completeness signals;
-8. compatibility/reuse status.
-
-Companyfacts cross-check is optional/auxiliary and cannot turn invalid filing evidence into PASS.
 
 ## P11-J — Supplemental 8-K / 6-K
 
@@ -363,7 +397,7 @@ Integrate **periodic SEC v2 results only** into existing registry with additive 
 
 Supplemental 8-K/6-K remain outside the existing SQLiteRegistry / ParsedDataRecord path in P11 v1.
 
-Registry/ParsedData persistence occurs only after P11-I validation has produced the final status and P11-G identity is confirmed.
+Registry/ParsedData persistence occurs only after P11-H validation has produced the final status, P11-G identity is confirmed, and P11-I has atomically committed/reloaded the complete final v2 export.
 
 ### Generic planner safety boundary
 

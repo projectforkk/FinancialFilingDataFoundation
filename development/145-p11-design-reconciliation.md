@@ -346,3 +346,31 @@ P11-ISSUE-031 binds the generic P1 artifact_path field to one exact P11 meaning:
 `artifact_path = project-root-relative POSIX path to <parsed_root>/<parse_run_id>/export-v2`
 
 This allows the existing ParsedDataRecord schema to remain unchanged while making P11-K persistence and package-aware reuse deterministic. The registry never points to a manifest child or staging directory, and the loader always receives the complete v2 export directory.
+
+
+## 24. Final validation / export / registry reconciliation — ISSUE-032
+
+P11-ISSUE-032 supersedes the earlier historical gate-order mappings in Sections 15/16 for the final P11 v1 implementation contract.
+
+The authoritative current order is:
+
+```text
+P11-E source package
+→ package-aware reuse selector
+→ P11-F parser
+→ P11-G confirmed filing identity
+→ P11-H final validation model
+→ P11-I final v2 serialization / loader verification / atomic export commit
+→ P11-K registry persistence
+```
+
+Responsibilities are now disjoint:
+
+- P11-H computes validation only and creates no registry-eligible export;
+- P11-I is the only gate that creates the final complete `export-v2` directory;
+- P11-K persists only after P11-I commit and successful reload;
+- no provisional validation placeholder or post-registration artifact mutation is allowed.
+
+The older H-writer/I-validation wording in historical reconciliation sections records prior issue chronology only and is not normative after this section.
+
+This closes P11-ISSUE-032 in the amended design, pending fresh detached review.

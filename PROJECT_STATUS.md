@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 DESIGN REVIEW STOPPED — P11-ISSUE-032 / PRODUCTION CLOSED`
+`P11 ISSUE-032 REMEDIATED / AMENDED DESIGN READY FOR CANDIDATE FREEZE / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-032. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`). Review of exact candidate `b0424620f4b7e6fc0b898c657166b171fc35e7a7` passed the automated ISSUE-010..031 matrix but manual cross-gate review found P11-ISSUE-032: validation occurs after the gate that was required to write the complete final v2 export. Stop: `development/178-p11-validation-finalization-review-stop.md`. The premature `development/177-p11-final-detached-design-review-result.md` is retained as INVALID / NOT AUTHORITATIVE by `development/179-p11-b042462-stale-pass-result-invalid.md`. P11 production remains CLOSED.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-032. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`). Review of exact candidate `b0424620f4b7e6fc0b898c657166b171fc35e7a7` passed the automated ISSUE-010..031 matrix but manual cross-gate review found P11-ISSUE-032. Stop: `development/178-p11-validation-finalization-review-stop.md`. The premature `development/177-p11-final-detached-design-review-result.md` remains INVALID / NOT AUTHORITATIVE by `development/179-p11-b042462-stale-pass-result-invalid.md`. ISSUE-032 is remediated in the current amended design by moving final validation computation to P11-H and final v2 serialization/loader/atomic commit to P11-I; evidence: `development/180-p11-validation-finalization-amendment-evidence.md = PASS`. A fresh exact-candidate detached design review is still required. P11 production remains CLOSED.
 
 P10-C is closed:
 
@@ -704,4 +704,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `DESIGN REVIEW STOPPED / ISSUE-032 OPEN / PRODUCTION NOT STARTED`
+- P11 — US SEC Provider: `ISSUE-032 REMEDIATED / CANDIDATE FREEZE PENDING / PRODUCTION NOT STARTED`

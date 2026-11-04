@@ -77,6 +77,33 @@ Registry `artifact_path` stores the normalized project-root-relative POSIX path 
 
 The directory must contain every required file listed in this section before it may be registered. A staging/partial directory is never a valid artifact_path.
 
+### Finalization order
+
+A final registry-eligible v2 export does not exist until validation is complete.
+
+Normative order:
+
+1. P11-F produces deterministic parser outputs;
+2. P11-G confirms final filing identity;
+3. P11-H computes the final validation model;
+4. P11-I serializes all non-validation artifacts;
+5. P11-I serializes final `validation.json` from the P11-H validation model;
+6. P11-I derives manifest `validation_status` and `blocking_issue_count` from that same final validation model and serializes final `manifest.json`;
+7. P11-I runs the complete v2 loader against the staging export directory;
+8. only after successful reload does P11-I atomically commit the complete directory to `<parsed_root>/<parse_run_id>/export-v2`;
+9. only then may P11-K persist `ParsedDataRecord.artifact_path`.
+
+Forbidden:
+
+- provisional/fabricated validation status;
+- a final `manifest.json` written before validation;
+- a registry-eligible final export missing `validation.json`;
+- P11-H committing the final export;
+- P11-K mutating final export bytes after registration.
+
+The final `manifest.json.validation_status` MUST equal `validation.json.status`.
+The final `manifest.json.blocking_issue_count` MUST equal the length of `validation.json.blocking_issues`.
+
 ## 4. manifest.json
 
 Allowed `source_kind` values for P11 v1:

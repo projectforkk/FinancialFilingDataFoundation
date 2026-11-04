@@ -541,3 +541,25 @@ Resolution in current amendment:
 - missing vs path-invalid vs existing-invalid reason mapping is frozen.
 
 No production/test/runtime change was made.
+
+
+## 20. Finalization-order finding — P11-ISSUE-032
+
+Fresh review of `b0424620f4b7e6fc0b898c657166b171fc35e7a7` passed the ISSUE-010..031 automated matrix, but manual cross-gate review found the writer/validation order was impossible: P11-H was required to write the complete v2 export including final validation fields before P11-I computed validation.
+
+Stop:
+`development/178-p11-validation-finalization-review-stop.md`
+
+Premature PASS invalidation:
+`development/179-p11-b042462-stale-pass-result-invalid.md`
+
+Resolution in current amendment:
+
+- P11-H = deterministic SEC validation over source package + parser outputs + confirmed identity;
+- P11-H produces the final validation model only and does not create a registry-eligible export;
+- P11-I = final v2 writer/loader/atomic commit;
+- P11-I serializes validation.json from P11-H, derives manifest validation_status/blocking_issue_count from the same model, validates the complete staging export, and atomically commits export-v2;
+- P11-K may register only after the committed export reloads successfully;
+- provisional validation placeholders and post-registration artifact mutation are forbidden.
+
+No production/test/runtime change was made.

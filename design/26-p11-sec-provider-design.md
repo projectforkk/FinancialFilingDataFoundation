@@ -816,7 +816,7 @@ requested periodic slot
 → P11-E exact source-package assembly
 → package-aware reuse selector
     ├─ exact reusable package artifact found → REUSE_DATA / skip P11-F..I
-    └─ no exact reusable artifact → P11-F parse → P11-G final identity → P11-H v2 → P11-I validation → P11-K persist
+    └─ no exact reusable artifact → P11-F parse → P11-G final identity → P11-H validation → P11-I final v2 export → P11-K persist
 ```
 
 The selector runs after the current exact source package is known but before parsing. Otherwise reuse would not save parser work.
@@ -872,7 +872,7 @@ Reuse path classification:
 - directory exists but any required v2 file above is missing => `P11_REUSE_ARTIFACT_INVALID`;
 - otherwise the accepted v2 loader validates schema/hash/identity/source-reference integrity.
 
-P11-K MUST atomically commit the complete export directory at this final path before calling `register_parsed_data`.
+P11-I MUST atomically commit the complete export directory at this final path and reload it successfully before P11-K may call `register_parsed_data`.
 
 For each candidate record, the selector MUST load the v2 artifact through the accepted v2 loader and verify all of:
 
@@ -1254,7 +1254,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-031 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/175`. The current amended design contains explicit resolutions for ISSUE-010..031; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-032 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/180`. The current amended design contains explicit resolutions for ISSUE-010..032; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 

@@ -235,6 +235,20 @@ Loader independently verifies:
 - locator integrity;
 - document/package identity.
 
+Finalization-order acceptance:
+
+- P11-H computes validation in memory/model form and does not create a registry-eligible final export;
+- before P11-H completes, no final `manifest.json` / `validation.json` pair exists;
+- P11-I serializes the final validation.json from the P11-H validation model;
+- P11-I derives manifest.validation_status and manifest.blocking_issue_count from that same final validation model;
+- manifest.validation_status == validation.status;
+- manifest.blocking_issue_count == len(validation.blocking_issues);
+- no provisional/fabricated validation placeholder is accepted;
+- complete staging export passes the final v2 loader before commit;
+- P11-I atomically commits the complete `<parsed_root>/<parse_run_id>/export-v2` directory;
+- P11-K registry persistence occurs only after the committed directory reloads successfully;
+- P11-K does not mutate committed artifact bytes.
+
 No P3/P6 v1 schema masquerading.
 
 ## 11. Source locator acceptance
@@ -404,7 +418,7 @@ Package-aware SEC result API:
 
 Package-aware SEC selector acceptance cases:
 
-1. requested target slot + exact document SHA + exact package SHA + exact registry/artifact metadata parity + accepted parser/schema + PASS + 0 blockers + COMPATIBLE => reusable and P11-F/G/H/I parser/identity/v2/validation work is skipped;
+1. requested target slot + exact document SHA + exact package SHA + exact registry/artifact metadata parity + accepted parser/schema + PASS + 0 blockers + COMPATIBLE => reusable and P11-F/G/H/I parser/identity/validation/final-v2 work is skipped;
 2. same document SHA but different current source_package_sha256 => P11_SOURCE_PACKAGE_CHANGE / no reuse;
 3. null artifact_path or safe expected export-v2 directory absent => P11_REUSE_ARTIFACT_MISSING / no reuse;
 4. absolute/drive-relative/UNC/traversal/outside-root path, path to manifest.json/child file, or safe but wrong `<parsed_root>/<parse_run_id>/export-v2` layout => P11_REUSE_ARTIFACT_PATH_INVALID / no reuse;

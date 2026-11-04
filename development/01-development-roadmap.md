@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P10 DONE / P11 DESIGN READY**
+状态：**P10 DONE / P11 DESIGN REVIEW STOPPED**
 
 ## 总原则
 
@@ -117,11 +117,13 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`DESIGN READY / P11-A PASS / PRODUCTION NOT STARTED`
+状态：`P11-ISSUE-032 REMEDIATED / AMENDED DESIGN REVIEW PENDING / PRODUCTION NOT STARTED`
 
-Accepted design baseline：
-- exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
-- final detached review = `development/177-p11-final-detached-design-review-result.md` = PASS；
+Latest reviewed design candidate：
+- historical exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7` = INELIGIBLE after P11-ISSUE-032；
+- authoritative stop = `development/178-p11-validation-finalization-review-stop.md`；
+- stale PASS = `development/177-p11-final-detached-design-review-result.md` = INVALID / SUPERSEDED；
+- ISSUE-032 amendment evidence = `development/180-p11-validation-finalization-amendment-evidence.md` = PASS；
 - `design/26-p11-sec-provider-design.md`；
 - `design/27-p11-implementation-plan.md`；
 - `design/30-parsed-financial-document-v2-contract.md`；
@@ -129,7 +131,7 @@ Accepted design baseline：
 - `development/144-p11-environment-interface-audit.md`；
 - `development/145-p11-design-reconciliation.md`。
 
-Next gate：`P11-B Environment / SEC Runtime Probe`，requires separate authorization；provider production remains CLOSED.
+Next action：freeze amended exact candidate → fresh detached design review. `P11-B Environment / SEC Runtime Probe` remains NOT AUTHORIZED until P11-A PASS；provider production remains CLOSED.
 
 目标：
 SEC HTML / iXBRL / XBRL first acquisition and extraction path。

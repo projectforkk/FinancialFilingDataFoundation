@@ -116,11 +116,11 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
-| 26-p11-sec-provider-design.md | P11 | DESIGN READY / PRODUCTION CLOSED |
-| 27-p11-implementation-plan.md | P11 | DESIGN READY / PRODUCTION CLOSED |
+| 26-p11-sec-provider-design.md | P11 | DESIGN AMENDMENT REQUIRED / PRODUCTION CLOSED |
+| 27-p11-implementation-plan.md | P11 | DESIGN AMENDMENT REQUIRED / PRODUCTION CLOSED |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
-| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | DESIGN READY / PRODUCTION CLOSED |
+| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | DESIGN AMENDMENT REQUIRED / PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -164,7 +164,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 | 27 | acceptance/41 | DESIGN READY / P11-A PASS |
+| P11 | 26 | 27 | acceptance/41 | DESIGN REVIEW STOPPED / ISSUE-032 OPEN |
 
 ---
 
@@ -295,19 +295,21 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_DESIGN_READY`
+`P10_DONE / P11_ISSUE_032_REMEDIATED_REVIEW_PENDING`
 
-P11 accepted design baseline：
-- exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
-- final detached review = `development/177-p11-final-detached-design-review-result.md` = PASS；
+P11 latest reviewed candidate：
+- historical exact candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7` = INELIGIBLE after P11-ISSUE-032；
+- authoritative stop = `development/178-p11-validation-finalization-review-stop.md`；
+- stale PASS = `development/177-p11-final-detached-design-review-result.md` = INVALID / SUPERSEDED；
+- invalidity record = `development/179-p11-b042462-stale-pass-result-invalid.md`；
+- ISSUE-032 amendment evidence = `development/180-p11-validation-finalization-amendment-evidence.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
-- environment/interface audit = `development/144-p11-environment-interface-audit.md`；
-- reconciliation = `development/145-p11-design-reconciliation.md`；
 - P11 production = CLOSED；
-- next permitted gate = P11-B Environment / SEC Runtime Probe under separate authorization；
+- next action = freeze amended exact candidate and run fresh detached P11-A review；
+- P11-B = NOT AUTHORIZED；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
@@ -489,6 +491,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 170. review stop = `development/178-p11-validation-finalization-review-stop.md`；
 171. premature PASS artifact `development/177-p11-final-detached-design-review-result.md` = INVALID / NOT AUTHORITATIVE；
 172. invalidation record = `development/179-p11-b042462-stale-pass-result-invalid.md`；
-173. P11-ISSUE-032 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
-174. P11 production = CLOSED；
-175. Research MCP production / Semantic Resolver production remain closed / not authorized。
+173. P11-ISSUE-032 = REMEDIATED / FRESH REVIEW REQUIRED；
+174. amendment evidence = `development/180-p11-validation-finalization-amendment-evidence.md` = PASS；
+175. amended exact candidate = PENDING FREEZE；
+176. P11 production = CLOSED；
+177. Research MCP production / Semantic Resolver production remain closed / not authorized。
