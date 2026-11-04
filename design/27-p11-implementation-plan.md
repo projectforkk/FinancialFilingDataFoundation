@@ -76,7 +76,9 @@ Focused tests:
 2. US CompanyRef with zero-padded CIK;
 3. invalid CIK rejected;
 4. Q2 valid for US;
-5. H1 remains valid for existing markets;
+5. Q2 rejected for CN;
+6. Q2 rejected for HK;
+7. H1 remains valid for existing markets;
 6. 10-K/A normalization;
 7. 10-Q/A normalization;
 8. 20-F/A normalization;
@@ -150,8 +152,14 @@ Focused tests:
 - exact-byte identity;
 - exact known `p11-sec-source-package-identity-v1` hash fixture;
 - asset caller/order independence under canonical sort;
-- excluded URL/media/local-path/timestamp/HTTP metadata does not change package identity;
-- changed role/hash/file_name/size/dependency topology does change package identity;
+- canonical requested source_url participates in package identity;
+- redirect-final URL/declared HTTP media/local-path/timestamp/request/ETag diagnostics do not change package identity;
+- changed role/hash/file_name/source_url/size/dependency topology does change package identity;
+- accession index.json required and byte-addressed;
+- primaryDocument must be present in index.json;
+- every index-listed .xsd/.xml captured under exact role rules;
+- unrelated HTML/text exhibit not auto-downloaded;
+- explicitly requested safe-basename exhibit captured only if listed in index.json;
 - project-root-relative POSIX `local_content_path` round-trip;
 - absolute/drive-relative/traversal local path reject;
 - duplicate asset SHA reuse;
@@ -161,33 +169,11 @@ Focused tests:
 - path escape blocked;
 - timestamps excluded from package identity.
 
-## P11-F — Period Binding / Registry Integration
+## P11-F — SEC Runtime / Parser
 
-Implement provisional discovery -> final identity binding.
+Create isolated P11 runtime only after P11-B PASS and after P11-E can assemble a complete deterministic accession package.
 
-Extract/confirm:
-
-- DocumentFiscalYearFocus;
-- DocumentFiscalPeriodFocus;
-- form/report date consistency.
-
-Register primary asset only after final periodic binding.
-
-Rules tested:
-
-- 10-K FY;
-- 10-Q Q1/Q2/Q3;
-- Q2 never H1;
-- 20-F/40-F FY;
-- DEI conflict => review/block;
-- amendment remains distinct accession variant;
-- multiple variants do not silently canonicalize.
-
-## P11-G — SEC Runtime / Parser
-
-Create isolated P11 runtime only after P11-B PASS.
-
-**Before any P11-G parser production code, perform a Design-First parser-contract freeze.**
+**Before any P11-F parser production code, perform a Design-First parser-contract freeze.**
 
 It must record:
 
@@ -199,6 +185,7 @@ It must record:
 - exact raw_value whitespace rule fixtures;
 - exact parsed-decimal golden cases for format/scale/sign/nil;
 - external taxonomy resolution/cache behavior;
+- exact mapping of unresolved dependencies to REVIEW_REQUIRED vs BLOCKED;
 - proof that deterministic parse performs no unrecorded network.
 
 Candidate:
@@ -217,15 +204,16 @@ Parser operations:
 - section extraction;
 - DOM table extraction;
 - raw iXBRL/XBRL fact extraction;
+- DEI fact extraction needed for later period binding;
 - Arelle/local XBRL validation where frozen.
 
 No network during deterministic parse.
 
 Focused tests use local frozen fixtures.
 
-## P11-H — ParsedFinancialDocument v2 Writer/Loader
+## P11-G — ParsedFinancialDocument v2 Writer/Loader
 
-Implement design/30.
+Implement design/30 over P11-F parser outputs.
 
 Required artifacts:
 
@@ -250,6 +238,31 @@ Loaders must verify:
 - package/document identity.
 
 No v1 masquerading.
+
+## P11-H — Period Binding / Registry Integration
+
+Implement provisional discovery -> final identity binding only after P11-F/G can produce verified DEI/raw-fact artifacts.
+
+Extract/confirm:
+
+- DocumentFiscalYearFocus;
+- DocumentFiscalPeriodFocus;
+- form/report date consistency.
+
+Register/bind the primary periodic asset only after final period confirmation.
+
+Rules tested:
+
+- 10-K FY;
+- 10-Q Q1/Q2/Q3;
+- Q2 valid iff market=US;
+- CN Q2 rejected;
+- HK Q2 rejected;
+- Q2 never aliases H1;
+- 20-F/40-F FY;
+- DEI conflict => review/block;
+- amendment remains distinct accession variant;
+- multiple variants do not silently canonicalize.
 
 ## P11-I — SEC Validation
 

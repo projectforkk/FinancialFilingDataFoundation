@@ -60,14 +60,16 @@ Mandatory:
 9. exact caller CIK wins after validation;
 10. ticker lookup ambiguity blocks;
 11. ticker/CIK mismatch blocks/reviews;
-12. Q2 supported;
+12. Q2 supported for US;
 13. US Q2 not mapped to H1;
-14. CN/HK period behavior unchanged;
-15. 10-K/A normalized to base 10-K + amended;
-16. 10-Q/A normalized;
-17. 20-F/A normalized;
-18. 40-F/A normalized;
-19. 8-K/6-K supplemental identity is accession-bound, not periodic-slot-forced.
+14. CN Q2 rejected;
+15. HK Q2 rejected;
+16. existing CN/HK H1 behavior unchanged;
+17. 10-K/A normalized to base 10-K + amended;
+18. 10-Q/A normalized;
+19. 20-F/A normalized;
+20. 40-F/A normalized;
+21. 8-K/6-K supplemental identity is accession-bound, not periodic-slot-forced.
 
 ## 5. Official SEC discovery acceptance
 
@@ -131,6 +133,13 @@ Given CIK/accession/primaryDocument:
 
 Mandatory:
 
+- accession-directory `index.json` is captured as exact `FILING_INDEX` bytes;
+- primaryDocument comes from validated Submissions metadata, is a safe basename, and must be listed in the same index.json;
+- every index-listed safe basename ending `.xsd` or `.xml` is automatically captured;
+- exact suffix role classification matches design/26 Section 14;
+- unrelated HTML/text exhibits are not auto-downloaded;
+- explicitly requested exhibit uses exact safe basename and must be listed in index.json;
+- same asset cannot appear twice with conflicting inventory metadata;
 - exact primary source bytes preserved;
 - primary document SHA256 independently recomputed;
 - source package manifest canonical;

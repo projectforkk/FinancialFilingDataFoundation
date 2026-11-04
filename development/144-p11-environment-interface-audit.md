@@ -297,3 +297,21 @@ Findings and amended resolution:
 P11-D also receives a mandatory preimplementation HTTP-contract freeze for exact timeout/size/retry/User-Agent and rate-lock recovery parameters.
 
 No production/test/runtime change was made while resolving these design issues.
+
+
+## 10. Second detached review findings (P11-ISSUE-017..019)
+
+Fresh review of amended candidate `11648b22bfe97d88048c2dcf079034c37b3854af` stopped before development authorization.
+
+Stop record:
+`development/150-p11-amended-design-review-stop.md`
+
+Resolution in the current amendment:
+
+- **P11-ISSUE-017 — final package assembly**: CLOSED IN AMENDED DESIGN. Required accession-directory `index.json`, Submissions `primaryDocument`, automatic all-safe `.xsd/.xml` capture with exact suffix-role mapping, no automatic unrelated HTML/text exhibits, optional exhibit by exact safe basename present in index.json.
+- **P11-ISSUE-018 — impossible gate order**: CLOSED IN AMENDED PLAN. Parser moves to P11-F, v2 writer/loader P11-G, final DEI period binding/registry P11-H.
+- **P11-ISSUE-019 — Q2 market guard**: CLOSED IN AMENDED DESIGN. Q2 iff US; CN/HK Q2 rejected; existing H1 behavior preserved.
+
+Official SEC Accessing EDGAR Data documentation was rechecked: accession-number directories contain machine-readable index.json and all submitted filing component documents are stored in the accession directory.
+
+No production/test/runtime change was made.

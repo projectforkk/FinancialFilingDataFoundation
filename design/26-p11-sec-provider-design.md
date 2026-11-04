@@ -101,6 +101,8 @@ raw_fiscal_period: Q1 | Q2 | Q3 | H1 | FY
 Rules:
 
 - CN/HK semantics remain unchanged;
+- Q2 is valid iff market=US in P11 v1;
+- CN Q2 and HK Q2 are rejected;
 - US 10-Q uses Q1/Q2/Q3;
 - US Q2 MUST NOT be mapped to H1;
 - 10-K/20-F/40-F => FY;
@@ -325,13 +327,67 @@ All components are validated, never string-concatenated from arbitrary caller pa
 
 P11 stores a filing as an immutable source package.
 
-Required assets:
+Required source-package assembly for P11 v1 is deterministic.
 
-- filing index metadata;
-- primary document;
-- exact XBRL instance if separate;
-- filing-specific schema/linkbases required by the filing;
-- explicitly requested exhibit(s), if permitted.
+### Required accession index
+
+Always capture the exact accession-directory machine-readable index:
+
+`https://www.sec.gov/Archives/edgar/data/<cik-int>/<accession-no-dashes>/index.json`
+
+Role:
+`FILING_INDEX`
+
+Its exact bytes are a package asset and its entries are the only automatic filing-directory inventory for P11 v1.
+
+### Required primary document
+
+Capture `primaryDocument` from validated Submissions metadata.
+
+Requirements:
+
+- safe basename under Section 6;
+- must appear as an item in accession `index.json`;
+- exact bytes are `PRIMARY_DOCUMENT`;
+- absence/mismatch => `P11_PACKAGE_ASSET_MISSING`.
+
+### Automatic structured-data assets
+
+From accession `index.json`, automatically capture every regular-file item whose safe lowercase basename ends in:
+
+- `.xsd`;
+- `.xml`.
+
+Role classification is deterministic by lowercase suffix:
+
+- `*.xsd` => `TAXONOMY_SCHEMA`;
+- `*_cal.xml` => `CALCULATION_LINKBASE`;
+- `*_def.xml` => `DEFINITION_LINKBASE`;
+- `*_lab.xml` => `LABEL_LINKBASE`;
+- `*_pre.xml` => `PRESENTATION_LINKBASE`;
+- `*_htm.xml` => `XBRL_INSTANCE`;
+- any other `*.xml` => `OTHER_REQUIRED_DEPENDENCY`.
+
+If one filename matches multiple suffix rules, the most-specific rule above wins in the listed order before generic `.xml`.
+
+The same asset SHA may be referenced once only in the manifest; duplicate index entries that disagree on name/size are invalid.
+
+### Optional exhibits
+
+P11 v1 never auto-downloads unrelated HTML/text exhibits.
+
+An optional exhibit may be captured only when the caller supplies its exact safe basename and that basename appears in the same accession `index.json`.
+
+Role:
+`REQUESTED_EXHIBIT`
+
+No type/description guessing and no recursive arbitrary link following are allowed.
+
+### External taxonomy dependencies
+
+Standard/external taxonomy assets not present in the accession directory are NOT silently added by P11-E.
+
+Their exact runtime/cache resolution behavior must be frozen by the mandatory P11-F parser-contract amendment before parser implementation.
 
 Do not download every exhibit by default.
 
@@ -586,7 +642,7 @@ Numeric transformation boundary:
 - no currency/unit conversion, period inference, concept canonicalization or rounding beyond the filing's transform semantics;
 - unsupported/invalid transform => parsed value null + explicit validation issue, never guess.
 
-Because the exact standards transformation implementation may depend on the runtime/parser selected by P11-B, **P11-G parser production is CLOSED until a Design-First parser-contract freeze records the exact runtime version, transformation registry behavior, continuation/exclude handling golden fixtures and canonical decimal cases.** P11-G implementation may not choose these semantics ad hoc.
+Because the exact standards transformation implementation may depend on the runtime/parser selected by P11-B, **P11-F parser production is CLOSED until a Design-First parser-contract freeze records the exact runtime version, transformation registry behavior, continuation/exclude handling golden fixtures and canonical decimal cases.** P11-F implementation may not choose these semantics ad hoc.
 
 Companyfacts may confirm a standard fact but cannot replace filing evidence.
 

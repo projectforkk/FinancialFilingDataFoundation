@@ -210,3 +210,18 @@ The amended candidate remains additive:
 - no source/test/runtime file changed.
 
 Fresh detached design review is required before `P11_READY_FOR_DEVELOPMENT`.
+
+
+## 15. Package assembly / gate-order reconciliation
+
+Fresh review of `11648b2...` found P11-ISSUE-017..019 and stopped.
+
+The current amendment reconciles them as follows:
+
+- P11-E assembles the deterministic accession package from official accession-directory index.json + primaryDocument + all index-listed .xsd/.xml + explicit safe-basename requested exhibits only;
+- P11-F is now the parser/runtime gate and includes DEI extraction;
+- P11-G writes/loads ParsedFinancialDocument v2;
+- P11-H performs final DEI-based period binding and registry binding after parser output exists;
+- Q2 is legal only for market US; CN/HK Q2 remains rejected.
+
+This resolves the circular dependency without changing accepted P0-P10 contracts.
