@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-I CLOSED / P10-J CLOSED PENDING SEPARATE AUTHORIZATION`
+`AUTHORIZED — P10-J LIVE RUN ONLY / NO PRODUCTION CHANGES`
 
 P10-C is closed:
 
@@ -304,7 +304,13 @@ P10-I evidence:
 
 `development/111-p10-i-dynamic-spec-evidence.md = PASS`
 
-P10-I is closed. P10-J remains closed until a separate explicit authorization.
+P10-I is closed.
+
+P10-J live-run authorization:
+
+`development/112-p10-j-live-run-authorization.md`
+
+Only the isolated live research validation is authorized; production/tests/design changes remain forbidden.
 
 Still not authorized:
 
