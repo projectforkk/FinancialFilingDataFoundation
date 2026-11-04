@@ -255,3 +255,47 @@ P11-ISSUE-021 is resolved additively:
 - accession remains the supplemental source identity.
 
 A generic supplemental registry, if needed later, is a separate additive design rather than a silent widening of accepted periodic registry semantics.
+
+
+## 18. Logical source asset / content blob reconciliation
+
+P11-ISSUE-022 is resolved by separating two identities:
+
+- content identity = asset_sha256, used by content-addressed blob storage;
+- logical source identity = (file_name, canonical requested source_url), used by package/source-assets provenance.
+
+The same content may therefore be referenced by multiple logical source rows without duplicating blob bytes. Package identity preserves all logical rows. This avoids provenance loss while retaining storage deduplication.
+
+
+## 19. Discovery report-date / final report-date reconciliation
+
+P11-ISSUE-023 separates immutable acquisition identity from later semantic confirmation:
+
+- package report_date = Submissions discovery metadata normalized before parsing;
+- final periodic v2 report_date = P11-G confirmed value using DEI consistency;
+- package hash is never rewritten by parser output.
+
+This preserves stage ordering and immutable source-package identity while still allowing a null discovery reportDate to be completed by filing-native DEI evidence.
+
+
+## 20. US CIK / optional ticker reconciliation
+
+P11-ISSUE-024 keeps accepted CN/HK identity semantics while allowing correct SEC CIK-only operation:
+
+- CN/HK CompanyRef still requires ticker;
+- US CompanyRef may have ticker=null because CIK is canonical;
+- registry slot identity remains market + company_id + filing identity and does not require ticker;
+- v2 US ticker is optional display metadata only;
+- no placeholder ticker is introduced.
+
+
+## 20. Logical source provenance / immutable package reconciliation
+
+P11-ISSUE-025 separates:
+
+- content blob identity = asset_sha256;
+- logical source identity = source_asset_id derived from file_name + canonical source_url + asset_sha256.
+
+All source-native v2 provenance and deterministic IDs use the logical ID together with the content SHA, so identical bytes in different SEC logical files remain distinguishable.
+
+P11-ISSUE-026 freezes P11 v1 package immutability across stage boundaries: P11-E is the only package-construction gate; P11-F parser/runtime dependencies cannot mutate the filing package or package hash.

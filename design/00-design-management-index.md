@@ -458,6 +458,10 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 142. amendment evidence = `development/158-p11-supplemental-identity-amendment-evidence.md` = PASS；
 143. P11 candidate `5e1a1b7b39544af6c3ba464fc576174b480bd3ad` = INELIGIBLE after fresh review；
 144. review stop = `development/160-p11-logical-asset-review-stop.md`；
-145. P11-ISSUE-022 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
-146. P11 production = CLOSED；
-147. Research MCP production / Semantic Resolver production remain closed / not authorized。
+145. P11-ISSUE-022..024 = REMEDIATED / FRESH REVIEW REQUIRED；
+146. amendment evidence = `development/161-p11-logical-asset-amendment-evidence.md` = PASS；
+147. P11-ISSUE-025..026 = REMEDIATED / CANDIDATE FREEZE REQUIRED；
+148. amendment evidence = `development/162-p11-source-asset-provenance-amendment-evidence.md` = PASS；
+149. P11 source-provenance amended design = READY FOR CANDIDATE FREEZE；
+150. P11 production = CLOSED；
+151. Research MCP production / Semantic Resolver production remain closed / not authorized。

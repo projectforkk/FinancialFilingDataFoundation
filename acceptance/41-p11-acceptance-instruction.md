@@ -57,19 +57,24 @@ Mandatory:
 6. accession no-dash archive form exactly 18 digits;
 7. primaryDocument must be a safe single basename with no slash/backslash/control/query/fragment;
 8. ticker is not canonical identity;
-9. exact caller CIK wins after validation;
-10. ticker lookup ambiguity blocks;
-11. ticker/CIK mismatch blocks/reviews;
-12. Q2 supported for US;
-13. US Q2 not mapped to H1;
-14. CN Q2 rejected;
-15. HK Q2 rejected;
-16. existing CN/HK H1 behavior unchanged;
-17. 10-K/A normalized to base 10-K + amended;
-18. 10-Q/A normalized;
-19. 20-F/A normalized;
-20. 40-F/A normalized;
-21. 8-K/6-K supplemental identity is accession-bound, not periodic-slot-forced.
+9. exact caller CIK wins after validation and US ticker may be null;
+10. CN/HK CompanyRef still require non-empty ticker;
+11. US CIK-only flow never fabricates ticker;
+12. exactly one official ticker may populate normalized display ticker;
+13. zero/multiple official tickers for a known CIK may leave ticker=null without blocking CIK discovery;
+14. ticker-only zero match => P11_COMPANY_IDENTITY_NOT_FOUND;
+15. ticker lookup multiple-CIK ambiguity => P11_COMPANY_IDENTITY_AMBIGUOUS;
+16. ticker/CIK mismatch => P11_COMPANY_IDENTITY_AMBIGUOUS;
+17. Q2 supported for US;
+18. US Q2 not mapped to H1;
+19. CN Q2 rejected;
+20. HK Q2 rejected;
+21. existing CN/HK H1 behavior unchanged;
+22. 10-K/A normalized to base 10-K + amended;
+23. 10-Q/A normalized;
+24. 20-F/A normalized;
+25. 40-F/A normalized;
+26. 8-K/6-K supplemental identity is accession-bound, not periodic-slot-forced.
 
 ## 5. Official SEC discovery acceptance
 
@@ -153,7 +158,24 @@ Mandatory:
 - `local_content_path` persists as project-root-relative POSIX only;
 - absolute/drive-relative/UNC/traversal local paths rejected;
 - resolved local content must remain inside configured P11 SEC raw-assets root;
-- duplicate asset SHA reused safely;
+- two different logical source assets with identical bytes/SHA remain two manifest/source-assets rows;
+- each row has a distinct deterministic `source_asset_id` derived from exact `(file_name, canonical source_url, asset_sha256)`;
+- known `source_asset_id` fixture reproduces `41183564053cd4f7be5c66d4ed4e7c44d72ad137f9aaf60e7f5bf30c9ef41fa2`;
+- content-addressed raw blob is physically reused once for those rows;
+- exact duplicate logical key `(file_name, canonical requested source_url)` is rejected;
+- package hash includes both logical rows even when their asset_sha256 matches;
+- role precedence is exactly FILING_INDEX > PRIMARY_DOCUMENT > structured suffix > REQUESTED_EXHIBIT;
+- an explicit request for an already included higher-precedence asset adds no duplicate row and does not change role;
+- exact provider filename case/spelling is retained in logical identity; lowercasing is classification-only;
+- every index-derived filename passes the frozen safe-basename rules;
+- `asset_sha256` equals SHA256 of exact captured bytes;
+- `byte_size` equals actual captured byte length, not substituted index metadata;
+- numeric index size mismatch vs captured bytes => P11_PACKAGE_INVALID;
+- `primary=true` iff role=PRIMARY_DOCUMENT, otherwise false;
+- every P11 v1 package asset has `dependency_depth=0` and `referring_asset_sha256=null`;
+- parser/runtime external taxonomy/cache assets are not appended to the immutable package and do not change `source_package_sha256`;
+- package top-level filing_date is valid non-empty Submissions YYYY-MM-DD or P11_SUBMISSIONS_INVALID;
+- package top-level report_date is immutable discovery reportDate/null and is never rewritten by DEI;
 - package asset hash mismatch blocks;
 - partial commit never becomes accepted package;
 - same accession + changed bytes creates source drift/new package, not overwrite;
@@ -168,7 +190,7 @@ Periodic forms:
 - 20-F => FY;
 - 40-F => FY.
 
-Binding must use DEI period/fiscal-year focus when available.
+Binding must use DEI period/fiscal-year focus and the immutable Submissions discovery reportDate contract from design/26.
 
 Mandatory cases:
 
@@ -176,6 +198,13 @@ Mandatory cases:
 - Q2;
 - Q3;
 - FY;
+- valid discovery reportDate + matching DEI DocumentPeriodEndDate => exact final report_date;
+- null discovery reportDate + valid DEI DocumentPeriodEndDate => DEI fills final periodic report_date;
+- valid discovery reportDate + missing DEI period-end => discovery value retained;
+- both missing => P11_PERIOD_UNRESOLVED;
+- discovery vs DEI date disagreement => P11_PERIOD_CONFLICT;
+- malformed non-empty Submissions reportDate => P11_SUBMISSIONS_INVALID before package commit;
+- later DEI confirmation never changes source_package_sha256;
 - mismatched DEI vs requested slot => P11_PERIOD_CONFLICT;
 - unresolved period => P11_PERIOD_UNRESOLVED;
 - no calendar-month guessing.
@@ -224,6 +253,9 @@ Mandatory locator/identity fixtures:
 - namespace-prefix changes do not change XML locator identity;
 - source locator object keys are exact and optional values appear as JSON null;
 - locator resolves to exactly one node;
+- every source-referencing artifact carries both `source_asset_id` and `source_asset_sha256`, and the pair resolves to exactly one source-assets row;
+- same-content/different-logical-source fixtures produce distinct `evidence_id`, `raw_fact_id`, `segment_id`, `section_id` and `table_id` values;
+- `document.primary_source_asset_id` resolves to the unique PRIMARY_DOCUMENT row and matches its SHA/name/media type/size;
 - known `evidence_id`, `raw_fact_id`, `segment_id`, `section_id`, `table_id`, `cell_id`, `config_hash` and `parse_run_id` fixtures match independently precomputed hashes;
 - caller order and local paths do not change those IDs;
 - parser/config semantic change does change `parser_version` or `config_hash`.
@@ -284,17 +316,36 @@ If visual CSS interpretation is necessary:
 
 ## 15. Arelle/runtime
 
-If final design freezes Arelle:
+The mandatory P11-F pre-code parser-contract freeze must be present and accepted before parser implementation.
+
+Acceptance verifies the frozen parser contract covers:
+
+- exact parser/HTML/XML/Arelle library versions and lock;
+- exact source_kind classification;
+- deterministic media_type classification;
+- HTML recovery/tree normalization;
+- XML external entity/network behavior;
+- source-segment boundaries and normalized_text;
+- section detection/hierarchy;
+- DOM table inclusion/cell text/rowspan/colspan/header-tree;
+- Inline XBRL transformation registry;
+- continuedAt / ix:exclude;
+- locator goldens;
+- raw-value and parsed-decimal goldens;
+- external taxonomy/cache behavior;
+- unresolved dependency status mapping;
+- no unrecorded network during deterministic parse.
+
+If the frozen runtime uses Arelle:
 
 - exact package version pinned;
 - dependency lock reproducible;
 - runtime Python version/arch recorded;
 - runtime package lock matches;
 - parser operates on local package;
-- no unrecorded network during deterministic parse;
 - validation messages mapped deterministically.
 
-If final implementation does not use Arelle, acceptance must instead prove an equivalent frozen XBRL parser contract.
+If final implementation does not use Arelle, acceptance must instead prove an equivalent frozen XBRL parser contract with the same required semantics.
 
 ## 16. Registry / reuse
 
@@ -362,6 +413,7 @@ Simulated or live-safe deterministic case:
 
 Exact mandatory results:
 
+- ticker-only company identity zero match -> P11_COMPANY_IDENTITY_NOT_FOUND
 - ambiguous ticker/CIK -> P11_COMPANY_IDENTITY_AMBIGUOUS
 - missing filing -> P11_FILING_NOT_FOUND
 - missing User-Agent -> P11_USER_AGENT_REQUIRED

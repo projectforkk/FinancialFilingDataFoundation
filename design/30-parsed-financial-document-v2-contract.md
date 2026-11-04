@@ -106,7 +106,7 @@ Required:
 - source_package_sha256 nullable;
 - market;
 - company_id;
-- ticker;
+- ticker nullable for US;
 - filing_type;
 - fiscal_year nullable only for supplemental filings;
 - raw_fiscal_period nullable only for supplemental filings;
@@ -120,6 +120,7 @@ Required:
 - source_title;
 - provider_company_id;
 - source_kind;
+- primary_source_asset_id;
 - primary_asset_sha256;
 - primary_asset_name;
 - primary_media_type;
@@ -127,6 +128,13 @@ Required:
 - accession_number nullable outside SEC.
 
 For SEC, `company_id` and `provider_company_id` are canonical normalized CIK unless a later design explicitly changes this rule.
+
+US `ticker` is display/lookup metadata only:
+
+- it may be null;
+- it MUST NOT be fabricated when CIK is known;
+- when non-null it follows design/26 Section 4 normalized/validated ticker rules;
+- multiple official tickers without a caller-selected validated ticker remain null rather than selecting one arbitrarily.
 
 Filing-role nullability:
 
@@ -147,10 +155,43 @@ Filing-role nullability:
 
 P11 v1 supplemental identity remains accession-bound even when all three periodic/date fields above are null except filing_date.
 
+For periodic SEC filings, `document.json.report_date` is the final P11-G confirmed report date from design/26 Section 7. It may differ from the immutable package-identity discovery `report_date` only when the discovery value was null and DEI supplies the exact final date. This never changes `source_package_sha256`.
+
 ## 6. source_assets.jsonl
 
-One row per captured source asset:
+One row per captured **logical source asset**.
 
+Logical asset identity follows design/26:
+
+`(file_name, canonical requested source_url)`
+
+Two logical rows may share the same `asset_sha256` and may therefore share the same `local_content_path` content-addressed blob. They remain separate source-assets rows because source path/role provenance is distinct.
+
+`source_asset_id` is the stable logical-source identifier. It is SHA256 of canonical JSON of this exact object:
+
+```json
+{
+  "schema_version": "p11-source-asset-id-v1",
+  "file_name": "example.htm",
+  "source_url": "https://www.sec.gov/Archives/.../example.htm",
+  "asset_sha256": "<lowercase sha256>"
+}
+```
+
+Known fixture using the package example in design/26:
+
+`41183564053cd4f7be5c66d4ed4e7c44d72ad137f9aaf60e7f5bf30c9ef41fa2`
+
+Rules:
+
+- role, local path, media type, timestamps and HTTP diagnostics do not participate in `source_asset_id`;
+- changing logical filename, canonical requested source URL or exact bytes changes `source_asset_id`;
+- same bytes under different logical names/URLs produce different `source_asset_id` values;
+- loader recomputes and verifies `source_asset_id` for every row.
+
+Required fields:
+
+- source_asset_id;
 - asset_sha256;
 - source_package_sha256;
 - role;
@@ -177,6 +218,14 @@ Allowed SEC roles include:
 - OTHER_REQUIRED_DEPENDENCY.
 
 Every stored row is exact-byte-addressed.
+
+Cross-artifact source reference rule:
+
+- every segment/section/table/raw-fact/evidence row that references a source asset carries both `source_asset_id` and `source_asset_sha256`;
+- `source_asset_id` MUST resolve to exactly one row in `source_assets.jsonl`;
+- the resolved row's `asset_sha256` MUST equal the referencing `source_asset_sha256`;
+- a matching content SHA alone is insufficient provenance when multiple logical source rows share bytes;
+- `document.json.primary_source_asset_id` MUST resolve to the unique `PRIMARY_DOCUMENT` row and its SHA/name/media type/size must match the corresponding `primary_*` document fields.
 
 `source_url` is the canonical requested URL from the immutable package identity, not a redirect-final URL.
 
@@ -207,6 +256,7 @@ Required:
 - source_locator;
 - raw_text;
 - normalized_text;
+- source_asset_id;
 - source_asset_sha256;
 - section_hint nullable.
 
@@ -230,6 +280,7 @@ Required:
 - level;
 - segment_start;
 - segment_end;
+- source_asset_id;
 - source_asset_sha256;
 - locator_type;
 - source_locator;
@@ -243,6 +294,7 @@ For HTML-origin tables:
 
 - table_id;
 - raw_title nullable;
+- source_asset_id;
 - source_asset_sha256;
 - locator_type = HTML_DOM;
 - source_locator;
@@ -282,6 +334,7 @@ Required source-neutral fields:
 - raw_period_label nullable;
 - raw_scope nullable;
 - evidence_id;
+- source_asset_id;
 - source_asset_sha256;
 - locator_type;
 - source_locator.
@@ -329,6 +382,7 @@ Required:
 - evidence_id;
 - document_sha256;
 - extraction_version;
+- source_asset_id;
 - source_asset_sha256;
 - locator_type;
 - source_locator;
@@ -444,9 +498,12 @@ Example:
 
 ```json
 {
+  "source_asset_id": "<lowercase sha256>",
   "asset_sha256": "<lowercase sha256>"
 }
 ```
+
+The pair must resolve to exactly one logical source-assets row. `source_asset_id` is the logical provenance key; `asset_sha256` independently confirms the referenced content bytes.
 
 Rules:
 
@@ -466,6 +523,7 @@ Rules:
 ```json
 {
   "document_sha256": "<lowercase sha256>",
+  "source_asset_id": "<lowercase sha256>",
   "source_asset_sha256": "<lowercase sha256>",
   "locator_type": "IXBRL_FACT",
   "source_locator": {},
@@ -493,6 +551,7 @@ For XBRL/iXBRL facts, `raw_fact_id` is SHA256 of canonical JSON of this exact ob
 ```json
 {
   "document_sha256": "<lowercase sha256>",
+  "source_asset_id": "<lowercase sha256>",
   "source_asset_sha256": "<lowercase sha256>",
   "concept_qname": "{namespace-uri}LocalName",
   "context_ref": "ctx",
@@ -539,6 +598,7 @@ All IDs below use the Section 12 canonical JSON encoder and SHA256 of the exact 
 ```json
 {
   "document_sha256": "<sha>",
+  "source_asset_id": "<sha>",
   "source_asset_sha256": "<sha>",
   "locator_type": "HTML_DOM",
   "source_locator": {},
@@ -552,6 +612,7 @@ All IDs below use the Section 12 canonical JSON encoder and SHA256 of the exact 
 ```json
 {
   "document_sha256": "<sha>",
+  "source_asset_id": "<sha>",
   "source_asset_sha256": "<sha>",
   "locator_type": "HTML_DOM",
   "source_locator": {},
@@ -566,6 +627,7 @@ All IDs below use the Section 12 canonical JSON encoder and SHA256 of the exact 
 ```json
 {
   "document_sha256": "<sha>",
+  "source_asset_id": "<sha>",
   "source_asset_sha256": "<sha>",
   "locator_type": "HTML_DOM",
   "source_locator": {},

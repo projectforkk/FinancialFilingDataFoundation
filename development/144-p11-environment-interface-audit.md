@@ -352,3 +352,95 @@ Resolution in current amendment:
 - P11 v1 supplemental filings stay outside existing periodic SQLiteRegistry/ParsedDataRecord and remain authoritative in source package + v2 + supplemental export.
 
 No production/test/runtime change was made.
+
+
+## 13. Logical asset identity finding — P11-ISSUE-022
+
+Fresh review of `5e1a1b7b39544af6c3ba464fc576174b480bd3ad` passed the automated contract matrix but manual package review found content-blob SHA and logical accession asset identity were conflated.
+
+Stop:
+`development/160-p11-logical-asset-review-stop.md`
+
+Resolution in current amendment:
+
+- raw content blobs deduplicate by asset_sha256;
+- package/source-assets rows represent logical assets keyed by exact (file_name, canonical requested source_url);
+- multiple logical rows may share one SHA/blob;
+- duplicate logical keys are invalid;
+- role precedence is FILING_INDEX > PRIMARY_DOCUMENT > structured suffix > REQUESTED_EXHIBIT;
+- requested asset already captured at higher precedence is not duplicated or re-roled;
+- all direct accession-directory assets use dependency_depth=0 / referring_asset_sha256=null.
+
+No production/test/runtime change was made.
+
+
+## 14. Additional amendment finding — P11-ISSUE-023
+
+While P11-ISSUE-022 was stopped, cross-stage review found package identity is computed before DEI-based final period/report-date binding, but the package identity itself contains report_date.
+
+Without an explicit distinction, a parser could be tempted to rewrite package identity after DEI confirmation.
+
+Resolution in current amendment:
+
+- source-package identity report_date = normalized SEC Submissions discovery reportDate (valid YYYY-MM-DD or null if empty; malformed non-empty blocks);
+- this package field is immutable once package hash is computed;
+- final periodic v2 document report_date is confirmed in P11-G using discovery reportDate and DEI DocumentPeriodEndDate;
+- both valid must match;
+- one may supply the final value when the other is null;
+- both absent => P11_PERIOD_UNRESOLVED;
+- disagreement => P11_PERIOD_CONFLICT;
+- final DEI confirmation never rewrites source_package_sha256.
+
+P11-ISSUE-023 is closed in the amended design pending fresh review.
+
+
+## 15. Additional amendment finding — P11-ISSUE-024
+
+While ISSUE-022/023 remained stopped, field-nullability review found P11 had already declared CIK canonical and ticker display-only, but accepted P1 CompanyRef and v2 document schema still implied ticker was always non-empty.
+
+Resolution in current amendment:
+
+- CompanyRef ticker becomes market-conditionally optional: CN/HK still non-empty, US may be null;
+- CIK-only US flow is valid and never fabricates ticker;
+- ticker lookup key is ASCII-trim + ASCII uppercase;
+- ticker-only zero official match => P11_COMPANY_IDENTITY_NOT_FOUND;
+- multiple distinct CIK matches => P11_COMPANY_IDENTITY_AMBIGUOUS;
+- caller ticker/CIK mismatch => P11_COMPANY_IDENTITY_AMBIGUOUS;
+- when CIK is known and caller supplied no ticker, exactly one official ticker may populate display ticker; zero/multiple distinct tickers => ticker=null;
+- v2 ticker is nullable for US;
+- registry migration is unnecessary because current periodic SQLite slot/parsed-data identity does not persist ticker.
+
+P11-ISSUE-024 is closed in the amended design pending fresh review.
+
+
+## 16. Additional pre-candidate findings — P11-ISSUE-025..026
+
+While ISSUE-022..024 remediation was still uncommitted and production remained closed, candidate-preflight review found two provenance/immutability gaps.
+
+### P11-ISSUE-025 — logical source provenance collision
+
+After allowing different logical accession assets to share identical bytes/SHA, v2 source-referencing artifacts still used only `source_asset_sha256`. That cannot distinguish two logical files that share one content blob.
+
+Resolution:
+
+- add deterministic `source_asset_id` derived from exact file_name + canonical requested source_url + asset_sha256;
+- known fixture = `41183564053cd4f7be5c66d4ed4e7c44d72ad137f9aaf60e7f5bf30c9ef41fa2`;
+- source-assets rows persist both logical ID and content SHA;
+- document primary source references a `primary_source_asset_id`;
+- segment/section/table/raw-fact/evidence rows carry both source_asset_id and source_asset_sha256;
+- their deterministic IDs include source_asset_id, preventing same-content/different-source collisions;
+- SOURCE_ASSET locator carries both logical ID and content SHA.
+
+### P11-ISSUE-026 — parser-time package mutation ambiguity
+
+The design reserved dependency_depth/referrer semantics for possible external dependencies after P11-E, but P11-E already commits the immutable package/hash before P11-F parser/runtime work.
+
+Resolution:
+
+- every P11 v1 package asset is an accession-directory direct asset;
+- every package row uses dependency_depth=0 / referring_asset_sha256=null;
+- P11-F cannot append external taxonomy/cache assets or rewrite source_package_sha256;
+- external taxonomy/runtime-cache material is outside the filing package under the separately frozen parser contract;
+- putting external dependencies into a future package requires a new versioned package identity design before package construction.
+
+No production/test/runtime change was made.

@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 AMENDED FINAL DESIGN REVIEW STOPPED — P11-ISSUE-022 / PRODUCTION CLOSED`
+`P11 SOURCE-PROVENANCE AMENDED DESIGN READY FOR CANDIDATE FREEZE / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Detached design review of candidate `3ccaedc14a4c0f3f222cd192c8b7e1479d787ccd` stopped with material design findings P11-ISSUE-010 through P11-ISSUE-016. Stop record: `development/147-p11-detached-design-review-stop.md`. That candidate remains INELIGIBLE. The Design-First remediation of P11-ISSUE-010..016 is documented in `development/148-p11-design-amendment-evidence.md = PASS`. Fresh re-review of candidate `11648b22bfe97d88048c2dcf079034c37b3854af` found P11-ISSUE-017..019; stop: `development/150-p11-amended-design-review-stop.md`. Their remediation is documented in `development/151-p11-second-design-amendment-evidence.md = PASS`. Production remains CLOSED pending a fresh detached design review PASS and separate development authorization.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-026. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`). The current worktree contains the Design-First remediation through ISSUE-026 and is ready only for candidate freeze. Production remains CLOSED pending exact-candidate fresh detached design review PASS and a separate development authorization.
 
 P10-C is closed:
 

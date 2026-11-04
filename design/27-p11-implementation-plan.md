@@ -72,19 +72,25 @@ Must retain CN/HK behavior byte/semantic compatible.
 
 Focused tests:
 
-1. CN/HK unchanged;
-2. US CompanyRef with zero-padded CIK;
-3. invalid CIK rejected;
-4. Q2 valid for US;
-5. Q2 rejected for CN;
-6. Q2 rejected for HK;
-7. H1 remains valid for existing markets;
-6. 10-K/A normalization;
-7. 10-Q/A normalization;
-8. 20-F/A normalization;
-9. 40-F/A normalization;
-10. 8-K/6-K supplemental identity;
-11. no forced 8-K/6-K periodic slot.
+1. CN/HK unchanged and still require non-empty ticker;
+2. US CompanyRef with zero-padded CIK and ticker=null;
+3. US CIK-only flow does not fabricate ticker;
+4. one official ticker may populate normalized display ticker;
+5. multiple official tickers with no caller selection => ticker=null;
+6. ticker-only zero match => P11_COMPANY_IDENTITY_NOT_FOUND;
+7. ticker-only multiple-CIK match => P11_COMPANY_IDENTITY_AMBIGUOUS;
+8. caller ticker/CIK mismatch => P11_COMPANY_IDENTITY_AMBIGUOUS;
+9. invalid CIK rejected;
+10. Q2 valid for US;
+11. Q2 rejected for CN;
+12. Q2 rejected for HK;
+13. H1 remains valid for existing markets;
+14. 10-K/A normalization;
+15. 10-Q/A normalization;
+16. 20-F/A normalization;
+17. 40-F/A normalization;
+18. 8-K/6-K supplemental identity;
+19. no forced 8-K/6-K periodic slot.
 
 STOP before acquisition changes if identity design assumption fails.
 
@@ -162,7 +168,19 @@ Focused tests:
 - explicitly requested safe-basename exhibit captured only if listed in index.json;
 - project-root-relative POSIX `local_content_path` round-trip;
 - absolute/drive-relative/traversal local path reject;
-- duplicate asset SHA reuse;
+- two distinct logical assets may share one asset_sha256 and remain two manifest/source-assets rows;
+- content-addressed blob bytes stored once/reused;
+- exact duplicate logical key (file_name, canonical source_url) rejected;
+- role precedence FILING_INDEX > PRIMARY_DOCUMENT > structured suffix > REQUESTED_EXHIBIT;
+- requested exhibit already included at higher precedence adds no duplicate row and keeps existing role;
+- exact provider filename case preserved; lowercase used only for classification;
+- asset_sha256 from exact captured bytes;
+- byte_size from exact captured length;
+- declared index size mismatch blocks;
+- primary boolean true iff PRIMARY_DOCUMENT role;
+- every direct accession-directory asset has dependency_depth=0 and referring_asset_sha256=null;
+- package filingDate valid/missing/malformed cases;
+- package discovery reportDate valid/null/malformed cases;
 - same accession/new bytes => new package;
 - existing package collision mismatch blocked;
 - atomic failure leaves no partial accepted package;
@@ -178,7 +196,14 @@ Create isolated P11 runtime only after P11-B PASS and after P11-E can assemble a
 It must record:
 
 - exact runtime Python/version/architecture;
-- exact Arelle/parser version and dependency lock;
+- exact Arelle/parser/HTML/XML library versions and dependency lock;
+- exact `source_kind` classification rules;
+- exact deterministic `media_type` classification rules for captured assets;
+- HTML parser recovery/tree-normalization behavior;
+- XML parser security/entity/network behavior;
+- exact source-segment boundary and `normalized_text` rules;
+- exact section detection/heading hierarchy rules;
+- exact DOM table inclusion, cell text, rowspan/colspan and header-tree rules;
 - exact Inline XBRL transformation registry behavior;
 - `continuedAt` and `ix:exclude` behavior;
 - canonical QName/DOM/XML locator golden fixtures;
@@ -209,6 +234,8 @@ Parser operations:
 
 No network during deterministic parse.
 
+P11-F MUST NOT mutate the already committed P11-E source package, add external taxonomy assets to it, or change `source_package_sha256`. External taxonomy/runtime-cache behavior is separate and frozen by the parser-contract amendment.
+
 Focused tests use local frozen fixtures.
 
 ## P11-G — Final Period / Filing Identity Binding
@@ -219,7 +246,11 @@ Extract/confirm:
 
 - DocumentFiscalYearFocus;
 - DocumentFiscalPeriodFocus;
-- form/report date consistency.
+- DocumentPeriodEndDate;
+- immutable package discovery report_date from Submissions;
+- form/report-date consistency.
+
+Final periodic report_date follows design/26 Section 7 exactly: discovery vs DEI must agree when both exist, one may fill when the other is null, neither => P11_PERIOD_UNRESOLVED, disagreement => P11_PERIOD_CONFLICT. Package identity is never rewritten.
 
 No registry write occurs in P11-G.
 
@@ -267,6 +298,10 @@ Loaders must verify:
 - hashes;
 - IDs;
 - locator integrity;
+- `source_asset_id` recomputes from exact logical filename/source_url/content SHA;
+- every artifact `source_asset_id + source_asset_sha256` pair resolves to exactly one logical source row;
+- duplicate-content logical rows remain distinguishable;
+- `primary_source_asset_id` resolves to the unique PRIMARY_DOCUMENT row;
 - asset references;
 - package/document identity;
 - periodic document identity matches the confirmed binding.

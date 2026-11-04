@@ -78,16 +78,28 @@ For market `US`:
 
 - canonical provider company identity = 10-digit zero-padded CIK;
 - `CompanyRef.company_id` = normalized 10-digit CIK;
+- `CompanyRef.ticker` becomes market-conditionally optional: CN/HK remain non-empty exactly as accepted P1 behavior, while US may use null;
 - ticker is a lookup/display attribute and can change;
 - ticker association is not sufficient for identity;
+- CIK-only US operation is valid and MUST NOT fabricate a ticker;
 - CIK never comes from filename inference.
 
 Ticker resolution:
 
-1. exact caller-supplied CIK wins after validation;
-2. otherwise resolve ticker using SEC-hosted ticker mapping;
-3. verify resolved CIK against Submissions API ticker/name metadata when available;
-4. ambiguity or mismatch => `P11_COMPANY_IDENTITY_AMBIGUOUS`.
+1. ticker lookup key = surrounding ASCII whitespace trim + ASCII uppercase; empty after trim is absent;
+2. exact caller-supplied CIK wins after validation and does not require a ticker;
+3. if no CIK is supplied, resolve the normalized ticker using the SEC-hosted ticker mapping;
+4. zero official ticker matches => `P11_COMPANY_IDENTITY_NOT_FOUND`;
+5. more than one distinct CIK match => `P11_COMPANY_IDENTITY_AMBIGUOUS`;
+6. verify a caller/resolved ticker against Submissions API ticker metadata when available;
+7. ticker/CIK mismatch => `P11_COMPANY_IDENTITY_AMBIGUOUS`.
+
+Persisted/display ticker for v2:
+
+- if caller supplied a ticker and it validates for the CIK, persist the normalized ASCII-uppercase ticker;
+- if caller supplied no ticker and Submissions exposes exactly one distinct non-empty ticker after normalization, persist that ticker;
+- if Submissions exposes zero or multiple distinct tickers for a valid caller CIK, persist `ticker=null` rather than choosing one arbitrarily;
+- ticker null never blocks CIK-based filing discovery.
 
 ## 5. Identity model amendments
 
@@ -176,15 +188,32 @@ Preferred evidence order:
 
 1. Inline/XBRL DEI `DocumentFiscalYearFocus`;
 2. Inline/XBRL DEI `DocumentFiscalPeriodFocus`;
-3. filing form + report date consistency;
-4. filer fiscal year end only as a consistency check.
+3. Inline/XBRL DEI `DocumentPeriodEndDate`;
+4. normalized Submissions `reportDate`;
+5. filing form consistency;
+6. filer fiscal year end only as a consistency check.
+
+Discovery report-date normalization:
+
+- empty SEC Submissions `reportDate` => null;
+- exact `YYYY-MM-DD` calendar-valid value => normalized discovery report date;
+- non-empty malformed/invalid date => `P11_SUBMISSIONS_INVALID`;
+- this discovery value is frozen in the source-package identity before parsing and is never rewritten from DEI.
+
+Final periodic `document.json.report_date`:
+
+- if discovery report date and DEI `DocumentPeriodEndDate` are both valid, they MUST match;
+- if only one is valid/present, use that exact value;
+- if neither is available, return `P11_PERIOD_UNRESOLVED`;
+- disagreement => `P11_PERIOD_CONFLICT`;
+- final v2 report-date confirmation never rewrites `source_package_sha256`.
 
 Rules:
 
 - 10-K must resolve to FY;
 - 10-Q must resolve to Q1/Q2/Q3;
 - 20-F/40-F must resolve to FY;
-- conflicting DEI vs requested slot => REVIEW_REQUIRED/BLOCKED;
+- conflicting DEI vs requested slot => REVIEW_REQUIRED/BLOCKED with `P11_PERIOD_CONFLICT` where applicable;
 - no guessing based only on calendar month.
 
 ## 8. Supplemental filing identity
@@ -370,7 +399,51 @@ Role classification is deterministic by lowercase suffix:
 
 If one filename matches multiple suffix rules, the most-specific rule above wins in the listed order before generic `.xml`.
 
-The same asset SHA may be referenced once only in the manifest; duplicate index entries that disagree on name/size are invalid.
+### Logical asset identity / blob dedup
+
+The immutable package manifest represents logical accession-directory assets.
+
+Logical asset key:
+
+`(file_name, canonical requested source_url)`
+
+Rules:
+
+- `file_name` is the exact case-sensitive provider/index basename spelling; lowercase is used only transiently for suffix classification and never replaces the identity spelling;
+- every index-derived filename must satisfy the same safe-basename/path rules as Section 6 before it can enter package assembly;
+- the logical asset key MUST be unique inside one package;
+- two different logical assets MAY have identical bytes and therefore the same `asset_sha256`;
+- such rows MUST both remain in the package manifest/source-assets output;
+- raw blob storage may physically reuse one content-addressed blob for those rows;
+- exact duplicate logical keys are invalid, regardless of whether their metadata/bytes agree;
+- `asset_sha256 = SHA256(exact captured asset bytes)`;
+- `byte_size = len(exact captured asset bytes)`, never the provider-declared size substituted for actual bytes;
+- if index.json provides a numeric declared size and it disagrees with captured byte_size, package construction blocks as `P11_PACKAGE_INVALID`;
+- `primary=true` iff the final role is `PRIMARY_DOCUMENT`; all other roles use `primary=false`;
+- package `asset_count` counts logical rows, not unique SHA blobs.
+
+Every P11 v1 source-package row is selected directly from the accession directory in P11-E and therefore uses:
+
+- `dependency_depth = 0`;
+- `referring_asset_sha256 = null`.
+
+P11-F MUST NOT append external taxonomy/runtime-cache assets to an already committed source package and MUST NOT mutate `source_package_sha256`.
+
+External taxonomy dependencies in P11 v1 belong to the separately frozen parser runtime/cache contract. If a future design wants those external assets inside the immutable filing package, it requires a new versioned package-identity design amendment before package construction; it cannot reuse this v1 identity contract silently.
+
+### Role precedence
+
+One logical asset has exactly one manifest role.
+
+Precedence:
+
+1. accession `index.json` => `FILING_INDEX`;
+2. exact filename equals validated `primaryDocument` => `PRIMARY_DOCUMENT`;
+3. otherwise structured suffix classification above;
+4. otherwise explicit requested exhibit => `REQUESTED_EXHIBIT`;
+5. otherwise exclude from P11 v1 package.
+
+If an explicitly requested exhibit is already included by rules 1-3, the request is satisfied by the existing logical row. No duplicate row is added and the higher-precedence role is retained.
 
 ### Optional exhibits
 
@@ -422,6 +495,20 @@ A receipt never changes package identity or immutable package-manifest bytes.
 Primary `document_sha256`:
 SHA256(exact primary document bytes).
 
+Before constructing the package identity object, top-level fields are frozen as follows:
+
+- `schema_version = "p11-sec-source-package-identity-v1"`;
+- `cik` = normalized 10-digit target filer CIK from Section 6;
+- `accession_number` = normalized dashed accession from Section 6;
+- `base_form` = normalized base form from Section 6;
+- `amended` = exact normalized amendment boolean;
+- `filing_date` = non-empty calendar-valid Submissions `filingDate` in exact `YYYY-MM-DD`; missing/malformed => `P11_SUBMISSIONS_INVALID`;
+- `report_date` = immutable normalized Submissions discovery reportDate from Section 7, valid date or null;
+- `primary_document` = exact validated provider basename spelling;
+- `assets` = complete logical asset rows after Section 14 selection, role precedence and canonical sort.
+
+No parser output may alter these top-level package-identity values after package commit.
+
 `source_package_sha256` is SHA256 of the exact canonical JSON bytes of this identity object:
 
 ```json
@@ -469,6 +556,15 @@ Excluded from package identity:
 Those excluded fields remain provenance/diagnostic metadata but cannot change the package hash by themselves.
 
 `source_package_sha256` itself is not included in its own identity payload.
+
+The package-identity `report_date` field is the normalized **Submissions discovery reportDate** from Section 7, not the later DEI-confirmed/final v2 report date.
+
+Therefore:
+
+- valid discovery reportDate => exact `YYYY-MM-DD`;
+- empty discovery reportDate => JSON null;
+- malformed non-empty discovery reportDate blocks package construction as `P11_SUBMISSIONS_INVALID`;
+- later DEI confirmation/conflict never mutates an already computed package identity/hash.
 
 Known canonical fixture:
 
@@ -716,6 +812,7 @@ SEC SourceMetadata:
 Minimum P11 codes:
 
 Identity/discovery:
+- P11_COMPANY_IDENTITY_NOT_FOUND
 - P11_COMPANY_IDENTITY_AMBIGUOUS
 - P11_CIK_INVALID
 - P11_SUBMISSIONS_INVALID
@@ -871,7 +968,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in development/144. P11-ISSUE-010 through P11-ISSUE-016 were found by detached review of candidate `3ccaedc...` and are recorded in `development/147-p11-detached-design-review-stop.md`. The current amended design contains explicit resolutions for ISSUE-010..016; those resolutions are not accepted until a fresh detached design review passes.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-026 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/162`. The current amended design contains explicit resolutions for ISSUE-010..026; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 
