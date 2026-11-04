@@ -455,14 +455,22 @@ For periodic filings:
 - persist ParsedDataRecord only after the v2 artifact has been written/loaded and validation completed;
 - artifact_path is mandatory for P11 periodic records and is the project-root-relative POSIX path to the exact `<parsed_root>/<parse_run_id>/export-v2` directory;
 - parse_run_id is validated as lowercase 64-hex before path construction;
-- the complete export-v2 directory is atomically committed or idempotently verified before register_parsed_data;
+- the complete export-v2 directory is atomically committed or idempotently verified before registry persistence;
 - an existing final export is never overwritten/deleted/replaced;
 - any existing-final byte/identity mismatch => P11_FINAL_ARTIFACT_COLLISION;
 - registry never points to manifest.json, another child file, or a staging/partial directory;
 - no trailing slash is stored;
-- if register_parsed_data fails after final export success, leave the final export unchanged and unregistered; a later retry may re-verify the exact existing final export and retry registry persistence;
+- P11-K MUST call additive `SQLiteRegistry.register_parsed_data_atomic(record)` rather than accepted `register_parsed_data(record)`;
+- `register_parsed_data_atomic` starts `BEGIN IMMEDIATE` before the parse_run_id lookup, so exact concurrent P11 writers serialize before the existence check;
+- exact existing row across all persisted semantic fields except created_at => normal idempotent success;
+- missing row => insert once and commit;
+- same parse_run_id with any different persisted semantic field => `ParsedDataRecordConflict` => `P11_REGISTRY_RECORD_CONFLICT` / BLOCKED;
+- SQLite busy/locked/I/O/commit or other persistence failure => `P11_REGISTRY_PERSISTENCE_FAILED` / BLOCKED;
+- there is no hidden retry loop inside registry persistence;
+- on registry failure after final export success, leave the final export unchanged; a later outer retry must re-verify the exact existing final export before retrying atomic registry persistence;
 - an unregistered orphan final export is not reusable because the package-aware selector discovers candidates only from registry rows;
-- no P11 registry schema migration is required solely to store source_package_sha256.
+- `REGISTRY_SCHEMA_VERSION` remains 1 and no P11 schema migration is required;
+- accepted `register_parsed_data()` and existing CN/HK callers remain unchanged.
 
 ### Package-aware reuse public API
 

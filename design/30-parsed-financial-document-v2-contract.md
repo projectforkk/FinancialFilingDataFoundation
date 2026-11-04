@@ -195,7 +195,9 @@ Normative order:
 10. existing-final verification loads final and compares every required artifact file byte-for-byte with this attempt's validated staging export plus exact identity/validation semantics;
 11. any existing-final mismatch/missing/invalid state => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
 12. after a new atomic commit or idempotent existing-final match, reload the final path successfully;
-13. only then may P11-K persist `ParsedDataRecord.artifact_path`.
+13. only then may P11-K persist `ParsedDataRecord.artifact_path` through additive `SQLiteRegistry.register_parsed_data_atomic(record)`;
+14. P11-K registry persistence is outside final `export-v2` bytes and MUST NOT mutate the final directory;
+15. concurrent exact P11-K writers are serialized by the atomic registry API before the parse_run_id existence check; exact existing record is idempotent success, different record is `P11_REGISTRY_RECORD_CONFLICT`, and other registry persistence failure is `P11_REGISTRY_PERSISTENCE_FAILED`.
 
 A successful existing-final match is idempotent success and keeps the original final directory byte-unchanged.
 

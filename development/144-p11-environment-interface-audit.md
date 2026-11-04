@@ -628,3 +628,29 @@ Resolution in the amended design:
 P11-B must prove the target runtime exposes an atomic same-filesystem no-replace directory commit primitive with distinguishable destination-exists semantics. No copy/delete/replace fallback is allowed.
 
 No production/test/runtime change was made.
+
+
+## 24. Concurrent registry persistence finding — P11-ISSUE-036
+
+Fresh detached review of `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47` passed automated ISSUE-010..035 guards, but manual P11-I -> P11-K review reproduced a check-then-insert race in accepted `SQLiteRegistry.register_parsed_data()`.
+
+Authoritative stop:
+`development/191-p11-registry-concurrency-review-stop.md`
+
+The accepted method performs a parse_run_id SELECT before INSERT without a transaction-level writer lock. Two exact concurrent writers can both observe absence and one can fail with `UNIQUE constraint failed: parsed_data.parse_run_id`.
+
+Resolution in the amended design:
+
+- existing `register_parsed_data()` remains unchanged for P0-P10/CN-HK;
+- P11-K uses additive `SQLiteRegistry.register_parsed_data_atomic(record)`;
+- the atomic API executes `BEGIN IMMEDIATE` before the parse_run_id SELECT;
+- exact existing record returns idempotent success;
+- missing row inserts once and commits;
+- same parse_run_id with different content raises public `ParsedDataRecordConflict` and maps to `P11_REGISTRY_RECORD_CONFLICT`;
+- SQLite busy/locked/I/O/commit failure maps to `P11_REGISTRY_PERSISTENCE_FAILED`;
+- no hidden retry loop and no registry schema migration;
+- final export remains immutable on every registry failure.
+
+No new external dependency or P11-B environment dependency is introduced by ISSUE-036. SQLite transaction semantics are part of the already accepted local registry runtime; P11-B remains reserved for the separately authorized SEC/runtime probe.
+
+No production/test/runtime change was made.

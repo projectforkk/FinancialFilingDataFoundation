@@ -1016,7 +1016,61 @@ Specific rules:
 - if more than one candidate is fully reusable for the exact same package/document/slot, select the lexicographically smallest `parse_run_id` after all exact-package checks;
 - no candidate may be chosen merely because its `document_sha256` matches.
 
-Registry persistence in P11-K may continue using existing `ParsedDataRecord` because `parse_run_id` and `artifact_path` bind to the package-aware v2 artifact; package equivalence is re-verified from that artifact before reuse.
+Registry persistence in P11-K continues using existing `ParsedDataRecord` schema because `parse_run_id` and `artifact_path` bind to the package-aware v2 artifact; package equivalence is re-verified from that artifact before reuse.
+
+### 17.4 Concurrent-safe P11-K registry persistence
+
+The accepted `SQLiteRegistry.register_parsed_data(record)` API remains the P0-P10/CN-HK path and MUST NOT be silently redefined by P11.
+
+P11-K MUST instead use this additive API:
+
+`SQLiteRegistry.register_parsed_data_atomic(record: ParsedDataRecord) -> None`
+
+and the public conflict exception:
+
+`ParsedDataRecordConflict(ValueError)`
+
+Both are additive to the existing registry schema/API. `REGISTRY_SCHEMA_VERSION` remains `1`; no migration is allowed for ISSUE-036.
+
+`register_parsed_data_atomic()` MUST implement this exact algorithm on one SQLite connection:
+
+1. execute `BEGIN IMMEDIATE` before reading `parsed_data`;
+2. `SELECT * FROM parsed_data WHERE parse_run_id = ?`;
+3. if a row exists, compare exactly these persisted semantic fields, excluding only `created_at`:
+   - parse_run_id;
+   - market;
+   - company_id;
+   - filing_type;
+   - fiscal_year;
+   - raw_fiscal_period;
+   - document_sha256;
+   - parser_version;
+   - schema_version;
+   - validation_status;
+   - blocking_issue_count;
+   - compatibility_status;
+   - artifact_path;
+4. existing exact row => commit/release the transaction and return normally as idempotent success;
+5. existing different row => roll back and raise `ParsedDataRecordConflict` with exact message `parse_run_id already exists with different content: <parse_run_id>`;
+6. if no row exists, INSERT the record using the existing parsed_data columns, set `created_at` from the existing registry clock helper, commit, and return normally;
+7. any SQLite busy/locked/I/O/commit failure => roll back when possible and propagate a persistence failure; it MUST NOT be converted into exact idempotent success merely because a row is later observed;
+8. no automatic retry loop is hidden inside this API.
+
+`BEGIN IMMEDIATE` is normative: it serializes concurrent writers before the existence check, closing the accepted method's SELECT-then-INSERT race. A second exact writer waits according to the configured SQLite connection timeout, then reads the first committed row and returns exact idempotent success. If lock acquisition times out, the call fails closed and a later outer retry may safely re-enter the same atomic API.
+
+P11-K maps outcomes exactly:
+
+- normal return => registry persistence success;
+- `ParsedDataRecordConflict` => `P11_REGISTRY_RECORD_CONFLICT` / BLOCKED;
+- SQLite busy/locked/I/O/commit or other persistence exception => `P11_REGISTRY_PERSISTENCE_FAILED` / BLOCKED.
+
+On either P11 registry failure:
+
+- do not mutate/delete/replace the already verified final `export-v2`;
+- do not synthesize a success registry row;
+- a later retry MUST re-verify the existing final artifact before retrying atomic registry persistence.
+
+Existing `register_parsed_data()` implementation and all existing CN/HK callers remain unchanged.
 
 Existing CN/HK planner/reuse semantics remain unchanged.
 
@@ -1220,6 +1274,10 @@ Package/storage:
 - P11_PATH_OUTSIDE_PROJECT
 - P11_FINAL_ARTIFACT_COLLISION
 - P11_FINAL_ARTIFACT_COMMIT_FAILED
+
+Registry:
+- P11_REGISTRY_RECORD_CONFLICT
+- P11_REGISTRY_PERSISTENCE_FAILED
 
 Planner/reuse:
 - P11_PACKAGE_AWARE_PLANNER_REQUIRED

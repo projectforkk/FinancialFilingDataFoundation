@@ -868,17 +868,17 @@ P10 acceptance 必须包含至少一个完整 live research run，证明 Codex �
 
 ### P11 — US SEC Provider
 
-状态：**P11-ISSUE-035 REMEDIATED / AMENDED DESIGN REVIEW PENDING / PRODUCTION CLOSED**
+状态：**P11-ISSUE-036 REMEDIATED / AMENDED DESIGN REVIEW PENDING / PRODUCTION CLOSED**
 
 P11 通过官方 SEC/EDGAR 入口接入 HTML / Inline XBRL / XBRL。
 
 由于 accepted `ParsedFinancialDocument v1`、P3/P5/P6 evidence 都是物理 PDF page/bbox 语义，P11 不允许把 SEC HTML 伪装成 PDF。P11 新增 source-neutral `ParsedFinancialDocument v2`，以 DOM/XBRL node locator 作为真实 evidence coordinate；v1 保持 accepted history 不变。
 
 P11 latest reviewed design candidate：
-- historical exact candidate = `00027be24be8e1c2ef3746600fa6e4f59ef641a5` = INELIGIBLE after P11-ISSUE-035；
-- authoritative stop = `development/188-p11-final-path-concurrency-review-stop.md`；
-- ISSUE-034 amendment evidence = `development/186-p11-final-export-byte-determinism-amendment-evidence.md` = PASS and remains valid；
-- ISSUE-035 amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS；
+- historical exact candidate = `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47` = INELIGIBLE after P11-ISSUE-036；
+- authoritative stop = `development/191-p11-registry-concurrency-review-stop.md`；
+- ISSUE-035 amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS and remains valid；
+- ISSUE-036 amendment evidence = `development/192-p11-registry-concurrency-amendment-evidence.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral contract = `design/30-parsed-financial-document-v2-contract.md`；
@@ -1051,7 +1051,7 @@ Accepted chain：
 - reconciled `design/28` remains future semantic reference only；
 - reconciled `design/29` remains future Research MCP reference only。
 
-P10 is closed. P11-A final review remains reopened because exact candidate `00027be24be8e1c2ef3746600fa6e4f59ef641a5` was stopped by P11-ISSUE-035 after ISSUE-034 had been remediated. Authoritative stop: `development/188-p11-final-path-concurrency-review-stop.md`. ISSUE-035 is now remediated in the amended design; evidence: `development/189-p11-final-path-concurrency-amendment-evidence.md = PASS`. P11 production remains closed. P11-B is NOT authorized until the amended exact candidate passes a fresh detached design review. Research MCP production and Semantic Resolver production remain unauthorized.
+P10 is closed. P11-A final review remains reopened because exact candidate `2ef1e8ced4b5c3d7103c73bdc8cc532882fa7d47` was stopped by P11-ISSUE-036 after ISSUE-035 had been remediated. Authoritative stop: `development/191-p11-registry-concurrency-review-stop.md`. ISSUE-036 is now remediated in the amended design; evidence: `development/192-p11-registry-concurrency-amendment-evidence.md = PASS`. P11 production remains closed. P11-B is NOT authorized until the amended exact candidate passes a fresh detached design review. Research MCP production and Semantic Resolver production remain unauthorized.
 
 继续保持职责边界：
 

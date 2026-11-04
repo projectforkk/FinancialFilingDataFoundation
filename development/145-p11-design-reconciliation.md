@@ -428,3 +428,24 @@ A concurrent loser becomes idempotent success only after the existing final expo
 The exact runtime primitive is an environment capability that P11-B must prove before production authorization; the required semantics are frozen here and no weaker fallback is permitted.
 
 No registry schema migration is introduced, and P0-P10 behavior remains unchanged.
+
+
+## 28. Concurrent registry persistence reconciliation — ISSUE-036
+
+P11-ISSUE-036 closes the remaining concurrency gap after deterministic final-path convergence.
+
+P11-I can now allow multiple exact attempts to converge on one immutable final artifact without making P11-K race on the accepted check-then-insert registry method.
+
+The amended boundary is additive:
+
+- P0-P10/CN-HK continue using accepted `register_parsed_data()` unchanged;
+- P11-K alone uses `register_parsed_data_atomic()`;
+- `BEGIN IMMEDIATE` serializes P11-K writers before the parse_run_id existence check;
+- exact existing row is idempotent success;
+- different existing row is explicit conflict;
+- infrastructure/locking failure is explicit persistence failure;
+- schema version remains 1.
+
+This preserves accepted registry schema and existing caller behavior while making the new P11 concurrent path deterministic and retry-safe.
+
+The final artifact remains the immutable source of parse output; registry persistence is an index/reuse boundary that occurs only after final reload and cannot mutate final bytes.

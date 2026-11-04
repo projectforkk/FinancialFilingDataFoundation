@@ -263,7 +263,10 @@ Finalization-order acceptance:
 - normal runtime cleanup removes only the current attempt's staging and never automatically deletes/recycles another attempt's staging;
 - simulated loser with one-byte-different staging => `P11_FINAL_ARTIFACT_COLLISION`, with no final overwrite/delete/replace;
 - simulated permission/I/O/invalid-path commit failure => `P11_FINAL_ARTIFACT_COMMIT_FAILED`, not idempotent success;
-- P11-K does not mutate committed artifact bytes.
+- P11-K does not mutate committed artifact bytes;
+- after successful final reload, concurrent exact P11-K callers use `register_parsed_data_atomic` and both converge to registry success with exactly one exact row;
+- a forced P11 registry row conflict blocks with `P11_REGISTRY_RECORD_CONFLICT` without final-artifact or existing-row mutation;
+- a forced registry busy/locked/I/O failure blocks with `P11_REGISTRY_PERSISTENCE_FAILED` and remains safe for outer retry.
 
 Final-export byte-determinism acceptance:
 
@@ -413,6 +416,24 @@ Periodic filing:
 - stored artifact_path has no trailing slash and never points to manifest.json/child file/staging path;
 - the complete export-v2 directory is atomically committed before registry persistence;
 - no P11 registry schema migration is required solely for source-package identity.
+
+P11-K concurrent registry persistence acceptance:
+
+- accepted `SQLiteRegistry.register_parsed_data(record)` remains unchanged and is not the P11-K write API;
+- additive exact API = `SQLiteRegistry.register_parsed_data_atomic(record: ParsedDataRecord) -> None`;
+- additive public conflict exception = `ParsedDataRecordConflict(ValueError)`;
+- `REGISTRY_SCHEMA_VERSION == 1`; no schema migration;
+- `register_parsed_data_atomic` executes `BEGIN IMMEDIATE` before `SELECT * FROM parsed_data WHERE parse_run_id = ?`;
+- two concurrent exact writers for one parse_run_id both return normally, exactly one physical row exists, and the row equals the requested record across every persisted semantic field except created_at;
+- a third exact retry returns normally and does not add/change a row;
+- same parse_run_id + any different persisted semantic field => exact `ParsedDataRecordConflict` message `parse_run_id already exists with different content: <parse_run_id>` and existing row unchanged;
+- P11-K maps `ParsedDataRecordConflict` to `P11_REGISTRY_RECORD_CONFLICT` / BLOCKED;
+- SQLite busy/locked/I/O/commit or other persistence failure => `P11_REGISTRY_PERSISTENCE_FAILED` / BLOCKED;
+- busy/locked/I/O failure is never converted to success merely because a row is observed later;
+- no hidden retry loop occurs inside the atomic registry API;
+- registry failure never mutates/deletes/replaces final export-v2;
+- later outer retry re-verifies existing final export before retrying atomic registry persistence;
+- existing CN/HK callers continue using accepted `register_parsed_data()` and their planner/reuse behavior is unchanged.
 
 Generic planner boundary:
 
