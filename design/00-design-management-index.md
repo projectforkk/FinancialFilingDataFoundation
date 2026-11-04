@@ -295,7 +295,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_DESIGN_FREEZE_PENDING`
+`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_DESIGN_FREEZE_AUTHORIZED`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
