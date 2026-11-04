@@ -302,9 +302,12 @@ P10 design candidate：
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
-下一步：
-1. 完成 design consistency / encoding / diff review；
-2. commit/push exact P10 design baseline；
-3. push 成功前 production 继续 BLOCKED；
-4. push 后由独立 development instruction授权 P10-B Environment / Accepted Interface Audit；
+Design baseline 已形成：
+`acb9009d4751bbe5f8f8acec32ea7ffe30ce4c2f`
+
+当前仅授权：
+1. P10-B Environment / Accepted Interface Audit；
+2. instruction = `development/77-p10-environment-audit-instruction.md`；
+3. P10-B 只读，不修改 production/tests/runtime；
+4. P10-C 及以后继续关闭，直到 audit evidence push + 后续 explicit instruction；
 5. P11 / Research MCP production / Semantic Resolver production继续关闭。

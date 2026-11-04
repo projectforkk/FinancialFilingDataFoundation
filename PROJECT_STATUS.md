@@ -152,24 +152,21 @@
 
 ## Approved next phase
 
-**P10 — Design Baseline Finalization**
+**P10-B — Environment / Accepted Interface Audit**
 
 Status:
 
-`DESIGN READY / PRODUCTION BLOCKED UNTIL DEVELOPMENT INSTRUCTION`
+`AUTHORIZED — READ-ONLY AUDIT ONLY`
 
-Current actions authorized:
+Design baseline:
 
-- design consistency review；
-- UTF-8/no-BOM validation；
-- `git diff --check`；
-- commit/push P10 design baseline。
+`acb9009d4751bbe5f8f8acec32ea7ffe30ce4c2f`
 
-After design baseline push：
+Current instruction:
 
-- create a separate P10 development instruction；
-- first authorized execution gate is P10-B Environment / Accepted Interface Audit；
-- production implementation still must wait for that instruction。
+`development/77-p10-environment-audit-instruction.md`
+
+P10 production/tests remain blocked during P10-B.
 
 Still not authorized:
 
