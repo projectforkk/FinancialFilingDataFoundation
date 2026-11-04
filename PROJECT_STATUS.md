@@ -166,6 +166,14 @@ Current instruction:
 
 `development/77-p10-environment-audit-instruction.md`
 
+Historical stopped attempt:
+
+`development/78-p10-environment-interface-audit.md`
+
+Authorized rerun output:
+
+`development/79-p10-environment-interface-audit-rerun.md`
+
 P10-B first probe found the src-layout invocation gap recorded as `P10-ISSUE-001`. The amended design/plan/acceptance contract is now GitHub truth at `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c`; P10-B may rerun under the exact-candidate `PYTHONPATH` contract.
 
 P10 production/tests remain blocked during P10-B.

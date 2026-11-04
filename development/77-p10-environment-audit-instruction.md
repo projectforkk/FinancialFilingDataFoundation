@@ -88,9 +88,13 @@ No reset/clean/rebase/force push。
 
 ## 5. Output
 
-Create:
+The initial stopped attempt is already preserved as:
 
 `development/78-p10-environment-interface-audit.md`
+
+For the authorized P10-ISSUE-001 rerun create a new result:
+
+`development/79-p10-environment-interface-audit-rerun.md`
 
 It must contain:
 
