@@ -473,9 +473,10 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 157. candidate `d47a0b5de5c2b3e88a5df629476d05d26e7d83fb` = INELIGIBLE after fresh review；
 158. review authorization = `development/169-p11-reuse-api-final-review-authorization.md`；
 159. review stop = `development/170-p11-registry-artifact-parity-review-stop.md`；
-160. P11-ISSUE-030 = REMEDIATED / CANDIDATE FREEZE REQUIRED；
+160. P11-ISSUE-030 = REMEDIATED / FRESH REVIEW REQUIRED；
 161. amendment evidence = `development/171-p11-registry-artifact-parity-amendment-evidence.md` = PASS；
 162. premature d47a0b5 PASS artifact = `development/172-p11-d47a0b5-stale-pass-result-invalid.md` = INVALID / retained for audit；
-163. P11 registry-artifact parity amended design = READY FOR CANDIDATE FREEZE；
-164. P11 production = CLOSED；
-165. Research MCP production / Semantic Resolver production remain closed / not authorized。
+163. exact candidate = `85df002516d577531e68c303ad86c0903ca813c6`；
+164. review authorization = `development/173-p11-registry-artifact-parity-final-review-authorization.md`；
+165. P11 production = CLOSED；
+166. Research MCP production / Semantic Resolver production remain closed / not authorized。
