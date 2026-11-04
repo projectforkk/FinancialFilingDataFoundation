@@ -156,7 +156,7 @@
 
 Status:
 
-`P10 HARNESS V2 CANDIDATE READY / TARGETED FORMAL REVIEW PENDING / P10-N CLOSED`
+`AUTHORIZED — P10 ACCEPTANCE PACKAGE TARGETED FORMAL REVIEW ONLY / P10-N CLOSED`
 
 P10-C is closed:
 
@@ -492,7 +492,11 @@ Harness v2 evidence:
 
 Detached precheck preview = PASS with both base manifest and fixture manifest identity source `GIT_BLOB`.
 
-P10-N remains closed until targeted formal review and re-freeze.
+Targeted formal review authorization:
+
+`development/133-p10-acceptance-package-formal-review-authorization.md`
+
+P10-N remains closed until targeted formal review PASS and re-freeze.
 
 Required sequence:
 
