@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-I DYNAMIC SPEC VALIDATION ONLY / NO PRODUCTION CHANGES`
+`P10-I CLOSED / P10-J CLOSED PENDING SEPARATE AUTHORIZATION`
 
 P10-C is closed:
 
@@ -300,7 +300,11 @@ P10-I authorization:
 
 `development/110-p10-i-dynamic-spec-authorization.md`
 
-Only dynamic-spec integration validation/workspace evidence is authorized; production/tests/design changes remain forbidden.
+P10-I evidence:
+
+`development/111-p10-i-dynamic-spec-evidence.md = PASS`
+
+P10-I is closed. P10-J remains closed until a separate explicit authorization.
 
 Still not authorized:
 
