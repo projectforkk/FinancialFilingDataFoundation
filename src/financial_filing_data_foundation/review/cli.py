@@ -49,6 +49,10 @@ def _submission_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 
 class _JsonArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("add_help", False)
+        super().__init__(*args, **kwargs)
+
     def error(self, message: str) -> None:
         raise ReviewError(
             "P9_CLI_ARGUMENT_ERROR",

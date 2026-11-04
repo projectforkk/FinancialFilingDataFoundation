@@ -63,17 +63,42 @@ def normalize_semantic(value: str) -> str:
     return " ".join(value.strip().split())
 
 
+_SQL_IDENTIFIER = (
+    r'(?:[A-Za-z_][A-Za-z0-9_$]*|'
+    r'`[^`\r\n]+`|'
+    r'"[^"\r\n]+"|'
+    r'\[[^\]\r\n]+\])'
+)
+_SQL_OBJECT = rf"(?:{_SQL_IDENTIFIER})(?:\.(?:{_SQL_IDENTIFIER}))*"
+_SQL_PROJECTION_ITEM = (
+    rf"(?:\*|{_SQL_OBJECT}(?:\.\*)?|"
+    rf"[A-Za-z_][A-Za-z0-9_$]*\([^()\r\n]{{0,120}}\))"
+)
+_SQL_PROJECTION = (
+    rf"(?:distinct\s+)?{_SQL_PROJECTION_ITEM}"
+    rf"(?:\s*,\s*{_SQL_PROJECTION_ITEM})*"
+)
+_SQL_TERMINATOR = (
+    r"(?=\s*(?:$|;|"
+    r"\b(?:where|join|group\s+by|order\s+by|having|limit|offset|union)\b))"
+)
+
 _FORBIDDEN_RESOLUTION_TEXT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b(?:https?|ftp|file|ssh)://|\bwww\.", re.IGNORECASE),
-    re.compile(r"(?:^|[\s\"'(])(?:[a-z]:[\\/]|\\\\[^\\\s]+\\[^\\\s]+)", re.IGNORECASE),
-    re.compile(r"(?<![\w:])/(?:[A-Za-z0-9._~-]+/)+[A-Za-z0-9._~-]*"),
+    re.compile(
+        r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\[^\\\s]+\\[^\\\s]+)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_:])/[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*"
+    ),
     re.compile(r"(?:^|[\\/])\.\.(?:[\\/]|$)"),
     re.compile(
         r"(?:^|[\r\n;&|])\s*(?:"
         r"cmd(?:\.exe)?\s+/[ck]\b|"
         r"powershell(?:\.exe)?\s+-\w+|"
         r"pwsh(?:\.exe)?\s+-\w+|"
-        r"bash(?:\.exe)?\s+-[lc]\b|"
+        r"bash(?:\.exe)?\s+-(?:lc|cl|l|c)\b|"
         r"sh\s+-c\b|"
         r"invoke-expression\b|"
         r"rm\s+-rf\b|"
@@ -84,17 +109,23 @@ _FORBIDDEN_RESOLUTION_TEXT_PATTERNS: tuple[re.Pattern[str], ...] = (
         re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
-        r"\b(?:"
-        r"select\b.{0,200}\bfrom\b|"
-        r"insert\s+into\b|"
-        r"update\b.{0,200}\bset\b|"
-        r"delete\s+from\b|"
-        r"(?:drop|alter|create)\s+table\b|"
-        r"union\s+select\b|"
-        r"pragma\b"
-        r")",
-        re.IGNORECASE | re.DOTALL,
+        rf"\bselect\s+{_SQL_PROJECTION}\s+from\s+{_SQL_OBJECT}{_SQL_TERMINATOR}",
+        re.IGNORECASE,
     ),
+    re.compile(rf"\binsert\s+into\s+{_SQL_OBJECT}\b", re.IGNORECASE),
+    re.compile(
+        rf"\bupdate\s+{_SQL_OBJECT}\s+set\s+{_SQL_IDENTIFIER}\s*=",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bdelete\s+from\s+{_SQL_OBJECT}{_SQL_TERMINATOR}",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\b(?:drop|alter|create)\s+table\s+{_SQL_OBJECT}\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bunion\s+select\b|\bpragma\b", re.IGNORECASE),
     re.compile(
         r"(?:^|\n)\s*(?:"
         r"import\s+[A-Za-z_]|"

@@ -1170,9 +1170,17 @@ def test_justification_uses_raw_4000_character_boundary(review_fixture) -> None:
         ("justification", "https://attacker.example/path"),
         ("value", "SELECT * FROM secrets"),
         ("justification", r"C:\\secrets\\payload.txt"),
+        ("justification", r"path=C:\\secrets\\payload.txt"),
+        ("justification", "/tmp"),
+        ("justification", "/etc/passwd"),
+        ("justification", "../secret"),
         ("justification", "powershell -Command Get-ChildItem"),
+        ("justification", "bash -lc id"),
+        ("justification", "PRAGMA"),
         ("justification", "import os\nos.system('whoami')"),
         ("justification", "token=super-secret-value"),
+        ("value", "SELECT revenue FROM secrets"),
+        ("value", "UPDATE ledger SET amount = 1"),
     ],
 )
 def test_resolution_payload_security_rejects_forbidden_content(
@@ -1242,7 +1250,11 @@ def test_resolution_payload_security_allows_benign_slashes_and_keywords(
                 }
             ],
             reviewed_at="2026-11-04T08:01:00+09:00",
-            justification="P5/P6 evidence checked; SQL review completed.",
+            justification=(
+                "P5/P6 evidence checked; SQL review completed. "
+                "Select revenue from the annual report evidence. "
+                "Update guidance set by management."
+            ),
         ),
     )
 
@@ -1342,6 +1354,10 @@ def test_resolved_parsed_data_record_is_deterministic(review_fixture) -> None:
         [],
         ["unknown-command"],
         ["tasks"],
+        ["--help"],
+        ["-h"],
+        ["tasks", "--help"],
+        ["tasks", "-h"],
         [
             "submit",
             "--review-dir",
