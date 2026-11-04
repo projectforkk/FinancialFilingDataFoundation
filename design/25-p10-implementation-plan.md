@@ -475,6 +475,20 @@ PASS。
 
 P9 mutation只能写 isolated P10 review_root。
 
+P10-ISSUE-007 isolated P9 fixture rule：
+
+- P9 review store is path-bound by its deterministic manifest；
+- do not copy/move an existing review directory into the isolated root；
+- construct the isolated root with accepted `prepare_review_overlay`；
+- inspect the newly generated task IDs/actions/evidence requirements；
+- if the frozen spec requires the reviewed semantic field, replay only the supported evidence-grounded action into the isolated root；
+- use the newly generated isolated `resolution_id` and `overlay_set_hash`；
+- materialize with accepted P9 API；
+- validate with accepted P9 loader；
+- keep source/live P9 store byte-identical；
+- keep raw P8 value/metric bytes unchanged；
+- unrelated unresolved issues need not be forced closed for a specific claim to be COMPLETE。
+
 Gate：
 PASS。
 

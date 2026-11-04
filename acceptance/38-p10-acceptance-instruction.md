@@ -218,6 +218,15 @@ Acceptance 必须使用两份内容实质不同的 runtime research spec。
 - raw unchanged；
 - resolution identity可验证。
 
+P10-ISSUE-007 fixture rule：
+
+- isolated P9 store必须在最终目标 review root 通过 accepted `prepare_review_overlay` 创建；
+- 不得复制/移动既有 P9 review directory 到新路径后当作有效 store；
+- 不得编辑 manifest 绕过 `review_dir` path binding；
+- 若需要重现既有 reviewed semantics，必须使用 isolated root新生成的 task/evidence contract重新提交 supported action；
+- acceptance记录新生成的 isolated resolution ID 与 overlay-set hash；
+- accepted/source P9 review root before/after bytes必须不变。
+
 不得 mass fill。
 
 不得为了让 run COMPLETE 强制关闭 unresolved issue。

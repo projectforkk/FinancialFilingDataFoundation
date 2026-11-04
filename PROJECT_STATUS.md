@@ -152,11 +152,11 @@
 
 ## Approved next phase
 
-**P10-G — Thin Integration Instruction**
+**P10-J — Live P8/P9 Research Run**
 
 Status:
 
-`AUTHORIZED — P10-J LIVE RUN ONLY / NO PRODUCTION CHANGES`
+`STOPPED — P10-ISSUE-007 DESIGN AMENDMENT PENDING PUSH`
 
 P10-C is closed:
 
@@ -310,7 +310,20 @@ P10-J live-run authorization:
 
 `development/112-p10-j-live-run-authorization.md`
 
-Only the isolated live research validation is authorized; production/tests/design changes remain forbidden.
+P10-J stopped after accepted P9 rejected a relocated/copy of existing review state:
+
+`development/113-p10-j-live-run-stop.md`
+
+P10-ISSUE-007:
+
+- accepted P9 review manifest binds the project-relative `review_dir`；
+- a byte-for-byte copied review store at another path is intentionally invalid；
+- isolated P10 review roots must be constructed at their final path with accepted P9 `prepare`；
+- only supported/evidence-grounded actions required by the frozen spec may be replayed；
+- the isolated root must use its newly generated resolution/snapshot identity；
+- source/live P9 state and P8 raw values remain immutable.
+
+P10-J is stopped until the amended design/plan/acceptance contract is committed/pushed and a new explicit reauthorization exists.
 
 Still not authorized:
 
