@@ -17,7 +17,16 @@ Reauthorization:
 Reauthorization commit:
 `8fd2604e912431100d500b358fe54fce7eb0dcf9`
 
-Implementation candidate:
+Initial implementation:
+`f4b5245` — `feat: implement P10 research context`
+
+Corrective implementation:
+`9c3db94` — `fix: harden P10 catalog identity`
+
+Boundary-test correction:
+`c8b4041` — `test: harden P10 context boundaries`
+
+Final production/test candidate:
 `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`
 
 Branch:
@@ -26,12 +35,12 @@ Branch:
 Worktree:
 `D:\\Codex\\FinancialFilingDataFoundation\\worktrees\\active\\p10-dynamic-research-design`
 
-All work, test temp, and basetemp paths remained under:
+All work/temp/test paths remained inside:
 `D:\\Codex\\FinancialFilingDataFoundation`
 
 ## 1. Candidate scope
 
-Exact P10-D production/test diff from the reauthorization parent:
+Exact P10-D changes from reauthorization baseline:
 
 ```text
 M  src/financial_filing_data_foundation/research/__init__.py
@@ -43,289 +52,211 @@ No P8/P9 source or test path changed.
 
 No dependency/runtime file changed.
 
-No P10-E provenance, P10-F CLI, Research MCP, Semantic Resolver, or P11 production was added.
+No provenance, CLI, integration instruction, Research MCP, Semantic Resolver, or P11 implementation was added.
 
 ## 2. Implemented contract
 
 P10-D adds deterministic:
 
-- `ResearchContext`
-- `P8ToolContract`
-- `P9PolicyContract`
-- `build_research_context(spec_bundle, p8_catalog, p9_review_root)`
-- exact P8 accepted integration descriptor
-- exact P9 public policy descriptor
-- raw catalog byte SHA256
-- accepted `McpCatalog.load` semantic consistency reload
-- canonical project-relative P9 review-root identity
-- exact fixed capability manifest
-- deterministic `research_context_id`
+- `P8ToolContract`；
+- `P9PolicyContract`；
+- immutable `ResearchContext`；
+- exact P8 accepted integration descriptor；
+- exact P9 public policy descriptor；
+- exact fixed capability mapping；
+- deterministic catalog raw-byte SHA；
+- deterministic P8/P9/capability fingerprints；
+- canonical P9 review-root identity；
+- deterministic `research_context_id`；
+- `build_research_context(spec_bundle, p8_catalog, p9_review_root)`。
 
-The builder has no caller capability override.
-
-## 3. P10-ISSUE-003 contract
-
-Implementation follows design/24 Sections 13.1–13.7 and 14.
-
-### 3.1 Spec-first ordering
-
-The builder first derives only the accepted `McpCatalog.project_root`, then calls:
-
-`verify_research_spec(project_root, spec_bundle)`
-
-before reading/reloading the current catalog file.
-
-Focused test independently corrupts both the spec and catalog and verifies the result remains:
-
-`P10_RESEARCH_SPEC_CHANGED`
-
-This freezes the required deterministic error precedence.
-
-### 3.2 P8 descriptor
-
-Exact descriptor:
+Schemas/policy:
 
 ```text
-server_version=p8-local-mcp-v1
-catalog_schema_version=p8-mcp-catalog-v1
-result_schema_version=p8-mcp-result-v1
-tool_count=11
+context schema = p10-research-context-v1
+integration policy = p10-dynamic-research-v1
 ```
 
-Exact accepted tool names:
+There is no caller capability override.
+
+## 3. P10-ISSUE-003 identity contract
+
+Implementation follows design/24 Section 13:
+
+- exact canonical JSON bytes reuse the P10-C Section 8.1 serializer；
+- P8 descriptor freezes accepted server version and exact 11 tool names；
+- P8 catalog/result schema values come from main-runtime public P8 constants；
+- main runtime does not import dedicated `mcp/server.py`；
+- P9 descriptor uses public P9 version/policy/schema constants；
+- P8/P9 public contract drift fails closed as `P10_CONTEXT_INCOMPATIBLE`；
+- catalog current raw bytes are SHA256-hashed；
+- current catalog is semantically reloaded through accepted `McpCatalog.load`；
+- caller catalog semantic mismatch/current invalid catalog becomes `P10_CATALOG_INVALID`；
+- P9 review-root must be an existing project-relative directory；
+- absolute/drive-relative/traversal/symlink escape is rejected；
+- persisted review-root is canonical project-relative POSIX text；
+- review-root identity participates in `research_context_id`；
+- exact capability mapping is frozen, with AVAILABLE/UNAVAILABLE states only；
+- absolute project paths are not serialized into shared context。
+
+## 4. Implementation defect found and corrected
+
+A direct adversarial probe against initial candidate `f4b5245` manually constructed:
+
+```python
+McpCatalog(
+    project_root="not-a-path",
+    catalog_path="not-a-path",
+    documents=(),
+)
+```
+
+Initial behavior leaked:
 
 ```text
-ffdf_list_documents
-ffdf_get_document
-ffdf_search_document
-ffdf_read_pages
-ffdf_list_sections
-ffdf_list_tables
-ffdf_get_table
-ffdf_list_raw_facts
-ffdf_get_fact
-ffdf_get_evidence
-ffdf_get_validation
+AttributeError
+'str' object has no attribute 'resolve'
 ```
 
-Known independent fingerprint:
+This violated the already-frozen P10 error model; no design amendment was required.
 
-`bbeb600e732d5ca567193602d2a2b067fcedeabf9cb5d7cfdf5598671c267bc8`
+Correction `9c3db94`:
 
-The main runtime does not import `financial_filing_data_foundation.mcp.server` or the external MCP SDK.
+- normalizes catalog root/path through `Path(...)`；
+- catches OSError/RuntimeError/TypeError/ValueError；
+- maps malformed caller catalog state to `P10_CATALOG_INVALID`；
+- preserves the accepted catalog reload/equality contract。
 
-### 3.3 P9 descriptor
+Regression coverage was added in `c8b4041`.
 
-Exact public values:
+Final direct result:
 
 ```text
-p9_version=p9-review-overlay-v1
-policy_version=p9-review-policy-v1
-resolution_schema_version=p9-review-resolution-v1
-resolved_view_schema_version=p9-resolved-view-v1
+P10Error
+P10_CATALOG_INVALID
+catalog project root is invalid
 ```
 
-Known independent fingerprint:
+No native traceback leaks through this client boundary.
 
-`9b7a1078ab2365862dc5061c3b2a76a43f865553eb4df5938b96ffe9bbd4ff36`
+## 5. Known identity fixtures
 
-### 3.4 Capability manifest
-
-Exact fixed mapping:
+Independent canonical calculations:
 
 ```text
-P8_RAW_QUERY=AVAILABLE
-P8_PAGE_TEXT=AVAILABLE
-P8_TABLE_STRUCTURED=AVAILABLE
-P8_EVIDENCE=AVAILABLE
-P8_VALIDATION=AVAILABLE
-P9_REVIEW=AVAILABLE
-P9_RESOLVED_VIEW=AVAILABLE
-PDF_VISUAL_EVIDENCE=UNAVAILABLE
-SEMANTIC_RESOLVER=UNAVAILABLE
-CANONICAL_METRIC_LAYER=UNAVAILABLE
-P11_SEC_PROVIDER=UNAVAILABLE
+P8_TOOL_CONTRACT_FINGERPRINT =
+bbeb600e732d5ca567193602d2a2b067fcedeabf9cb5d7cfdf5598671c267bc8
+
+P9_POLICY_FINGERPRINT =
+9b7a1078ab2365862dc5061c3b2a76a43f865553eb4df5938b96ffe9bbd4ff36
+
+CAPABILITY_MANIFEST_HASH =
+30df28e273379e91c245222b751aaab1504b6c725ca4170a8fb6168082735935
 ```
 
-Known independent manifest hash:
+Direct fixture:
 
-`30df28e273379e91c245222b751aaab1504b6c725ca4170a8fb6168082735935`
+- spec logical name: `rules`
+- spec path: `inputs/rules.md`
+- spec bytes: `rules\n`
+- catalog bytes:
+  `{"schema_version":"p8-mcp-catalog-v1","documents":[]}\n`
+- review root: `reviews/a`
 
-No caller override exists.
-
-## 4. Known research-context fixture
-
-Fixed spec bytes:
+Expected/observed:
 
 ```text
-logical_name=rules
-relative_path=inputs/rules.md
-bytes=72 75 6c 65 73 0a
+SPEC_HASH =
+021830ab8ded8e8e5eeeef4aa190cf3ffa86ff73a97556f1ebc80f5245288371
+
+CATALOG_HASH =
+149a9ec1ed42763860358d44f5d2f6b65115fc5bcf32190b8ca14e3b457de05d
+
+CONTEXT_ID =
+a06bbce2a58e6af4b84e5259c41439b4bae0567e3076e2320d26e3d08661d9eb
 ```
 
-Known spec bundle hash:
-
-`021830ab8ded8e8e5eeeef4aa190cf3ffa86ff73a97556f1ebc80f5245288371`
-
-Fixed catalog raw bytes:
-
-```text
-{"schema_version":"p8-mcp-catalog-v1","documents":[]}
-```
-
-Known raw catalog SHA256:
-
-`149a9ec1ed42763860358d44f5d2f6b65115fc5bcf32190b8ca14e3b457de05d`
-
-Canonical P9 review root:
-
-`reviews/a`
-
-Known exact research context ID:
-
-`a06bbce2a58e6af4b84e5259c41439b4bae0567e3076e2320d26e3d08661d9eb`
-
-The expected values are hard-coded in focused tests and were calculated independently from the frozen design formula.
-
-## 5. Catalog validation
-
-Verified:
-
-- catalog type must be accepted `McpCatalog`
-- project root must resolve to an existing directory
-- catalog path must resolve inside project root
-- current raw bytes are hashed
-- current file is reloaded through accepted `McpCatalog.load`
-- caller object and reloaded catalog must be semantically equal
-- file bytes must not change during validation
-- stale caller catalog versus changed current file returns `P10_CATALOG_INVALID`
-- malformed current catalog returns `P10_CATALOG_INVALID`
-- non-`McpCatalog` caller object returns `P10_CATALOG_INVALID`
-- manually malformed `project_root` / `catalog_path` fields return `P10_CATALOG_INVALID` rather than leaking Python type/attribute errors
-
-No P8 catalog parsing/truth semantics are copied into P10.
-
-## 6. P9 review-root identity
-
-Verified:
-
-- caller input is project-root-relative
-- absolute path rejected
-- Windows drive-relative path rejected
-- traversal escape rejected
-- resolved path must remain within project root
-- target must already exist
-- target must be a directory
-- persisted form is canonical project-relative POSIX
-- no filesystem creation occurs
-- different canonical review roots produce different context IDs
-
-Reason classes:
-
-- outside/absolute/drive-relative/traversal:
-  `P10_CONTEXT_PATH_OUTSIDE_PROJECT`
-- missing/not-directory:
-  `P10_CONTEXT_INCOMPATIBLE`
-
-## 7. Context identity dimensions
-
-Focused tests prove `research_context_id` changes when any of these change:
-
-- spec bundle hash
-- raw P8 catalog SHA
-- P8 contract fingerprint
-- P9 policy fingerprint
-- canonical P9 review root
-- capability manifest hash
-
-The exact design formula includes:
-
-- context schema version
-- integration policy version
-- all identity dimensions above
-
-It excludes:
-
-- current time
-- random UUID
-- Codex output
-- tool order
-- absolute filesystem paths
-
-## 8. Focused tests
+## 6. Exact-candidate focused tests
 
 Exact candidate:
 
 `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`
 
-Exact command:
+Exact source binding:
 
 ```powershell
 $env:PYTHONPATH="D:\Codex\FinancialFilingDataFoundation\worktrees\active\p10-dynamic-research-design\src"
 $env:PYTHONDONTWRITEBYTECODE="1"
-D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit\research\test_research_context.py -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\u
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit\research\test_research_context.py -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\0
 ```
 
 Result:
 
 ```text
-29 passed in 0.29s
-FOCUSED_EXIT=0
+29 passed in 0.30s
 ```
 
-The focused set covers all design/25 P10-D required items 1–22, with some items split into separate negative cases. Additional hardening verifies P8/P9 public-contract drift fails closed and a review-root symlink escape is rejected.
+Focused coverage includes:
 
-## 9. Full unit regression
+- identical-context determinism；
+- spec verification/drift；
+- exact P8 descriptor + known fingerprint；
+- exact P9 descriptor + known fingerprint；
+- exact capability mapping + known hash；
+- no capability override in API；
+- raw catalog SHA + known context fixture；
+- stale/invalid/malformed/non-catalog inputs；
+- canonical review-root persistence；
+- absolute/drive-relative/traversal/symlink escape rejection；
+- missing/file review-root rejection；
+- different review roots -> different context IDs；
+- context ID sensitivity to spec/catalog/P8/P9/capability changes；
+- no absolute path serialization；
+- P8/P9 public-contract drift fail-closed；
+- main runtime external MCP SDK absence；
+- exact candidate source binding。
 
-Exact candidate command:
+## 7. Exact-candidate full regression
+
+Command:
 
 ```powershell
 $env:PYTHONPATH="D:\Codex\FinancialFilingDataFoundation\worktrees\active\p10-dynamic-research-design\src"
 $env:PYTHONDONTWRITEBYTECODE="1"
-D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\v
+D:\Codex\FinancialFilingDataFoundation\.venv\Scripts\python.exe -B -m pytest tests\unit -q -p no:cacheprovider --basetemp D:\Codex\FinancialFilingDataFoundation\worktrees\t\1
 ```
 
 Result:
 
 ```text
-368 passed in 25.18s
-FULL_EXIT=0
+368 passed in 25.07s
+EXIT_CODE=0
 ```
 
-P10-C exact candidate baseline had 339 passing unit tests.
-P10-D adds 29 passing context tests with no previous-stage regression.
+P10-C baseline was 339 tests. P10-D adds 29 passing context cases with no prior regression.
 
-## 10. Compile / import
+Historical/transient runs during concurrent worktree changes are excluded from formal evidence.
+
+## 8. Compile / import / static checks
 
 Compile:
+**PASS**
+
+Import:
+**PASS**
+
+Exact imports resolve to:
 
 ```text
-python -B -m compileall -q src\financial_filing_data_foundation\research tests\unit\research
-COMPILE_EXIT=0
-```
-
-Exact-candidate import:
-
-```text
-IMPORT_OK
 D:\Codex\FinancialFilingDataFoundation\worktrees\active\p10-dynamic-research-design\src\financial_filing_data_foundation\research\__init__.py
 D:\Codex\FinancialFilingDataFoundation\worktrees\active\p10-dynamic-research-design\src\financial_filing_data_foundation\research\context.py
-p10-research-context-v1
-p10-dynamic-research-v1
 ```
-
-The production fingerprint probe returned exactly:
-
-```text
-bbeb600e732d5ca567193602d2a2b067fcedeabf9cb5d7cfdf5598671c267bc8
-9b7a1078ab2365862dc5061c3b2a76a43f865553eb4df5938b96ffe9bbd4ff36
-30df28e273379e91c245222b751aaab1504b6c725ca4170a8fb6168082735935
-```
-
-## 11. Scope / security
 
 `git diff --check 8fd2604..c8b4041`:
 **PASS**
+
+Forbidden production surface scan:
+`NONE`
 
 P8/P9 source/test diff:
 `NONE`
@@ -333,47 +264,58 @@ P8/P9 source/test diff:
 Dependency/runtime diff:
 `NONE`
 
-Forbidden P10 research production surface scan:
-`NONE`
+No network, OpenAI/Codex/remote AI API, external MCP SDK, subprocess/shell, SQL, environment dump, or recursive prompt discovery is present in P10-D production.
 
-No:
+## 9. Dedicated P8 runtime cross-check
 
-- external MCP SDK import
-- dedicated `mcp/server.py` import
-- network client
-- OpenAI/Codex/remote AI API
-- subprocess/shell
-- SQL execution
-- Research MCP production
-- Semantic Resolver production
-- P11 production
+Using:
 
-## 12. Encoding
+`D:\\Codex\\FinancialFilingDataFoundation\\runtimes\\ffdf-mcp-2.3.0\\.venv`
 
-The three candidate paths decode as UTF-8 and contain no UTF-8 BOM:
+with exact candidate source binding:
 
-- `research/context.py`
-- `research/__init__.py`
-- `test_research_context.py`
+```text
+SERVER_VERSION=p8-local-mcp-v1
+TOOL_COUNT=11
+TOOLS=ffdf_list_documents|ffdf_get_document|ffdf_search_document|ffdf_read_pages|ffdf_list_sections|ffdf_list_tables|ffdf_get_table|ffdf_list_raw_facts|ffdf_get_fact|ffdf_get_evidence|ffdf_get_validation
+P8_DEDICATED_RUNTIME_CROSSCHECK=PASS
+```
 
-Repository Windows line-ending canonicalization warnings do not affect the Git blobs; `git diff --check` passed.
+This independently confirms the frozen main-runtime P8 integration descriptor still matches the accepted dedicated MCP runtime without importing the server into the main runtime.
 
-## 13. Final candidate state
+## 10. Direct context probe
 
-Implementation candidate:
+Independent direct build result:
 
+```text
+SPEC_HASH=021830ab8ded8e8e5eeeef4aa190cf3ffa86ff73a97556f1ebc80f5245288371
+CATALOG_HASH=149a9ec1ed42763860358d44f5d2f6b65115fc5bcf32190b8ca14e3b457de05d
+P8_FINGERPRINT=bbeb600e732d5ca567193602d2a2b067fcedeabf9cb5d7cfdf5598671c267bc8
+P9_FINGERPRINT=9b7a1078ab2365862dc5061c3b2a76a43f865553eb4df5938b96ffe9bbd4ff36
+CAPABILITY_HASH=30df28e273379e91c245222b751aaab1504b6c725ca4170a8fb6168082735935
+CONTEXT_ID=a06bbce2a58e6af4b84e5259c41439b4bae0567e3076e2320d26e3d08661d9eb
+MALFORMED_CATALOG=PASS
+NO_ABSOLUTE_PATH=PASS
+DIRECT_CONTEXT_PROBE=PASS
+```
+
+## 11. Final candidate state
+
+Production/test candidate:
 `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`
 
-Remote branch matched this exact candidate during candidate verification.
+Remote branch matched the candidate for formal runs.
 
-No production/test/runtime artifact was modified after the exact-candidate verification.
+No P10-D source/test/runtime artifact was modified after the exact-candidate run.
 
-## 14. Gate verdict
+## 12. Gate verdict
 
 # PASS — P10-D CANDIDATE READY FOR REVIEW
 
-P10-D implementation candidate is complete.
+After this evidence is committed/pushed:
 
-P10-E remains closed until P10-D receives an independent detached Code Review PASS and a later explicit authorization.
+**STOP P10-D.**
+
+P10-E remains closed until a separate detached review result PASS and explicit authorization.
 
 Research MCP production, Semantic Resolver production, and P11 production remain closed.
