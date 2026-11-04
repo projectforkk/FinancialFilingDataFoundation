@@ -322,5 +322,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 12. P10-C detached review instruction = `development/85-p10-c-code-review-instruction.md`；
 13. P10-C detached review result = `development/86-p10-c-detached-code-review-result.md` = PASS；
 14. P10-C = CLOSED；
-15. P10-D 及以后继续关闭，等待 separate explicit instruction；
-16. P11 / Research MCP production / Semantic Resolver production继续关闭。
+15. P10-D pre-implementation review found `P10-ISSUE-003`；
+16. P10-D = STOPPED before code pending design/24 + design/25 + acceptance/38 amendment push；
+17. stop record = `development/87-p10-d-preimplementation-design-stop.md`；
+18. P10-E 及以后继续关闭；
+19. P11 / Research MCP production / Semantic Resolver production继续关闭。

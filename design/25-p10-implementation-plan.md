@@ -124,12 +124,68 @@ spec focused tests PASS。
 实现：
 
 - `research/context.py`
+- `ResearchContext` / capability state model additions only as required；
 - exact P8/P9 contract fingerprints；
-- catalog SHA；
-- P9 policy identity；
-- exact capability manifest；
+- current catalog raw-byte SHA；
+- catalog self-consistency reload through accepted `McpCatalog.load`；
+- canonical project-relative P9 review-root identity；
+- exact fixed capability manifest；
 - deterministic `research_context_id`；
 - explicit unavailable visual/semantic/canonical/P11 capability。
+
+P10-ISSUE-003 contract：
+
+- `build_research_context(spec_bundle, p8_catalog, p9_review_root)` has no caller capability override；
+- infer project root from accepted `McpCatalog.project_root`；
+- call `verify_research_spec(project_root, spec_bundle)` before context creation；
+- P8 descriptor is the exact Section 13.2 object；
+- P8 catalog/result schema values come from main-runtime P8 public constants；
+- P8 server version/tool names are the frozen accepted integration descriptor and must not import `mcp/server.py`；
+- P9 descriptor is built from public `P9_VERSION / POLICY_VERSION / RESOLUTION_SCHEMA_VERSION / RESOLVED_VIEW_SCHEMA_VERSION`；
+- all descriptor/capability fingerprints use Section 13.1 canonical JSON；
+- current catalog raw bytes produce `p8_catalog_sha256`；
+- reload current catalog with accepted `McpCatalog.load` and require semantic equality with caller object；
+- P9 review root must be relative, existing directory, inside project root, and persisted as resolved relative POSIX path；
+- review-root path is included in context ID；
+- capability mapping is exact Section 14 mapping, no caller override；
+- context ID exact bytes are Section 13.7；
+- no absolute path may appear in serialized context。
+
+禁止：
+
+- import dedicated `mcp/server.py` from main runtime；
+- external MCP SDK dependency；
+- caller mutation/override of capability state；
+- P9 state mutation；
+- catalog mutation；
+- filesystem creation by context builder；
+- P10-E provenance implementation；
+- P10-F CLI implementation。
+
+Focused tests至少覆盖：
+
+1. deterministic identical context from identical inputs；
+2. spec drift propagates `P10_RESEARCH_SPEC_CHANGED`；
+3. P8 tool descriptor exact 11 names / server/schema values；
+4. independently known P8 fingerprint fixture；
+5. P9 public descriptor exact values；
+6. independently known P9 fingerprint fixture；
+7. exact fixed capability mapping；
+8. independently known capability-manifest hash；
+9. exact raw catalog SHA；
+10. stale caller catalog vs changed current file → `P10_CATALOG_INVALID`；
+11. invalid catalog propagates deterministic P10 catalog error；
+12. relative review root persisted as project-relative POSIX；
+13. absolute review root rejected；
+14. drive-relative / traversal escape review root rejected；
+15. missing/not-directory review root → `P10_CONTEXT_INCOMPATIBLE`；
+16. two canonical review roots → different context IDs；
+17. exact known `research_context_id` fixture；
+18. context ID changes when spec/catalog/P8/P9/review-root/capability fingerprint changes；
+19. context serialization contains no absolute filesystem path；
+20. no external MCP SDK import in main runtime；
+21. no P8/P9 source/test modification；
+22. exact-candidate source binding retained。
 
 Gate：
 context determinism tests PASS。

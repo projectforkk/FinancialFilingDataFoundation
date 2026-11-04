@@ -152,11 +152,11 @@
 
 ## Approved next phase
 
-**P10-C — Models / Spec Freeze**
+**P10-D — Research Context / Capability Manifest**
 
 Status:
 
-`P10-C REVIEW PASS / CLOSED — P10-D NOT YET AUTHORIZED`
+`STOPPED — P10-ISSUE-003 DESIGN AMENDMENT PENDING PUSH`
 
 Design baseline:
 
@@ -196,7 +196,11 @@ Detached review instruction: `development/85-p10-c-code-review-instruction.md`.
 
 Detached review result: `development/86-p10-c-detached-code-review-result.md` = PASS.
 
-P10-C is closed. P10-D remains closed until a separate explicit development instruction is committed/pushed.
+P10-C is closed.
+
+P10-D pre-implementation contract review found `P10-ISSUE-003`: the P8/P9/capability fingerprint bytes were underspecified and `p9_review_root` was omitted from `research_context_id`. P10-D is STOPPED before any `context.py` / context test implementation. Design/24 + design/25 + acceptance/38 must be committed/pushed as a new baseline before P10-D can be authorized.
+
+Stop record: `development/87-p10-d-preimplementation-design-stop.md`.
 
 Still not authorized:
 

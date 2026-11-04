@@ -352,14 +352,15 @@ verify_research_spec(
 
 ```python
 build_research_context(
-    spec_bundle,
-    p8_catalog,
-    p9_review_root,
-    capability_policy,
+    spec_bundle: ResearchSpecBundle,
+    p8_catalog: McpCatalog,
+    p9_review_root: str | Path,
 ) -> ResearchContext
 ```
 
 只构造当前 accepted capability context，不替 Codex选研究问题。
+
+P10 v1 capability manifest由 accepted baseline 固定，caller不得通过 `capability_policy` 覆盖 AVAILABLE / UNAVAILABLE 状态。未来 capability 状态变化必须先由新的 accepted design/runtime baseline证明。
 
 ### 11.4 validate_evidence_ledger
 
@@ -388,10 +389,23 @@ Schema：
   "integration_policy_version": "p10-dynamic-research-v1",
   "spec_bundle_hash": "...",
   "p8_catalog_sha256": "...",
-  "p8_tool_contract": "p8-mcp-result-v1/11-tools",
-  "p9_review_policy": "p9-review-policy-v1",
+  "p8_tool_contract": {
+    "server_version": "p8-local-mcp-v1",
+    "catalog_schema_version": "p8-mcp-catalog-v1",
+    "result_schema_version": "p8-mcp-result-v1",
+    "tool_names": ["exact accepted 11 names"]
+  },
+  "p8_tool_contract_fingerprint": "...",
+  "p9_policy_contract": {
+    "p9_version": "p9-review-overlay-v1",
+    "policy_version": "p9-review-policy-v1",
+    "resolution_schema_version": "p9-review-resolution-v1",
+    "resolved_view_schema_version": "p9-resolved-view-v1"
+  },
+  "p9_policy_fingerprint": "...",
   "p9_review_root": "project-relative configured root",
   "capabilities": {},
+  "capability_manifest_hash": "...",
   "research_context_id": "..."
 }
 ```
@@ -402,47 +416,169 @@ Schema：
 
 ## 13. Research context identity
 
-`research_context_id`：
+### 13.1 Canonical JSON
+
+P10-D fingerprint 使用与 Section 8.1 相同的 canonical JSON bytes：
+
+```python
+json.dumps(
+    value,
+    ensure_ascii=False,
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+).encode("utf-8")
+```
+
+### 13.2 P8 accepted tool contract fingerprint
+
+Main runtime不得 import `mcp/server.py`，因为该模块属于 dedicated MCP runtime 并依赖 external MCP SDK。
+
+P10 v1 therefore freezes the **accepted P8 integration descriptor** in `research/context.py`：
+
+```json
+{
+  "server_version": "p8-local-mcp-v1",
+  "catalog_schema_version": "p8-mcp-catalog-v1",
+  "result_schema_version": "p8-mcp-result-v1",
+  "tool_names": [
+    "ffdf_list_documents",
+    "ffdf_get_document",
+    "ffdf_search_document",
+    "ffdf_read_pages",
+    "ffdf_list_sections",
+    "ffdf_list_tables",
+    "ffdf_get_table",
+    "ffdf_list_raw_facts",
+    "ffdf_get_fact",
+    "ffdf_get_evidence",
+    "ffdf_get_validation"
+  ]
+}
+```
+
+其中 catalog/result schema必须从 accepted P8 main-runtime public API constants读取；server version/tool names是本 P10 accepted-baseline integration descriptor，不通过 runtime import server发现。
+
+`p8_tool_contract_fingerprint = SHA256(canonical JSON bytes of this object)`。
+
+P10 Independent Acceptance必须在 dedicated P8 MCP runtime中独立确认 server version / exact 11 names仍与该 descriptor一致。未来 P8 contract变化必须先更新 P10 design baseline，禁止 silent drift。
+
+### 13.3 P9 policy fingerprint
+
+P10 v1 使用 accepted P9 public API constants构造：
+
+```json
+{
+  "p9_version": "P9_VERSION",
+  "policy_version": "POLICY_VERSION",
+  "resolution_schema_version": "RESOLUTION_SCHEMA_VERSION",
+  "resolved_view_schema_version": "RESOLVED_VIEW_SCHEMA_VERSION"
+}
+```
+
+实际值必须从 `financial_filing_data_foundation.review` public API读取。
+
+`p9_policy_fingerprint = SHA256(canonical JSON bytes of this object)`。
+
+### 13.4 P8 catalog consistency
+
+`p8_catalog` 必须是 accepted `McpCatalog`。
+
+构造 context 前：
+
+1. 使用 `p8_catalog.project_root` 作为 P10 context project root；
+2. catalog path必须仍位于该 root；
+3. 对当前 catalog file raw bytes计算 `p8_catalog_sha256`；
+4. 用 accepted `McpCatalog.load(project_root, catalog_path)` 重新加载当前文件；
+5. reloaded catalog必须与 caller-provided catalog语义一致；否则 `P10_CATALOG_INVALID`；
+6. P10不得复制 P8 catalog parsing/truth semantics。
+
+### 13.5 P9 review-root identity
+
+`p9_review_root` 是 context identity的一部分，而不是仅展示字段。
+
+规则：
+
+- caller必须给 project-root-relative path；
+- absolute / drive-relative / traversal escape拒绝；
+- resolved path必须仍位于 `p8_catalog.project_root`；
+- P10-D不创建该目录；configured review root必须已存在且为 directory；
+- persisted form = resolved project-root-relative `as_posix()`；
+- absolute filesystem path不得进入 shared context/provenance；
+- outside root → `P10_CONTEXT_PATH_OUTSIDE_PROJECT`；
+- missing/not-directory → `P10_CONTEXT_INCOMPATIBLE`。
+
+同一 spec/catalog/policy 但不同 canonical review root必须生成不同 `research_context_id`。
+
+### 13.6 Capability manifest hash
+
+P10 v1 capability manifest是 Section 14 的固定 mapping，caller不可 override。
+
+`capability_manifest_hash = SHA256(canonical JSON bytes of capability mapping)`。
+
+Capability keys/states必须 exact；未来 additive capability变化需要新的 accepted design baseline。
+
+### 13.7 research_context_id
+
+Exact bytes：
 
 ```text
 SHA256(
-  integration_policy_version
-  + "\0" + spec_bundle_hash
-  + "\0" + p8_catalog_sha256
-  + "\0" + p8_tool_contract_fingerprint
-  + "\0" + p9_policy_fingerprint
-  + "\0" + capability_manifest_hash
+  (
+    schema_version
+    + "\0" + integration_policy_version
+    + "\0" + spec_bundle_hash
+    + "\0" + p8_catalog_sha256
+    + "\0" + p8_tool_contract_fingerprint
+    + "\0" + p9_policy_fingerprint
+    + "\0" + canonical_p9_review_root
+    + "\0" + capability_manifest_hash
+  ).encode("utf-8")
 )
 ```
+
+其中：
+
+- `schema_version = p10-research-context-v1`；
+- `integration_policy_version = p10-dynamic-research-v1`；
+- all SHA/fingerprint values are lowercase hex；
+- `canonical_p9_review_root` is the persisted project-relative POSIX string。
 
 不包含：
 
 - current time；
 - random UUID；
 - Codex response；
-- tool call order。
+- tool call order；
+- absolute filesystem path。
 
-它表示 deterministic input context，不表示“模型输出 deterministic”。
+它表示 deterministic input/capability context，不表示“模型输出 deterministic”。
 
 ---
 
 ## 14. Capability Manifest
 
-P10 v1 必须显式声明：
+P10 v1 必须显式声明以下 **exact machine mapping**：
 
-```text
-P8_RAW_QUERY                 AVAILABLE
-P8_PAGE_TEXT                 AVAILABLE
-P8_TABLE_STRUCTURED          AVAILABLE
-P8_EVIDENCE                  AVAILABLE
-P8_VALIDATION                AVAILABLE
-P9_REVIEW                    AVAILABLE
-P9_RESOLVED_VIEW             AVAILABLE
-PDF_VISUAL_EVIDENCE          UNAVAILABLE
-SEMANTIC_RESOLVER            UNAVAILABLE
-CANONICAL_METRIC_LAYER       UNAVAILABLE
-P11_SEC_PROVIDER             UNAVAILABLE
+```json
+{
+  "P8_RAW_QUERY": "AVAILABLE",
+  "P8_PAGE_TEXT": "AVAILABLE",
+  "P8_TABLE_STRUCTURED": "AVAILABLE",
+  "P8_EVIDENCE": "AVAILABLE",
+  "P8_VALIDATION": "AVAILABLE",
+  "P9_REVIEW": "AVAILABLE",
+  "P9_RESOLVED_VIEW": "AVAILABLE",
+  "PDF_VISUAL_EVIDENCE": "UNAVAILABLE",
+  "SEMANTIC_RESOLVER": "UNAVAILABLE",
+  "CANONICAL_METRIC_LAYER": "UNAVAILABLE",
+  "P11_SEC_PROVIDER": "UNAVAILABLE"
+}
 ```
+
+State value仅允许 `AVAILABLE` / `UNAVAILABLE`。
+
+P10 v1不接受 caller override / omission / extra capability key。
 
 任何不可用 capability 被当前 runtime specification 需要时，必须显式阻断。
 
@@ -911,6 +1047,7 @@ P10 不声称：
 - `P10_SPEC_PATH_OUTSIDE_PROJECT`
 - `P10_RESEARCH_SPEC_CHANGED`
 - `P10_CATALOG_INVALID`
+- `P10_CONTEXT_PATH_OUTSIDE_PROJECT`
 - `P10_CONTEXT_INCOMPATIBLE`
 - `P10_PROVENANCE_INVALID`
 - `P10_DATA_PREPARATION_REQUIRED`
@@ -1317,6 +1454,61 @@ Approved solution：
 No P10 production code existed when this issue was identified.
 
 Affected gates：P10-C / P10-I / P10-M / P10-N.
+
+### P10-ISSUE-003 — Research context fingerprints/root identity were underspecified before P10-D
+
+P10-D pre-implementation contract review found that the initial design named
+`p8_tool_contract_fingerprint`, `p9_policy_fingerprint`, and
+`capability_manifest_hash` without freezing their exact input bytes.
+
+It also accepted/persisted `p9_review_root` while excluding that root identity
+from `research_context_id`.
+
+Additional environment fact：
+
+- accepted P8 tool names/server version live in dedicated `mcp/server.py`；
+- importing that server from the main P10 runtime would violate the accepted
+  dual-runtime boundary because the main runtime intentionally has no external
+  MCP SDK；
+- accepted P8 catalog/result schema constants are available from the main-runtime
+  public P8 API；
+- accepted P9 policy/schema constants are available from the main-runtime public
+  P9 API。
+
+Risk：
+
+1. two implementations could produce different fingerprints for the same
+   accepted P8/P9/capability contract；
+2. two different P9 review roots could produce the same context ID even though
+   they can contain different durable reviewed decisions；
+3. naive P8 runtime discovery could accidentally add an MCP SDK dependency to
+   the main runtime；
+4. caller-controlled capability policy could silently change what P10 claims is
+   available。
+
+Approved solution：
+
+1. remove caller `capability_policy` from P10 v1
+   `build_research_context`；
+2. freeze exact P8 accepted integration descriptor in Section 13.2 without
+   importing dedicated `mcp/server.py`；
+3. derive P8 catalog/result schema fields from main-runtime public constants and
+   independently cross-check server/tool names during acceptance；
+4. freeze P9 descriptor from public P9 constants in Section 13.3；
+5. freeze all context fingerprints to Section 13.1 canonical JSON；
+6. require raw catalog SHA plus semantic reload/equality through accepted
+   `McpCatalog.load`；
+7. canonicalize/guard an existing project-relative P9 review root and include it
+   in context identity；
+8. freeze exact capability mapping/hash with no caller override；
+9. include context schema version and canonical P9 review root in the exact
+   Section 13.7 `research_context_id` bytes；
+10. add `P10_CONTEXT_PATH_OUTSIDE_PROJECT` for context-root escape；
+11. update P10-D focused tests and acceptance items 21–23 before authorization。
+
+No P10-D production code existed when this issue was identified.
+
+Affected gates：P10-D / P10-J / P10-M / P10-N.
 
 任何问题必须：
 

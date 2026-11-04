@@ -55,9 +55,9 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 18. spec input list is non-empty and blank/duplicate logical names are rejected；
 19. input paths are project-root-relative only; resolved target must be a regular file inside resolved project root; persisted path is resolved project-relative POSIX form; absolute/outside/traversal escape rejected；
 20. verify distinguishes malformed/tampered bundle (`P10_INVALID_SPEC_INPUT`), current-file drift/missing (`P10_RESEARCH_SPEC_CHANGED`), and root escape (`P10_SPEC_PATH_OUTSIDE_PROJECT`)；
-21. context manifest deterministic；
-22. context includes exact P8/P9 fingerprints；
-23. capability manifest exact；
+21. context manifest deterministic and `research_context_id` uses exact design/24 Section 13.7 bytes, including context schema version and canonical P9 review-root identity；
+22. context includes exact P8 accepted-tool descriptor/fingerprint and exact P9 public-policy descriptor/fingerprint; main runtime does not import dedicated `mcp/server.py`; Independent Acceptance cross-checks P8 server version/exact 11 names in dedicated MCP runtime；
+23. capability manifest is exact Section 14 mapping, caller cannot override/omit/add keys, and `capability_manifest_hash` uses Section 13.1 canonical JSON；
 24. PDF visual capability = UNAVAILABLE in P10 v1；
 25. semantic resolver capability = UNAVAILABLE；
 26. canonical layer capability = UNAVAILABLE；
