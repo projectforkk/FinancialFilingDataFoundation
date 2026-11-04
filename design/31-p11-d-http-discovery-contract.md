@@ -345,10 +345,11 @@ Every redirect:
 - requires exactly one `Location` header field with a non-empty value; missing or repeated Location => `P11_REDIRECT_NOT_ALLOWED`;
 - resolves relative Location against the current URL;
 - revalidates scheme/host/port/userinfo/fragment under Section 7;
-- obtains a new shared rate-gate reservation;
-- increments both redirect and outbound-start accounting.
+- increments `redirect_count` exactly once when the validated follow is scheduled;
+- obtains a new shared rate-gate reservation only after connection preparation for that hop succeeds;
+- increments `outbound_start_count` only if that followed hop reaches the Section 14.3 step-7 send transition.
 
-Invalid redirect, loop, disallowed target, missing Location or redirect count >3 => `P11_REDIRECT_NOT_ALLOWED`.
+Invalid redirect, loop, disallowed target or missing Location => `P11_REDIRECT_NOT_ALLOWED`. If an otherwise valid redirect is received when `redirect_count == 3`, no fourth redirect is followed and the result is `P11_REDIRECT_NOT_ALLOWED`.
 
 Redirects do not reset retry counters or the 120-second logical deadline. A followed redirect increments `redirect_count` exactly once; it does not increment `retry_count`.
 
@@ -373,14 +374,21 @@ Deterministic fallback backoff before retry 1/2/3:
 
 No jitter in P11 v1.
 
-A logical fetch has an additional absolute cap of 8 emitted/potentially-emitted outbound request starts total, including initial attempts, retries and redirect hops. `outbound_start_count` starts at 0 and increments at Section 14.3 step 7 immediately before header emission, therefore including partial-send failures. Connection-preparation failures before that step do not increment it.
+`outbound_start_count` starts at 0 and counts only actual Section 14.3 step-7 send transitions, including partial/failed header-send transitions. Connection-preparation failures before step 7 do not increment it even though they may consume retry budget.
 
-Before any new send transition, if `outbound_start_count == 8`, no ninth send occurs. Mapping:
+The exact logical-fetch invariant is:
 
-- if the pending action is a retry after HTTP 429 => `P11_RATE_LIMITED`;
-- if the pending action is any other retry => `P11_HTTP_FAILED`;
-- if the pending action is following an otherwise valid redirect => `P11_HTTP_FAILED` with outbound-start-cap diagnostic context;
-- a successful HTTP 200 received from the eighth emitted start succeeds normally.
+`outbound_start_count <= 1 + retry_count + redirect_count <= 7`
+
+The first inequality becomes equality only when the initial attempt and every scheduled retry/redirect hop represented by the counters actually reach the step-7 send transition. Connection-preparation failures can make the inequality strict. Because `retry_count <= 3` and `redirect_count <= 3`, the maximum reachable emitted-start count for one logical fetch is exactly 7. No valid P11-D state-machine path can emit an eighth request start.
+
+The per-logical-fetch `outbound_start_count == 7` check is retained only as a defensive invariant guard, not as an additional normal retry/redirect budget. Before step 7, if `outbound_start_count == 7`, no further send is permitted. Reaching that pre-send state means the separately frozen retry/redirect transition rules were violated; fail closed as `P11_HTTP_FAILED` with outbound-start-invariant diagnostic context. Normal exhausted-budget outcomes are determined before any new send is scheduled:
+
+- HTTP 429 when `retry_count == 3` => no retry; `P11_RATE_LIMITED`;
+- retryable HTTP 5xx, retryable transport/read/header-send failure, or connection-preparation failure when `retry_count == 3` => no retry; `P11_HTTP_FAILED`;
+- otherwise valid redirect when `redirect_count == 3` => no follow; `P11_REDIRECT_NOT_ALLOWED`.
+
+The cross-process 8 starts/second rate limit in Section 3 is independent of this per-logical-fetch structural maximum of 7.
 
 Retryable:
 
@@ -405,7 +413,7 @@ Non-retryable:
 
 404 is never retried and surfaces `P11_HTTP_FAILED`; discovery may subsequently map absence of a required official resource to its higher-level deterministic reason code.
 
-Exhausted 5xx/transport retry => `P11_HTTP_FAILED`.
+Exhausted 5xx/transport/connection-preparation retry => `P11_HTTP_FAILED`. Exhausted HTTP 429 retry budget => `P11_RATE_LIMITED`.
 
 ## 13. Retry-After
 
@@ -764,8 +772,8 @@ Before P11-D implementation can close, focused tests must prove at least:
 34. 429 Retry-After HTTP-date with no downward rounding;
 35. multiple Retry-After fields fail closed as `P11_RATE_LIMITED` without retry
 36. Retry-After >60s fails without early retry;
-37. total emitted HTTP outbound-start cap =8;
-38. eighth-start HTTP 200 succeeds; a pending ninth redirect/retry is blocked with the exact cap-exhaustion mapping
+37. logical-fetch counter invariant holds for emitted and connection-preparation-failure paths: `outbound_start_count <= 1 + retry_count + redirect_count <= 7`, with 7 reachable and strict inequality reachable when preparation fails;
+38. all 20 orderings of three retries plus three followed redirects after the initial request reach exactly seven emitted starts, no valid path emits an eighth start, and exhausted seventh-response mappings are exact (429 => `P11_RATE_LIMITED`, retryable 5xx/transport => `P11_HTTP_FAILED`, fourth redirect => `P11_REDIRECT_NOT_ALLOWED`); the defensive pre-send count-7 guard fails impossible state as `P11_HTTP_FAILED`
 39. partial-send failure counts one outbound start but increments retry_count only if another retry is actually scheduled
 40. redirect/retry interleaving preserves global retry_count 0..3 and redirect_count 0..3 without reset
 41. every retry/redirect that emits request bytes passes through shared gate;
