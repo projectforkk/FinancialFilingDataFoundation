@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P10 DONE / P11 DESIGN REVIEW STOPPED**
+状态：**P10 DONE / P11-D FINAL DESIGN REVIEW PASS / IMPLEMENTATION RESUME AUTHORIZATION PENDING**
 
 ## 总原则
 
@@ -117,7 +117,7 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`P11-A PASS / P11-B PASS / P11-C PASS / P11-D ISSUE-044 OPEN / IMPLEMENTATION STOPPED / DESIGN AMENDMENT REQUIRED`
+状态：`P11-A PASS / P11-B PASS / P11-C PASS / P11-D ISSUE-044 REMEDIATED / FINAL DESIGN REVIEW PASS / IMPLEMENTATION RESUME AUTHORIZATION PENDING`
 
 Latest reviewed design candidate：
 - historical exact candidate = `cd2fa0b01d23c0e3f75945c5cce5120738f51077` = INELIGIBLE after P11-ISSUE-039；
@@ -133,7 +133,7 @@ Latest reviewed design candidate：
 - `development/144-p11-environment-interface-audit.md`；
 - `development/145-p11-design-reconciliation.md`。
 
-P11-B Environment / SEC Runtime Probe = CLOSED / PASS (`development/205-p11-environment-runtime-probe.md`). P11-C Identity / Period Contract = CLOSED / PASS (`development/211-p11-c-final-detached-code-review-result.md`), accepted candidate `027288f6d5bb064f82764b3dc19961996de1dab8`, integration merge `1a5b04f22e1821558337821c758f70a7458da9ae`. P11-D candidates through `97da9773b8d9858e639ac60d9f60c96e2cc0f36d` are INELIGIBLE historical candidates. ISSUE-040 is remediated by development/216; ISSUE-041/042 by development/220; ISSUE-043 response framing by `development/223-p11-d-response-framing-amendment-evidence.md = PASS`. Next action: freeze a new exact amended design candidate and run fresh detached review; P11-D implementation remains not authorized. P11 provider production remains CLOSED.
+P11-B Environment / SEC Runtime Probe = CLOSED / PASS (`development/205-p11-environment-runtime-probe.md`). P11-C Identity / Period Contract = CLOSED / PASS (`development/211-p11-c-final-detached-code-review-result.md`), accepted candidate `027288f6d5bb064f82764b3dc19961996de1dab8`, integration merge `1a5b04f22e1821558337821c758f70a7458da9ae`. P11-D candidates through `97da9773b8d9858e639ac60d9f60c96e2cc0f36d` are INELIGIBLE historical candidates. ISSUE-040 is remediated by development/216; ISSUE-041/042 by development/220; ISSUE-043 response framing by `development/223-p11-d-response-framing-amendment-evidence.md = PASS`. ISSUE-044 is remediated by development/228 with canonical hash-basis correction in development/231; exact candidate af6917b1cf5c653aee66d5bee08f73cb7edbdc47 passed fresh detached final design review in development/233. Next action: issue a separate P11-D implementation-resume authorization; provider production remains CLOSED. P11 provider production remains CLOSED.
 
 目标：
 SEC HTML / iXBRL / XBRL first acquisition and extraction path。
