@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P9 DONE / P10 DESIGN READY**
+状态：**DESIGN BASELINE — P10 DONE / P11 NOT STARTED**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -1020,17 +1020,20 @@ P9 accepted identity：
 
 当前 P10 状态：
 
-**P10 — Codex Dynamic Research Integration（DESIGN READY）**
+**P10 — Codex Dynamic Research Integration（DONE / PASS）**
 
-Design candidate：
-- `design/24-p10-codex-dynamic-research-integration-design.md`；
-- `design/25-p10-implementation-plan.md`；
-- `acceptance/38-p10-acceptance-instruction.md`；
-- `development/76-p10-design-reconciliation.md`；
-- reconciled `design/28` future semantic reference；
-- reconciled `design/29` future Research MCP reference。
+Accepted chain：
+- production candidate = `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`；
+- Independent Acceptance candidate = `183ca5dc89a606715a3e352bf92a235f7aa31fad`；
+- acceptance result = `acceptance/40-p10-independent-acceptance-result.md` = PASS；
+- accepted integration merge = `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`；
+- main integration evidence = `230968937a8ebdcbde56982a22b37125e4aefff4`；
+- final closeout = `development/142-p10-closeout.md`；
+- final main regression = `136 research / 444 full unit PASS`；
+- reconciled `design/28` remains future semantic reference only；
+- reconciled `design/29` remains future Research MCP reference only。
 
-P10 production 在该 exact design baseline commit/push 到 GitHub 且后续 development instruction 明确授权前不得开始。
+P10 is closed. P11 production, Research MCP production, and Semantic Resolver production require separate future authorization.
 
 继续保持职责边界：
 

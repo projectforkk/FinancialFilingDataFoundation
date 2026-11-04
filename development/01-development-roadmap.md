@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P9 DONE / P10 DESIGN READY**
+状态：**P10 DONE / P11 NOT STARTED**
 
 ## 总原则
 
@@ -110,7 +110,7 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P10 — Codex Dynamic Research Integration
 
-状态：`DESIGN READY / PRODUCTION NOT STARTED`
+状态：`DONE / PASS`
 
 目标：
 让 Codex 每次读取当前 runtime research specification，动态使用 accepted P8/P9 完成当前研究；P10 不实现固定 Skill，不复制研究业务规则。

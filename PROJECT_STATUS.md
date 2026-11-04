@@ -6,26 +6,27 @@
 
 ## Current state
 
-**P9_DONE / P10_DESIGN_READY**
+**P10_DONE / P11_NOT_STARTED**
 
 ## Accepted baseline
 
-- phase: `P9_DONE`
-- frozen acceptance candidate: `926c665f5dd667765781630638c62239b267ceb7`
-- reviewed production candidate: `66308627d1dd1f0af2f02ff3f18d3e91f33dcc8d`
-- reviewed/evidence candidate: `e7822438c80964f29960c3dafa278a5ede8cdc44`
-- final formal review verdict: `PASS`
-- final formal review evidence: `development/74-p9-jr3-formal-rereview-result.md`
+- phase: `P10_DONE`
+- frozen acceptance candidate: `183ca5dc89a606715a3e352bf92a235f7aa31fad`
+- reviewed production candidate: `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
+- final formal production review: `development/119-p10-l-formal-code-review-result.md = PASS`
+- final acceptance-package review: `development/134-p10-acceptance-package-formal-review-result.md = PASS`
 - acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/37-p9-acceptance-result.md`
-- accepted merge commit: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
-- accepted_baseline_sha: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
-- acceptance focused P9: `73 passed`
-- acceptance synthetic golden: `2 passed, 71 deselected`
-- acceptance full unit: `308 passed`
-- post-merge full regression: `308 passed in 23.74s`
-- live CN/HK: `PASS`
-- accepted base immutability: `23 / 23 files unchanged`
+- acceptance evidence: `acceptance/40-p10-independent-acceptance-result.md`
+- accepted merge commit: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`
+- accepted_baseline_sha: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`
+- main integration evidence commit: `230968937a8ebdcbde56982a22b37125e4aefff4`
+- acceptance focused P10: `136 passed`
+- acceptance full unit: `444 passed`
+- final main focused P10: `136 passed in 22.66s`
+- final main full unit: `444 passed in 45.79s`
+- live CN 600519 FY2024: `COMPLETE / PASS`
+- negative capability K1-K5: `PASS`
+- accepted base immutability: `47 / 47 files unchanged`
 - blocker: `NONE`
 
 ## Phase history
@@ -139,24 +140,28 @@
 
 ### P10 — Codex Dynamic Research Integration
 
-- status: `DESIGN READY / PRODUCTION NOT STARTED`
-- branch: `design/p10-dynamic-research-integration`
+- status: `DONE / PASS`
 - starting main: `e9b30626f2b88ac5527d42bd76d0b682efbeef0e`
+- production candidate: `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
+- accepted candidate: `183ca5dc89a606715a3e352bf92a235f7aa31fad`
+- acceptance evidence: `acceptance/40-p10-independent-acceptance-result.md = PASS`
+- accepted merge: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`
+- main integration evidence: `230968937a8ebdcbde56982a22b37125e4aefff4`
+- closeout: `development/142-p10-closeout.md`
+- final main research: `136 passed in 22.66s`
+- final main full unit: `444 passed in 45.79s`
 - detailed design: `design/24-p10-codex-dynamic-research-integration-design.md`
 - implementation plan: `design/25-p10-implementation-plan.md`
-- acceptance baseline: `acceptance/38-p10-acceptance-instruction.md`
-- reconciliation: `development/76-p10-design-reconciliation.md`
 - design/28: future semantic reference / implementation not authorized
 - design/29: future Research MCP reference / production not authorized
-- production changes: `NONE`
 
 ## Approved next phase
 
-**P10-O — Closeout**
+**No next production phase authorized**
 
 Status:
 
-`P10-O V2 INTEGRATION GATE PASS / MAIN FAST-FORWARD READY`
+`P10 DONE / PASS — P11 NOT STARTED / NOT AUTHORIZED`
 
 P10-C is closed:
 
@@ -546,15 +551,30 @@ P10-O closeout authorization:
 
 Fresh v2 integration gate evidence:
 
-`development/141-p10-o-v2-integration-evidence.md = PASS / MAIN FAST-FORWARD READY`
+`development/141-p10-o-v2-integration-evidence.md = PASS`
 
-Fresh v2 integration merge: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`. Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and must not be reused. P10 is not declared DONE until final main verification passes.
+Fresh v2 integration merge: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`.
 
-P10 production remains frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
+Main integration evidence commit:
+
+`230968937a8ebdcbde56982a22b37125e4aefff4`
+
+Final closeout:
+
+`development/142-p10-closeout.md = DONE / PASS`
+
+Final main verification:
+
+- P10 research: `136 passed in 22.66s`;
+- full unit: `444 passed in 45.79s`;
+- P8/P9/runtime/security/base immutability: `PASS`.
+
+Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and historical only.
+
+P10 is DONE / PASS. P11 / Research MCP production / Semantic Resolver production remain unauthorized.
 
 Still not authorized:
 
-- P10-J and later production;
 - Research MCP production;
 - Semantic Resolver production;
 - P11 production;
@@ -662,5 +682,5 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
-- P10 — Codex Dynamic Research Integration: `DESIGN READY / PRODUCTION NOT STARTED`
+- P10 — Codex Dynamic Research Integration: `DONE / PASS`
 - P11 — US SEC Provider: `NOT STARTED`

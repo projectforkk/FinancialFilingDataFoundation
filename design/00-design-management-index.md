@@ -114,8 +114,8 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 21-p8-implementation-plan.md | P8 | ACCEPTED HISTORY |
 | 22-p9-review-overlay-design.md | P9 | ACCEPTED HISTORY |
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
-| 24-p10-codex-dynamic-research-integration-design.md | P10 | DESIGN READY |
-| 25-p10-implementation-plan.md | P10 | DESIGN READY |
+| 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
+| 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 
@@ -160,7 +160,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P7 | 18 | 19 | acceptance/26 | DONE |
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
-| P10 | 24 | 25 | acceptance/38 (baseline) | DESIGN READY |
+| P10 | 24 | 25 | acceptance/40 | DONE |
 | P11 | 26 | 27 | TBD | NOT STARTED |
 
 ---
@@ -292,7 +292,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P9_DONE / P10_DESIGN_READY`
+`P10_DONE / P11_NOT_STARTED`
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
@@ -422,8 +422,10 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 112. P10-N accepted detached candidate = `183ca5dc89a606715a3e352bf92a235f7aa31fad`；
 113. P10-N = CLOSED / PASS；
 114. P10-O v2 closeout authorization = `development/140-p10-o-closeout-authorization-v2.md`；
-115. P10-O v2 integration evidence = `development/141-p10-o-v2-integration-evidence.md` = PASS / MAIN FAST-FORWARD READY；
+115. P10-O v2 integration evidence = `development/141-p10-o-v2-integration-evidence.md` = PASS；
 116. P10-O v2 merge commit = `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`；
-117. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
-118. P10 final DONE remains pending final main verification；
-119. P11 / Research MCP production / Semantic Resolver production remain closed。
+117. main integration evidence commit = `230968937a8ebdcbde56982a22b37125e4aefff4`；
+118. final closeout = `development/142-p10-closeout.md` = DONE / PASS；
+119. P10 = DONE / PASS；
+120. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
+121. P11 / Research MCP production / Semantic Resolver production remain closed / not authorized。
