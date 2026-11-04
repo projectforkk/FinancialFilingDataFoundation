@@ -1,6 +1,8 @@
 # 177 — P11 Final Detached Design Review Result
 
-Status: **PASS — P11-A DESIGN BASELINE CLOSED / PRODUCTION CLOSED**
+Status: **INVALID / SUPERSEDED BY P11-ISSUE-032 STOP / NOT AUTHORITATIVE**
+
+> Governance notice: this PASS was committed before the manual cross-gate review completed. `development/178-p11-validation-finalization-review-stop.md` subsequently found P11-ISSUE-032 on the same exact candidate. This file is retained only as historical premature-review evidence and MUST NOT close P11-A or authorize P11-B.
 
 Phase:
 P11 — US SEC Provider
@@ -222,7 +224,7 @@ No remaining material field/API/path/ordering ambiguity was found that would req
 
 ## 12. Verdict
 
-# PASS — P11 DESIGN READY / PRODUCTION CLOSED
+# INVALID — SUPERSEDED BY development/178 / DO NOT USE AS PASS
 
 Exact accepted P11-A design candidate:
 

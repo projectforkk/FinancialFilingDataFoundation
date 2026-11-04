@@ -482,12 +482,13 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 163. candidate `85df002516d577531e68c303ad86c0903ca813c6` = INELIGIBLE after fresh review；
 164. review authorization = `development/173-p11-registry-artifact-parity-final-review-authorization.md`；
 165. review stop = `development/174-p11-artifact-path-contract-review-stop.md`；
-166. P11-ISSUE-031 = REMEDIATED / CLOSED BY FINAL REVIEW；
+166. P11-ISSUE-031 = REMEDIATED；
 167. amendment evidence = `development/175-p11-artifact-path-amendment-evidence.md` = PASS；
-168. accepted P11-A design candidate = `b0424620f4b7e6fc0b898c657166b171fc35e7a7`；
-169. final review authorization = `development/176-p11-artifact-path-final-review-authorization.md`；
-170. final detached design review = `development/177-p11-final-detached-design-review-result.md` = PASS；
-171. P11-A = CLOSED / DESIGN READY；
-172. P11 production = CLOSED；
-173. next permitted gate = P11-B Environment / SEC Runtime Probe under separate authorization；
-174. Research MCP production / Semantic Resolver production remain closed / not authorized。
+168. candidate `b0424620f4b7e6fc0b898c657166b171fc35e7a7` = INELIGIBLE after manual cross-gate review；
+169. review authorization = `development/176-p11-artifact-path-final-review-authorization.md`；
+170. review stop = `development/178-p11-validation-finalization-review-stop.md`；
+171. premature PASS artifact `development/177-p11-final-detached-design-review-result.md` = INVALID / NOT AUTHORITATIVE；
+172. invalidation record = `development/179-p11-b042462-stale-pass-result-invalid.md`；
+173. P11-ISSUE-032 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
+174. P11 production = CLOSED；
+175. Research MCP production / Semantic Resolver production remain closed / not authorized。
