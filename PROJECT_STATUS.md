@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-G REVIEW RERUN ONLY / P10-ISSUE-006 AMENDED BASELINE`
+`P10-G CLOSED / P10-H CLOSED PENDING SEPARATE AUTHORIZATION`
 
 P10-C is closed:
 
@@ -280,7 +280,13 @@ The amended P10-F baseline freezes:
 - deterministic context rebuild for validate-ledger;
 - no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
 
-P10-G candidate content remains frozen. Only the detached documentation review rerun is authorized under development/106; P10-H remains closed.
+P10-G detached review rerun is PASS and the gate is closed.
+
+Detached review result:
+
+`development/107-p10-g-detached-review-result.md = PASS`
+
+P10-H remains closed until a separate explicit authorization.
 
 Still not authorized:
 
