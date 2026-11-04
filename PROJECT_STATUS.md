@@ -156,7 +156,7 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-006 DESIGN AMENDMENT PENDING PUSH`
+`AUTHORIZED — P10-G REVIEW RERUN ONLY / P10-ISSUE-006 AMENDED BASELINE`
 
 P10-C is closed:
 
@@ -259,6 +259,14 @@ P10-ISSUE-006:
 - worktree-byte SHA is therefore not the cross-worktree identity;
 - amended contract uses exact candidate Git blob bytes as P10-G artifact identity.
 
+Current P10-G amended design baseline:
+
+`d896173`
+
+Review rerun authorization:
+
+`development/106-p10-g-review-reauthorization.md`
+
 The amended P10-F baseline freezes:
 
 - exact four CLI argv contracts;
@@ -272,7 +280,7 @@ The amended P10-F baseline freezes:
 - deterministic context rebuild for validate-ledger;
 - no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
 
-P10-G detached review is STOPPED pending the P10-ISSUE-006 design amendment push. Candidate content remains frozen; no artifact change is authorized.
+P10-G candidate content remains frozen. Only the detached documentation review rerun is authorized under development/106; P10-H remains closed.
 
 Still not authorized:
 

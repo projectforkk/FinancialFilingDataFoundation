@@ -358,6 +358,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 48. P10-G detached review instruction = `development/104-p10-g-documentation-review-instruction.md`；
 49. P10-G detached review stop = `development/105-p10-g-detached-review-stop.md`；
 50. P10-G pre-PASS review found `P10-ISSUE-006`: worktree SHA is EOL-sensitive；
-51. P10-G = STOPPED pending Git-blob identity design amendment push；
-52. P10-H and later remain closed；
-53. P11 / Research MCP production / Semantic Resolver production remain closed。
+51. P10-G amended design baseline = `d896173`；
+52. P10-G review rerun authorization = `development/106-p10-g-review-reauthorization.md`；
+53. P10-G = REVIEW RERUN AUTHORIZED ONLY；
+54. P10-H and later remain closed；
+55. P11 / Research MCP production / Semantic Resolver production remain closed。
