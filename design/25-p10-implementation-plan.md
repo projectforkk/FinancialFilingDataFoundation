@@ -567,14 +567,16 @@ FAIL → Design-First corrective loop。
 - exact commands；
 - Windows basetemp path。
 
-P10-ISSUE-008 fixture identity：
+P10-ISSUE-008 / P10-ISSUE-009 acceptance-package identity：
 
 - acceptance fixture manifest identity = exact candidate Git blob bytes；
 - each frozen fixture identity = exact candidate Git blob bytes；
-- binary-safe `git cat-file blob HEAD:<path>` bytes are authoritative；
-- detached checkout LF/CRLF bytes are diagnostic only；
-- harness validates manifest size/SHA against Git blob bytes；
-- harness copies validated Git blob bytes into the mutable acceptance workspace；
+- acceptance base immutability manifest identity = exact candidate Git blob bytes；
+- binary-safe `git cat-file blob HEAD:<path>` bytes are authoritative for tracked frozen package files；
+- detached checkout LF/CRLF/filter-transformed bytes are diagnostic only；
+- harness validates fixture manifest + fixture size/SHA against Git blob bytes；
+- harness parses/reports the base immutability manifest from Git blob bytes, then validates its 47 referenced project files from actual filesystem bytes；
+- harness copies validated fixture Git blob bytes into the mutable acceptance workspace；
 - no `.gitattributes` change is required。
 
 任何 design/production/acceptance-package change后原 freeze失效。

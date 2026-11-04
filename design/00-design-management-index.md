@@ -400,6 +400,11 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 90. prior P10-M freeze + corrected P10-N authorization are INVALIDATED；
 91. P10-ISSUE-008 design baseline = `f8bffca`；
 92. acceptance harness amendment authorization = `development/129-p10-acceptance-harness-amendment-authorization.md`；
-93. P10-N remains CLOSED pending harness amendment review + re-freeze；
-94. P10 closeout/main integration = STOPPED；
-95. P11 / Research MCP production / Semantic Resolver production remain closed。
+93. partial harness candidate = `9621f20d33c1d1b650bcdf1a7686b5f0b9c7c817`；
+94. detached precheck preview = PASS for fixture Git-blob identity；
+95. preview stop = `development/130-p10-acceptance-harness-preview-stop.md`；
+96. preview found `P10-ISSUE-009`: base manifest identity still checkout-filter-sensitive；
+97. partial harness candidate is INELIGIBLE；
+98. P10-N remains CLOSED pending harness v2 + targeted review + re-freeze；
+99. P10 closeout/main integration = STOPPED；
+100. P11 / Research MCP production / Semantic Resolver production remain closed。

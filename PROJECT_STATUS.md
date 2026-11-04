@@ -156,7 +156,7 @@
 
 Status:
 
-`AUTHORIZED — P10-ISSUE-008 ACCEPTANCE HARNESS AMENDMENT ONLY / P10-N CLOSED`
+`STOPPED — P10-ISSUE-009 BASE MANIFEST IDENTITY AMENDMENT REQUIRED / P10-N CLOSED`
 
 P10-C is closed:
 
@@ -457,7 +457,24 @@ Acceptance harness amendment authorization:
 
 `development/129-p10-acceptance-harness-amendment-authorization.md`
 
-Only the harness path is authorized; P10-N remains closed.
+Partial harness candidate:
+
+`9621f20d33c1d1b650bcdf1a7686b5f0b9c7c817`
+
+Detached precheck preview:
+
+- fixture identity source = `GIT_BLOB`;
+- all 8 frozen fixture hashes = PASS;
+- precheck status = PASS;
+- preview then exposed P10-ISSUE-009: base immutability manifest still used checkout bytes.
+
+Preview stop:
+
+`development/130-p10-acceptance-harness-preview-stop.md`
+
+The partial harness candidate is not eligible for formal review/freeze.
+
+A second design amendment is required before harness v2. P10-N remains closed.
 
 Required sequence:
 

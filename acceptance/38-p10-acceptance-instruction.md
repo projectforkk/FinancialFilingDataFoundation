@@ -163,29 +163,33 @@ If the detached worktree uses CRLF due Git checkout policy, record that represen
 
 The Git blob must decode as UTF-8 and contain no BOM.
 
-### 2.3 Frozen acceptance fixture identity
+### 2.3 Frozen acceptance package identity
 
-The frozen acceptance fixture package uses exact candidate Git blob bytes as the cross-worktree identity source.
+Frozen tracked acceptance-package files use exact candidate Git blob bytes as the cross-worktree identity source.
 
 This applies to:
 
 - `acceptance/p10-fixtures/manifest.json`;
-- every fixture listed by that manifest.
+- every fixture listed by that manifest;
+- `acceptance/p10-base-immutability-manifest.json`.
 
 Independent Acceptance must:
 
 1. read the fixture manifest from `git cat-file blob HEAD:acceptance/p10-fixtures/manifest.json` using binary-safe subprocess bytes;
 2. parse that exact blob as UTF-8 JSON;
 3. read every listed fixture from `git cat-file blob HEAD:acceptance/p10-fixtures/<name>`;
-4. validate the manifest size/SHA against those exact blob bytes;
-5. copy those validated blob bytes into the mutable acceptance workspace;
-6. record checkout representation separately if useful, but never treat checkout CRLF/LF bytes as frozen fixture identity.
+4. validate each fixture size/SHA against those exact blob bytes;
+5. copy those validated fixture blob bytes into the mutable acceptance workspace;
+6. read `acceptance/p10-base-immutability-manifest.json` from exact candidate Git blob bytes;
+7. parse/report the base-manifest SHA from those blob bytes;
+8. validate the 47 referenced immutable project files from their actual project filesystem bytes;
+9. record checkout representation separately if useful, but never treat checkout filter/EOL bytes as frozen package identity.
 
 Forbidden:
 
-- using arbitrary checked-out Markdown bytes as the manifest identity source;
-- copying CRLF-converted checkout bytes into the acceptance workspace when the frozen Git blob is LF;
-- editing the fixture manifest to accommodate checkout EOL conversion;
+- using arbitrary checked-out fixture/base-manifest bytes as frozen identity;
+- copying CRLF/filter-transformed checkout fixture bytes into the acceptance workspace when Git blob bytes differ;
+- editing manifests to accommodate checkout conversion;
 - changing `.gitattributes` merely to make P10-N pass.
 
 ---

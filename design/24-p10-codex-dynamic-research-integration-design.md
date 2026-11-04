@@ -2393,6 +2393,36 @@ Approved solution:
 
 Affected gates: P10-M / P10-N / P10-O closeout.
 
+### P10-ISSUE-009 — Frozen base-manifest identity was still checkout-filter-sensitive
+
+The first detached preview of the P10-ISSUE-008 harness candidate `9621f20d33c1d1b650bcdf1a7686b5f0b9c7c817` passed fixture validation but exposed a second acceptance-package identity gap.
+
+Facts:
+
+- frozen `acceptance/p10-base-immutability-manifest.json` SHA in P10-M = `ae176a49858caabb45e525fbeb9b99eec23e4b5f649dfa584ebe4656c2dba003`;
+- exact candidate Git blob SHA = the same `ae176a498...`;
+- detached checkout SHA = `fab2c081c448f2b7d3821d226d692f152a6495e064f034ecef6d350d798416e1`;
+- harness `validate_manifest()` still parsed and hashed the checked-out file bytes;
+- the 47 referenced immutable project files themselves validated correctly;
+- no P10 production/test drift occurred.
+
+Root cause:
+
+The accepted freeze records the base-manifest Git content identity, but the harness still used checkout-filtered bytes for that manifest. This is the same cross-worktree identity class as P10-ISSUE-006/008.
+
+Approved solution:
+
+1. read `acceptance/p10-base-immutability-manifest.json` from exact candidate Git blob bytes;
+2. parse the manifest JSON from those blob bytes;
+3. report/verify the manifest SHA from those blob bytes;
+4. continue validating the 47 referenced project files from their actual project filesystem bytes;
+5. do not replace the 47 immutable-base files with Git blobs;
+6. frozen acceptance-package tracked identities are Git-truth identities, while mutable/accepted project-state files remain filesystem byte identities;
+7. partial harness candidate `9621f20...` is ineligible for formal review/freeze;
+8. a corrected harness v2 requires targeted review, new freeze, and fresh P10-N.
+
+Affected gates: P10-M / P10-N / P10-O closeout.
+
 任何问题必须：
 
 ```text
