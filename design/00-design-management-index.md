@@ -438,5 +438,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 122. P11 environment/interface audit = `development/144-p11-environment-interface-audit.md` = PASS / design may proceed；
 123. P11 design reconciliation = `development/145-p11-design-reconciliation.md` = PASS；
 124. P11 design candidate = `design/26` + `design/27` + `design/30` + `acceptance/41`；
-125. P11 = DESIGN CANDIDATE / DETACHED DESIGN REVIEW PENDING / PRODUCTION CLOSED；
-126. Research MCP production / Semantic Resolver production remain closed / not authorized。
+125. P11 candidate `3ccaedc14a4c0f3f222cd192c8b7e1479d787ccd` = INELIGIBLE after detached design review；
+126. review stop = `development/147-p11-detached-design-review-stop.md`；
+127. P11-ISSUE-010..016 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
+128. P11 production = CLOSED；
+129. Research MCP production / Semantic Resolver production remain closed / not authorized。

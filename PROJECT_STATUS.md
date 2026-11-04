@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 DESIGN CANDIDATE READY FOR DETACHED DESIGN REVIEW / PRODUCTION NOT AUTHORIZED`
+`P11 DESIGN REVIEW STOPPED — P11-ISSUE-010..016 / PRODUCTION NOT AUTHORIZED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Production remains CLOSED until detached design review PASS + a separate development authorization.
+Detached design review of candidate `3ccaedc14a4c0f3f222cd192c8b7e1479d787ccd` stopped with material design findings P11-ISSUE-010 through P11-ISSUE-016. Stop record: `development/147-p11-detached-design-review-stop.md`. That candidate is INELIGIBLE. Production remains CLOSED pending Design-First amendment + fresh detached review PASS + separate development authorization.
 
 P10-C is closed:
 
