@@ -3,52 +3,52 @@
 Status: **PASS - ISSUE-044 REMEDIATED / AMENDED DESIGN READY FOR EXACT-CANDIDATE REVIEW / P11-D IMPLEMENTATION STOPPED**
 
 Prior accepted design baseline under re-review:
-104df1e5f4fe18c1c106029ea9026a8d66bf6e04
+`104df1e5f4fe18c1c106029ea9026a8d66bf6e04`
 
 STOP:
-development/227-p11-d-outbound-start-counter-review-stop.md
+`development/227-p11-d-outbound-start-counter-review-stop.md`
 
 Amended contract:
-design/31-p11-d-http-discovery-contract.md
+`design/31-p11-d-http-discovery-contract.md`
 
 Amended contract SHA256:
-$sha
+`497407adb368f8abbbe12afa1096fb7d9674d2fdb1a5778c8468b8f4b52dfaf9`
 
 ## Exact remediation
 
 The logical-fetch accounting contract is now coherent with connection-preparation failures and the independent retry/redirect budgets:
 
-- outbound_start_count counts only actual Section 14.3 step-7 send transitions, including partial/failed header sends;
-- connection-preparation failure may consume retry budget but does not increment outbound_start_count;
-- exact invariant: outbound_start_count <= 1 + retry_count + redirect_count <= 7;
+- `outbound_start_count` counts only actual Section 14.3 step-7 send transitions, including partial/failed header sends;
+- connection-preparation failure may consume retry budget but does not increment `outbound_start_count`;
+- exact invariant: `outbound_start_count <= 1 + retry_count + redirect_count <= 7`;
 - equality on the left holds only when the initial attempt and every counted retry/redirect reach the send transition;
 - the maximum reachable emitted-start count for one logical fetch is exactly 7;
 - no valid state-machine path emits an eighth start;
 - the Section 3 aggregate rate limit remains independently 8 starts/second across processes;
-- a count-7 pre-send guard remains only as a defensive impossible-state invariant and fails closed as P11_HTTP_FAILED.
+- a count-7 pre-send guard remains only as a defensive impossible-state invariant and fails closed as `P11_HTTP_FAILED`.
 
 Normal exhausted-budget mappings are frozen before another send can be scheduled:
 
-- HTTP 429 with etry_count == 3 => P11_RATE_LIMITED;
-- retryable 5xx/transport/read/header-send/connection-preparation failure with etry_count == 3 => P11_HTTP_FAILED;
-- otherwise valid redirect with edirect_count == 3 => P11_REDIRECT_NOT_ALLOWED.
+- HTTP 429 with `retry_count == 3` => `P11_RATE_LIMITED`;
+- retryable 5xx/transport/read/header-send/connection-preparation failure with `retry_count == 3` => `P11_HTTP_FAILED`;
+- otherwise valid redirect with `redirect_count == 3` => `P11_REDIRECT_NOT_ALLOWED`.
 
-Redirect accounting was also made exact: edirect_count increments when a validated follow is scheduled; the resulting hop increments outbound_start_count only if connection preparation succeeds and the hop reaches step 7.
+Redirect accounting was also made exact: `redirect_count` increments when a validated follow is scheduled; the resulting hop increments `outbound_start_count` only if connection preparation succeeds and the hop reaches step 7.
 
 ## Semantic/static evidence
 
 Project-local probe:
-workspace/scratch/p11-issue044/counter_probe.py
+`workspace/scratch/p11-issue044/counter_probe.py`
 
 PASS results:
 
-- INTERLEAVINGS=20 for every ordering of three retries plus three redirects;
-- MAX_REACHABLE_EMITTED_STARTS=7;
-- EIGHTH_EMITTED_START_REACHABLE=NO;
-- PREPARATION_FAILURE_STRICT_INEQUALITY=PASS;
-- TERMINAL_REASON_MAPPING=PASS;
+- `INTERLEAVINGS=20` for every ordering of three retries plus three redirects;
+- `MAX_REACHABLE_EMITTED_STARTS=7`;
+- `EIGHTH_EMITTED_START_REACHABLE=NO`;
+- `PREPARATION_FAILURE_STRICT_INEQUALITY=PASS`;
+- `TERMINAL_REASON_MAPPING=PASS`;
 - stale scan found no eighth-start/ninth-send/absolute-cap-8 logical-fetch wording;
-- git diff --check PASS;
+- `git diff --check` PASS;
 - production/test/integration/runtime-lock diff = NONE.
 
 Mandatory P11-D focused case numbering remains 1..68. Cases 37-38 now prove the corrected invariant, all 20 maximum interleavings, seventh-response exhaustion mappings, and that an eighth emitted start is unreachable.
