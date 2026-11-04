@@ -156,7 +156,7 @@
 
 Status:
 
-`P10-K CLOSED / P10-L CLOSED PENDING SEPARATE AUTHORIZATION`
+`AUTHORIZED — P10-L FORMAL REVIEW ONLY / NO CANDIDATE CHANGES`
 
 P10-C is closed:
 
@@ -345,7 +345,13 @@ P10-K evidence:
 
 `development/117-p10-k-negative-gates-evidence.md = PASS`
 
-P10-K is closed. P10-L remains closed until a separate explicit authorization.
+P10-K is closed.
+
+P10-L formal review authorization:
+
+`development/118-p10-l-formal-review-authorization.md`
+
+Only detached formal review is authorized; candidate changes remain forbidden.
 
 Still not authorized:
 
