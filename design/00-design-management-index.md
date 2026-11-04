@@ -295,7 +295,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_AUTHORIZATION_PENDING`
+`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_AUTHORIZED`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
@@ -316,7 +316,8 @@ P11 latest reviewed candidate：
 - accepted P11-A design baseline = `5877a238f5af6102ef48e56141cdb893590b6aab`；
 - P11-B authorization = `development/204-p11-b-environment-runtime-probe-authorization.md`；
 - P11-B result = `development/205-p11-environment-runtime-probe.md` = PASS；
-- next action = separately authorize P11-C Identity / Period Contract；
+- P11-C authorization = `development/206-p11-c-identity-period-authorization.md`；
+- next action = implement P11-C Identity / Period Contract in `task/p11-c-identity-period`；
 - P11-B = CLOSED / PASS；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -548,6 +549,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 219. P11-B authorization = `development/204-p11-b-environment-runtime-probe-authorization.md`；
 220. P11-B result = `development/205-p11-environment-runtime-probe.md` = PASS；
 221. P11-B = CLOSED / PASS；
-222. P11-C = NEXT / NOT YET AUTHORIZED；
-223. P11 production = CLOSED；
-224. Research MCP production / Semantic Resolver production remain closed / not authorized。
+222. P11-C authorization = `development/206-p11-c-identity-period-authorization.md`；
+223. P11-C = AUTHORIZED / IMPLEMENTATION ONLY；
+224. P11 production = CLOSED；
+225. Research MCP production / Semantic Resolver production remain closed / not authorized。

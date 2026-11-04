@@ -868,7 +868,7 @@ P10 acceptance 必须包含至少一个完整 live research run，证明 Codex �
 
 ### P11 — US SEC Provider
 
-状态：**P11-A PASS / P11-B PASS / P11-C NEXT / PRODUCTION CLOSED**
+状态：**P11-A PASS / P11-B PASS / P11-C AUTHORIZED IMPLEMENTATION / PRODUCTION CLOSED**
 
 P11 通过官方 SEC/EDGAR 入口接入 HTML / Inline XBRL / XBRL。
 
@@ -1053,7 +1053,7 @@ Accepted chain：
 - reconciled `design/28` remains future semantic reference only；
 - reconciled `design/29` remains future Research MCP reference only。
 
-P10 is closed. P11-A Design Baseline is CLOSED / PASS on exact candidate `5877a238f5af6102ef48e56141cdb893590b6aab`; formal review result: `development/203-p11-final-detached-design-review-result.md = PASS`. P11-B Environment / SEC Runtime Probe is CLOSED / PASS (`development/205-p11-environment-runtime-probe.md`). P11-C requires separate authorization. P11 provider production remains closed. Research MCP production and Semantic Resolver production remain unauthorized.
+P10 is closed. P11-A Design Baseline is CLOSED / PASS on exact candidate `5877a238f5af6102ef48e56141cdb893590b6aab`; formal review result: `development/203-p11-final-detached-design-review-result.md = PASS`. P11-B Environment / SEC Runtime Probe is CLOSED / PASS (`development/205-p11-environment-runtime-probe.md`). P11-C Identity / Period Contract is authorized by `development/206-p11-c-identity-period-authorization.md`. P11 provider production remains closed. Research MCP production and Semantic Resolver production remain unauthorized.
 
 继续保持职责边界：
 

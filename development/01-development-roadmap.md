@@ -117,7 +117,7 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`P11-A PASS / P11-B PASS / P11-C AUTHORIZATION PENDING / PRODUCTION NOT STARTED`
+状态：`P11-A PASS / P11-B PASS / P11-C AUTHORIZED IMPLEMENTATION / PRODUCTION NOT STARTED`
 
 Latest reviewed design candidate：
 - historical exact candidate = `cd2fa0b01d23c0e3f75945c5cce5120738f51077` = INELIGIBLE after P11-ISSUE-039；
@@ -133,7 +133,7 @@ Latest reviewed design candidate：
 - `development/144-p11-environment-interface-audit.md`；
 - `development/145-p11-design-reconciliation.md`。
 
-P11-B Environment / SEC Runtime Probe = CLOSED / PASS (`development/205-p11-environment-runtime-probe.md`). Next action: separately authorize P11-C Identity / Period Contract. P11 provider production remains CLOSED.
+P11-B Environment / SEC Runtime Probe = CLOSED / PASS (`development/205-p11-environment-runtime-probe.md`). P11-C Identity / Period Contract is authorized by `development/206-p11-c-identity-period-authorization.md`. Next action: implement only the authorized P11-C scope. P11 provider production remains CLOSED.
 
 目标：
 SEC HTML / iXBRL / XBRL first acquisition and extraction path。
