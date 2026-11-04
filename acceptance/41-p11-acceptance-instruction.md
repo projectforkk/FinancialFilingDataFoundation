@@ -246,7 +246,11 @@ Finalization-order acceptance:
 - manifest.blocking_issue_count == len(validation.blocking_issues);
 - no provisional/fabricated validation placeholder is accepted;
 - complete staging export passes the final v2 loader before commit;
-- final path absent => atomic move/rename staging to exact `<parsed_root>/<parse_run_id>/export-v2`;
+- staging root is `<parsed_root>/.staging`; two concurrent attempts for the same `parse_run_id` use distinct exclusive `attempt_token` directories and never share writable staging;
+- final path absent => one atomic same-filesystem **non-replacing** directory commit attempt to exact `<parsed_root>/<parse_run_id>/export-v2`;
+- commit outcome is distinguishable as `COMMITTED_NEW`, `DESTINATION_EXISTS`, or `COMMIT_ERROR`;
+- two-process same-`parse_run_id` probe proves exactly one `COMMITTED_NEW`; a loser receiving `DESTINATION_EXISTS` transitions to existing-final verification and can succeed only after loader/identity/all-nine-byte equality;
+- `COMMIT_ERROR` => `P11_FINAL_ARTIFACT_COMMIT_FAILED` / BLOCKED and cannot be reclassified from a later final-path existence observation;
 - final path already exists and every required file is byte-identical plus loader/identity semantics match => idempotent success without replacing/mutating final bytes;
 - final path already exists and any required byte/file/identity/validation semantic differs or is invalid => P11_FINAL_ARTIFACT_COLLISION / BLOCKED;
 - existing final export is never overwritten, deleted or replaced;
@@ -256,6 +260,9 @@ Finalization-order acceptance:
 - later retry may verify the existing final export idempotently and retry registry persistence;
 - unregistered orphan final export is not selected for reuse;
 - staging path is never registered or reusable;
+- normal runtime cleanup removes only the current attempt's staging and never automatically deletes/recycles another attempt's staging;
+- simulated loser with one-byte-different staging => `P11_FINAL_ARTIFACT_COLLISION`, with no final overwrite/delete/replace;
+- simulated permission/I/O/invalid-path commit failure => `P11_FINAL_ARTIFACT_COMMIT_FAILED`, not idempotent success;
 - P11-K does not mutate committed artifact bytes.
 
 Final-export byte-determinism acceptance:

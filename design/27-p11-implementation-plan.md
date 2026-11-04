@@ -335,17 +335,24 @@ Finalization order:
 2. serialize P11-H final `validation.json`;
 3. derive manifest `validation_status` and `blocking_issue_count` exactly from that validation model;
 4. serialize final `manifest.json`;
-5. verify all required files/counts/IDs/hashes/source references with the v2 loader in a project-local staging directory;
+5. write/verify all required files/counts/IDs/hashes/source references with the v2 loader in an exclusive attempt staging directory under `<parsed_root>/.staging/<parse_run_id>/<attempt_token>/export-v2`;
 6. evaluate the deterministic final path `<parsed_root>/<parse_run_id>/export-v2`:
-   - absent => atomic move/rename staging to final path;
-   - present => never overwrite; load existing final export and require exact identity plus byte-for-byte equality of every required artifact against staging;
-7. if existing final path differs/misses/fails => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
-8. after new commit or idempotent existing-final success, reload the final path;
-9. only after successful final reload may P11-K persist `ParsedDataRecord`.
+   - already present before commit => never overwrite; enter exact existing-final verification;
+   - absent => perform exactly one atomic non-replacing same-filesystem directory commit;
+7. classify the commit attempt:
+   - `COMMITTED_NEW` => reload final path;
+   - `DESTINATION_EXISTS` => concurrent winner/earlier attempt exists; enter exact existing-final verification;
+   - `COMMIT_ERROR` => `P11_FINAL_ARTIFACT_COMMIT_FAILED` / BLOCKED; do not infer success from later path presence;
+8. existing-final verification requires exact identity/validation semantics plus byte-for-byte equality of every required artifact against this attempt's validated staging export;
+9. if existing final path differs/misses/fails => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
+10. after new commit or idempotent existing-final success, reload the final path;
+11. only after successful final reload may P11-K persist `ParsedDataRecord`.
 
 Existing-final byte equality is checked over every required v2 file, not merely manifest identity.
 
-A successful idempotent existing-final check discards/retires staging and keeps the original final directory unchanged.
+A successful idempotent existing-final check discards/retires only this attempt's staging directory and keeps the original final directory unchanged.
+
+Concurrent writers for one `parse_run_id` MUST use distinct staging directories. Exactly one no-replace commit can return `COMMITTED_NEW`; any losing writer that receives `DESTINATION_EXISTS` can succeed only after the same loader/identity/all-nine-byte existing-final verification. P11-B must prove the target runtime's exact no-replace atomic directory commit primitive before production authorization.
 
 Final writer/loader must verify:
 

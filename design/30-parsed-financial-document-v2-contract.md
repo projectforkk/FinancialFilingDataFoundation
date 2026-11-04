@@ -184,15 +184,22 @@ Normative order:
 4. P11-I serializes all non-validation artifacts;
 5. P11-I serializes final `validation.json` from the P11-H validation model;
 6. P11-I derives manifest `validation_status` and `blocking_issue_count` from that same final validation model and serializes final `manifest.json`;
-7. P11-I runs the complete v2 loader against the staging export directory;
+7. P11-I writes to an exclusive attempt staging directory `<parsed_root>/.staging/<parse_run_id>/<attempt_token>/export-v2` and runs the complete v2 loader against it;
 8. P11-I evaluates the deterministic final path `<parsed_root>/<parse_run_id>/export-v2`:
-   - if absent, atomically move/rename the complete staging directory to the final path;
-   - if present, never overwrite it; load it and compare every required artifact file byte-for-byte with staging plus exact identity/validation semantics;
-9. any existing-final mismatch/missing/invalid state => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
-10. after a new atomic commit or idempotent existing-final match, reload the final path successfully;
-11. only then may P11-K persist `ParsedDataRecord.artifact_path`.
+   - if already present, never overwrite it and enter existing-final verification;
+   - if absent, perform exactly one atomic same-filesystem **non-replacing** directory commit;
+9. commit outcomes are exact:
+   - `COMMITTED_NEW` => this attempt created final;
+   - `DESTINATION_EXISTS` => another attempt/earlier run created final; transition to existing-final verification;
+   - `COMMIT_ERROR` => `P11_FINAL_ARTIFACT_COMMIT_FAILED` / BLOCKED;
+10. existing-final verification loads final and compares every required artifact file byte-for-byte with this attempt's validated staging export plus exact identity/validation semantics;
+11. any existing-final mismatch/missing/invalid state => `P11_FINAL_ARTIFACT_COLLISION` / BLOCKED;
+12. after a new atomic commit or idempotent existing-final match, reload the final path successfully;
+13. only then may P11-K persist `ParsedDataRecord.artifact_path`.
 
 A successful existing-final match is idempotent success and keeps the original final directory byte-unchanged.
+
+Concurrent attempts for the same `parse_run_id` MUST use distinct staging directories. A losing no-replace commit is not a collision merely because the destination now exists; it is idempotent success only after the exact existing-final loader/identity/all-nine-byte comparison passes. An unrelated commit failure cannot be converted to success by a later existence check.
 
 If registry persistence later fails, the valid final export remains immutable and unregistered. A retry may verify the same final export and retry registry persistence; the orphan final export is not reusable without a registry row.
 

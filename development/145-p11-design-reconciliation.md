@@ -409,3 +409,22 @@ The authoritative final serialization contract is now in design/30:
 Therefore the same source package + parser/config + confirmed identity + validation semantic model must reproduce the same bytes for all nine final files, independent of host newline mode, caller container ordering and wall-clock/performance measurements.
 
 This makes ISSUE-033 existing-final byte comparison meaningful and platform-independent.
+
+
+## 27. Deterministic final-path concurrency reconciliation — ISSUE-035
+
+P11-ISSUE-035 closes the check-then-commit race left after ISSUE-033/034.
+
+The authoritative commit protocol now separates three outcomes:
+
+- `COMMITTED_NEW`: this writer created the immutable final directory;
+- `DESTINATION_EXISTS`: another writer/earlier run won; run exact existing-final verification;
+- `COMMIT_ERROR`: fail closed as `P11_FINAL_ARTIFACT_COMMIT_FAILED`.
+
+Staging is attempt-isolated below `<parsed_root>/.staging`, so concurrent writers never mutate the same staging tree and same-filesystem atomic commit remains possible.
+
+A concurrent loser becomes idempotent success only after the existing final export loads, identities match, and all nine final files are byte-identical to the loser's validated staging export. No overwrite/delete/replace is allowed.
+
+The exact runtime primitive is an environment capability that P11-B must prove before production authorization; the required semantics are frozen here and no weaker fallback is permitted.
+
+No registry schema migration is introduced, and P0-P10 behavior remains unchanged.

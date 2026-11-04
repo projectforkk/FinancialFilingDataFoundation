@@ -889,15 +889,51 @@ All nine required final files MUST use the exact deterministic byte-serializatio
 
 P11-I MUST follow this exact commit contract:
 
+#### Concurrent commit primitive and attempt-isolated staging
+
+The deterministic final path is shared by all attempts for the same `parse_run_id`, therefore P11-I MUST be safe under concurrent writers.
+
+Staging root is frozen to:
+
+`<parsed_root>/.staging`
+
+Each attempt MUST create an exclusive attempt directory:
+
+`<parsed_root>/.staging/<parse_run_id>/<attempt_token>/export-v2`
+
+where:
+
+- `attempt_token` is a diagnostic-only lowercase 32-hex token generated from 128 bits of OS CSPRNG entropy;
+- the attempt directory is created with exclusive-create semantics; a token collision generates a new token before any artifact write;
+- concurrent attempts MUST NOT share a writable staging directory;
+- `attempt_token`, staging paths and process identity MUST NOT appear in final `export-v2` bytes or registry `artifact_path`;
+- because staging is under `parsed_root`, staging and final are on the same configured filesystem/volume.
+
+Final commit uses one atomic **non-replacing** directory move/rename operation. Its semantic outcomes are frozen as:
+
+- `COMMITTED_NEW`: this attempt created the final path;
+- `DESTINATION_EXISTS`: another attempt or earlier run already created the final path;
+- `COMMIT_ERROR`: any other failure.
+
+The commit primitive MUST provide fail-if-destination-exists semantics. It MUST NOT overwrite, delete, replace, merge into, or mutate an existing final directory.
+
+P11-B MUST prove the target runtime supplies an atomic same-filesystem non-replacing directory commit primitive with these three distinguishable outcomes. If that cannot be proven, P11 production remains BLOCKED and no fallback to copy/delete/replace is permitted.
+
+`DESTINATION_EXISTS` is neither success nor collision by itself. It MUST transition to the exact existing-final verification path below.
+
+`COMMIT_ERROR` maps to `P11_FINAL_ARTIFACT_COMMIT_FAILED` / BLOCKED. Permission, invalid-path, cross-filesystem, I/O and unknown failures MUST NOT be reclassified as `DESTINATION_EXISTS` merely because the final path is later observed to exist.
+
 #### Final path absent
 
 If the final path does not exist:
 
-1. build the complete export under a project-local staging directory;
+1. build the complete export under this attempt's exclusive staging directory;
 2. run the complete v2 loader against staging;
-3. atomically move/rename the staging directory to the final path;
-4. reload the final path;
-5. only after successful final reload may P11-K persist the registry row.
+3. perform exactly one atomic non-replacing commit attempt to the final path;
+4. on `COMMITTED_NEW`, reload the final path;
+5. on `DESTINATION_EXISTS`, transition to **Final path already exists** verification without mutating the final path;
+6. on `COMMIT_ERROR`, emit `P11_FINAL_ARTIFACT_COMMIT_FAILED` and BLOCK;
+7. only after successful final reload following either new commit or exact existing-final verification may P11-K persist the registry row.
 
 #### Final path already exists
 
@@ -940,11 +976,11 @@ If P11-I commits/reuses a valid final export and P11-K registry persistence fail
 
 Staging is never registry-eligible and never reusable.
 
-A stale staging directory may be removed only by an explicitly scoped cleanup path that proves:
+Concurrent attempts for the same `parse_run_id` MUST use distinct exclusive attempt directories under `<parsed_root>/.staging`.
 
-- the path is below the configured P11 staging root;
-- it is not the deterministic final export path;
-- no registry row points to it.
+Normal attempt cleanup may remove only that attempt's own staging directory after successful new commit, exact idempotent existing-final verification, or terminal failure.
+
+P11 v1 normal runtime MUST NOT automatically delete or recycle a staging directory owned by another attempt, even if it appears old. Foreign-attempt staging cleanup is outside the P11 v1 commit path and requires a separately authorized administrative maintenance procedure.
 
 Normal runtime logic never treats staging presence as success.
 
@@ -1183,6 +1219,7 @@ Package/storage:
 - P11_SOURCE_CONTENT_DRIFT
 - P11_PATH_OUTSIDE_PROJECT
 - P11_FINAL_ARTIFACT_COLLISION
+- P11_FINAL_ARTIFACT_COMMIT_FAILED
 
 Planner/reuse:
 - P11_PACKAGE_AWARE_PLANNER_REQUIRED

@@ -607,3 +607,24 @@ Resolution in current amendment:
 - acceptance compares SHA256 of all nine final files across deliberately different wall-clock/performance diagnostics.
 
 No production/test/runtime change was made.
+
+
+## 23. Deterministic final-path concurrency finding — P11-ISSUE-035
+
+Fresh detached review of `00027be24be8e1c2ef3746600fa6e4f59ef641a5` passed automated ISSUE-010..034 guards, but manual concurrency review found a race between the pre-commit existence check and deterministic final-path creation.
+
+Authoritative stop:
+`development/188-p11-final-path-concurrency-review-stop.md`
+
+Resolution in the amended design:
+
+- each writer uses an exclusive attempt staging directory under `<parsed_root>/.staging`;
+- final commit is one atomic same-filesystem non-replacing directory move with exact outcomes `COMMITTED_NEW / DESTINATION_EXISTS / COMMIT_ERROR`;
+- a losing concurrent writer receiving `DESTINATION_EXISTS` transitions into the existing ISSUE-033 loader/identity/all-nine-byte verification path;
+- exact match is concurrent idempotent success; mismatch is `P11_FINAL_ARTIFACT_COLLISION`;
+- unrelated commit failure is `P11_FINAL_ARTIFACT_COMMIT_FAILED` and cannot be converted to success from a later path existence check;
+- normal runtime cleanup can remove only the current attempt's staging and never automatically deletes another attempt's staging.
+
+P11-B must prove the target runtime exposes an atomic same-filesystem no-replace directory commit primitive with distinguishable destination-exists semantics. No copy/delete/replace fallback is allowed.
+
+No production/test/runtime change was made.

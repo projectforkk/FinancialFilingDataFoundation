@@ -295,19 +295,19 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_035_DESIGN_REVIEW_STOPPED`
+`P10_DONE / P11_ISSUE_035_REMEDIATED_REVIEW_PENDING`
 
 P11 latest reviewed candidate：
-- exact candidate = `00027be24be8e1c2ef3746600fa6e4f59ef641a5` = INELIGIBLE after P11-ISSUE-035；
+- historical exact candidate = `00027be24be8e1c2ef3746600fa6e4f59ef641a5` = INELIGIBLE after P11-ISSUE-035；
 - authoritative stop = `development/188-p11-final-path-concurrency-review-stop.md`；
 - ISSUE-034 amendment evidence = `development/186-p11-final-export-byte-determinism-amendment-evidence.md` = PASS and remains valid；
-- ISSUE-035 = concurrent deterministic final-path commit semantics not yet frozen；
+- ISSUE-035 amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
 - P11 production = CLOSED；
-- next action = Design-First amendment for ISSUE-035, then freeze a new exact candidate and run fresh detached P11-A review；
+- next action = freeze amended exact candidate and run fresh detached P11-A review；
 - P11-B = NOT AUTHORIZED；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -506,6 +506,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 186. review authorization = `development/187-p11-final-export-byte-determinism-final-review-authorization.md`；
 187. candidate `00027be24be8e1c2ef3746600fa6e4f59ef641a5` = INELIGIBLE after manual final-path concurrency review；
 188. review stop = `development/188-p11-final-path-concurrency-review-stop.md`；
-189. P11-ISSUE-035 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
-190. P11 production = CLOSED；
-191. Research MCP production / Semantic Resolver production remain closed / not authorized。
+189. P11-ISSUE-035 = REMEDIATED / FRESH REVIEW REQUIRED；
+190. amendment evidence = `development/189-p11-final-path-concurrency-amendment-evidence.md` = PASS；
+191. P11 production = CLOSED；
+192. Research MCP production / Semantic Resolver production remain closed / not authorized。
