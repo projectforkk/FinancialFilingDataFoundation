@@ -24,14 +24,30 @@ from .models import (
     ResearchSpecInput,
     SPEC_BUNDLE_SCHEMA_VERSION,
 )
+from .provenance import (
+    LEDGER_SCHEMA_VERSION,
+    PROVENANCE_VALIDATION_SCHEMA_VERSION,
+    P8_RAW_DIRECT,
+    P9_DURABLE_RESOLVED,
+    RUN_LOCAL_STRUCTURED_VERIFIED,
+    UNRESOLVED,
+    USE_CLASSES_V1,
+    EvidenceLedger,
+    EvidenceLedgerEntry,
+    ProvenanceValidation,
+    validate_evidence_ledger,
+)
 from .spec import freeze_research_spec, verify_research_spec
 
 __all__ = [
     "CAPABILITY_MANIFEST_V1",
     "CONTEXT_SCHEMA_VERSION",
     "INTEGRATION_POLICY_VERSION",
+    "LEDGER_SCHEMA_VERSION",
+    "PROVENANCE_VALIDATION_SCHEMA_VERSION",
     "P10Error",
     "P8_CATALOG_SCHEMA_VERSION_V1",
+    "P8_RAW_DIRECT",
     "P8_RESULT_SCHEMA_VERSION_V1",
     "P8_SERVER_VERSION_V1",
     "P8_TOOL_NAMES_V1",
@@ -41,6 +57,13 @@ __all__ = [
     "P9_RESOLVED_VIEW_SCHEMA_VERSION_V1",
     "P9_VERSION_V1",
     "P9PolicyContract",
+    "P9_DURABLE_RESOLVED",
+    "RUN_LOCAL_STRUCTURED_VERIFIED",
+    "UNRESOLVED",
+    "USE_CLASSES_V1",
+    "EvidenceLedger",
+    "EvidenceLedgerEntry",
+    "ProvenanceValidation",
     "ResearchContext",
     "ResearchSpecBundle",
     "ResearchSpecFile",
@@ -48,5 +71,6 @@ __all__ = [
     "SPEC_BUNDLE_SCHEMA_VERSION",
     "build_research_context",
     "freeze_research_spec",
+    "validate_evidence_ledger",
     "verify_research_spec",
 ]
