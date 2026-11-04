@@ -348,5 +348,10 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 38. P10-F production candidate = `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`；
 39. P10-F evidence = `development/99-p10-f-cli-evidence.md` = PASS；
 40. P10-F detached review instruction = `development/100-p10-f-code-review-instruction.md`；
-41. P10-F = REVIEW AUTHORIZED / P10-G CLOSED；
-42. P11 / Research MCP production / Semantic Resolver production remain closed。
+41. P10-F detached review result = `development/101-p10-f-detached-code-review-result.md` = PASS；
+42. P10-F review result commit = `5b54748`；
+43. P10-F = CLOSED；
+44. P10-G authorization = `development/102-p10-g-integration-instruction-authorization.md`；
+45. P10-G = AUTHORIZED ONLY for thin integration instruction documentation；
+46. P10-H and later remain closed；
+47. P11 / Research MCP production / Semantic Resolver production remain closed。

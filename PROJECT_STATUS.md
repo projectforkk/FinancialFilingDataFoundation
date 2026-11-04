@@ -152,11 +152,11 @@
 
 ## Approved next phase
 
-**P10-F — Deterministic CLI**
+**P10-G — Thin Integration Instruction**
 
 Status:
 
-`P10-F CANDIDATE READY / DETACHED REVIEW AUTHORIZED / P10-G CLOSED`
+`AUTHORIZED — P10-G ONLY / DOCUMENTATION SCOPE`
 
 P10-C is closed:
 
@@ -210,7 +210,21 @@ Detached review instruction:
 
 `development/100-p10-f-code-review-instruction.md`
 
-The amended baseline freezes:
+Detached review result:
+
+`development/101-p10-f-detached-code-review-result.md = PASS`
+
+Review result commit:
+
+`5b54748`
+
+P10-F is closed.
+
+P10-G authorization:
+
+`development/102-p10-g-integration-instruction-authorization.md`
+
+The amended P10-F baseline freezes:
 
 - exact four CLI argv contracts;
 - stdin-only JSON request transport;
@@ -223,12 +237,11 @@ The amended baseline freezes:
 - deterministic context rebuild for validate-ledger;
 - no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
 
-P10-F production is frozen during detached review. No further P10-F code changes are authorized in the active worktree.
+P10-G is authorized only for `integration/p10/FFDF_RESEARCH_INTEGRATION.md`. No src/tests/runtime/dependency change is authorized in this gate.
 
 Still not authorized:
 
-- further P10-F production changes during review;
-- P10-G and later production;
+- P10-H and later production;
 - Research MCP production;
 - Semantic Resolver production;
 - P11 production;
