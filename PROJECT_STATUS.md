@@ -161,11 +161,28 @@
 
 Status:
 
-`P11 DESIGN AUTHORIZED / PRODUCTION NOT AUTHORIZED`
+`P11 DESIGN CANDIDATE READY FOR DETACHED DESIGN REVIEW / PRODUCTION NOT AUTHORIZED`
 
 Authorization:
 
 `development/143-p11-design-authorization.md`
+
+Environment/interface audit:
+
+`development/144-p11-environment-interface-audit.md = PASS`
+
+Design reconciliation:
+
+`development/145-p11-design-reconciliation.md = PASS`
+
+Design candidate:
+
+- `design/26-p11-sec-provider-design.md`
+- `design/27-p11-implementation-plan.md`
+- `design/30-parsed-financial-document-v2-contract.md`
+- `acceptance/41-p11-acceptance-instruction.md`
+
+Production remains CLOSED until detached design review PASS + a separate development authorization.
 
 P10-C is closed:
 
@@ -687,4 +704,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
+- P11 — US SEC Provider: `DESIGN CANDIDATE / REVIEW PENDING / PRODUCTION NOT STARTED`

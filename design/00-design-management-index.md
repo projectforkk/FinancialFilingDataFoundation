@@ -116,8 +116,11 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
+| 26-p11-sec-provider-design.md | P11 | DESIGN CANDIDATE / PRODUCTION CLOSED |
+| 27-p11-implementation-plan.md | P11 | DESIGN CANDIDATE / PRODUCTION CLOSED |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
+| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | DESIGN CANDIDATE / PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -161,7 +164,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 | 27 | TBD | DESIGN AUTHORIZED |
+| P11 | 26 | 27 | acceptance/41 (candidate) | DESIGN CANDIDATE / REVIEW PENDING |
 
 ---
 
@@ -292,13 +295,16 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_DESIGN_AUTHORIZED`
+`P10_DONE / P11_DESIGN_CANDIDATE_REVIEW_PENDING`
 
-P10 design candidate：
-- detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
-- implementation plan = `design/25-p10-implementation-plan.md`；
-- acceptance baseline = `acceptance/38-p10-acceptance-instruction.md`；
-- reconciliation = `development/76-p10-design-reconciliation.md`；
+P11 design candidate：
+- detailed design = `design/26-p11-sec-provider-design.md`；
+- implementation plan = `design/27-p11-implementation-plan.md`；
+- source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
+- acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
+- environment/interface audit = `development/144-p11-environment-interface-audit.md`；
+- reconciliation = `development/145-p11-design-reconciliation.md`；
+- P11 production = CLOSED pending detached design review + separate development authorization；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
@@ -429,5 +435,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 119. P10 = DONE / PASS；
 120. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
 121. P11 design authorization = `development/143-p11-design-authorization.md`；
-122. P11 = DESIGN AUTHORIZED / PRODUCTION CLOSED；
-123. Research MCP production / Semantic Resolver production remain closed / not authorized。
+122. P11 environment/interface audit = `development/144-p11-environment-interface-audit.md` = PASS / design may proceed；
+123. P11 design reconciliation = `development/145-p11-design-reconciliation.md` = PASS；
+124. P11 design candidate = `design/26` + `design/27` + `design/30` + `acceptance/41`；
+125. P11 = DESIGN CANDIDATE / DETACHED DESIGN REVIEW PENDING / PRODUCTION CLOSED；
+126. Research MCP production / Semantic Resolver production remain closed / not authorized。

@@ -117,7 +117,15 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
+状态：`DESIGN CANDIDATE / DETACHED REVIEW PENDING / PRODUCTION NOT STARTED`
+
+设计候选：
+- `design/26-p11-sec-provider-design.md`；
+- `design/27-p11-implementation-plan.md`；
+- `design/30-parsed-financial-document-v2-contract.md`；
+- `acceptance/41-p11-acceptance-instruction.md`；
+- `development/144-p11-environment-interface-audit.md`；
+- `development/145-p11-design-reconciliation.md`。
 
 目标：
 SEC HTML / iXBRL / XBRL first acquisition and extraction path。
