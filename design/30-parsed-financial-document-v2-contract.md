@@ -65,6 +65,101 @@ export-v2/
 
 `tables.jsonl` may be empty when the source contains no reliable table structure.
 
+### Final export byte serialization contract
+
+Every file under final `export-v2` is deterministic semantic output. Per-attempt diagnostics are forbidden from the final export.
+
+Forbidden final-export values include:
+
+- wall-clock timestamps;
+- elapsed/duration values;
+- request/retry timing;
+- request/process/attempt IDs;
+- host-specific absolute paths;
+- staging/temp paths;
+- random values/nonces;
+- `acquired_at`;
+- any value whose only purpose is runtime/performance diagnostics.
+
+Such values may exist only in separate project-local receipt/diagnostic files outside `export-v2` and outside registry `artifact_path`.
+
+#### JSON files
+
+For exactly:
+
+- `manifest.json`;
+- `document.json`;
+- `validation.json`;
+
+the complete file bytes are:
+
+```python
+json.dumps(
+    value,
+    ensure_ascii=False,
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+).encode("utf-8") + b"\n"
+```
+
+Required byte rules:
+
+- UTF-8 only;
+- no BOM;
+- no indentation;
+- no trailing spaces;
+- U+000A LF only;
+- exactly one final LF;
+- no platform-native newline conversion.
+
+The final LF is part of file bytes. It is not part of canonical-object ID/hash payloads unless an individual ID contract explicitly says otherwise.
+
+#### JSONL files
+
+For:
+
+- `source_assets.jsonl`;
+- `source_segments.jsonl`;
+- `sections.jsonl`;
+- `tables.jsonl`;
+- `raw_facts.jsonl`;
+- `evidence.jsonl`;
+
+each row is encoded with the same canonical JSON encoder above, without an embedded terminator, followed by exactly one byte `0x0A`.
+
+Rules:
+
+- no BOM;
+- LF only;
+- no blank lines;
+- one LF after every row, including the last row;
+- an empty JSONL file is exactly zero bytes.
+
+Top-level row order is exact:
+
+- `source_assets.jsonl`: ascending `source_asset_id`;
+- `source_segments.jsonl`: ascending `(ordinal, segment_id)`;
+- `sections.jsonl`: ascending `section_id`;
+- `tables.jsonl`: ascending `table_id`;
+- `raw_facts.jsonl`: ascending `raw_fact_id`;
+- `evidence.jsonl`: ascending `evidence_id`.
+
+Caller/input container order MUST NOT change those top-level output orders.
+
+#### Nested collection order
+
+No unordered Python/container iteration may affect final bytes.
+
+- schema fields whose semantics are source order preserve the exact frozen source/parser order;
+- table `rows` are ascending `row_index`;
+- table `raw_cells` are ascending `(row_index, column_index, cell_id)`;
+- ordered source-node/header child arrays preserve deterministic DOM/XML source order frozen by the P11-F parser contract;
+- semantically unordered issue/warning/set-like arrays are sorted ascending by each element's canonical JSON bytes;
+- JSON object/map key order is always the canonical `sort_keys=True` order.
+
+If a later schema adds a collection whose semantic ordering is not explicit, that schema is incomplete and MUST NOT be serialized until a Design-First amendment freezes its order.
+
 ### P11 persisted export directory binding
 
 For P11 periodic registry persistence, the v2 artifact is the **directory** shown above, not an individual child file.
@@ -283,6 +378,7 @@ Cross-artifact source reference rule:
 `local_content_path` contract:
 
 - persisted value is project-root-relative POSIX text only;
+- for P11 v1 content blobs it uses the extensionless SHA-only path frozen in design/26; filename/extension does not participate in physical blob-path selection;
 - absolute, drive-relative, UNC, empty, `.`, `..` and traversal-containing paths are rejected;
 - loader resolves `project_root / local_content_path`, then requires the resolved file to remain inside the configured P11 SEC raw-assets root;
 - the file's SHA256/size must match the row;
@@ -290,7 +386,7 @@ Cross-artifact source reference rule:
 
 Example:
 
-`workspace/sec/raw/assets/sha256/ab/<sha>.htm`
+`workspace/sec/raw/assets/sha256/ab/<sha>`
 
 ## 7. source_segments.jsonl
 
@@ -722,7 +818,7 @@ Required:
 - warnings;
 - validator_version.
 
-Wall-clock validation time may be diagnostic but MUST NOT participate in identity.
+Wall-clock validation time, elapsed duration and other per-attempt diagnostics MUST NOT appear in final `validation.json` or any other final `export-v2` file. If collected, they are stored only in a separate project-local diagnostic/performance receipt outside `export-v2` and outside registry `artifact_path`.
 
 ## 15. DATA_READY gate
 

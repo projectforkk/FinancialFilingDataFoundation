@@ -585,3 +585,25 @@ Resolution in current amendment:
 - staging is never registry-eligible/reusable.
 
 No production/test/runtime change was made.
+
+
+## 22. Final export byte-determinism finding — P11-ISSUE-034
+
+Fresh review of `866e07025e53b2da852700d2e688b3a3af0bc39a` passed automated ISSUE-010..033 guards, but manual byte-level review found ISSUE-033 idempotent comparison was not implementable safely because final v2 serialization still allowed per-attempt diagnostics and did not freeze complete JSON/JSONL byte ordering/newline rules.
+
+Stop:
+`development/185-p11-final-export-byte-determinism-review-stop.md`
+
+Resolution in current amendment:
+
+- all final export files contain deterministic semantic data only;
+- wall-clock/performance/request/process/temp-path/random/acquired_at diagnostics are forbidden from final export and moved to separate receipts;
+- manifest.json/document.json/validation.json use exact canonical JSON UTF-8 bytes + one LF;
+- JSONL uses canonical row bytes + one LF per row, no BOM/CRLF/blank lines; empty file = zero bytes;
+- exact top-level JSONL row order is frozen;
+- unordered issue/warning/set-like arrays use canonical-JSON-byte sort;
+- source-order arrays preserve frozen parser/source order;
+- P11 v1 raw content blob path is extensionless SHA-only, eliminating same-SHA/different-extension discovery-order effects on local_content_path;
+- acceptance compares SHA256 of all nine final files across deliberately different wall-clock/performance diagnostics.
+
+No production/test/runtime change was made.

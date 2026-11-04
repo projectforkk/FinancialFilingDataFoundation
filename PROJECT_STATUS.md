@@ -161,7 +161,7 @@
 
 Status:
 
-`P11 FINAL DESIGN REVIEW STOPPED — P11-ISSUE-034 / PRODUCTION CLOSED`
+`P11-ISSUE-034 REMEDIATED / AMENDED DESIGN READY FOR CANDIDATE FREEZE / PRODUCTION CLOSED`
 
 Authorization:
 
@@ -182,7 +182,7 @@ Design candidate:
 - `design/30-parsed-financial-document-v2-contract.md`
 - `acceptance/41-p11-acceptance-instruction.md`
 
-Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-033. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`, `182`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`, `183`). Candidate `992583b87af8f8c682dc434cc134317f4db35522` passed ISSUE-010..032 automated guards but manual persistence review found P11-ISSUE-033: deterministic final export collision/retry semantics were not frozen. Stop: `development/182-p11-final-export-collision-review-stop.md`. ISSUE-033 is remediated in the current amended design: final export is immutable, byte-identical retries are idempotent, any existing-final mismatch is `P11_FINAL_ARTIFACT_COLLISION`, and registry-failure recovery preserves the final artifact for verified retry. Evidence: `development/183-p11-final-export-idempotency-amendment-evidence.md = PASS`. A fresh exact-candidate detached design review is still required. P11 production remains CLOSED.
+Successive P11 design reviews/preflights stopped historical candidates before production and opened P11-ISSUE-010 through P11-ISSUE-034. Historical stop records are preserved (`development/147`, `150`, `152`, `154`, `157`, `160`, `164`, `167`, `170`, `174`, `178`, `182`, `185`); amendment evidence is preserved (`development/148`, `151`, `155`, `158`, `161`, `162`, `165`, `168`, `171`, `175`, `180`, `183`, `186`). Candidate `866e07025e53b2da852700d2e688b3a3af0bc39a` passed automated ISSUE-010..033 guards but manual byte-level review found P11-ISSUE-034: final export byte serialization/order and per-attempt diagnostic exclusion were not fully frozen, making ISSUE-033 idempotent byte comparison potentially nondeterministic. Stop: `development/185-p11-final-export-byte-determinism-review-stop.md`. ISSUE-034 is remediated in the current amended design with exact JSON/JSONL UTF-8/LF serialization, deterministic row/nested collection order, diagnostic isolation, and extensionless SHA-only raw blob paths. Evidence: `development/186-p11-final-export-byte-determinism-amendment-evidence.md = PASS`. A fresh exact-candidate detached design review is still required. P11 production remains CLOSED.
 
 P10-C is closed:
 
@@ -704,4 +704,4 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-033 REMEDIATED / CANDIDATE FREEZE PENDING / PRODUCTION NOT STARTED`
+- P11 — US SEC Provider: `ISSUE-034 REMEDIATED / CANDIDATE FREEZE PENDING / PRODUCTION NOT STARTED`

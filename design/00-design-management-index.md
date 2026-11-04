@@ -295,13 +295,13 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_033_REMEDIATED_REVIEW_PENDING`
+`P10_DONE / P11_ISSUE_034_REMEDIATED_REVIEW_PENDING`
 
 P11 latest reviewed candidate：
-- historical exact candidate = `992583b87af8f8c682dc434cc134317f4db35522` = INELIGIBLE after P11-ISSUE-033；
-- authoritative stop = `development/182-p11-final-export-collision-review-stop.md`；
-- prior ISSUE-032 amendment evidence = `development/180-p11-validation-finalization-amendment-evidence.md` = PASS；
-- ISSUE-033 amendment evidence = `development/183-p11-final-export-idempotency-amendment-evidence.md` = PASS；
+- historical exact candidate = `866e07025e53b2da852700d2e688b3a3af0bc39a` = INELIGIBLE after P11-ISSUE-034；
+- authoritative stop = `development/185-p11-final-export-byte-determinism-review-stop.md`；
+- prior ISSUE-033 amendment evidence = `development/183-p11-final-export-idempotency-amendment-evidence.md` = PASS；
+- ISSUE-034 amendment evidence = `development/186-p11-final-export-byte-determinism-amendment-evidence.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
@@ -500,6 +500,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 180. candidate `866e07025e53b2da852700d2e688b3a3af0bc39a` = INELIGIBLE after fresh review；
 181. review authorization = `development/184-p11-final-artifact-idempotency-final-review-authorization.md`；
 182. review stop = `development/185-p11-final-export-byte-determinism-review-stop.md`；
-183. P11-ISSUE-034 = OPEN / DESIGN-FIRST AMENDMENT REQUIRED；
-184. P11 production = CLOSED；
-185. Research MCP production / Semantic Resolver production remain closed / not authorized。
+183. P11-ISSUE-034 = REMEDIATED / FRESH REVIEW REQUIRED；
+184. amendment evidence = `development/186-p11-final-export-byte-determinism-amendment-evidence.md` = PASS；
+185. amended exact candidate = PENDING FREEZE；
+186. P11 production = CLOSED；
+187. Research MCP production / Semantic Resolver production remain closed / not authorized。

@@ -156,6 +156,7 @@ Mandatory:
 - changing redirect final URL/declared HTTP media type/local path/timestamp/request-id/ETag/Last-Modified does not change package hash;
 - same package hash always maps to byte-identical immutable package manifest identity bytes; acquisition receipts may differ without rewriting that manifest;
 - `local_content_path` persists as project-root-relative POSIX only;
+- P11 v1 raw blob path is extensionless SHA-only (`workspace/sec/raw/assets/sha256/<aa>/<sha>`), so identical bytes under different logical extensions cannot change `local_content_path`;
 - absolute/drive-relative/UNC/traversal local paths rejected;
 - resolved local content must remain inside configured P11 SEC raw-assets root;
 - two different logical source assets with identical bytes/SHA remain two manifest/source-assets rows;
@@ -256,6 +257,28 @@ Finalization-order acceptance:
 - unregistered orphan final export is not selected for reuse;
 - staging path is never registered or reusable;
 - P11-K does not mutate committed artifact bytes.
+
+Final-export byte-determinism acceptance:
+
+- `manifest.json`, `document.json`, `validation.json` use exact canonical JSON encoding from design/30, UTF-8/no-BOM/LF-only, exactly one final LF;
+- every non-empty JSONL row uses the same canonical JSON encoding plus one LF;
+- empty JSONL is exactly zero bytes;
+- exact top-level row order:
+  - source_assets by source_asset_id;
+  - source_segments by (ordinal, segment_id);
+  - sections by section_id;
+  - tables by table_id;
+  - raw_facts by raw_fact_id;
+  - evidence by evidence_id;
+- two complete serializations of the same semantic inputs under intentionally different wall-clock/performance diagnostics produce identical SHA256 for all nine required final files;
+- Windows/CRLF/native-newline settings do not change final export bytes;
+- JSON insertion order and shuffled caller/input collection order do not change final bytes;
+- semantically unordered issue/warning/set-like arrays are canonical-byte sorted;
+- no wall-clock timestamp, elapsed/duration, request/process/attempt ID, absolute/staging/temp path, random nonce, acquired_at or performance-only diagnostic appears in final export;
+- performance diagnostics are stored only outside export-v2 and outside registry artifact_path;
+- same-content logical assets with different filename extensions resolve to the same extensionless SHA-only physical blob path;
+- semantic content change changes the relevant artifact bytes and is not normalized away;
+- ISSUE-033 idempotent retry remains successful when only external diagnostic/performance receipt values differ.
 
 No P3/P6 v1 schema masquerading.
 
@@ -593,7 +616,7 @@ Different cases may share a filing when all requirements are independently prove
 
 ## 25. Performance
 
-Record for each representative live run:
+Record for each representative live run in a separate project-local performance receipt outside final `export-v2` and outside registry `artifact_path`:
 
 - request_count;
 - peak_request_rate;

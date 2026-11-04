@@ -596,7 +596,7 @@ P11 adds a dedicated source-package store, for example:
 
 ```text
 workspace/sec/raw/
-  assets/sha256/<aa>/<sha>.<safe-ext>
+  assets/sha256/<aa>/<sha>
   packages/<package-sha>/manifest.json
   receipts/<receipt-id>.json
   staging/
@@ -605,6 +605,9 @@ workspace/sec/raw/
 Properties:
 
 - content-addressed;
+- blob path is extensionless and depends only on lowercase SHA256: `assets/sha256/<first-two-hex>/<64-hex-sha>`;
+- source filename/extension/media classification never changes the physical blob path;
+- two logical assets with identical bytes always resolve to the same physical blob path regardless discovery/input order;
 - atomic commit;
 - exact-byte SHA validation;
 - path traversal rejection;
@@ -882,6 +885,8 @@ The final path is deterministic:
 
 and final artifact bytes are immutable once accepted.
 
+All nine required final files MUST use the exact deterministic byte-serialization and JSONL row-order contract in design/30. Per-attempt diagnostics, wall-clock values and platform newline behavior are forbidden from influencing final artifact bytes.
+
 P11-I MUST follow this exact commit contract:
 
 #### Final path absent
@@ -1145,7 +1150,7 @@ SEC SourceMetadata:
 - filing_date = official filing date;
 - report_date = report date;
 - provider_company_id = 10-digit CIK;
-- acquired_at = diagnostic exact ISO timestamp.
+- acquired_at = diagnostic exact ISO timestamp stored only in acquisition/registry receipt metadata; it MUST NOT be serialized into final ParsedFinancialDocument v2 `export-v2` bytes.
 
 ## 27. Error / reason codes
 
@@ -1298,7 +1303,7 @@ Live sources must be official SEC only.
 
 ## 33. Performance
 
-Acceptance records separately:
+Acceptance records performance separately in a project-local diagnostic/performance receipt outside final `export-v2` and outside registry `artifact_path`:
 
 - submissions discovery time;
 - asset download time;
@@ -1324,7 +1329,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-033 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/183`. The current amended design contains explicit resolutions for ISSUE-010..033; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-034 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/186`. The current amended design contains explicit resolutions for ISSUE-010..034; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 

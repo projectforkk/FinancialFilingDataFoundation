@@ -391,3 +391,21 @@ The authoritative persistence semantics are now:
 - orphan final artifacts without registry rows are not package-aware reuse candidates.
 
 This preserves deterministic artifact identity, safe retry behavior and registry-as-candidate-index semantics without schema migration.
+
+
+## 26. Final export byte determinism reconciliation — ISSUE-034
+
+P11-ISSUE-034 closes the last known contradiction between deterministic parse_run identity and ISSUE-033 byte-identical retry semantics.
+
+The authoritative final serialization contract is now in design/30:
+
+- exact canonical JSON bytes + LF for manifest/document/validation;
+- exact canonical JSONL row bytes, line framing and top-level row ordering;
+- deterministic nested collection ordering;
+- no per-attempt diagnostic values inside export-v2;
+- external performance/acquisition receipts are outside artifact_path;
+- raw blob physical path depends only on SHA256 and is extensionless.
+
+Therefore the same source package + parser/config + confirmed identity + validation semantic model must reproduce the same bytes for all nine final files, independent of host newline mode, caller container ordering and wall-clock/performance measurements.
+
+This makes ISSUE-033 existing-final byte comparison meaningful and platform-independent.

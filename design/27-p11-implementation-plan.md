@@ -331,7 +331,7 @@ Final required artifacts:
 
 Finalization order:
 
-1. construct deterministic non-validation artifact bytes;
+1. construct deterministic non-validation artifact bytes using the exact design/30 canonical JSON/JSONL serializer, row order, UTF-8/no-BOM/LF-only rules, and extensionless SHA-only raw blob path contract;
 2. serialize P11-H final `validation.json`;
 3. derive manifest `validation_status` and `blocking_issue_count` exactly from that validation model;
 4. serialize final `manifest.json`;
@@ -366,8 +366,32 @@ Final writer/loader must verify:
 
 P11-I is the only gate that creates a registry-eligible final `export-v2` directory.
 
+Byte-determinism requirements:
+
+- all three JSON files use the exact canonical JSON bytes + one final LF from design/30;
+- all six JSONL files use canonical row bytes, exact frozen top-level row ordering and LF-only line framing from design/30;
+- empty JSONL = zero bytes;
+- final artifact generation MUST NOT serialize wall-clock/performance/request/process/temp-path diagnostics;
+- any performance/attempt diagnostics are written only to separate receipts outside `export-v2`;
+- same exact source package + parser/config/identity/validation semantic model MUST reproduce identical SHA256 for all nine required final files;
+- caller/input collection order, Python mapping/set iteration order and host newline mode MUST NOT affect final bytes;
+- same-content logical assets with different source filename extensions still share the same extensionless SHA-only raw blob path.
+
 No registry write occurs in P11-I.
 No v1 masquerading.
+
+Focused P11-I tests:
+
+- two serializations with different wall-clock/performance receipt values produce identical hashes for all nine final files;
+- CRLF/native-newline host settings do not change final bytes;
+- JSON object insertion order does not change JSON bytes;
+- shuffled caller/input row order does not change JSONL bytes;
+- exact top-level JSONL row ordering matches design/30;
+- semantically unordered issue/warning arrays are canonical-byte sorted;
+- empty JSONL is zero bytes;
+- same SHA under different logical filename extensions produces one extensionless physical blob path;
+- no forbidden diagnostic field appears in any final export file;
+- one semantic field change changes the relevant final bytes as expected.
 
 ## P11-J — Supplemental 8-K / 6-K
 
