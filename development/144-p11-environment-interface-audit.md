@@ -522,3 +522,22 @@ Resolution in the current amendment:
 - any mismatch is P11_REUSE_ARTIFACT_INVALID before reuse-policy classification.
 
 No production/test/runtime change was made.
+
+
+## 19. Parsed artifact path finding — P11-ISSUE-031
+
+Fresh detached review of `85df002516d577531e68c303ad86c0903ca813c6` passed the ISSUE-010..030 matrix but manual review of accepted P1 `ParsedDataRecord.artifact_path` found the target type/layout was not frozen.
+
+Stop:
+`development/174-p11-artifact-path-contract-review-stop.md`
+
+Resolution in current amendment:
+
+- P11 periodic artifact_path always points to the v2 export directory, never manifest.json/child/staging;
+- exact layout = <parsed_root>/<parse_run_id>/export-v2;
+- parse_run_id must be lowercase 64-hex before path construction;
+- registry stores normalized project-root-relative POSIX directory path, no trailing slash;
+- directory is atomically committed before register_parsed_data;
+- missing vs path-invalid vs existing-invalid reason mapping is frozen.
+
+No production/test/runtime change was made.

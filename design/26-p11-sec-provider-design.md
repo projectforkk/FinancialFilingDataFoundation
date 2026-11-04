@@ -798,9 +798,9 @@ artifact_path = null
 Candidate classification:
 
 - record.document_sha256 != current document SHA => `P11_SOURCE_DOCUMENT_CHANGE`; do not load that artifact;
-- null/missing artifact_path => `P11_REUSE_ARTIFACT_MISSING`;
-- unsafe artifact path => `P11_REUSE_ARTIFACT_PATH_INVALID`;
-- v2 load/hash/source-reference/parse-run/document/slot identity failure => `P11_REUSE_ARTIFACT_INVALID`;
+- null artifact_path or safe expected export-v2 directory absent => `P11_REUSE_ARTIFACT_MISSING`;
+- absolute/drive-relative/UNC/traversal/outside-root/wrong-layout/child-file artifact_path => `P11_REUSE_ARTIFACT_PATH_INVALID`;
+- existing non-directory path, missing required v2 file, v2 load/hash/source-reference/parse-run/document/slot identity failure, or registry/artifact metadata parity mismatch => `P11_REUSE_ARTIFACT_INVALID`;
 - exact document but loaded package != current package => `P11_SOURCE_PACKAGE_CHANGE`;
 - validation != PASS => `P11_REUSE_VALIDATION_NOT_PASS`;
 - blocking issue count > 0 => `P11_REUSE_BLOCKING_ISSUES`;
@@ -833,8 +833,46 @@ Candidate discovery:
 
 - call existing `SQLiteRegistry.list_parsed_data(slot)`;
 - no registry schema migration is required solely for P11 v1 package-aware reuse;
-- every P11 periodic reusable `ParsedDataRecord` MUST have non-null `artifact_path`;
-- `artifact_path` is resolved as project-root-relative POSIX path under the configured P11 parsed-artifact root; absolute/drive-relative/UNC/traversal/outside-root paths are rejected.
+- every P11 periodic reusable `ParsedDataRecord` MUST have non-null `artifact_path`.
+
+### P11 periodic artifact_path contract
+
+For P11 periodic v2 records, `artifact_path` always identifies the **ParsedFinancialDocument v2 export directory**, never `manifest.json` or another child file.
+
+Exact persistence layout:
+
+```text
+<parsed_root>/<parse_run_id>/export-v2/
+  manifest.json
+  document.json
+  source_assets.jsonl
+  source_segments.jsonl
+  sections.jsonl
+  tables.jsonl
+  raw_facts.jsonl
+  evidence.jsonl
+  validation.json
+```
+
+Rules:
+
+- `parse_run_id` MUST match `^[0-9a-f]{64}$` before use as a path component;
+- `parsed_root` resolves inside `project_root`;
+- registry stores `artifact_path` as the normalized project-root-relative POSIX path to the exact `export-v2` directory;
+- stored `artifact_path` has no trailing slash;
+- registry never stores the path to `manifest.json`;
+- registry never stores a staging/partial directory.
+
+Reuse path classification:
+
+- null `artifact_path` => `P11_REUSE_ARTIFACT_MISSING`;
+- safe resolved `artifact_path` does not exist => `P11_REUSE_ARTIFACT_MISSING`;
+- absolute/drive-relative/UNC/traversal/outside-`parsed_root` path => `P11_REUSE_ARTIFACT_PATH_INVALID`;
+- path exists but is not a directory => `P11_REUSE_ARTIFACT_INVALID`;
+- directory exists but any required v2 file above is missing => `P11_REUSE_ARTIFACT_INVALID`;
+- otherwise the accepted v2 loader validates schema/hash/identity/source-reference integrity.
+
+P11-K MUST atomically commit the complete export directory at this final path before calling `register_parsed_data`.
 
 For each candidate record, the selector MUST load the v2 artifact through the accepted v2 loader and verify all of:
 
@@ -860,9 +898,9 @@ A candidate failing any condition is not reusable.
 Specific rules:
 
 - same primary `document_sha256` but different `source_package_sha256` => no reuse and explicit `P11_SOURCE_PACKAGE_CHANGE`;
-- missing artifact_path => `P11_REUSE_ARTIFACT_MISSING`;
-- path outside configured parsed root => `P11_REUSE_ARTIFACT_PATH_INVALID`;
-- loader/hash/identity mismatch => `P11_REUSE_ARTIFACT_INVALID`;
+- null artifact_path or safe resolved artifact directory absent => `P11_REUSE_ARTIFACT_MISSING`;
+- absolute/drive-relative/UNC/traversal/outside configured parsed root => `P11_REUSE_ARTIFACT_PATH_INVALID`;
+- existing artifact_path that is not a directory, missing required v2 files, or loader/hash/identity mismatch => `P11_REUSE_ARTIFACT_INVALID`;
 - any parser_version/schema_version/validation_status/blocking_issue_count/compatibility_status mismatch between the loaded v2 artifact and ParsedDataRecord => `P11_REUSE_ARTIFACT_INVALID` before policy/validation classification;
 - exact-package candidates whose registry/artifact parity passes but whose verified values fail validation/compatibility reuse the existing validation/reuse rejection semantics;
 - if more than one candidate is fully reusable for the exact same package/document/slot, select the lexicographically smallest `parse_run_id` after all exact-package checks;
@@ -1216,7 +1254,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-029 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/168`. The current amended design contains explicit resolutions for ISSUE-010..029; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-031 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/175`. The current amended design contains explicit resolutions for ISSUE-010..031; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 

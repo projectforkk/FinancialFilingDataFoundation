@@ -65,6 +65,18 @@ export-v2/
 
 `tables.jsonl` may be empty when the source contains no reliable table structure.
 
+### P11 persisted export directory binding
+
+For P11 periodic registry persistence, the v2 artifact is the **directory** shown above, not an individual child file.
+
+Exact storage location:
+
+`<parsed_root>/<parse_run_id>/export-v2`
+
+Registry `artifact_path` stores the normalized project-root-relative POSIX path to that directory, without a trailing slash.
+
+The directory must contain every required file listed in this section before it may be registered. A staging/partial directory is never a valid artifact_path.
+
 ## 4. manifest.json
 
 Allowed `source_kind` values for P11 v1:

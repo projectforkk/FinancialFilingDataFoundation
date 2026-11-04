@@ -356,7 +356,10 @@ Periodic filing:
 - source metadata accession/CIK correct;
 - slot bound only after period confirmation;
 - parsed record uses schema v2;
-- P11 periodic ParsedDataRecord artifact_path is non-null project-root-relative POSIX under the configured P11 parsed-artifact root;
+- P11 periodic ParsedDataRecord artifact_path is the normalized project-root-relative POSIX path to the exact `<parsed_root>/<parse_run_id>/export-v2` directory;
+- parse_run_id is lowercase 64-hex before path construction;
+- stored artifact_path has no trailing slash and never points to manifest.json/child file/staging path;
+- the complete export-v2 directory is atomically committed before registry persistence;
 - no P11 registry schema migration is required solely for source-package identity.
 
 Generic planner boundary:
@@ -403,9 +406,9 @@ Package-aware SEC selector acceptance cases:
 
 1. requested target slot + exact document SHA + exact package SHA + exact registry/artifact metadata parity + accepted parser/schema + PASS + 0 blockers + COMPATIBLE => reusable and P11-F/G/H/I parser/identity/v2/validation work is skipped;
 2. same document SHA but different current source_package_sha256 => P11_SOURCE_PACKAGE_CHANGE / no reuse;
-3. null or missing artifact_path => P11_REUSE_ARTIFACT_MISSING / no reuse;
-4. absolute/drive-relative/UNC/traversal/outside-root artifact path => P11_REUSE_ARTIFACT_PATH_INVALID / no reuse;
-5. v2 loader/hash/ID/source-reference failure => P11_REUSE_ARTIFACT_INVALID / no reuse;
+3. null artifact_path or safe expected export-v2 directory absent => P11_REUSE_ARTIFACT_MISSING / no reuse;
+4. absolute/drive-relative/UNC/traversal/outside-root path, path to manifest.json/child file, or safe but wrong `<parsed_root>/<parse_run_id>/export-v2` layout => P11_REUSE_ARTIFACT_PATH_INVALID / no reuse;
+5. expected path exists but is not a directory, required v2 file is missing, or v2 loader/hash/ID/source-reference fails => P11_REUSE_ARTIFACT_INVALID / no reuse;
 6. loaded manifest parse_run_id != registry record parse_run_id => P11_REUSE_ARTIFACT_INVALID;
 7. loaded manifest/document document_sha256 mismatch => P11_REUSE_ARTIFACT_INVALID;
 8. loaded manifest source_package_sha256 mismatch => no reuse; exact source-package change reason retained;

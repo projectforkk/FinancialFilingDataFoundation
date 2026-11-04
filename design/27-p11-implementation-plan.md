@@ -380,7 +380,11 @@ For periodic filings:
 
 - register the primary exact source asset with the confirmed filing identity;
 - persist ParsedDataRecord only after the v2 artifact has been written/loaded and validation completed;
-- artifact_path is mandatory for P11 periodic records and is project-root-relative POSIX under the configured P11 parsed-artifact root;
+- artifact_path is mandatory for P11 periodic records and is the project-root-relative POSIX path to the exact `<parsed_root>/<parse_run_id>/export-v2` directory;
+- parse_run_id is validated as lowercase 64-hex before path construction;
+- the complete export-v2 directory is atomically committed before register_parsed_data;
+- registry never points to manifest.json, another child file, or a staging/partial directory;
+- no trailing slash is stored;
 - no P11 registry schema migration is required solely to store source_package_sha256.
 
 ### Package-aware reuse public API
@@ -438,24 +442,27 @@ Input:
 Algorithm:
 
 1. call SQLiteRegistry.list_parsed_data(slot);
-2. reject records with null artifact_path;
-3. resolve artifact_path under the configured parsed root and reject absolute/drive-relative/UNC/traversal/outside-root paths;
-4. load artifact with the P11 v2 loader;
-5. require loaded manifest parse_run_id == record.parse_run_id;
-6. require loaded manifest/document document_sha256 == current document_sha256 == record.document_sha256;
-7. require loaded manifest source_package_sha256 == current source_package_sha256;
-8. require loaded document periodic identity == requested target slot;
-9. require exact registry/artifact metadata parity before policy classification:
+2. null artifact_path => P11_REUSE_ARTIFACT_MISSING;
+3. resolve artifact_path as a project-root-relative POSIX directory path and require it to equal the expected `<parsed_root>/<record.parse_run_id>/export-v2` location;
+4. absolute/drive-relative/UNC/traversal/outside-root or wrong-layout path => P11_REUSE_ARTIFACT_PATH_INVALID;
+5. safe expected path absent => P11_REUSE_ARTIFACT_MISSING;
+6. existing path not a directory or missing any required v2 file => P11_REUSE_ARTIFACT_INVALID;
+7. load the directory with the P11 v2 loader;
+8. require loaded manifest parse_run_id == record.parse_run_id;
+9. require loaded manifest/document document_sha256 == current document_sha256 == record.document_sha256;
+10. require loaded manifest source_package_sha256 == current source_package_sha256;
+11. require loaded document periodic identity == requested target slot;
+12. require exact registry/artifact metadata parity before policy classification:
    - manifest parser_version == record.parser_version;
    - manifest schema_version == record.schema_version;
    - manifest validation_status == validation.status == record.validation_status.value;
    - manifest blocking_issue_count == len(validation.blocking_issues) == record.blocking_issue_count;
    - validation compatibility_status == record.compatibility_status.value;
-10. any parity mismatch => P11_REUSE_ARTIFACT_INVALID;
-11. apply parser/schema reuse policy only to parity-verified values;
-12. require PASS, zero blockers and COMPATIBLE;
-13. only exact-package survivors are reusable;
-14. if multiple exact-package survivors remain, choose lexicographically smallest parse_run_id.
+13. any parity mismatch => P11_REUSE_ARTIFACT_INVALID;
+14. apply parser/schema reuse policy only to parity-verified values;
+15. require PASS, zero blockers and COMPATIBLE;
+16. only exact-package survivors are reusable;
+17. if multiple exact-package survivors remain, choose lexicographically smallest parse_run_id.
 
 Explicit results:
 

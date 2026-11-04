@@ -337,3 +337,12 @@ P11-ISSUE-030 closes the remaining metadata-binding gap in package-aware reuse.
 P11-K may use existing ParsedDataRecord without adding source_package_sha256 to the registry only because every reuse decision now re-loads the v2 artifact and verifies both package identity and exact parity of parser/schema/validation/blocking/compatibility metadata against the registry row.
 
 A parity mismatch invalidates the registry/artifact binding itself and is classified as P11_REUSE_ARTIFACT_INVALID before ordinary validation/reuse reasons are considered.
+
+
+## 23. Parsed artifact path / v2 loader reconciliation
+
+P11-ISSUE-031 binds the generic P1 artifact_path field to one exact P11 meaning:
+
+`artifact_path = project-root-relative POSIX path to <parsed_root>/<parse_run_id>/export-v2`
+
+This allows the existing ParsedDataRecord schema to remain unchanged while making P11-K persistence and package-aware reuse deterministic. The registry never points to a manifest child or staging directory, and the loader always receives the complete v2 export directory.
