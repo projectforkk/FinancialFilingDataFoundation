@@ -302,8 +302,8 @@ P10 design candidate：
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
 
-Last frozen design baseline before P10-E amendment：
-`ba962aef818d7a31731637a5cfef1f57020a7d1d`
+Current P10-E amended design baseline：
+`d6b34d84d1eeae6b0f2009895a14c5956217a18f`
 
 P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<worktree>\\src` source binding 已由 `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c` 冻结。
 
@@ -333,7 +333,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 23. P10-D = CLOSED；
 24. P10-E pre-implementation review found `P10-ISSUE-004` before production code；
 25. P10-E stop record = `development/92-p10-e-preimplementation-design-stop.md`；
-26. P10-E design/plan/acceptance amendment = pending commit/push；
-27. P10-E production remains BLOCKED until new baseline + separate reauthorization；
-28. P10-F and later remain closed；
-29. P11 / Research MCP production / Semantic Resolver production remain closed。
+26. P10-E amended design baseline = `d6b34d84d1eeae6b0f2009895a14c5956217a18f`；
+27. P10-E reauthorization = `development/93-p10-e-provenance-reauthorization.md`；
+28. P10-E = AUTHORIZED ONLY within provenance gate scope；
+29. P10-F and later remain closed；
+30. P11 / Research MCP production / Semantic Resolver production remain closed。

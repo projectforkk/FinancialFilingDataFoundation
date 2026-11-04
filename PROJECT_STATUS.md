@@ -156,13 +156,17 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-004 DESIGN AMENDMENT PENDING PUSH`
+`AUTHORIZED — P10-E ONLY / P10-F CLOSED`
 
-Last frozen design baseline before P10-E amendment:
+Current P10-E design baseline:
 
-`ba962aef818d7a31731637a5cfef1f57020a7d1d`
+`d6b34d84d1eeae6b0f2009895a14c5956217a18f`
 
-Current stop record:
+Current authorization:
+
+`development/93-p10-e-provenance-reauthorization.md`
+
+Historical stop record:
 
 `development/92-p10-e-preimplementation-design-stop.md`
 
@@ -192,8 +196,10 @@ The amendment freezes:
 - validator API with `spec_bundle` + `p8_catalog`;
 - validation result schema and error mapping.
 
-P10-E production remains blocked until this amended design/plan/acceptance
-contract is committed/pushed and a separate explicit reauthorization is created.
+The amended P10-E design/plan/acceptance contract is GitHub truth at
+`d6b34d84d1eeae6b0f2009895a14c5956217a18f`.
+
+P10-E provenance implementation is authorized only within development/93 scope.
 
 Still not authorized:
 
