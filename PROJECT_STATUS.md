@@ -152,11 +152,11 @@
 
 ## Approved next phase
 
-**P10-B — Environment / Accepted Interface Audit**
+**P10-C — Models / Spec Freeze**
 
 Status:
 
-`P10-B REVIEW PASS / CLOSED — P10-C AUTHORIZED`
+`STOPPED — P10-ISSUE-002 DESIGN AMENDMENT PENDING PUSH`
 
 Design baseline:
 
@@ -164,7 +164,7 @@ Design baseline:
 
 Current instruction:
 
-`development/77-p10-environment-audit-instruction.md`
+`development/81-p10-c-spec-freeze-instruction.md` (historical authorization; superseded before code by P10-ISSUE-002)
 
 Historical stopped attempt:
 
@@ -178,7 +178,9 @@ P10-ISSUE-001 exact-candidate source binding is verified. No install/upgrade is 
 
 Design-owner review: `development/80-p10-b-github-review.md` = `PASS — P10-B CLOSED`.
 
-P10-C is authorized by `development/81-p10-c-spec-freeze-instruction.md` after that instruction is committed/pushed. Scope is Models / Spec Freeze only; P10-D and later remain closed.
+P10-C authorization `development/81-p10-c-spec-freeze-instruction.md` was committed before implementation started, but pre-implementation contract review found `P10-ISSUE-002`: spec bundle byte-level identity was underspecified. P10-C is STOPPED before any `src/` or `tests/` change. The design/plan/acceptance amendment must be committed/pushed before a new P10-C authorization may be issued.
+
+Stop record: `development/82-p10-c-preimplementation-design-stop.md`.
 
 Still not authorized:
 

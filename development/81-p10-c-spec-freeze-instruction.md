@@ -1,6 +1,6 @@
 # 81 — P10-C Development Instruction — Models / Spec Freeze
 
-Status: **AUTHORIZED — P10-C ONLY**
+Status: **STOPPED — P10-ISSUE-002 DESIGN AMENDMENT PENDING PUSH**
 
 Phase:
 `P10 — Codex Dynamic Research Integration`
@@ -109,21 +109,34 @@ Descriptor records at least:
 - size；
 - sha256。
 
-Bundle ordering:
+P10-ISSUE-002 freezes the byte-level identity contract:
 
-- deterministic by logical name；
-- caller ordering must not affect identity。
+- input list must be non-empty；
+- `logical_name` must be a non-blank string and is not trim/case-fold normalized for identity；
+- duplicate logical names rejected；
+- descriptors sort by exact logical-name Unicode string；
+- persisted path = resolved project-root-relative `as_posix()`；
+- size = exact raw-byte length；
+- SHA256 = exact raw-file bytes；
+- no UTF-8 decode / BOM / newline normalization。
+
+Canonical descriptor-array bytes are exactly:
+
+```python
+json.dumps(
+    descriptors,
+    ensure_ascii=False,
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+).encode("utf-8")
+```
 
 Bundle hash:
 
-`SHA256(canonical JSON of sorted descriptors)`
+`SHA256(canonical descriptor-array bytes)`
 
-Canonical JSON:
-
-- UTF-8；
-- sorted keys；
-- compact separators；
-- `allow_nan=False`。
+The hash input is the descriptor array only. It does not include `schema_version` or `spec_bundle_hash` itself.
 
 ---
 
@@ -138,13 +151,15 @@ Canonical JSON:
 - descriptor set unchanged；
 - recomputed bundle hash unchanged。
 
-Any byte drift:
+Error classification is fixed:
 
-`P10_RESEARCH_SPEC_CHANGED`
-
-Invalid initial input uses deterministic P10 invalid/path reason code per design.
+- malformed/tampered bundle structure, ordering or stored hash → `P10_INVALID_SPEC_INPUT`；
+- current listed file missing, deleted, size changed or bytes/hash changed → `P10_RESEARCH_SPEC_CHANGED`；
+- resolved path escapes project root → `P10_SPEC_PATH_OUTSIDE_PROJECT`。
 
 No silent refresh of bundle.
+
+The implementation must validate bundle schema/order/hash self-consistency before trusting stored descriptors.
 
 ---
 
@@ -173,22 +188,29 @@ At minimum directly test:
 
 1. valid single file；
 2. valid multiple files；
-3. raw byte SHA correctness；
-4. order-independent bundle identity；
-5. deterministic descriptor ordering；
-6. duplicate logical name reject；
-7. empty logical name reject；
-8. missing file reject；
-9. directory input reject；
-10. absolute path reject；
-11. `../` traversal escape reject；
-12. resolved symlink/junction escape when platform fixture permits；
-13. file byte mutation detected；
-14. file size-preserving byte mutation detected；
-15. deleted file after freeze detected；
-16. bundle tamper/hash mismatch rejected；
-17. same bytes + same descriptors -> same bundle hash；
-18. no instruction content stored in manifest/bundle serialization。
+3. empty input list reject；
+4. raw byte SHA/size correctness；
+5. non-UTF8/BOM/newline-sensitive raw bytes hash without normalization；
+6. order-independent bundle identity；
+7. deterministic exact-logical-name descriptor ordering；
+8. duplicate logical name reject；
+9. blank logical name reject；
+10. same logical text with different case remains distinct unless exactly duplicated；
+11. missing initial file reject；
+12. directory input reject；
+13. absolute path reject；
+14. `../` traversal escape reject；
+15. persisted relative path uses resolved project-relative POSIX form；
+16. resolved symlink/junction escape when platform fixture permits；
+17. file byte mutation detected；
+18. file size-preserving byte mutation detected；
+19. deleted file after freeze = `P10_RESEARCH_SPEC_CHANGED`；
+20. malformed bundle/schema/order reject = `P10_INVALID_SPEC_INPUT`；
+21. bundle hash tamper reject = `P10_INVALID_SPEC_INPUT`；
+22. descriptor tamper with recomputation mismatch reject；
+23. same raw files + same descriptors -> same bundle hash；
+24. hash input excludes schema_version/spec_bundle_hash；
+25. no instruction content stored in manifest/bundle serialization。
 
 Windows-specific tests must not require Administrator privileges.
 
@@ -240,7 +262,11 @@ If implementation reveals ambiguity or requires new dependency:
 
 No code-first design change.
 
-After P10-C candidate/evidence is committed/pushed:
+P10-ISSUE-002 stop boundary:
+
+This instruction is not active for implementation until the P10-ISSUE-002 amendment to design/24 + design/25 + acceptance/38 + this instruction is committed/pushed and P10-C is explicitly reauthorized against that new baseline.
+
+After the later authorized P10-C candidate/evidence is committed/pushed:
 
 STOP.
 

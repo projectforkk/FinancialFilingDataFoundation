@@ -79,10 +79,40 @@ P10-ISSUE-001 已确认：当前不需要 install FFDF package 或新增 depende
 - duplicate logical-name guard；
 - verify drift。
 
+P10-ISSUE-002 identity contract：
+
+- input list non-empty；
+- logical_name non-blank / duplicate rejected；
+- input path project-root-relative only；
+- resolved target must be regular file and remain inside resolved project root；
+- persisted relative_path = resolved project-relative `as_posix()`；
+- size/hash from exact raw bytes, no decode/BOM/newline normalization；
+- descriptors sorted by exact logical_name；
+- canonical JSON bytes use `ensure_ascii=False`, `sort_keys=True`, `separators=(",", ":")`, `allow_nan=False`；
+- bundle hash input = descriptor array only；
+- verify must reject malformed/tampered bundle separately from current-file drift。
+
 禁止：
 - recursive prompt discovery；
 - external arbitrary path；
-- parsing business meaning。
+- parsing business meaning；
+- editable/install workaround for source layout；
+- context/provenance/CLI implementation in P10-C。
+
+Focused tests至少覆盖：
+
+1. same explicit files in different caller order → identical bundle/hash；
+2. exact raw-byte SHA/size including non-UTF8/BOM/newline-sensitive bytes；
+3. canonical descriptor ordering/hash known fixture；
+4. empty input rejected；
+5. blank/duplicate logical_name rejected；
+6. absolute/outside/traversal path rejected；
+7. directory input rejected；
+8. canonical project-relative POSIX path persisted；
+9. changed/missing file → `P10_RESEARCH_SPEC_CHANGED`；
+10. tampered descriptor/hash/schema/order → `P10_INVALID_SPEC_INPUT`；
+11. root escape during verification → `P10_SPEC_PATH_OUTSIDE_PROJECT`；
+12. exact-candidate `PYTHONPATH` source binding retained。
 
 Gate：
 spec focused tests PASS。

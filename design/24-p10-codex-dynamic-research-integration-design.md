@@ -250,6 +250,33 @@ bundle：
 SHA256(canonical JSON of sorted file descriptors)
 ```
 
+### 8.1 Spec identity canonicalization
+
+P10-C 不得自行解释“canonical JSON”。v1 identity 固定如下：
+
+1. `files` 必须至少包含 1 个显式输入；空 bundle 为 `P10_INVALID_SPEC_INPUT`；
+2. `logical_name` 必须是非空字符串，纯空白值拒绝；值本身不自动 trim/case-fold，排序按原始 Unicode 字符串升序；duplicate logical name 拒绝；
+3. caller path 必须是 project-root-relative；absolute path 拒绝；候选路径 `resolve(strict=True)` 后必须是 regular file，且仍位于 `project_root.resolve(strict=True)` 内；
+4. persisted `relative_path` 使用 resolved file 相对 resolved project root 的 `as_posix()` 结果，因此 separator 固定为 `/`，不得持久化 absolute path；
+5. `size = len(raw_bytes)`；`sha256 = SHA256(raw_bytes)`；不得做 UTF-8 decode、BOM/newline normalization 或文本重写；
+6. file descriptors 按 `logical_name` 升序形成 JSON array；
+7. canonical JSON bytes 精确定义为：
+
+```python
+json.dumps(
+    descriptors,
+    ensure_ascii=False,
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+).encode("utf-8")
+```
+
+8. `spec_bundle_hash = SHA256(canonical_json_bytes(descriptor_array))`；hash input **只包含 descriptor array**，不包含 `schema_version` 或 `spec_bundle_hash` 字段本身；
+9. `verify_research_spec` 必须先验证 bundle schema/descriptor ordering/hash 自洽，再按 persisted canonical `relative_path` 重读 raw bytes；bundle 结构/hash 被篡改 → `P10_INVALID_SPEC_INPUT`；当前文件缺失、size/hash 改变 → `P10_RESEARCH_SPEC_CHANGED`；路径解析越出 project root → `P10_SPEC_PATH_OUTSIDE_PROJECT`。
+
+以上规则保证同一显式文件集合不受 caller 输入顺序、Windows path separator 或 JSON pretty-print 差异影响。
+
 文件内容本身不复制进 manifest。
 
 ---
@@ -1256,6 +1283,40 @@ Approved solution：
 5. P10-B must be rerun/completed after this amendment is pushed。
 
 Affected gates：P10-B / P10-F / P10-H / P10-L / P10-N.
+
+### P10-ISSUE-002 — Spec bundle identity was underspecified before P10-C
+
+P10-C pre-implementation contract review found that the design required
+`SHA256(canonical JSON of sorted file descriptors)` but did not freeze:
+
+- the exact JSON serialization bytes；
+- whether `schema_version` participates in the hash；
+- canonical `relative_path` representation；
+- raw-byte vs decoded-text hashing；
+- empty-bundle handling；
+- malformed/tampered bundle vs changed-file error classification。
+
+Root cause：
+
+The initial P10 design intentionally kept runtime research-spec file contents opaque, but the identity contract stopped one level too early and left byte-level canonicalization to implementation choice.
+
+Risk：
+
+Two conforming-looking implementations could generate different `spec_bundle_hash` values for the same explicit input files, making Spec A/B identity, review evidence, and Independent Acceptance non-portable.
+
+Approved solution：
+
+1. freeze the exact canonical JSON serialization in Section 8.1；
+2. hash the sorted descriptor array only；
+3. hash exact raw file bytes with no text normalization；
+4. persist resolved project-root-relative POSIX paths；
+5. reject empty bundles and duplicate logical names；
+6. distinguish malformed/tampered bundle (`P10_INVALID_SPEC_INPUT`), file drift (`P10_RESEARCH_SPEC_CHANGED`), and root escape (`P10_SPEC_PATH_OUTSIDE_PROJECT`)；
+7. update P10-C focused tests and acceptance items 16–20 before production authorization。
+
+No P10 production code existed when this issue was identified.
+
+Affected gates：P10-C / P10-I / P10-M / P10-N.
 
 任何问题必须：
 

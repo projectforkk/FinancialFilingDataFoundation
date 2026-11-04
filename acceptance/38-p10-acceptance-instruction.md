@@ -50,11 +50,11 @@ candidate HEAD变化 → 本次 acceptance全部作废。
 13. no subprocess/shell/SQL execution surface；
 14. project-root path guard；
 15. spec file explicit-list only；
-16. spec bundle raw-byte SHA correct；
-17. spec bundle identity deterministic/order-independent；
-18. duplicate logical names rejected；
-19. external/traversal spec paths rejected；
-20. spec mutation detected；
+16. spec descriptor size/SHA use exact raw bytes with no decode/BOM/newline normalization；
+17. spec bundle identity uses exact Section 8.1 canonical JSON bytes, descriptors sorted by exact logical_name, and hash input = descriptor array only；caller input order cannot change identity；
+18. spec input list is non-empty and blank/duplicate logical names are rejected；
+19. input paths are project-root-relative only; resolved target must be a regular file inside resolved project root; persisted path is resolved project-relative POSIX form; absolute/outside/traversal escape rejected；
+20. verify distinguishes malformed/tampered bundle (`P10_INVALID_SPEC_INPUT`), current-file drift/missing (`P10_RESEARCH_SPEC_CHANGED`), and root escape (`P10_SPEC_PATH_OUTSIDE_PROJECT`)；
 21. context manifest deterministic；
 22. context includes exact P8/P9 fingerprints；
 23. capability manifest exact；

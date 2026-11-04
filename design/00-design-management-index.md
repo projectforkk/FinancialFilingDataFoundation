@@ -312,7 +312,9 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 2. evidence = `development/79-p10-environment-interface-audit-rerun.md`；
 3. design-owner review = `development/80-p10-b-github-review.md` = PASS；
 4. P10-ISSUE-001 exact-candidate source binding = CLOSED / PASS；
-5. no install/upgrade required；
-6. P10-C Models / Spec Freeze = AUTHORIZED by `development/81-p10-c-spec-freeze-instruction.md` after instruction push；
-7. P10-D 及以后继续关闭；
-8. P11 / Research MCP production / Semantic Resolver production继续关闭。
+5. historical P10-C authorization = `development/81-p10-c-spec-freeze-instruction.md`；
+6. P10-C = STOPPED before code by `P10-ISSUE-002` because spec bundle byte-level identity was underspecified；
+7. design/24 + design/25 + acceptance/38 amendment must be committed/pushed before a new P10-C authorization；
+8. stop record = `development/82-p10-c-preimplementation-design-stop.md`；
+9. P10-D 及以后继续关闭；
+10. P11 / Research MCP production / Semantic Resolver production继续关闭。
