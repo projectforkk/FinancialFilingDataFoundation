@@ -1,6 +1,6 @@
 # 01 — Financial Filing Data Foundation 详细设计书
 
-状态：**DESIGN BASELINE — P9 DONE / P10 DESIGN AUTHORIZED**
+状态：**DESIGN BASELINE — P9 DONE / P10 DESIGN READY**
 
 仓库：`projectforkk/FinancialFilingDataFoundation`
 
@@ -359,6 +359,10 @@ P10 的固定职责仅包括：
 - 对运行时规范提出但当前工具链不具备的能力，显式返回 incompatible / blocked，不得通过猜测或静默降级完成。
 
 P10 不承担 deterministic parsing，不生成或维护固定研究问题清单，也不成为研究业务规则真源。
+
+P10 v1 的 accepted dependency 仅限 P8/P9。P10 可以增加 deterministic run plumbing（runtime spec freeze、capability/context manifest、evidence ledger validation），但不得把 Codex reasoning 写入 Python production。
+
+P10 v1 不实现 PDF visual renderer。若 P8/P9 structured evidence 无法安全满足当前 research need，必须显式返回 `P10_VISUAL_CAPABILITY_REQUIRED`；不得假装 future Research MCP 已存在。design/29 仅作为未来 additive visual/resolved-query reference，design/28 仅作为未来 deterministic semantic architecture reference。
 
 ---
 
@@ -860,6 +864,8 @@ deterministic gate、accounting consistency、document completeness。
 
 P10 acceptance 必须包含至少一个完整 live research run，证明 Codex 能直接读取动态研究规范、调用 P8/P9、取得可追溯证据，并按运行时规范完成信息查询。
 
+同时必须包含 negative capability case：如果 structured evidence不足且需要未验收的 PDF visual capability，P10 必须显式 BLOCK/GAP，不得猜测或越权实现 Research MCP。
+
 ### P11 — US SEC Provider
 
 接入 HTML / Inline XBRL / XBRL，复用统一 ParsedFinancialDocument Contract。
@@ -1012,17 +1018,19 @@ P9 accepted identity：
 - accepted merge = `58a1d2236b68a56fc66ddf8b97603e7232c87265`；
 - post-merge full regression = `308 passed`。
 
-当前仅批准进入：
+当前 P10 状态：
 
-**P10 — Codex Dynamic Research Integration（DESIGN AUTHORIZED）**
+**P10 — Codex Dynamic Research Integration（DESIGN READY）**
 
-P10 当前只允许：
-- 读取最新 accepted main / P8 / P9 真源；
-- 完成 detailed design、implementation plan、acceptance instruction；
-- 将既有 research-consumption / PDF visual fallback / semantic resolver 草案与 P9 accepted boundary 逐项 reconcile；
-- commit/push P10 design baseline。
+Design candidate：
+- `design/24-p10-codex-dynamic-research-integration-design.md`；
+- `design/25-p10-implementation-plan.md`；
+- `acceptance/38-p10-acceptance-instruction.md`；
+- `development/76-p10-design-reconciliation.md`；
+- reconciled `design/28` future semantic reference；
+- reconciled `design/29` future Research MCP reference。
 
-P10 production 在 DESIGN_READY 之前不得开始。
+P10 production 在该 exact design baseline commit/push 到 GitHub 且后续 development instruction 明确授权前不得开始。
 
 继续保持职责边界：
 

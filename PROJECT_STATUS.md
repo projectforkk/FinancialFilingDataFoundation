@@ -6,7 +6,7 @@
 
 ## Current state
 
-**P9_DONE / P10_DESIGN_AUTHORIZED**
+**P9_DONE / P10_DESIGN_READY**
 
 ## Accepted baseline
 
@@ -137,36 +137,424 @@
 - post-merge full regression: `308 passed in 23.74s`
 - accepted merge: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
 
+### P10 — Codex Dynamic Research Integration
+
+- status: `DESIGN READY / PRODUCTION NOT STARTED`
+- branch: `design/p10-dynamic-research-integration`
+- starting main: `e9b30626f2b88ac5527d42bd76d0b682efbeef0e`
+- detailed design: `design/24-p10-codex-dynamic-research-integration-design.md`
+- implementation plan: `design/25-p10-implementation-plan.md`
+- acceptance baseline: `acceptance/38-p10-acceptance-instruction.md`
+- reconciliation: `development/76-p10-design-reconciliation.md`
+- design/28: future semantic reference / implementation not authorized
+- design/29: future Research MCP reference / production not authorized
+- production changes: `NONE`
+
 ## Approved next phase
 
-**P10 — Codex Dynamic Research Integration**
+**P10-O — Closeout**
 
 Status:
 
-`DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
+`AUTHORIZED — P10-O CLOSEOUT INTEGRATION ONLY / FRESH V2 INTEGRATION`
 
-Authorization basis:
+P10-C is closed:
 
-- P9 Independent Acceptance: `PASS`
-- acceptance evidence: `acceptance/37-p9-acceptance-result.md`
-- accepted P9 merge: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
-- post-merge full regression: `308 passed in 23.74s`
-- P9 blocker: `NONE`
+- production candidate `35553df23f58a7f539b7390f98c7f154e42c817e`;
+- detached review `development/86-p10-c-detached-code-review-result.md = PASS`.
 
-Authorized now:
+P10-D is closed:
 
-- read the latest accepted `main` design and P8/P9 contracts；
-- prepare P10 detailed design / implementation plan / acceptance instruction；
-- reconcile any prior cross-phase research-consumption / visual / semantic design drafts against the accepted P9 baseline before adopting them；
-- commit/push a new P10 design baseline before any P10 production implementation。
+- amended design baseline `ba962aef818d7a31731637a5cfef1f57020a7d1d`;
+- final production/test candidate `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`;
+- development evidence `development/89-p10-d-context-evidence.md = PASS`;
+- detached review result `development/91-p10-d-detached-code-review-result.md = PASS`;
+- review result commit `109af3057942db62d80e8a39d0f18f68d0321fd8`.
 
-Not authorized yet:
+P10-E is closed:
 
-- P10 production code；
-- P11 production；
-- Research MCP production；
-- Semantic Resolver production；
-- any change that weakens P8 read-only or P9 durable-review boundaries。
+- amended design baseline `d6b34d84d1eeae6b0f2009895a14c5956217a18f`;
+- production candidate `802a395247e490a83acaef744c1641188fbf704e`;
+- development evidence `development/94-p10-e-provenance-evidence.md = PASS`;
+- detached review instruction `development/95-p10-e-code-review-instruction.md`;
+- detached review result `development/96-p10-e-detached-code-review-result.md = PASS`;
+- review result commit `af7295d740ecadeb9c17705c1e1048f3f742a8e6`.
+
+P10-F pre-implementation review found `P10-ISSUE-005` before any CLI production code existed.
+
+Stop record:
+
+`development/97-p10-f-preimplementation-design-stop.md`
+
+Current P10-F design baseline:
+
+`860e628ecf9f804734c9d343b3f2a9894928c9e9`
+
+Development authorization:
+
+`development/98-p10-f-cli-reauthorization.md`
+
+P10-F production candidate:
+
+`d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
+
+Development evidence:
+
+`development/99-p10-f-cli-evidence.md = PASS`
+
+Evidence commit:
+
+`fad7f84`
+
+Detached review instruction:
+
+`development/100-p10-f-code-review-instruction.md`
+
+Detached review result:
+
+`development/101-p10-f-detached-code-review-result.md = PASS`
+
+Review result commit:
+
+`5b54748`
+
+P10-F is closed.
+
+P10-G authorization:
+
+`development/102-p10-g-integration-instruction-authorization.md`
+
+P10-G candidate:
+
+`3a805a8f333ac20770d6aec1c8285d93993d18fc`
+
+Integration artifact:
+
+`integration/p10/FFDF_RESEARCH_INTEGRATION.md`
+
+Artifact SHA256:
+
+`ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`
+
+Development evidence:
+
+`development/103-p10-g-integration-instruction-evidence.md = PASS`
+
+Evidence commit:
+
+`241055f`
+
+Detached documentation review instruction:
+
+`development/104-p10-g-documentation-review-instruction.md`
+
+Detached review stop:
+
+`development/105-p10-g-detached-review-stop.md`
+
+P10-ISSUE-006:
+
+- same exact Git candidate produced LF active-worktree bytes and CRLF fresh-detached bytes under `core.autocrlf=true`;
+- candidate Git blob itself is LF and has SHA256 `ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`;
+- worktree-byte SHA is therefore not the cross-worktree identity;
+- amended contract uses exact candidate Git blob bytes as P10-G artifact identity.
+
+Current P10-G amended design baseline:
+
+`d896173`
+
+Review rerun authorization:
+
+`development/106-p10-g-review-reauthorization.md`
+
+The amended P10-F baseline freezes:
+
+- exact four CLI argv contracts;
+- stdin-only JSON request transport;
+- 16 MiB request limit;
+- exact request schemas;
+- project-relative catalog/review-root inputs;
+- exact canonical success/error envelopes;
+- exact CLI reason codes and exit codes;
+- spec-first error precedence;
+- deterministic context rebuild for validate-ledger;
+- no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
+
+P10-G detached review rerun is PASS and the gate is closed.
+
+Detached review result:
+
+`development/107-p10-g-detached-review-result.md = PASS`
+
+P10-H validation authorization:
+
+`development/108-p10-h-full-regression-authorization.md`
+
+P10-H evidence:
+
+`development/109-p10-h-full-regression-scope-evidence.md = PASS`
+
+P10-H is closed.
+
+P10-I authorization:
+
+`development/110-p10-i-dynamic-spec-authorization.md`
+
+P10-I evidence:
+
+`development/111-p10-i-dynamic-spec-evidence.md = PASS`
+
+P10-I is closed.
+
+P10-J live-run authorization:
+
+`development/112-p10-j-live-run-authorization.md`
+
+P10-J stopped after accepted P9 rejected a relocated/copy of existing review state:
+
+`development/113-p10-j-live-run-stop.md`
+
+P10-ISSUE-007:
+
+- accepted P9 review manifest binds the project-relative `review_dir`；
+- a byte-for-byte copied review store at another path is intentionally invalid；
+- isolated P10 review roots must be constructed at their final path with accepted P9 `prepare`；
+- only supported/evidence-grounded actions required by the frozen spec may be replayed；
+- the isolated root must use its newly generated resolution/snapshot identity；
+- source/live P9 state and P8 raw values remain immutable.
+
+P10-J amended design baseline:
+
+`668269e`
+
+P10-J rerun authorization:
+
+`development/114-p10-j-live-run-reauthorization.md`
+
+P10-J live-run evidence:
+
+`development/115-p10-j-live-research-evidence.md = PASS / COMPLETE`
+
+P10-J is closed.
+
+P10-K authorization:
+
+`development/116-p10-k-negative-gates-authorization.md`
+
+P10-K evidence:
+
+`development/117-p10-k-negative-gates-evidence.md = PASS`
+
+P10-K is closed.
+
+P10-L formal review authorization:
+
+`development/118-p10-l-formal-review-authorization.md`
+
+P10-L formal review result:
+
+`development/119-p10-l-formal-code-review-result.md = PASS`
+
+P10-L is closed.
+
+P10-M acceptance-freeze authorization:
+
+`development/120-p10-m-acceptance-freeze-authorization.md`
+
+P10-M freeze evidence:
+
+`development/121-p10-m-acceptance-freeze-evidence.md = PASS`
+
+Frozen package:
+
+- `acceptance/39-p10-final-acceptance-freeze.md`
+- `acceptance/p10_independent_acceptance_harness.py`
+- `acceptance/p10-base-immutability-manifest.json`
+- `acceptance/p10-fixtures/**`
+
+Core design and production remain frozen.
+
+Historical invalid freeze attempt:
+
+`42e39c971a360ca4e0ee09761221cc8da7ddbaa9`
+
+Stop record:
+
+`development/122-p10-m-freeze-stop.md`
+
+Reason: staged `git diff --cached --check` found trailing whitespace in `acceptance/39`, but PowerShell continued to commit/push. This commit is ineligible for P10-N and remains historical evidence.
+
+Corrected re-freeze evidence:
+
+`development/123-p10-m-refreeze-evidence.md = PASS`
+
+Corrected `acceptance/39` SHA256:
+
+`92889cc508c8d62e3fa8f36044fdde8dd81131970df54e615b1967b936603b94`
+
+Corrected P10-M re-freeze evidence:
+
+`development/123-p10-m-refreeze-evidence.md = PASS`
+
+Actual eligible corrected P10-M re-freeze commit:
+
+`4d1ab46f11d1d7b88934309ce32319e2200f0d8f`
+
+The historical SHA recorded later as `56cbe185e97e6e07dd354e03b98942d87f8e5787` does not exist in Git and is invalid.
+
+P10-M remains closed on the actual corrected candidate above.
+
+Historical invalid P10-N authorization:
+
+`development/124-p10-n-independent-acceptance-authorization.md`
+
+Historical invalid closeout authorization:
+
+`development/125-p10-closeout-authorization.md`
+
+Closeout stop:
+
+`development/126-p10-closeout-stop.md`
+
+Facts:
+
+- no `acceptance/40-p10-independent-acceptance-result.md` existed;
+- no `workspace/p10-n` execution root existed;
+- no P10-N detached acceptance worktree existed;
+- therefore P10-N had not actually executed;
+- historical integration merge `b560f49a78316fa59a4183de326d2dee0a80ebb6` is ineligible for main integration;
+- `origin/main` remains the accepted P9 baseline `e9b30626f2b88ac5527d42bd76d0b682efbeef0e`.
+
+Corrected P10-N authorization:
+
+`development/127-p10-n-corrected-reauthorization.md`
+
+Exact acceptance candidate:
+
+`4d1ab46f11d1d7b88934309ce32319e2200f0d8f`
+
+Corrected P10-N execution reached frozen harness precheck and STOPPED before any research acceptance run.
+
+Stop record:
+
+`development/128-p10-n-precheck-stop.md`
+
+P10-ISSUE-008 facts:
+
+- fixture manifest size/SHA matches exact candidate Git blob bytes;
+- all 8 frozen Markdown fixture Git blobs are LF;
+- detached Windows checkout under `core.autocrlf=true` materializes CRLF;
+- frozen harness incorrectly used checkout `Path.read_bytes()` as fixture identity;
+- no P10 production/test change or fixture semantic drift occurred.
+
+The prior P10-M freeze and corrected P10-N authorization are invalidated by the acceptance-package identity defect.
+
+Current ISSUE-008 design baseline:
+
+`f8bffca`
+
+Acceptance harness amendment authorization:
+
+`development/129-p10-acceptance-harness-amendment-authorization.md`
+
+Partial harness candidate:
+
+`9621f20d33c1d1b650bcdf1a7686b5f0b9c7c817`
+
+Detached precheck preview:
+
+- fixture identity source = `GIT_BLOB`;
+- all 8 frozen fixture hashes = PASS;
+- precheck status = PASS;
+- preview then exposed P10-ISSUE-009: base immutability manifest still used checkout bytes.
+
+Preview stop:
+
+`development/130-p10-acceptance-harness-preview-stop.md`
+
+The partial harness candidate is not eligible for formal review/freeze.
+
+P10-ISSUE-009 design baseline:
+
+`ad78cbe`
+
+Harness v2 authorization:
+
+`development/131-p10-acceptance-harness-v2-authorization.md`
+
+Harness v2 candidate:
+
+`db06b7a890e25908d224b6a63d8695be2f414b25`
+
+Harness v2 evidence:
+
+`development/132-p10-acceptance-harness-v2-evidence.md = PASS`
+
+Detached precheck preview = PASS with both base manifest and fixture manifest identity source `GIT_BLOB`.
+
+Targeted formal review authorization:
+
+`development/133-p10-acceptance-package-formal-review-authorization.md`
+
+Targeted formal review result:
+
+`development/134-p10-acceptance-package-formal-review-result.md = PASS`
+
+P10-M re-freeze authorization:
+
+`development/135-p10-m-issue008009-refreeze-authorization.md`
+
+Re-freeze evidence:
+
+`development/136-p10-m-issue008009-refreeze-evidence.md = PASS / PACKAGE READY`
+
+Fresh precheck preview = PASS; base and fixture manifest identities are both `GIT_BLOB`.
+
+Actual P10-M re-freeze commit:
+
+`183ca5dc89a606715a3e352bf92a235f7aa31fad`
+
+P10-M is closed on this exact candidate.
+
+P10-N authorization:
+
+`development/137-p10-n-independent-acceptance-authorization.md`
+
+Only exact candidate `183ca5dc89a606715a3e352bf92a235f7aa31fad` was eligible. The first execution attempt stopped because the mutable live P9 submission metadata did not match the frozen acceptance/39 metadata. Stop record: `development/138-p10-n-execution-stop.md`. Fresh rerun authorization: `development/139-p10-n-rerun-authorization.md`. Candidate/package/design remained unchanged.
+
+Fresh Independent Acceptance result:
+
+`acceptance/40-p10-independent-acceptance-result.md = PASS`
+
+Verified in the fresh rerun:
+
+- precheck PASS with Git-blob fixture/base identity;
+- research unit `136 passed`;
+- full unit `444 passed`;
+- dynamic Spec A/B hashes/toolsets differ and both ledgers PASS;
+- live CN 600519 run = COMPLETE;
+- fresh isolated P9 resolution/overlay validated;
+- K1–K5 exact negative capability gates PASS;
+- immutable 47-file base postcheck PASS;
+- detached candidate remained clean at `183ca5dc89a606715a3e352bf92a235f7aa31fad`.
+
+P10-N is CLOSED / PASS.
+
+P10-O closeout authorization:
+
+`development/140-p10-o-closeout-authorization-v2.md`
+
+Only fresh v2 closeout integration is authorized. Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and must not be reused.
+
+P10 production remains frozen; P11 / Research MCP production / Semantic Resolver production remain unauthorized.
+
+Still not authorized:
+
+- P10-J and later production;
+- Research MCP production;
+- Semantic Resolver production;
+- P11 production;
+- any weakening of P8 read-only or P9 durable-review boundaries.
 
 ## Project directory consolidation
 
@@ -270,5 +658,5 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P7 — Quality Gate / Validation: `DONE`
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
-- P10 — Codex Dynamic Research Integration: `DESIGN AUTHORIZED / PRODUCTION NOT STARTED`
+- P10 — Codex Dynamic Research Integration: `DESIGN READY / PRODUCTION NOT STARTED`
 - P11 — US SEC Provider: `NOT STARTED`

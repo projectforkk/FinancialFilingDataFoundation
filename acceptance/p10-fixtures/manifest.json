@@ -1,0 +1,45 @@
+{
+  "fixtures": [
+    {
+      "name": "corrupt-p9.md",
+      "sha256": "67bc7b16a5e9bac01dd822a3438301b13d7c48f04a45fdc657d60817bd50d3e2",
+      "size": 611
+    },
+    {
+      "name": "drift.md",
+      "sha256": "add924f9ce435ba526f2f7977ad4f7bce02be858cc15bee86b5205b23aa9f56b",
+      "size": 286
+    },
+    {
+      "name": "live-cn.md",
+      "sha256": "309fe14ab1fb41a8feae96e1d35d69c085d391afbcb39b99acbb63636fe6fe10",
+      "size": 1697
+    },
+    {
+      "name": "missing.md",
+      "sha256": "43a8d6a797d6b8997b9c650bdbfe97a79a385b6556db98fb0207132316f7cf35",
+      "size": 446
+    },
+    {
+      "name": "spec-a.md",
+      "sha256": "3c825c79422edac120f45b5c196d4a7e5105298d31df609f6ae3dab1abf09121",
+      "size": 639
+    },
+    {
+      "name": "spec-b.md",
+      "sha256": "abc8ecb590d87945d31969584ee8c0c530f43c25d9b90d3f8a25bbfd81a97f07",
+      "size": 717
+    },
+    {
+      "name": "unresolved.md",
+      "sha256": "7bc6a18f0b1726a980ecaafdbfd53c75ce589d92e458ec8251cd368db91035e0",
+      "size": 640
+    },
+    {
+      "name": "visual.md",
+      "sha256": "03ff96ace5bdba80c86296afc1e72fb296aae29cb639ef5d05236d29ca83743e",
+      "size": 575
+    }
+  ],
+  "schema_version": "p10-acceptance-fixture-manifest-v1"
+}

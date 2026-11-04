@@ -114,6 +114,10 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 21-p8-implementation-plan.md | P8 | ACCEPTED HISTORY |
 | 22-p9-review-overlay-design.md | P9 | ACCEPTED HISTORY |
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
+| 24-p10-codex-dynamic-research-integration-design.md | P10 | DESIGN READY |
+| 25-p10-implementation-plan.md | P10 | DESIGN READY |
+| 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
+| 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -156,7 +160,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P7 | 18 | 19 | acceptance/26 | DONE |
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
-| P10 | 24 | 25 | TBD | DESIGN AUTHORIZED |
+| P10 | 24 | 25 | acceptance/38 (baseline) | DESIGN READY |
 | P11 | 26 | 27 | TBD | NOT STARTED |
 
 ---
@@ -288,17 +292,136 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P9_DONE / P10_DESIGN_AUTHORIZED`
+`P9_DONE / P10_DESIGN_READY`
 
-P9 closeout baseline：
-- Independent Acceptance = `PASS`；
-- acceptance evidence = `acceptance/37-p9-acceptance-result.md`；
-- accepted merge = `58a1d2236b68a56fc66ddf8b97603e7232c87265`；
-- post-merge full regression = `308 passed`。
+P10 design candidate：
+- detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
+- implementation plan = `design/25-p10-implementation-plan.md`；
+- acceptance baseline = `acceptance/38-p10-acceptance-instruction.md`；
+- reconciliation = `development/76-p10-design-reconciliation.md`；
+- design/28 semantic architecture = reference only / implementation not authorized；
+- design/29 Research MCP = reference only / production not authorized。
 
-下一步仅授权 P10 DESIGN：
-1. 从最新 accepted `main` 重新读取跨阶段架构、P8、P9 真源；
-2. 形成 P10 detailed design、implementation plan、acceptance instruction；
-3. 将既有 research-consumption / visual / semantic 设计草案与 P9 accepted boundary 逐项 reconcile；
-4. commit/push P10 design baseline；
-5. 在 P10 DESIGN_READY 之前不得开始 P10 production；P11 / Research MCP production / Semantic Resolver production 继续关闭。
+Current P10-E amended design baseline：
+`d6b34d84d1eeae6b0f2009895a14c5956217a18f`
+
+P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<worktree>\\src` source binding 已由 `ee5ddb9798f45b9abac081fb4f7c2c999c131b6c` 冻结。
+
+当前：
+1. P10-B rerun = `PASS — P10_ENVIRONMENT_READY`；
+2. evidence = `development/79-p10-environment-interface-audit-rerun.md`；
+3. design-owner review = `development/80-p10-b-github-review.md` = PASS；
+4. P10-ISSUE-001 exact-candidate source binding = CLOSED / PASS；
+5. historical P10-C authorization = `development/81-p10-c-spec-freeze-instruction.md`；
+6. P10-C historical authorization 81 was stopped before code by `P10-ISSUE-002`；
+7. amended design baseline = `f20e4fd46c8d56e85dce80a16daf91abafd6323f`；
+8. stop record = `development/82-p10-c-preimplementation-design-stop.md`；
+9. P10-C reauthorization = `development/83-p10-c-spec-freeze-reauthorization.md`；
+10. P10-C production candidate = `35553df23f58a7f539b7390f98c7f154e42c817e`；
+11. P10-C evidence = `development/84-p10-c-spec-freeze-evidence.md` = PASS；
+12. P10-C detached review instruction = `development/85-p10-c-code-review-instruction.md`；
+13. P10-C detached review result = `development/86-p10-c-detached-code-review-result.md` = PASS；
+14. P10-C = CLOSED；
+15. P10-D pre-implementation review found `P10-ISSUE-003`；
+16. P10-D amended design baseline = `ba962aef818d7a31731637a5cfef1f57020a7d1d`；
+17. stop record = `development/87-p10-d-preimplementation-design-stop.md`；
+18. P10-D reauthorization = `development/88-p10-d-context-reauthorization.md`；
+19. P10-D final production/test candidate = `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`；
+20. P10-D evidence = `development/89-p10-d-context-evidence.md` = PASS；
+21. P10-D detached review instruction = `development/90-p10-d-code-review-instruction.md`；
+22. P10-D detached review result = `development/91-p10-d-detached-code-review-result.md` = PASS；
+23. P10-D = CLOSED；
+24. P10-E pre-implementation review found `P10-ISSUE-004` before production code；
+25. P10-E stop record = `development/92-p10-e-preimplementation-design-stop.md`；
+26. P10-E amended design baseline = `d6b34d84d1eeae6b0f2009895a14c5956217a18f`；
+27. P10-E reauthorization = `development/93-p10-e-provenance-reauthorization.md`；
+28. P10-E production candidate = `802a395247e490a83acaef744c1641188fbf704e`；
+29. P10-E evidence = `development/94-p10-e-provenance-evidence.md` = PASS；
+30. P10-E detached review instruction = `development/95-p10-e-code-review-instruction.md`；
+31. P10-E detached review result = `development/96-p10-e-detached-code-review-result.md` = PASS；
+32. P10-E review result commit = `af7295d740ecadeb9c17705c1e1048f3f742a8e6`；
+33. P10-E = CLOSED；
+34. P10-F pre-implementation review found `P10-ISSUE-005` before CLI code；
+35. P10-F stop record = `development/97-p10-f-preimplementation-design-stop.md`；
+36. P10-F amended design baseline = `860e628ecf9f804734c9d343b3f2a9894928c9e9`；
+37. P10-F reauthorization = `development/98-p10-f-cli-reauthorization.md`；
+38. P10-F production candidate = `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`；
+39. P10-F evidence = `development/99-p10-f-cli-evidence.md` = PASS；
+40. P10-F detached review instruction = `development/100-p10-f-code-review-instruction.md`；
+41. P10-F detached review result = `development/101-p10-f-detached-code-review-result.md` = PASS；
+42. P10-F review result commit = `5b54748`；
+43. P10-F = CLOSED；
+44. P10-G authorization = `development/102-p10-g-integration-instruction-authorization.md`；
+45. P10-G candidate = `3a805a8f333ac20770d6aec1c8285d93993d18fc`；
+46. P10-G artifact SHA256 = `ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`；
+47. P10-G evidence = `development/103-p10-g-integration-instruction-evidence.md` = PASS；
+48. P10-G detached review instruction = `development/104-p10-g-documentation-review-instruction.md`；
+49. P10-G detached review stop = `development/105-p10-g-detached-review-stop.md`；
+50. P10-G pre-PASS review found `P10-ISSUE-006`: worktree SHA is EOL-sensitive；
+51. P10-G amended design baseline = `d896173`；
+52. P10-G review rerun authorization = `development/106-p10-g-review-reauthorization.md`；
+53. P10-G detached review rerun result = `development/107-p10-g-detached-review-result.md` = PASS；
+54. P10-G = CLOSED；
+55. P10-H authorization = `development/108-p10-h-full-regression-authorization.md`；
+56. P10-H evidence = `development/109-p10-h-full-regression-scope-evidence.md` = PASS；
+57. P10-H = CLOSED；
+58. P10-I authorization = `development/110-p10-i-dynamic-spec-authorization.md`；
+59. P10-I evidence = `development/111-p10-i-dynamic-spec-evidence.md` = PASS；
+60. P10-I = CLOSED；
+61. P10-J authorization = `development/112-p10-j-live-run-authorization.md`；
+62. P10-J live-run stop = `development/113-p10-j-live-run-stop.md`；
+63. P10-J found `P10-ISSUE-007`: P9 review stores are path-bound / non-relocatable；
+64. P10-J amended design baseline = `668269e`；
+65. P10-J rerun authorization = `development/114-p10-j-live-run-reauthorization.md`；
+66. P10-J evidence = `development/115-p10-j-live-research-evidence.md` = PASS / COMPLETE；
+67. P10-J = CLOSED；
+68. P10-K authorization = `development/116-p10-k-negative-gates-authorization.md`；
+69. P10-K evidence = `development/117-p10-k-negative-gates-evidence.md` = PASS；
+70. P10-K = CLOSED；
+71. P10-L authorization = `development/118-p10-l-formal-review-authorization.md`；
+72. P10-L formal review result = `development/119-p10-l-formal-code-review-result.md` = PASS；
+73. P10-L = CLOSED；
+74. P10-M authorization = `development/120-p10-m-acceptance-freeze-authorization.md`；
+75. P10-M freeze evidence = `development/121-p10-m-acceptance-freeze-evidence.md` = PASS；
+76. P10-M historical freeze attempt = `42e39c971a360ca4e0ee09761221cc8da7ddbaa9` = INVALID；
+77. P10-M stop record = `development/122-p10-m-freeze-stop.md`；
+78. P10-M corrected re-freeze evidence = `development/123-p10-m-refreeze-evidence.md` = PASS；
+79. P10-M actual corrected re-freeze commit = `4d1ab46f11d1d7b88934309ce32319e2200f0d8f`；
+80. historical later-recorded candidate `56cbe185e97e6e07dd354e03b98942d87f8e5787` = INVALID / NON-EXISTENT；
+81. P10-M = CLOSED on actual candidate `4d1ab46f...`；
+82. historical P10-N authorization = `development/124-p10-n-independent-acceptance-authorization.md` = INVALID；
+83. historical closeout authorization = `development/125-p10-closeout-authorization.md` = INVALID；
+84. closeout stop = `development/126-p10-closeout-stop.md`；
+85. historical integration merge `b560f49a78316fa59a4183de326d2dee0a80ebb6` = INELIGIBLE；
+86. corrected P10-N authorization = `development/127-p10-n-corrected-reauthorization.md`；
+87. corrected P10-N candidate = `4d1ab46f11d1d7b88934309ce32319e2200f0d8f`；
+88. P10-N precheck stop = `development/128-p10-n-precheck-stop.md`；
+89. P10-N found `P10-ISSUE-008`: frozen fixture identity was checkout-EOL-sensitive；
+90. prior P10-M freeze + corrected P10-N authorization are INVALIDATED；
+91. P10-ISSUE-008 design baseline = `f8bffca`；
+92. acceptance harness amendment authorization = `development/129-p10-acceptance-harness-amendment-authorization.md`；
+93. partial harness candidate = `9621f20d33c1d1b650bcdf1a7686b5f0b9c7c817`；
+94. detached precheck preview = PASS for fixture Git-blob identity；
+95. preview stop = `development/130-p10-acceptance-harness-preview-stop.md`；
+96. preview found `P10-ISSUE-009`: base manifest identity still checkout-filter-sensitive；
+97. partial harness candidate is INELIGIBLE；
+98. P10-ISSUE-009 design baseline = `ad78cbe`；
+99. harness v2 authorization = `development/131-p10-acceptance-harness-v2-authorization.md`；
+100. harness v2 candidate = `db06b7a890e25908d224b6a63d8695be2f414b25`；
+101. harness v2 evidence = `development/132-p10-acceptance-harness-v2-evidence.md` = PASS；
+102. targeted formal review authorization = `development/133-p10-acceptance-package-formal-review-authorization.md`；
+103. targeted formal review result = `development/134-p10-acceptance-package-formal-review-result.md` = PASS；
+104. P10-M re-freeze authorization = `development/135-p10-m-issue008009-refreeze-authorization.md`；
+105. P10-M re-freeze evidence = `development/136-p10-m-issue008009-refreeze-evidence.md` = PASS / PACKAGE READY；
+106. P10-M exact re-freeze commit = `183ca5dc89a606715a3e352bf92a235f7aa31fad`；
+107. P10-M = CLOSED；
+108. P10-N authorization = `development/137-p10-n-independent-acceptance-authorization.md`；
+109. P10-N first execution stop = `development/138-p10-n-execution-stop.md`；
+110. P10-N fresh rerun authorization = `development/139-p10-n-rerun-authorization.md`；
+111. P10-N result = `acceptance/40-p10-independent-acceptance-result.md` = PASS；
+112. P10-N accepted detached candidate = `183ca5dc89a606715a3e352bf92a235f7aa31fad`；
+113. P10-N = CLOSED / PASS；
+114. P10-O v2 closeout authorization = `development/140-p10-o-closeout-authorization-v2.md`；
+115. P10-O = AUTHORIZED FRESH V2 INTEGRATION ONLY；
+116. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
+117. P11 / Research MCP production / Semantic Resolver production remain closed。

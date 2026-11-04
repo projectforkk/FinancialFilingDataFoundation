@@ -1,0 +1,243 @@
+{
+  "cn_document_sha256": "5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30",
+  "entries": [
+    {
+      "path": "runtime-locks/mcp-2.3.0-py312-win-amd64.lock.txt",
+      "sha256": "8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec",
+      "size": 707
+    },
+    {
+      "path": "workspace/live/p6-facts/cn-a/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/evidence.jsonl",
+      "sha256": "17d127ba1b37b7f39a1d9dae8336016261cb6b6ec7ac95ed70e97f3b519e39d2",
+      "size": 1974650
+    },
+    {
+      "path": "workspace/live/p6-facts/cn-a/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/fact_manifest.json",
+      "sha256": "d76cc20b29f389d4bc858e005e84a74b804869188d67ee23a653eb1c48677a5d",
+      "size": 1556
+    },
+    {
+      "path": "workspace/live/p6-facts/cn-a/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/raw_facts.jsonl",
+      "sha256": "30b9845ecb8b0b9216a6f3fefdd640b9f63fe24fb71984cf1cb44ae0f39cb2c3",
+      "size": 1769780
+    },
+    {
+      "path": "workspace/live/p6-facts/hk-a/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/evidence.jsonl",
+      "sha256": "1bbf8bdd55a78663419ecffbe1471cb59862426bf70ba2831c6444246da79573",
+      "size": 2676038
+    },
+    {
+      "path": "workspace/live/p6-facts/hk-a/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/fact_manifest.json",
+      "sha256": "d3fdbf40356650cda7dd95f73d98db254d60a3b5d1e782e8f9eba1b7201d97d7",
+      "size": 1635
+    },
+    {
+      "path": "workspace/live/p6-facts/hk-a/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/raw_facts.jsonl",
+      "sha256": "a35142503ed53eeb57c441d6b69e4ce73e6990f2282d436b0cf20636c2222340",
+      "size": 2461037
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p3/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/document.json",
+      "sha256": "db89f5484b2f7e96b04a5d1977ba065882c7a7ae3669eb9fb9b7717656ac61c2",
+      "size": 769
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p3/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/pages.jsonl",
+      "sha256": "9bb06df4ad89bdd5de53d4d3fccba19fdf15cc2725c3776da88cbcc063eea3ae",
+      "size": 8475527
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p3/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/search.sqlite",
+      "sha256": "844add1950b3fbf2dfd4a6e76f6546b1a41a8a3b03e9d5d074964d0babc69e78",
+      "size": 1196032
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p3/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/sections.jsonl",
+      "sha256": "3183fe1f94861b53e8a74ba2e448c40c589013c502297755293212cd64af163f",
+      "size": 520812
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p4/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/candidate_manifest.json",
+      "sha256": "040b1d49766dcfc07f444e17623e7b44d7226d3bc8bbf4cf85aea9d1662d1b70",
+      "size": 663
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p4/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/candidates.jsonl",
+      "sha256": "90fc947efc1c7eeabe441b61496e80a7a20c7ad02262706f29137ed48257870f",
+      "size": 68597
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p5/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/table_groups.jsonl",
+      "sha256": "e5b6ba7e3a960d487009f935f3755b69536efd85bcee4bd60576f4f8622d9708",
+      "size": 1993
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p5/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/table_manifest.json",
+      "sha256": "cebbfcad9f3ed5a46c00dcbbec8dddd9622e942552888adbeabebd3785a14ea2",
+      "size": 1292
+    },
+    {
+      "path": "workspace/live/p6-inputs/cn/p5/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/tables.jsonl",
+      "sha256": "11bfbd19854742401fef58852e9b696fbb9e9b29d742c65a81fcf82e80cd3b4a",
+      "size": 2255574
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p3/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/document.json",
+      "sha256": "7021f0782d264b0b5ae897275dae77e1b506381c4ec23b1c42641a786be751c7",
+      "size": 916
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p3/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/pages.jsonl",
+      "sha256": "1930b9257cc0aa48bca9dc72ecdf2e4557db8d785b81f7f39c2e65c1a9929d0c",
+      "size": 10029168
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p3/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/search.sqlite",
+      "sha256": "9211c2b2ade2666eae8daf0a30fe856e20c052d651f665398263f33868cf228a",
+      "size": 1314816
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p3/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/sections.jsonl",
+      "sha256": "9a74f90ff4a9b8938c45b889ccf679ee117f158ebae67f522b37d53da8f688b8",
+      "size": 396549
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p4/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/candidate_manifest.json",
+      "sha256": "5555eca278194235ca61df8880b0825614377e24aa1cc673aaf15489ede2914f",
+      "size": 663
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p4/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/candidates.jsonl",
+      "sha256": "6ed15a62dbd5d4cd4b07180e85e1c25ad5c2de25b89b16862b6684ac3a173a22",
+      "size": 66040
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p5/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/table_groups.jsonl",
+      "sha256": "b3937df8da12d6d84cbfc453b431adc898530728e71a5b47ded98ff981ce26f7",
+      "size": 9495
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p5/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/table_manifest.json",
+      "sha256": "a8c2bc27ab7285a932d3a7e6a467fb9e15386b94df43c285ea5fc8b571af0827",
+      "size": 1293
+    },
+    {
+      "path": "workspace/live/p6-inputs/hk/p5/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/tables.jsonl",
+      "sha256": "b58f8bb848f7fa398f9dc860a4d17dbc83a291dc7f2d62a89d19e860852bac20",
+      "size": 2131661
+    },
+    {
+      "path": "workspace/live/p7-validation/cn-a/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/issues.jsonl",
+      "sha256": "f8458ac09ff25cfcac9a9ab550f860c0a90de4493b36c111a179bcd10eadffd6",
+      "size": 1363
+    },
+    {
+      "path": "workspace/live/p7-validation/cn-a/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/validation_report.json",
+      "sha256": "b30a4aa63cf2d5d33d2f3e3bd146ea9bd37f16858afc59e02834c487f075b0bc",
+      "size": 2714
+    },
+    {
+      "path": "workspace/live/p7-validation/hk-a/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/issues.jsonl",
+      "sha256": "b39e2496c52d1a0dd5ea273258c29b57a02eadfa257b2bbf6ce97f1c70f4ec70",
+      "size": 2716
+    },
+    {
+      "path": "workspace/live/p7-validation/hk-a/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/validation_report.json",
+      "sha256": "fbd2d1328f80c17a29d221675c66885c75cc9039fce153cd8adc4f423f06c01b",
+      "size": 2740
+    },
+    {
+      "path": "workspace/mcp/p8-acceptance-catalog.json",
+      "sha256": "e493f2f6a951007c1e5ac932268796d35d33386760f4503d48ff0a7f7a148cdc",
+      "size": 1507
+    },
+    {
+      "path": "workspace/mcp/p8-live-catalog.json",
+      "sha256": "e493f2f6a951007c1e5ac932268796d35d33386760f4503d48ff0a7f7a148cdc",
+      "size": 1507
+    },
+    {
+      "path": "workspace/p9-live-review/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/resolutions/1f571a13bab2408541fb4a496e9287a2c80aed9912a6507769d5fc637fc4fc97.json",
+      "sha256": "f35f162e60a24a1c53053397f300093c5c8fbecc95d811e4ccd77d92d11cdbca",
+      "size": 1966
+    },
+    {
+      "path": "workspace/p9-live-review/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/review_manifest.json",
+      "sha256": "4a39a82ed4fac72aee35884a60eecda2e3038c7663ece079c44dff8b731882be",
+      "size": 2647
+    },
+    {
+      "path": "workspace/p9-live-review/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/review_queue.jsonl",
+      "sha256": "3fdc6db4fddd3db0620c0aa2db5fdb43f801a00d564a951c3cde61e3f474bd05",
+      "size": 724
+    },
+    {
+      "path": "workspace/p9-live-review/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/snapshots/3626452141eb127ebf40b4615b73ac05eb2c8eb1c47aad50790a9e855ae3a619/resolution_report.json",
+      "sha256": "d6857e6f19c29879ea05f7504fca854dd028b117f74f356b6ee26f23da29301a",
+      "size": 2925
+    },
+    {
+      "path": "workspace/p9-live-review/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/snapshots/3626452141eb127ebf40b4615b73ac05eb2c8eb1c47aad50790a9e855ae3a619/resolved_facts.jsonl",
+      "sha256": "df99001774a3ed0a64351dab884d2098d7c9a7ea6b2cbb453eff03f3a2ed8f09",
+      "size": 2172124
+    },
+    {
+      "path": "workspace/p9-live-review/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/snapshots/3626452141eb127ebf40b4615b73ac05eb2c8eb1c47aad50790a9e855ae3a619/resolved_issues.jsonl",
+      "sha256": "ac5502f471cf9d4a83604f7c448ee9f225323a51a284a875d9d83e72eb9119af",
+      "size": 443
+    },
+    {
+      "path": "workspace/p9-live-review/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30/snapshots/3626452141eb127ebf40b4615b73ac05eb2c8eb1c47aad50790a9e855ae3a619/snapshot_manifest.json",
+      "sha256": "5ed96f506150cb48f9797da047f1d294d6df961cce6a33d77b7d3ad0f3837252",
+      "size": 2198
+    },
+    {
+      "path": "workspace/p9-live-review/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/review_manifest.json",
+      "sha256": "b3a5fce6fe20904f06f14ab0087a49f13e3a52a4ff54c6f13b8264c4d1cf6a24",
+      "size": 2646
+    },
+    {
+      "path": "workspace/p9-live-review/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/review_queue.jsonl",
+      "sha256": "c3f427b1148851e00e06d48d11717f917af69695dbd37f2267daa151659989c5",
+      "size": 2960
+    },
+    {
+      "path": "workspace/p9-live-review/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/snapshots/ecd91784868125f55c65e43cb60eb60debd94cc3c19fe61604b4cff323b70981/resolution_report.json",
+      "sha256": "cac2f94f3d1c2eb4add0de138182b19f1020c7ef33ff56e5988b683a03b09b8f",
+      "size": 2844
+    },
+    {
+      "path": "workspace/p9-live-review/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/snapshots/ecd91784868125f55c65e43cb60eb60debd94cc3c19fe61604b4cff323b70981/resolved_facts.jsonl",
+      "sha256": "08b6cca367119964669bdc9097e33dec8451b54d9f14fd110d237bd0a0d6470c",
+      "size": 3011193
+    },
+    {
+      "path": "workspace/p9-live-review/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/snapshots/ecd91784868125f55c65e43cb60eb60debd94cc3c19fe61604b4cff323b70981/resolved_issues.jsonl",
+      "sha256": "a4fb351895909b7c5f494bf8b6c4d5413069ab291bd7af6d747a35796b22688b",
+      "size": 1604
+    },
+    {
+      "path": "workspace/p9-live-review/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0/snapshots/ecd91784868125f55c65e43cb60eb60debd94cc3c19fe61604b4cff323b70981/snapshot_manifest.json",
+      "sha256": "ea19aef05c941de97fe6b71b36a038ab29e69249c091b75f5ae2ade79a320ed8",
+      "size": 2124
+    },
+    {
+      "path": "worktrees/archive/clean/p2-acceptance-803fe3d/workspace/p2-acceptance-live/raw/sha256/52/5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30.pdf",
+      "sha256": "5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30",
+      "size": 3626217
+    },
+    {
+      "path": "worktrees/archive/clean/p2-acceptance-803fe3d/workspace/p2-acceptance-live/raw/sha256/70/70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0.pdf",
+      "sha256": "70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0",
+      "size": 5241364
+    },
+    {
+      "path": "worktrees/archive/clean/p2-acceptance-803fe3d/workspace/p2-acceptance-live/registry.sqlite",
+      "sha256": "cffb184430875f76ec52149c632842c02e840ce578fed4a048cf2993823e0e01",
+      "size": 69632
+    }
+  ],
+  "hk_document_sha256": "70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0",
+  "project_root": "D:/Codex/FinancialFilingDataFoundation",
+  "schema_version": "p10-acceptance-base-manifest-v1"
+}
