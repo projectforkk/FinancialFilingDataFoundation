@@ -497,6 +497,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 177. review stop = `development/182-p11-final-export-collision-review-stop.md`；
 178. P11-ISSUE-033 = REMEDIATED / FRESH REVIEW REQUIRED；
 179. amendment evidence = `development/183-p11-final-export-idempotency-amendment-evidence.md` = PASS；
-180. amended exact candidate = PENDING FREEZE；
-181. P11 production = CLOSED；
-182. Research MCP production / Semantic Resolver production remain closed / not authorized。
+180. amended exact candidate = `866e07025e53b2da852700d2e688b3a3af0bc39a`；
+181. review authorization = `development/184-p11-final-artifact-idempotency-final-review-authorization.md`；
+182. P11 production = CLOSED；
+183. Research MCP production / Semantic Resolver production remain closed / not authorized。
