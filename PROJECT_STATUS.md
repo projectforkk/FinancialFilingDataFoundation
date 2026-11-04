@@ -156,7 +156,7 @@
 
 Status:
 
-`STOPPED — P10-ISSUE-007 DESIGN AMENDMENT PENDING PUSH`
+`AUTHORIZED — P10-J RERUN ONLY / P10-ISSUE-007 AMENDED BASELINE`
 
 P10-C is closed:
 
@@ -323,7 +323,15 @@ P10-ISSUE-007:
 - the isolated root must use its newly generated resolution/snapshot identity；
 - source/live P9 state and P8 raw values remain immutable.
 
-P10-J is stopped until the amended design/plan/acceptance contract is committed/pushed and a new explicit reauthorization exists.
+P10-J amended design baseline:
+
+`668269e`
+
+P10-J rerun authorization:
+
+`development/114-p10-j-live-run-reauthorization.md`
+
+Only the isolated P10-J rerun under the amended path-bound P9-store contract is authorized. P10-K remains closed.
 
 Still not authorized:
 

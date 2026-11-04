@@ -371,7 +371,8 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 61. P10-J authorization = `development/112-p10-j-live-run-authorization.md`；
 62. P10-J live-run stop = `development/113-p10-j-live-run-stop.md`；
 63. P10-J found `P10-ISSUE-007`: P9 review stores are path-bound / non-relocatable；
-64. P10-J design amendment = PENDING PUSH；
-65. P10-J = STOPPED；
-66. P10-K and later remain closed；
-67. P11 / Research MCP production / Semantic Resolver production remain closed。
+64. P10-J amended design baseline = `668269e`；
+65. P10-J rerun authorization = `development/114-p10-j-live-run-reauthorization.md`；
+66. P10-J = RERUN AUTHORIZED ONLY；
+67. P10-K and later remain closed；
+68. P11 / Research MCP production / Semantic Resolver production remain closed。
