@@ -94,6 +94,8 @@ Mandatory:
 
 Malformed/missing fields produce deterministic reason codes.
 
+Current + historical discovery merge MUST follow design/31: normalize through one candidate validator, dedupe exact-equal duplicate accessions, reject conflicting duplicate accessions with `P11_SUBMISSIONS_INVALID`, and canonical-sort by `(filing_date ASC, accession_number ASC)` independent of source/shard order.
+
 No scraping of third-party filing mirrors.
 
 ## 6. Fair access / HTTP
@@ -121,6 +123,18 @@ Mandatory:
 - content type validated;
 - file:// rejected;
 - arbitrary caller URL rejected.
+- exact P11-D values/algorithms come from `design/31-p11-d-http-discovery-contract.md`;
+- User-Agent source = `SEC_USER_AGENT`, grammar-valid visible ASCII identity + contact token, raw value never logged;
+- headers = User-Agent + `Accept: application/json` + `Accept-Encoding: identity`;
+- connect timeout 10s / read-idle timeout 30s / logical fetch deadline 120s;
+- caps: ticker JSON 16 MiB / current Submissions 32 MiB / historical Submissions 16 MiB;
+- redirect maximum = 3 and automatic redirects disabled;
+- retry maximum = 3 with deterministic 1s/2s/4s fallback;
+- Retry-After maximum accepted wait = 60s;
+- total outbound-start cap per logical fetch = 8;
+- shared lock path/state schema and 5s lock-acquisition ceiling exactly match design/31;
+- invalid/corrupt rate state may recover only after a full 125ms wait while holding the safe kernel lock;
+- rolling rate measurement uses half-open `[t,t+1s)` windows;
 
 Record peak observed request rate in live acceptance.
 

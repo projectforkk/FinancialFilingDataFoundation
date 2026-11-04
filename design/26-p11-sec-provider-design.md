@@ -290,7 +290,9 @@ Retry policy:
 - 404: no blind retry loop;
 - 403/access denied: block and surface reason;
 - retries also pass through the same aggregate rate gate;
-- exact timeout, response-size caps, retry count/backoff and User-Agent grammar MUST be frozen by a Design-First P11-D HTTP-contract amendment before any P11-D production code is authorized; P11-D code may not choose these values ad hoc.
+- exact P11-D HTTP/discovery values and algorithms are frozen normatively by `design/31-p11-d-http-discovery-contract.md`; no P11-D production code is authorized until that contract passes fresh detached design review.
+
+P11-D exact client API, User-Agent grammar, request headers, 10s/30s/120s timeout contract, JSON size caps, retry/redirect ceilings, project-root cross-process lock/state format, stale/crash recovery, deterministic current+historical merge and failure mapping are defined in `design/31-p11-d-http-discovery-contract.md`. For those details, design/31 is authoritative.
 
 ## 11. Host allowlist
 

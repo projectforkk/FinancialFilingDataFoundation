@@ -99,9 +99,9 @@ STOP before acquisition changes if identity design assumption fails.
 
 ## P11-D — SEC HTTP / Discovery Client
 
-**Preimplementation Design-First freeze required before any P11-D code.**
+**Preimplementation Design-First contract is frozen in `design/31-p11-d-http-discovery-contract.md`, but P11-D implementation remains NOT AUTHORIZED until that amended contract passes fresh detached design review.**
 
-That amendment must freeze exact:
+The normative design/31 contract freezes exact:
 
 - User-Agent grammar/config source;
 - timeout values;

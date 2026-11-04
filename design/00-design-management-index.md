@@ -121,6 +121,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | P11-A DESIGN BASELINE PASS / PRODUCTION CLOSED |
+| 31-p11-d-http-discovery-contract.md | P11-D exact HTTP / rate gate / discovery merge contract | AMENDED DESIGN / FRESH REVIEW REQUIRED / IMPLEMENTATION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -295,7 +296,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_DESIGN_FREEZE_AUTHORIZED`
+`P10_DONE / P11_A_PASS / P11_B_PASS / P11_C_PASS / P11_D_HTTP_CONTRACT_AMENDED_REVIEW_REQUIRED`
 
 P11 latest reviewed candidate：
 - historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
@@ -320,7 +321,9 @@ P11 latest reviewed candidate：
 - P11-C candidate = `027288f6d5bb064f82764b3dc19961996de1dab8`；
 - P11-C final review = `development/211-p11-c-final-detached-code-review-result.md` = PASS；
 - P11-C integration merge = `1a5b04f22e1821558337821c758f70a7458da9ae`；
-- next action = separately authorize P11-D Design-First SEC HTTP / Discovery contract freeze；
+- P11-D design contract = `design/31-p11-d-http-discovery-contract.md`；
+- P11-D amendment evidence = `development/213-p11-d-http-discovery-design-amendment-evidence.md` = PASS；
+- next action = freeze P11-D amended design candidate and run fresh detached design review；
 - P11-B = CLOSED / PASS；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
