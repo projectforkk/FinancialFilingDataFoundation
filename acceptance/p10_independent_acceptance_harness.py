@@ -40,7 +40,7 @@ INTEGRATION_CANDIDATE = "3a805a8f333ac20770d6aec1c8285d93993d18fc"
 INTEGRATION_BLOB_SHA256 = (
     "ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296"
 )
-CORE_DESIGN_BASELINE = "668269e87774730ade03afb4b7564256671eb31f"
+CORE_DESIGN_BASELINE = "f8bffca572a6580c0a1f2babc0cc3b0c9e494204"
 P8_LOCK_SHA256 = (
     "8e958b8abcfd9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec"
 )
@@ -164,9 +164,17 @@ def validate_and_copy_fixtures(
     project_root: Path,
     work_root: Path,
 ) -> dict[str, Any]:
-    fixture_dir = source_root / "acceptance" / "p10-fixtures"
-    manifest_path = fixture_dir / "manifest.json"
-    manifest = load_json(manifest_path)
+    manifest_git_path = "acceptance/p10-fixtures/manifest.json"
+    manifest_raw = run_git(
+        source_root,
+        "cat-file",
+        "blob",
+        f"HEAD:{manifest_git_path}",
+    )
+    try:
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HarnessFailure("fixture manifest Git blob is not valid UTF-8 JSON") from exc
     require(
         manifest.get("schema_version") == FIXTURE_MANIFEST_SCHEMA,
         "fixture manifest schema mismatch",
@@ -175,21 +183,27 @@ def validate_and_copy_fixtures(
     inputs.mkdir(parents=True, exist_ok=True)
     copied: dict[str, str] = {}
     for item in manifest.get("fixtures", []):
-        source = fixture_dir / item["name"]
-        raw = source.read_bytes()
-        require(len(raw) == item["size"], f"fixture size drift: {item['name']}")
+        name = str(item["name"])
+        raw = run_git(
+            source_root,
+            "cat-file",
+            "blob",
+            f"HEAD:acceptance/p10-fixtures/{name}",
+        )
+        require(len(raw) == item["size"], f"fixture size drift: {name}")
         require(
             sha256_bytes(raw) == item["sha256"],
-            f"fixture SHA drift: {item['name']}",
+            f"fixture SHA drift: {name}",
         )
-        destination = inputs / item["name"]
+        destination = inputs / name
         destination.write_bytes(raw)
-        require(destination.read_bytes() == raw, f"fixture copy mismatch: {item['name']}")
+        require(destination.read_bytes() == raw, f"fixture copy mismatch: {name}")
         require(inside(project_root, destination), "fixture copy outside project root")
-        copied[item["name"]] = item["sha256"]
+        copied[name] = item["sha256"]
     require(len(copied) == 8, "unexpected fixture count")
     return {
-        "fixture_manifest_sha256": sha256_bytes(manifest_path.read_bytes()),
+        "fixture_manifest_sha256": sha256_bytes(manifest_raw),
+        "fixture_identity_source": "GIT_BLOB",
         "fixtures": copied,
     }
 
