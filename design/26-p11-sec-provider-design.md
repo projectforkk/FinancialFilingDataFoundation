@@ -1434,7 +1434,7 @@ Every P11 gate must prove:
 
 ## 35. Issue log
 
-P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-034 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/186`. The current amended design contains explicit resolutions for ISSUE-010..034; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
+P11-ISSUE-001 through P11-ISSUE-009 are recorded in `development/144-p11-environment-interface-audit.md`. P11-ISSUE-010 through P11-ISSUE-034 were found during successive detached/manual design reviews and candidate-preflight checks; stop/amendment evidence is retained in `development/147` through `development/186`. P11-ISSUE-035 through P11-ISSUE-038 are recorded by the later review/amendment pairs `development/188/189`, `development/191/192`, `development/194/195`, and `development/197/198`. The current amended design contains explicit resolutions for ISSUE-010..038; none is accepted as DESIGN READY until the next exact candidate passes a fresh detached design review.
 
 Any new material issue:
 

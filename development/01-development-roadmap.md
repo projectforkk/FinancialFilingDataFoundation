@@ -117,13 +117,13 @@ evidence-grounded durable review overlay，不覆盖 RAW/LOCAL_EXTRACTED。
 
 ## P11 — US SEC Provider
 
-状态：`P11-ISSUE-037 REMEDIATED / AMENDED DESIGN REVIEW PENDING / PRODUCTION NOT STARTED`
+状态：`P11-ISSUE-038 REMEDIATED / AMENDED DESIGN REVIEW PENDING / PRODUCTION NOT STARTED`
 
 Latest reviewed design candidate：
-- historical exact candidate = `cb35f537c75390d9b63b55af72c7278520ebd9be` = INELIGIBLE after P11-ISSUE-037；
-- authoritative stop = `development/194-p11-registry-api-surface-review-stop.md`；
-- ISSUE-036 amendment evidence = `development/192-p11-registry-concurrency-amendment-evidence.md` = PASS and remains valid；
-- ISSUE-037 amendment evidence = `development/195-p11-registry-api-surface-amendment-evidence.md` = PASS；
+- historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
+- authoritative stop = `development/197-p11-governance-status-review-stop.md`；
+- ISSUE-037 amendment evidence = `development/195-p11-registry-api-surface-amendment-evidence.md` = PASS and remains valid；
+- ISSUE-038 amendment evidence = `development/198-p11-governance-status-amendment-evidence.md` = PASS；
 - `design/26-p11-sec-provider-design.md`；
 - `design/27-p11-implementation-plan.md`；
 - `design/30-parsed-financial-document-v2-contract.md`；

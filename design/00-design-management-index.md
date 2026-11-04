@@ -116,11 +116,11 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
-| 26-p11-sec-provider-design.md | P11 | DESIGN AMENDMENT REQUIRED / PRODUCTION CLOSED |
-| 27-p11-implementation-plan.md | P11 | DESIGN AMENDMENT REQUIRED / PRODUCTION CLOSED |
+| 26-p11-sec-provider-design.md | P11 | AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED |
+| 27-p11-implementation-plan.md | P11 | AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
-| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | DESIGN AMENDMENT REQUIRED / PRODUCTION CLOSED |
+| 30-parsed-financial-document-v2-contract.md | cross-phase source-neutral parsed contract / P11 | AMENDED DESIGN / FRESH REVIEW REQUIRED / PRODUCTION CLOSED |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -295,19 +295,19 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P10_DONE / P11_ISSUE_038_DESIGN_REVIEW_STOPPED`
+`P10_DONE / P11_ISSUE_038_REMEDIATED_REVIEW_PENDING`
 
 P11 latest reviewed candidate：
-- exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
+- historical exact candidate = `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after P11-ISSUE-038；
 - authoritative stop = `development/197-p11-governance-status-review-stop.md`；
 - ISSUE-037 amendment evidence = `development/195-p11-registry-api-surface-amendment-evidence.md` = PASS and remains valid；
-- ISSUE-038 = governance status/index reconciliation not yet frozen；
+- ISSUE-038 amendment evidence = `development/198-p11-governance-status-amendment-evidence.md` = PASS；
 - detailed design = `design/26-p11-sec-provider-design.md`；
 - implementation plan = `design/27-p11-implementation-plan.md`；
 - source-neutral parsed contract = `design/30-parsed-financial-document-v2-contract.md`；
 - acceptance baseline = `acceptance/41-p11-acceptance-instruction.md`；
 - P11 production = CLOSED；
-- next action = Design-First governance reconciliation for ISSUE-038, then freeze a new exact candidate and run fresh detached P11-A review；
+- next action = freeze amended exact candidate and run fresh detached P11-A review；
 - P11-B = NOT AUTHORIZED；
 - design/28 semantic architecture = reference only / implementation not authorized；
 - design/29 Research MCP = reference only / production not authorized。
@@ -524,6 +524,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 204. review authorization = `development/196-p11-registry-api-surface-final-review-authorization.md`；
 205. candidate `c3a2f84c7ebd5f8533adfaaa596b97f672dfb31d` = INELIGIBLE after governance-state review；
 206. review stop = `development/197-p11-governance-status-review-stop.md`；
-207. P11-ISSUE-038 = OPEN / GOVERNANCE RECONCILIATION REQUIRED；
-208. P11 production = CLOSED；
-209. Research MCP production / Semantic Resolver production remain closed / not authorized。
+207. P11-ISSUE-038 = REMEDIATED / FRESH REVIEW REQUIRED；
+208. amendment evidence = `development/198-p11-governance-status-amendment-evidence.md` = PASS；
+209. P11 production = CLOSED；
+210. Research MCP production / Semantic Resolver production remain closed / not authorized。
