@@ -20,6 +20,9 @@ EXPECTED_TOOLS = (
     "ffdf_get_fact",
     "ffdf_get_evidence",
     "ffdf_get_validation",
+    "ffdf_get_company_report_context",
+    "ffdf_search_company",
+    "ffdf_find_table_rows",
 )
 
 
@@ -39,7 +42,7 @@ def test_server_declares_exact_read_only_tool_names() -> None:
             break
 
     assert tuple(values) == EXPECTED_TOOLS
-    assert len(set(values)) == 11
+    assert len(set(values)) == 14
 
 
 def test_server_exposes_stdio_only_and_no_arbitrary_tools() -> None:

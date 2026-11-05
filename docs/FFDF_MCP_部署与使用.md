@@ -81,7 +81,7 @@ enabled 只表示 Codex 已启用该 MCP 配置。真正可用还需要完成协
 
 ## 5. 当前 FFDF MCP 工具
 
-FFDF MCP 固定提供 11 个只读工具：
+FFDF MCP 当前提供 14 个只读工具；原有 11 个 P8 工具保持兼容，新增 3 个 report-safe（报告安全）接口：
 
 1. ffdf_list_documents
 2. ffdf_get_document
@@ -94,6 +94,9 @@ FFDF MCP 固定提供 11 个只读工具：
 9. ffdf_get_fact
 10. ffdf_get_evidence
 11. ffdf_get_validation
+12. ffdf_get_company_report_context
+13. ffdf_search_company
+14. ffdf_find_table_rows
 
 中文注释：
 
@@ -105,14 +108,19 @@ FFDF MCP 固定提供 11 个只读工具：
 - list_raw_facts / get_fact：读取 P6 原始事实。
 - get_evidence：追溯原始事实证据。
 - get_validation：检查 P7 验证结果与问题。
+- get_company_report_context：按最新优先列出同一公司的全部已入库报告，并附带 Validation 与报告生成防错规则。
+- search_company：跨同一公司多期报告搜索，并自动附带相邻页；同时使用字面子串扫描补足中文 FTS 可能漏页的问题。
+- find_table_rows：按 P5 原始披露行标签查询，保留“新能源行业”“外销”等源标签，优先使用直接披露值而不是人工重组。
 
 ## 6. 推荐研究调用顺序
 
-    ffdf_list_documents
+    ffdf_get_company_report_context
       ↓
-    ffdf_get_document
+    ffdf_search_company
       ↓
-    ffdf_get_validation
+    ffdf_find_table_rows
+      ↓
+    ffdf_get_document / ffdf_get_validation
       ↓
     ffdf_search_document / ffdf_read_pages
       ↓
@@ -124,9 +132,11 @@ FFDF MCP 固定提供 11 个只读工具：
 
 中文注释：
 
-先确认 Validation，再使用表格和 Raw Facts。不要看到某个数值就直接当作已完成语义确认的数据。
+生成正式研究报告时，优先先取 company_report_context，再做跨期搜索和源表行查询。直接披露的聚合行优先于 AI 自行重组；源标签不得随意扩大语义；涉及分红、回购等状态时必须先检查较新的报告；搜索章节性内容时必须读取相邻页。
 
-REVIEW_REQUIRED 不等于失败。只要没有 blocking issue，数据仍可用于研究，但不能静默提升为 canonical PASS。
+随后再确认 Validation，并按需深入 P5/P6/Evidence。不要看到某个数值就直接当作已完成语义确认的数据。
+
+REVIEW_REQUIRED 不等于失败。只要没有 blocking issue，数据仍可用于研究，但不能静默提升为 canonical PASS。当前 Catalog 仍以定期报告为主，不能用它证明未入库临时公告中的最新事件状态。
 
 
 ## 7. 新财报入库后如何让 MCP 看到
@@ -157,7 +167,7 @@ MCP Server 在启动时读取 Catalog，因此新入库后推荐：
 
     FFDF_MCP_HANDSHAKE=PASS
     PROTOCOL=2026-07-28
-    TOOLS=11
+    TOOLS=14
     TICKER=605117
     DOCUMENTS=23
     YEARS=2021,2022,2023,2024,2025,2026
@@ -166,7 +176,7 @@ MCP Server 在启动时读取 Catalog，因此新入库后推荐：
 
 - Codex MCP 配置可启动 FFDF；
 - MCP protocol 握手成功；
-- 11 个工具完整暴露；
+- 14 个工具完整暴露，其中新增3个 report-safe 接口；
 - 605117 的 23 份本地财报可以被 MCP 查询；
 - 当前 Catalog 与最新批量入库结果一致。
 

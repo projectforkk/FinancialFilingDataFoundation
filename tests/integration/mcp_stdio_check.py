@@ -25,6 +25,9 @@ EXPECTED_TOOLS = (
     "ffdf_get_fact",
     "ffdf_get_evidence",
     "ffdf_get_validation",
+    "ffdf_get_company_report_context",
+    "ffdf_search_company",
+    "ffdf_find_table_rows",
 )
 
 

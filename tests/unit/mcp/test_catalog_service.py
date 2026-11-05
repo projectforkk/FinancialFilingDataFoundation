@@ -14,6 +14,11 @@ from financial_filing_data_foundation.mcp import (
     McpQueryService,
     McpServiceError,
 )
+from financial_filing_data_foundation.mcp.report_safe import (
+    find_table_rows,
+    get_company_report_context,
+    search_company,
+)
 from financial_filing_data_foundation.native.models import (
     P3_PARSER_VERSION,
     SCHEMA_VERSION as P3_SCHEMA_VERSION,
@@ -447,6 +452,16 @@ def test_service_calls_do_not_mutate_artifacts(service_fixture) -> None:
     service.get_fact(DOC_SHA, fact["raw_fact_id"])
     service.get_evidence(DOC_SHA, fact["evidence_id"])
     service.get_validation(DOC_SHA)
+    get_company_report_context(service, "CN", "TEST")
+    search_company(service, "CN", "TEST", "营业收入")
+    find_table_rows(
+        service,
+        "CN",
+        "TEST",
+        "营业收入",
+        fiscal_year=2024,
+        filing_type="ANNUAL",
+    )
     assert docs["data"]["total"] == 1
 
     after = {
@@ -458,3 +473,48 @@ def test_service_calls_do_not_mutate_artifacts(service_fixture) -> None:
         for path in paths
     }
     assert before == after
+
+
+def test_report_safe_company_context(service_fixture) -> None:
+    _, _, _, _, service = service_fixture
+    result = get_company_report_context(service, "CN", "TEST")
+    assert result["tool"] == "ffdf_get_company_report_context"
+    assert result["report_safe_version"] == "p8-report-safe-v1"
+    assert result["data"]["total"] == 1
+    assert result["data"]["latest_filing"]["document_sha256"] == DOC_SHA
+    assert result["data"]["report_guardrails"]["direct_disclosure_preferred"] is True
+
+
+def test_report_safe_company_search_includes_context(service_fixture) -> None:
+    _, _, _, _, service = service_fixture
+    result = search_company(
+        service,
+        "CN",
+        "TEST",
+        "营业收入",
+        page_window=1,
+    )
+    assert result["tool"] == "ffdf_search_company"
+    assert result["data"]["returned_hits"] >= 1
+    first = result["data"]["results"][0]
+    assert first["match_page"]["page_no"] == 1
+    assert "营业收入" in first["match_page"]["text"]
+    assert first["neighbor_pages"] == []
+
+
+def test_report_safe_find_table_rows_preserves_source_label(service_fixture) -> None:
+    _, _, _, _, service = service_fixture
+    result = find_table_rows(
+        service,
+        "CN",
+        "TEST",
+        "营业收入",
+        fiscal_year=2024,
+        filing_type="ANNUAL",
+    )
+    assert result["tool"] == "ffdf_find_table_rows"
+    assert result["data"]["returned"] >= 1
+    first = result["data"]["matches"][0]
+    assert first["disclosure_label"] == "营业收入"
+    assert first["exact_match"] is True
+    assert first["direct_disclosure"] is True

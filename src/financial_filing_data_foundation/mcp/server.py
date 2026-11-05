@@ -12,6 +12,11 @@ from financial_filing_data_foundation.mcp.service import (
     McpQueryService,
     McpServiceError,
 )
+from financial_filing_data_foundation.mcp.report_safe import (
+    find_table_rows as _find_table_rows,
+    get_company_report_context as _get_company_report_context,
+    search_company as _search_company,
+)
 
 
 SERVER_NAME = "ffdf-local"
@@ -29,6 +34,9 @@ TOOL_NAMES = (
     "ffdf_get_fact",
     "ffdf_get_evidence",
     "ffdf_get_validation",
+    "ffdf_get_company_report_context",
+    "ffdf_search_company",
+    "ffdf_find_table_rows",
 )
 
 T = TypeVar("T")
@@ -62,7 +70,13 @@ def create_server(
         ),
         instructions=(
             "All tools are deterministic and local. No network, AI, "
-            "arbitrary filesystem access, or mutation is available."
+            "arbitrary filesystem access, or mutation is available. "
+            "For research reports, prefer exact direct disclosure rows over "
+            "manual recomposition, preserve source labels, search newer "
+            "filings before carrying forward an older event state, and read "
+            "neighbor pages before treating a multi-page section as complete. "
+            "Derived values must declare their components. The filing catalog "
+            "is not a complete temporary-announcement event feed."
         ),
         log_level="WARNING",
     )
@@ -240,6 +254,91 @@ def create_server(
             include_issues,
             severity,
             offset,
+            limit,
+        )
+
+    @server.tool(
+        name="ffdf_get_company_report_context",
+        description=(
+            "Get report-safe company filing context, validation summaries, "
+            "chronology limits, and research guardrails."
+        ),
+        structured_output=True,
+    )
+    def ffdf_get_company_report_context(
+        market: str,
+        ticker: str,
+        fiscal_year_from: int | None = None,
+        fiscal_year_to: int | None = None,
+    ) -> dict[str, Any]:
+        return _tool_call(
+            _get_company_report_context,
+            service,
+            market,
+            ticker,
+            fiscal_year_from,
+            fiscal_year_to,
+        )
+
+    @server.tool(
+        name="ffdf_search_company",
+        description=(
+            "Search the same company across local filings, newest first, "
+            "and include neighboring P3 pages to reduce stale-state and "
+            "multi-page omission errors."
+        ),
+        structured_output=True,
+    )
+    def ffdf_search_company(
+        market: str,
+        ticker: str,
+        query: str,
+        fiscal_year_from: int | None = None,
+        fiscal_year_to: int | None = None,
+        document_limit: int = 20,
+        limit_per_document: int = 3,
+        page_window: int = 1,
+    ) -> dict[str, Any]:
+        return _tool_call(
+            _search_company,
+            service,
+            market,
+            ticker,
+            query,
+            fiscal_year_from,
+            fiscal_year_to,
+            document_limit,
+            limit_per_document,
+            page_window,
+        )
+
+    @server.tool(
+        name="ffdf_find_table_rows",
+        description=(
+            "Find exact or containing P5 source row labels across a company. "
+            "Returns original disclosure labels and full row cells so reports "
+            "can prefer direct disclosure over manual recomposition."
+        ),
+        structured_output=True,
+    )
+    def ffdf_find_table_rows(
+        market: str,
+        ticker: str,
+        label: str,
+        match_mode: str = "exact",
+        fiscal_year: int | None = None,
+        filing_type: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        return _tool_call(
+            _find_table_rows,
+            service,
+            market,
+            ticker,
+            label,
+            match_mode,
+            fiscal_year,
+            filing_type,
             limit,
         )
 
