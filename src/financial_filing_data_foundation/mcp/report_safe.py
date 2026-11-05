@@ -144,7 +144,7 @@ def get_company_report_context(
     )
     rows: list[dict[str, Any]] = []
     for metadata in documents:
-        detail = service.get_document(metadata["document_sha256"])["data"]
+        detail = service.get_document_summary_internal(metadata["document_sha256"])
         rows.append(
             {
                 **metadata,

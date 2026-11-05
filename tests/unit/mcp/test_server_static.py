@@ -23,6 +23,18 @@ EXPECTED_TOOLS = (
     "ffdf_get_company_report_context",
     "ffdf_search_company",
     "ffdf_find_table_rows",
+    "ffdf_get_review_state",
+    "ffdf_get_resolved_fact",
+    "ffdf_list_resolved_facts",
+    "ffdf_list_review_tasks",
+    "ffdf_get_review_context",
+    "ffdf_locate_evidence",
+    "ffdf_render_table",
+    "ffdf_render_table_group",
+    "ffdf_render_page",
+    "ffdf_prepare_review_overlay",
+    "ffdf_submit_review_resolution",
+    "ffdf_materialize_resolved_view",
 )
 
 
@@ -42,7 +54,7 @@ def test_server_declares_exact_read_only_tool_names() -> None:
             break
 
     assert tuple(values) == EXPECTED_TOOLS
-    assert len(set(values)) == 14
+    assert len(set(values)) == 26
 
 
 def test_server_exposes_stdio_only_and_no_arbitrary_tools() -> None:

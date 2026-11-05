@@ -11,6 +11,8 @@ from financial_filing_data_foundation.candidates import detect_table_candidates
 from financial_filing_data_foundation.facts import extract_raw_facts, load_raw_facts
 from financial_filing_data_foundation.facts.models import EXTRACTOR_VERSION
 from financial_filing_data_foundation.identity import FilingSlotKey
+from financial_filing_data_foundation.mcp import McpCatalog, McpQueryService
+from financial_filing_data_foundation.mcp.research_review import ResearchReviewService
 from financial_filing_data_foundation.native.models import (
     P3_PARSER_VERSION,
     SCHEMA_VERSION as P3_SCHEMA_VERSION,
@@ -680,6 +682,94 @@ def test_resolved_view_fills_nulls_without_mutating_raw_and_can_reach_pass(
 
     after = {stage: _tree_hash(path) for stage, path in artifacts.items()}
     assert after == before
+
+
+
+def test_research_review_service_reuses_complete_p9_without_visual(
+    review_fixture,
+) -> None:
+    root, catalog_path, _, _, overlay, _, bundle, tasks = review_fixture
+    table, cell = _table_and_cell(bundle)
+    evidence = [
+        {
+            "type": "P5_CELL",
+            "table_id": table["table_id"],
+            "cell_id": cell["cell_id"],
+        }
+    ]
+
+    period_task = _task(tasks, "RAW_PERIOD_COVERAGE_LOW")
+    submit_resolution(
+        overlay.review_dir,
+        _submission(
+            period_task,
+            action="SET_PERIOD",
+            target={
+                "target_type": "TABLE_COLUMN_FIELD",
+                "table_id": table["table_id"],
+                "column_index": 1,
+                "field": "period",
+            },
+            value="PERIOD_TEST",
+            evidence_refs=evidence,
+            reviewed_at="2026-11-05T09:00:00+09:00",
+        ),
+    )
+    unit_task = _task(tasks, "RAW_UNIT_COVERAGE_LOW")
+    submit_resolution(
+        overlay.review_dir,
+        _submission(
+            unit_task,
+            action="SET_UNIT",
+            target={
+                "target_type": "TABLE_FIELD",
+                "table_id": table["table_id"],
+                "field": "unit",
+            },
+            value="UNIT_TEST",
+            evidence_refs=evidence,
+            reviewed_at="2026-11-05T09:01:00+09:00",
+        ),
+    )
+    snapshot = materialize_resolved_view(overlay.review_dir)
+    assert snapshot.resolved_validation_status.value == "PASS"
+
+    catalog = McpCatalog.load(root, catalog_path)
+    p8 = McpQueryService(catalog)
+    research = ResearchReviewService(
+        project_root=root,
+        catalog=catalog,
+        p8_service=p8,
+        review_root=overlay.review_dir.parent,
+        profile="RESEARCH_FALLBACK",
+    )
+
+    state = research.get_review_state(DOC_SHA)["data"]
+    assert state["quality_state"] == "COMPLETE_REVIEWED"
+    assert state["snapshot_available"] is True
+    assert state["resolved_reuse_eligible"] is True
+    assert state["unresolved_review_issue_count"] == 0
+
+    affected_fact = next(
+        fact
+        for fact in bundle.context.facts
+        if fact["table_id"] == table["table_id"]
+        and int(fact["column_index"]) == 1
+    )
+    resolved = research.get_resolved_fact(
+        DOC_SHA,
+        affected_fact["raw_fact_id"],
+    )["data"]
+
+    assert resolved["raw"]["raw_period_label"] is None
+    assert resolved["raw"]["raw_unit"] is None
+    assert resolved["effective"]["period"] == "PERIOD_TEST"
+    assert resolved["effective"]["unit"] == "UNIT_TEST"
+    assert resolved["review"]["applied"] is True
+    assert len(resolved["review"]["resolution_ids"]) == 2
+    # ResearchReviewService has no renderer dependency; COMPLETE_REVIEWED
+    # therefore reuses durable P9 state without any PDF visual call.
+
 
 
 def test_zero_overlay_snapshot_is_deterministic(review_fixture) -> None:

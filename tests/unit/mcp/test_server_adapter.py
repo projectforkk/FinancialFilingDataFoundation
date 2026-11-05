@@ -21,6 +21,18 @@ EXPECTED_TOOLS = (
     "ffdf_get_company_report_context",
     "ffdf_search_company",
     "ffdf_find_table_rows",
+    "ffdf_get_review_state",
+    "ffdf_get_resolved_fact",
+    "ffdf_list_resolved_facts",
+    "ffdf_list_review_tasks",
+    "ffdf_get_review_context",
+    "ffdf_locate_evidence",
+    "ffdf_render_table",
+    "ffdf_render_table_group",
+    "ffdf_render_page",
+    "ffdf_prepare_review_overlay",
+    "ffdf_submit_review_resolution",
+    "ffdf_materialize_resolved_view",
 )
 
 

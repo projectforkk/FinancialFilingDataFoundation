@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import json
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
+from mcp import types as mcp_types
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -16,6 +19,17 @@ from financial_filing_data_foundation.mcp.report_safe import (
     find_table_rows as _find_table_rows,
     get_company_report_context as _get_company_report_context,
     search_company as _search_company,
+)
+from financial_filing_data_foundation.mcp.research_review import (
+    ResearchReviewError,
+    ResearchReviewService,
+)
+from financial_filing_data_foundation.mcp.research_review_contract import (
+    ResearchReviewProfile,
+)
+from financial_filing_data_foundation.mcp.visual_renderer import (
+    PdfVisualRenderer,
+    VisualRenderError,
 )
 
 
@@ -37,6 +51,18 @@ TOOL_NAMES = (
     "ffdf_get_company_report_context",
     "ffdf_search_company",
     "ffdf_find_table_rows",
+    "ffdf_get_review_state",
+    "ffdf_get_resolved_fact",
+    "ffdf_list_resolved_facts",
+    "ffdf_list_review_tasks",
+    "ffdf_get_review_context",
+    "ffdf_locate_evidence",
+    "ffdf_render_table",
+    "ffdf_render_table_group",
+    "ffdf_render_page",
+    "ffdf_prepare_review_overlay",
+    "ffdf_submit_review_resolution",
+    "ffdf_materialize_resolved_view",
 )
 
 T = TypeVar("T")
@@ -45,17 +71,71 @@ T = TypeVar("T")
 def _tool_call(function: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     try:
         return function(*args, **kwargs)
-    except McpServiceError as exc:
+    except (McpServiceError, ResearchReviewError, VisualRenderError) as exc:
         raise ToolError(f"{exc.reason_code}: {exc}") from exc
+
+
+def _visual_content(visuals: tuple[Any, ...]) -> list[Any]:
+    metadata = [item.public_metadata() for item in visuals]
+    content: list[Any] = [
+        mcp_types.TextContent(
+            text=json.dumps(
+                {
+                    "schema_version": "research-visual-content-v1",
+                    "images": metadata,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+    ]
+    for item in visuals:
+        high_detail = str(item.metadata.get("detail") or "") == "HIGH_DETAIL"
+        content.append(
+            mcp_types.ImageContent(
+                data=base64.b64encode(item.png_bytes).decode("ascii"),
+                mimeType=item.mime_type,
+                _meta=(
+                    {"codex/imageDetail": "original"}
+                    if high_detail
+                    else None
+                ),
+            )
+        )
+    return content
 
 
 def create_server(
     project_root: str | Path,
     catalog_path: str | Path,
+    review_root: str | Path = "workspace/p9-live-review",
+    registry_path: str | Path = "workspace/ingest/registry.sqlite",
+    trusted_raw_root: str | Path = "workspace/ingest/raw-store",
+    research_review_profile: str = "RESEARCH_FALLBACK",
 ) -> MCPServer:
     try:
         catalog = McpCatalog.load(project_root, catalog_path)
         service = McpQueryService(catalog)
+        root = Path(project_root).expanduser().resolve()
+        review_service = ResearchReviewService(
+            project_root=root,
+            catalog=catalog,
+            p8_service=service,
+            review_root=review_root,
+            profile=research_review_profile,
+        )
+        registry = Path(registry_path)
+        if not registry.is_absolute():
+            registry = root / registry
+        trusted_raw = Path(trusted_raw_root)
+        if not trusted_raw.is_absolute():
+            trusted_raw = root / trusted_raw
+        renderer = PdfVisualRenderer(
+            catalog=catalog,
+            p8_service=service,
+            registry_path=registry,
+            trusted_raw_root=trusted_raw,
+        )
     except CatalogError as exc:
         raise RuntimeError(f"{exc.reason_code}: {exc}") from exc
     except McpServiceError as exc:
@@ -65,12 +145,13 @@ def create_server(
         name=SERVER_NAME,
         version=SERVER_VERSION,
         description=(
-            "Read-only local access to validated Financial Filing Data "
-            "Foundation artifacts."
+            "Local access to validated FFDF artifacts with additive report-safe, "
+            "resolved review, and PDF visual capabilities."
         ),
         instructions=(
-            "All tools are deterministic and local. No network, AI, "
-            "arbitrary filesystem access, or mutation is available. "
+            "All tools are deterministic and local. No network, AI, or arbitrary "
+            "filesystem access is available. Research fallback is read-only; "
+            "P9 write-through requires explicit QUALITY_REVIEW profile. "
             "For research reports, prefer exact direct disclosure rows over "
             "manual recomposition, preserve source labels, search newer "
             "filings before carrying forward an older event state, and read "
@@ -342,6 +423,176 @@ def create_server(
             limit,
         )
 
+    @server.tool(
+        name="ffdf_get_review_state",
+        description="Get derived P7/P9 quality state without materializing or mutating review data.",
+        structured_output=True,
+    )
+    def ffdf_get_review_state(document_sha256: str) -> dict[str, Any]:
+        return _tool_call(review_service.get_review_state, document_sha256)
+
+    @server.tool(
+        name="ffdf_get_resolved_fact",
+        description="Get one RawFact together with effective P9 semantic fields and provenance.",
+        structured_output=True,
+    )
+    def ffdf_get_resolved_fact(
+        document_sha256: str,
+        raw_fact_id: str,
+    ) -> dict[str, Any]:
+        return _tool_call(review_service.get_resolved_fact, document_sha256, raw_fact_id)
+
+    @server.tool(
+        name="ffdf_list_resolved_facts",
+        description="List effective facts while preserving underlying RawFact identity.",
+        structured_output=True,
+    )
+    def ffdf_list_resolved_facts(
+        document_sha256: str,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        return _tool_call(
+            review_service.list_resolved_facts,
+            document_sha256,
+            offset=offset,
+            limit=limit,
+        )
+
+    @server.tool(
+        name="ffdf_list_review_tasks",
+        description="List deterministic P9 review tasks and active-resolution flags.",
+        structured_output=True,
+    )
+    def ffdf_list_review_tasks(document_sha256: str) -> dict[str, Any]:
+        return _tool_call(review_service.list_review_tasks, document_sha256)
+
+    @server.tool(
+        name="ffdf_get_review_context",
+        description="Get minimal structured P3/P5/P6/P7/P9 context for one review task.",
+        structured_output=True,
+    )
+    def ffdf_get_review_context(
+        document_sha256: str,
+        review_task_id: str,
+    ) -> dict[str, Any]:
+        return _tool_call(
+            review_service.get_review_context,
+            document_sha256,
+            review_task_id,
+        )
+
+    @server.tool(
+        name="ffdf_locate_evidence",
+        description="Locate P3 pages, P5 tables and P6 facts without creating new RawFacts.",
+        structured_output=True,
+    )
+    def ffdf_locate_evidence(
+        document_sha256: str,
+        query: str,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        return _tool_call(
+            review_service.locate_evidence,
+            document_sha256,
+            query,
+            limit=limit,
+        )
+
+    @server.tool(
+        name="ffdf_render_table",
+        description="Render a trusted-original-PDF table crop; no path or arbitrary bbox input.",
+        structured_output=False,
+    )
+    def ffdf_render_table(
+        document_sha256: str,
+        table_id: str,
+        mode: str = "TABLE_WITH_HEADER",
+        detail: str = "NORMAL",
+    ) -> list[Any]:
+        return _visual_content(
+            _tool_call(
+                renderer.render_table,
+                document_sha256,
+                table_id,
+                mode=mode,
+                detail=detail,
+            )
+        )
+
+    @server.tool(
+        name="ffdf_render_table_group",
+        description="Render P5-declared members of one deterministic cross-page table group.",
+        structured_output=False,
+    )
+    def ffdf_render_table_group(
+        document_sha256: str,
+        table_group_id: str,
+        detail: str = "NORMAL",
+    ) -> list[Any]:
+        return _visual_content(
+            _tool_call(
+                renderer.render_table_group,
+                document_sha256,
+                table_group_id,
+                detail=detail,
+            )
+        )
+
+    @server.tool(
+        name="ffdf_render_page",
+        description="Render one trusted original PDF physical page by SHA and 1-based page number.",
+        structured_output=False,
+    )
+    def ffdf_render_page(
+        document_sha256: str,
+        page_no: int,
+        detail: str = "NORMAL",
+    ) -> list[Any]:
+        return _visual_content(
+            _tool_call(
+                renderer.render_page,
+                document_sha256,
+                page_no,
+                detail=detail,
+            )
+        )
+
+    @server.tool(
+        name="ffdf_prepare_review_overlay",
+        description="QUALITY_REVIEW-only explicit P9 overlay preparation.",
+        structured_output=True,
+    )
+    def ffdf_prepare_review_overlay(document_sha256: str) -> dict[str, Any]:
+        return _tool_call(review_service.prepare_review_overlay, document_sha256)
+
+    @server.tool(
+        name="ffdf_submit_review_resolution",
+        description="QUALITY_REVIEW-only P9 v1 resolution with optimistic state checks.",
+        structured_output=True,
+    )
+    def ffdf_submit_review_resolution(
+        document_sha256: str,
+        submission: dict[str, Any],
+        expected_base_validation_report_sha256: str,
+        expected_overlay_set_hash_before: str,
+    ) -> dict[str, Any]:
+        return _tool_call(
+            review_service.submit_review_resolution,
+            document_sha256,
+            submission,
+            expected_base_validation_report_sha256=expected_base_validation_report_sha256,
+            expected_overlay_set_hash_before=expected_overlay_set_hash_before,
+        )
+
+    @server.tool(
+        name="ffdf_materialize_resolved_view",
+        description="QUALITY_REVIEW-only explicit materialization of the active P9 overlay set.",
+        structured_output=True,
+    )
+    def ffdf_materialize_resolved_view(document_sha256: str) -> dict[str, Any]:
+        return _tool_call(review_service.materialize_resolved_view, document_sha256)
+
     return server
 
 
@@ -351,12 +602,27 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--catalog", required=True)
+    parser.add_argument("--review-root", default="workspace/p9-live-review")
+    parser.add_argument("--registry", default="workspace/ingest/registry.sqlite")
+    parser.add_argument("--trusted-raw-root", default="workspace/ingest/raw-store")
+    parser.add_argument(
+        "--research-review-profile",
+        choices=tuple(item.value for item in ResearchReviewProfile),
+        default=ResearchReviewProfile.RESEARCH_FALLBACK.value,
+    )
     return parser
 
 
 def main() -> int:
     args = _parser().parse_args()
-    server = create_server(args.project_root, args.catalog)
+    server = create_server(
+        args.project_root,
+        args.catalog,
+        args.review_root,
+        args.registry,
+        args.trusted_raw_root,
+        args.research_review_profile,
+    )
     server.run("stdio")
     return 0
 

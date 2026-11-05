@@ -50,9 +50,12 @@ def test_p8_logical_contract_matches_accepted_p10_contract() -> None:
     assert P8_RAW_V1_TOOL_NAMES == P8_TOOL_NAMES_V1
 
 
-def test_current_production_surface_is_p8_plus_report_safe_only() -> None:
-    assert CURRENT_PRODUCTION_TOOL_NAMES == _server_tool_names()
+def test_server_surface_preserves_baseline_then_adds_research_review() -> None:
+    server_names = _server_tool_names()
     assert len(CURRENT_PRODUCTION_TOOL_NAMES) == 14
+    assert server_names[:14] == CURRENT_PRODUCTION_TOOL_NAMES
+    assert server_names[14:] == RESEARCH_REVIEW_V1_TOOL_NAMES
+    assert len(server_names) == 26
     assert not set(RESEARCH_REVIEW_V1_TOOL_NAMES) & set(
         CURRENT_PRODUCTION_TOOL_NAMES
     )
