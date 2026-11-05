@@ -49,6 +49,7 @@ All FFDF-owned code, runtimes, worktrees, workspace data and temporary test path
 - Markdown: [`docs/FFDF_CN_HK_Usage_Manual.md`](docs/FFDF_CN_HK_Usage_Manual.md)
 - Word: [`docs/FFDF_CN_HK_Usage_Manual.docx`](docs/FFDF_CN_HK_Usage_Manual.docx)
 - User CLI: [`docs/FFDF_User_CLI.md`](docs/FFDF_User_CLI.md)
+- MCP 部署与使用（中文注释）: [`docs/FFDF_MCP_部署与使用.md`](docs/FFDF_MCP_部署与使用.md)
 
 The manual covers local runtimes, deployment health checks, CN/HK data preparation, P8 MCP, P9 Review Overlay, P10 Research Integration, testing, troubleshooting, backup boundaries, and day-to-day operating workflows.
 
