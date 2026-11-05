@@ -1,6 +1,6 @@
-# 29 — Research MCP Visual Evidence & Resolved Query 详细设计
+# 29 — Research MCP Visual Evidence, Resolved Query & Review Write-Through 详细设计
 
-状态：**ACTIVE FUTURE REFERENCE DESIGN — PRODUCTION NOT AUTHORIZED**
+状态：**ACTIVE FUTURE REFERENCE DESIGN v2 — PRODUCTION NOT AUTHORIZED**
 
 依赖：
 - P8 Local MCP = DONE；
@@ -14,13 +14,21 @@
 - Research MCP production = **NOT AUTHORIZED**；
 - P10 v1 不以本设计实现为前置条件。
 
-本设计解决未来问题：
+本设计解决两个相互关联但职责不同的问题：
 
-> 当结构化数据不完整、不准确或根本缺失，并且当前 P8/P9 已无法安全满足研究需求时，未来 Research MCP 如何提供 resolved query 与 PDF visual evidence。
+1. **QUALITY_REVIEW（数据库质量完善）**：指定公司与财报期间后，如何只处理尚未完善的 P7/P9 review 项，必要时让 Codex + Luna 查看原始 PDF 视觉证据，并把当前 P9 支持的语义修正持久化为 durable reviewed state；
+2. **RESEARCH_FALLBACK（研究期视觉回退）**：当当前研究所需事实无法由既有 resolved state 或 P8 structured evidence 安全支持时，如何提供受控 visual evidence，并明确区分 durable resolution、run-local verified、raw extraction defect 与 unresolved。
+
+**唯一数据访问边界：**
+
+- 公司财报文档发现与 Raw/Structured/Evidence/Validation 读取，固定通过已验收 P8 MCP / accepted P8 service contract；
+- durable review 写入，固定通过已验收 P9 public API semantics，由本设计新增的受控 Research MCP write-through tools 暴露；禁止直接编辑 P9 store 文件；
+- 禁止 Codex/Luna 直接访问 SQLite、JSONL、artifact directory 或任意数据库；
+- PDF visual 只能由 Research MCP 根据 `document_sha256` 从 trusted immutable source 渲染，caller 不得提交 filesystem path。
 
 在该 production capability 尚未独立验收前，P10 v1 必须返回 `P10_VISUAL_CAPABILITY_REQUIRED`，不得假装本文件中的工具已经存在。
 
-本设计不声称让 FFDF parser 自动完全正确。
+本设计不声称让 FFDF parser 自动完全正确，也不把模型视觉判断升级为 deterministic parser truth。
 
 ---
 
@@ -28,15 +36,19 @@
 
 新增 additive Research MCP Extension，使 Codex 可以：
 
-1. 查询 P8 RawFact / Evidence / Table / Validation；
-2. 查询 P9 是否已有 durable reviewed overlay；
-3. 优先消费 Resolved View，避免重复 visual review；
-4. 在 structured evidence 不足时定位原始 PDF 位置；
-5. 获取原始 PDF table/page visual evidence；
-6. 对当前研究做 reviewer decision；
-7. 明确区分 run-local verified 与 durable/canonical reusable；
-8. 在真正满足 P9 evidence contract 时选择性提交 P9；
-9. 将 recurring visual-review patterns 反馈为后续 Semantic Resolver rule candidate。
+1. 对指定公司与财报期间，先通过 P8 确定已经 ingest 的正式财报；
+2. 查询 P9 是否已有 durable reviewed overlay，并优先消费 Resolved View；
+3. 用 deterministic `quality_state` 判断文档是已完善、待复核、需上游修复、阻断还是 review state 损坏；
+4. 只枚举尚未完成的 P9 Review Task，不重复复核已经 PASS / durable resolved 的数据；
+5. 优先使用 P8 RawFact / Evidence / Table / Page Text / Validation 完成语义判断；
+6. structured evidence 不足且满足 Visual Trigger Matrix 时，定位并渲染最小充分的原始 PDF table/page visual evidence；
+7. 由 Codex 负责 orchestration，Luna 作为推荐的高吞吐 visual reviewer profile 对必要图片进行判断；
+8. 在真正满足当前 P9 evidence contract 时，通过受控 MCP write-through 提交 P9 resolution，并显式 materialize Resolved View；
+9. 写入后重新读取 review state，只有 `resolved_validation_status=PASS` 且 `resolved_reuse_eligible=true` 才认定数据库层已完善；
+10. 明确区分 durable resolved、run-local verified、raw extraction defect 与 unresolved；
+11. 将 recurring visual-review patterns 反馈为后续 Semantic Resolver / parser rule candidate。
+
+本设计优先优化“**一次视觉核实，后续重复复用**”，而不是让 Luna 重新阅读整份财报。
 
 ---
 
@@ -49,6 +61,7 @@
 - OCR；
 - arbitrary file read；
 - arbitrary bbox screenshot；
+- direct database / SQLite / JSONL / artifact-store query；
 - shell / SQL / Python execution；
 - network；
 - AI API；
@@ -62,8 +75,77 @@
 
 ## 3. 主路径
 
+### 3.1 QUALITY_REVIEW — 指定公司/期间的数据完善主路径
+
+这是第一层数据库完善的**唯一标准路径**：
+
 ```text
-Locate document
+market + ticker + target fiscal years / report periods
+        ↓
+P8 MCP: ffdf_list_documents
+        ↓
+确定目标 document_sha256 集合
+        ↓
+Research MCP: ffdf_get_review_state
+        ↓
+quality_state
+  ├─ COMPLETE_BASE / COMPLETE_REVIEWED
+  │      → skip，不打开 PDF，不重复 review
+  │
+  ├─ BLOCKED / INVALID_REVIEW_STATE
+  │      → STOP，返回明确 upstream / review-store error
+  │
+  └─ NEEDS_REVIEW
+         ↓
+Research MCP: ffdf_prepare_review_overlay（仅 overlay 不存在时）
+         ↓
+Research MCP: ffdf_list_review_tasks
+         ↓
+仅处理 unresolved + SUPPORTED tasks
+         ↓
+Research MCP: ffdf_get_review_context
+         ↓
+P8 structured evidence sufficient?
+    ├─ YES
+    │    → Codex reviewer decision
+    │    → ffdf_submit_review_resolution
+    │
+    └─ NO
+         ↓
+      Visual Trigger Matrix
+         ↓
+      ffdf_render_table
+         ↓
+      context still insufficient?
+         ├─ NO → Luna visual decision
+         └─ YES
+              → ffdf_render_table_group / ffdf_render_page
+              → Luna visual decision
+         ↓
+Decision Class
+  ├─ EXPLICIT_AND_ANCHORABLE
+  │      → ffdf_submit_review_resolution
+  ├─ EXPLICIT_VISUAL_ONLY
+  │      → 不得 durable submit；记录 run-local / upstream candidate
+  ├─ RAW_EXTRACTION_DEFECT
+  │      → STOP P9；进入 parser Design-First repair
+  └─ AMBIGUOUS
+         → 保持 REVIEW_REQUIRED
+         ↓
+Research MCP: ffdf_materialize_resolved_view
+         ↓
+Research MCP: ffdf_get_review_state
+         ↓
+resolved_validation_status == PASS
+AND resolved_reuse_eligible == true ?
+  ├─ YES → COMPLETE_REVIEWED
+  └─ NO  → 保持 NEEDS_REVIEW / NEEDS_UPSTREAM_FIX
+```
+
+### 3.2 RESEARCH_FALLBACK — 研究期视觉回退
+
+```text
+Locate document through P8
    ↓
 Query P9 review/resolved state
    ↓
@@ -74,23 +156,20 @@ durable resolved data exists?
          Visual Trigger Matrix
               ↓
        structured sufficient?
-        ├─ YES → research
+        ├─ YES → current-run research
         └─ NO
              ↓
        Review Context / Locate Evidence
              ↓
-       render_table
+       render_table → optional group/page escalation
              ↓
-       context complete?
-        ├─ YES → Codex reviewer decision
-        └─ NO
+       Codex/Luna reviewer decision
              ↓
-       render_table_group / render_page
-             ↓
-       still ambiguous?
-        ├─ YES → remain REVIEW_REQUIRED
-        └─ NO  → run-local verified or P9 durable submit
+       durable P9 submit only if current P9 contract is satisfied
+       otherwise run-local / defect / unresolved
 ```
+
+QUALITY_REVIEW 和 RESEARCH_FALLBACK 共用同一事实、视觉、P9 边界；区别只在触发来源和完成条件，不允许维护两套语义。
 
 ---
 
@@ -132,18 +211,159 @@ Research MCP Extension 使用 additive tool surface。
 
 ## 6. 未来新增 tool surface
 
-未来单独授权后建议新增 8 个 additive 工具：
+未来单独授权后新增 **12 个 additive Research MCP 工具**。P8 v1 原 11 tools 完全不变。
+
+### 6.1 Read / query tools
 
 1. `ffdf_get_review_state`
 2. `ffdf_get_resolved_fact`
 3. `ffdf_list_resolved_facts`
-4. `ffdf_get_review_context`
-5. `ffdf_locate_evidence`
-6. `ffdf_render_table`
-7. `ffdf_render_table_group`
-8. `ffdf_render_page`
+4. `ffdf_list_review_tasks`
+5. `ffdf_get_review_context`
+6. `ffdf_locate_evidence`
+7. `ffdf_render_table`
+8. `ffdf_render_table_group`
+9. `ffdf_render_page`
+
+### 6.2 Explicit write-through tools
+
+10. `ffdf_prepare_review_overlay`
+11. `ffdf_submit_review_resolution`
+12. `ffdf_materialize_resolved_view`
+
+Write-through tools 只能调用 accepted P9 public APIs：
+
+- `prepare_review_overlay`
+- `submit_resolution`
+- `materialize_resolved_view`
+
+不得：
+
+- 重写 P9 resolution semantics；
+- 直接修改 resolution JSONL / manifest / snapshot 文件；
+- 提供 arbitrary P9 store path；
+- 接受 SQL / shell / filesystem mutation；
+- 支持 P9 当前 enum 之外的新 action；
+- 通过 MCP 绕过 P9 evidence validation、supersession、active-set 或 conflict rules。
 
 如果实现时 MCP SDK 对 image/list-image response 有协议限制，必须先更新设计，不得静默改成 arbitrary file path 返回。
+
+### 6.3 Quality state — 不新增可漂移的“完善布尔字段”
+
+数据库是否“完善”不得通过新的持久化 `is_complete` 字段表达。
+
+Research MCP 必须从 P7 + P9 当前 validated state **确定性派生**：
+
+```text
+COMPLETE_BASE
+  = P7 validation_status == PASS
+    AND P7 reuse_eligible == true
+    AND no invalid P9 state
+
+COMPLETE_REVIEWED
+  = P9 resolved_validation_status == PASS
+    AND P9 resolved_reuse_eligible == true
+
+NEEDS_REVIEW
+  = document is REVIEW_REQUIRED
+    AND at least one unresolved SUPPORTED review task exists
+
+NEEDS_UPSTREAM_FIX
+  = unsupported review condition exists
+    OR visual decision = RAW_EXTRACTION_DEFECT
+    OR P6_MISSING_FACT_CANDIDATE blocks durable correction
+
+BLOCKED
+  = P7 BLOCKING / FAILURE
+    OR pipeline compatibility is not COMPATIBLE
+
+INVALID_REVIEW_STATE
+  = P9 store/snapshot exists but fails accepted validation
+```
+
+优先级：
+
+`INVALID_REVIEW_STATE > BLOCKED > COMPLETE_REVIEWED > COMPLETE_BASE > NEEDS_UPSTREAM_FIX > NEEDS_REVIEW`
+
+不得把 document-level `REVIEW_REQUIRED` 直接等同为“所有事实不可用”，也不得把某个 fact 已 resolved 误写为整份 document 已 COMPLETE。
+
+### 6.4 Review Task selection
+
+`ffdf_list_review_tasks` 必须返回 accepted P9 task identity，并至少支持：
+
+- document_sha256；
+- resolved/unresolved 状态；
+- reviewability；
+- supported_actions；
+- reason_code；
+- page_no；
+- table_id；
+- raw_fact_ids；
+- evidence_ids。
+
+QUALITY_REVIEW 默认只返回：
+
+```text
+resolved_state != RESOLVED
+AND reviewability == SUPPORTED
+```
+
+UNSUPPORTED task 必须单独计数并映射到 `NEEDS_UPSTREAM_FIX`，不能交给 Luna 猜测解决。
+
+### 6.5 Controlled P9 write-through
+
+`ffdf_submit_review_resolution` 必须：
+
+1. 只接受 P9 当前支持的 action：
+   - `SET_PERIOD`
+   - `SET_UNIT`
+   - `SET_SCOPE`
+   - `CLASSIFY_TABLE_STATEMENT`
+   - `ATTEST_ISSUE_RESOLVED`
+2. 要求 caller 提供 `review_task_id`；
+3. 要求 `expected_base_validation_report_sha256`；
+4. 若已有 overlay，要求 `expected_overlay_set_hash_before`；
+5. 在 submit 前重新加载 accepted P9 current state；
+6. current state 与 expected state 不同则拒绝：
+   `RESEARCH_MCP_REVIEW_STATE_CHANGED`；
+7. 证据仍由 P9 `validate_direct_evidence` / semantic validation 决定是否合法；
+8. 不接受 raw numeric replacement、raw metric rename 或任意 field patch；
+9. 成功只表示 resolution 已进入 immutable P9 store，不等于 document 已完善。
+
+`ffdf_materialize_resolved_view` 必须在 submit 之后显式调用，并返回：
+
+- overlay_set_hash；
+- resolved_validation_status；
+- resolved_reuse_eligible；
+- resolved/unresolved/unsupported counts；
+- active resolution IDs。
+
+最终必须再次调用 `ffdf_get_review_state` 验证状态，不允许以“submit 成功”代替“数据库已完善”。
+
+### 6.6 Codex + Luna reviewer profile
+
+FFDF correctness contract 不绑定具体模型名称。
+
+推荐运行配置：
+
+```text
+Codex = orchestration / tool selection / P9 submission host
+Luna  = default high-throughput visual reviewer
+```
+
+P9 现有 `ReviewerType` 保持：
+
+`CODEX`
+
+不新增 `LUNA` enum，不修改 P9 schema。
+
+建议 `reviewer_id` 使用稳定、无敏感信息的 profile，例如：
+
+`codex/luna-review`
+
+模型版本、token、运行统计属于 Research MCP telemetry / run log，不进入 P9 semantic truth。
+
+视觉模型输出本身不能成为 P9 evidence type；当前 P9 durable submit 仍必须有合法 P5/P6 anchor。
 
 ---
 
@@ -679,7 +899,9 @@ PDF
 
 ## 25. Resolved Query
 
-Codex 不应直接解释 P9 resolution store。
+Codex/Luna 不应直接解释或读取 P9 resolution store 文件。
+
+Research MCP 必须通过 accepted P9 public APIs / validated materialized snapshot 提供统一 resolved query。
 
 新增：
 
@@ -759,6 +981,113 @@ P9 corrupt
 ```
 
 因为这会隐藏已存在但损坏的 reviewed state。
+
+### 28.1 Prepare / submit / materialize 的 side-effect 边界
+
+三个 write-through tool 都必须明确标记为 mutation tool，并且 caller 必须显式调用。
+
+禁止：
+
+```text
+get_review_state
+→ implicit prepare
+→ implicit submit
+→ implicit materialize
+```
+
+读操作不得产生 durable state。
+
+允许且推荐：
+
+```text
+get_review_state
+→ explicit prepare if needed
+→ explicit submit one supported decision
+→ explicit materialize
+→ get_review_state verify
+```
+
+### 28.2 P9 evidence 与 visual evidence 的关系
+
+当前 P9 v1 支持的 durable evidence 仍是 accepted P5/P6 evidence contract。
+
+PDF visual 的作用是：
+
+> 帮助 reviewer 判断 P5/P6 evidence 的正确语义。
+
+PDF visual **不是**当前 P9 v1 的直接 durable evidence type。
+
+因此：
+
+- visual 清楚 + 存在合法 P5/P6 anchor → `EXPLICIT_AND_ANCHORABLE`，可按 P9 submit；
+- visual 清楚 + 没有合法 P5/P6 anchor → `EXPLICIT_VISUAL_ONLY`，当前不得 durable submit；
+- visual 证明 raw numeric extraction 错误 → `RAW_EXTRACTION_DEFECT`，不得用 P9 覆盖数值。
+
+### 28.3 同一页面多 Task 的 token 优化
+
+QUALITY_REVIEW 必须先按以下 identity 聚合：
+
+`document_sha256 + table_id/page_no`
+
+同一 table/page 上多个 Review Task：
+
+- 先一次读取 structured context；
+- 必要时一次 render；
+- 同一 VisualRef 在当前 run 内复用；
+- 每个 durable resolution 仍必须分别满足自己的 P9 target/evidence contract。
+
+禁止为了每个 fact 重复渲染同一页面。
+
+### 28.4 Visual escalation order
+
+固定顺序：
+
+```text
+structured evidence
+→ render_table NORMAL
+→ render_table HIGH_DETAIL when needed
+→ render_table_group when verified group exists
+→ render_page NORMAL
+→ render_page HIGH_DETAIL / deterministic tiles
+```
+
+只有明确需要上下文时才升级。
+
+不得：
+
+- 先全页后表格；
+- 自动浏览整份 PDF；
+- 自动前后翻页直到“找到答案”；
+- 为 clean/resolved fact 重复截图。
+
+### 28.5 QUALITY_REVIEW completion contract
+
+指定公司/期间的质量完善任务完成时必须输出按 document 的结果：
+
+- `document_sha256`
+- report period identity
+- initial quality_state
+- final quality_state
+- task_count
+- resolved_count
+- unresolved_count
+- unsupported_count
+- visual_call_count
+- rendered_unique_page_count
+- submitted_resolution_ids
+- parser_defect_candidate_count
+- missing_fact_candidate_count
+
+只有所有目标 document 均为：
+
+- `COMPLETE_BASE`，或
+- `COMPLETE_REVIEWED`
+
+才能把本次指定范围标记为：
+
+`QUALITY_REVIEW_COMPLETE`
+
+任何 `NEEDS_REVIEW / NEEDS_UPSTREAM_FIX / BLOCKED / INVALID_REVIEW_STATE` 都必须显式保留，不得以“Luna 已检查”代替完成状态。
 
 ---
 
@@ -1137,13 +1466,25 @@ NORMAL不足时可以 deterministic HIGH_DETAIL/tile。
 
 Caller 只能使用 domain identity：
 
+- market / ticker / fiscal year（仅用于 P8 document discovery）；
 - document_sha256；
 - raw_fact_id；
-- issue_id；
+- issue_id / review_task_id；
 - table_id；
 - table_group_id；
 - page_no；
 - locator query。
+
+特别禁止：
+
+- direct SQLite/SQL；
+- arbitrary project path；
+- raw-store path；
+- review_dir path；
+- snapshot path；
+- resolution-store file path。
+
+Research MCP 内部通过 trusted catalog + accepted P9 root identity 完成映射。
 
 ---
 
@@ -1234,9 +1575,11 @@ Research MCP 调用前后必须证明：
 - P6 unchanged；
 - P7 unchanged；
 - Registry unchanged；
-- P9 store unchanged unless caller explicitly执行 authorized P9 submit。
+- P9 store unchanged unless caller explicitly执行 `ffdf_prepare_review_overlay` / `ffdf_submit_review_resolution` / `ffdf_materialize_resolved_view`。
 
-render tool 永远 read-only。
+所有 query/render tool 永远 read-only。
+
+write-through tool 只能改变 P9 overlay/snapshot；不得改变 source/P3/P5/P6/P7/Registry。
 
 ---
 
@@ -1295,25 +1638,35 @@ render tool 永远 read-only。
 
 ---
 
-## 52. Tests — Resolved Query
+## 52. Tests — Resolved Query / Quality State / Write-Through
 
 至少：
 
-1. no P9 overlay → raw/effective equivalent；
-2. period overlay；
-3. unit overlay；
-4. scope overlay；
-5. multiple compatible overlays；
-6. superseded excluded；
-7. corrupt store blocks；
-8. raw unchanged；
-9. provenance returned；
-10. deterministic response；
+1. no P9 overlay + P7 PASS → COMPLETE_BASE；
+2. no P9 overlay + P7 REVIEW_REQUIRED + supported task → NEEDS_REVIEW；
+3. period overlay；
+4. unit overlay；
+5. scope overlay；
+6. multiple compatible overlays；
+7. superseded excluded；
+8. corrupt store → INVALID_REVIEW_STATE and blocks；
+9. raw unchanged；
+10. provenance returned；
 11. resolved REVIEW_REQUIRED；
-12. resolved PASS；
+12. resolved PASS + reuse eligible → COMPLETE_REVIEWED；
 13. Registry not mutated；
 14. P8 raw tools unchanged；
-15. existing overlay avoids repeat visual.
+15. existing durable overlay avoids repeat visual；
+16. prepare is explicit and idempotent for same accepted base；
+17. submit rejects stale expected overlay hash；
+18. submit rejects unsupported action；
+19. submit rejects raw numeric replacement；
+20. submit uses accepted P9 evidence validation；
+21. materialize after submit returns new overlay identity；
+22. final get_review_state sees the materialized state；
+23. read tools do not implicitly prepare/submit/materialize；
+24. same-page multiple tasks reuse one rendered VisualRef in-run；
+25. unsupported task maps to NEEDS_UPSTREAM_FIX rather than model guessing.
 
 ---
 
@@ -1338,66 +1691,111 @@ render tool 永远 read-only。
 
 ### R-A — Future Design Baseline
 
-design/28 + design/29 可以作为 reference design 冻结。
+design/28 + design/29 v2 可以作为 reference design 冻结。
 
-**R-B 及以后全部保持 CLOSED，直到 P10 closeout 或后续 design-owner 以新 baseline 明确授权 Research MCP production。**
+**本次 design 更新仍不授权 production implementation。R-B 及以后保持 CLOSED，直到 design-owner 以新 baseline 明确授权。**
 
-### R-B — Trusted Source & Period-aware Catalog
+### R-B — Trusted Source & Period-aware Identity
 
 - raw PDF mapping；
 - filing period identity；
 - path security；
-- SHA/page validation。
+- SHA/page validation；
+- no direct DB / SQL / arbitrary filesystem surface。
 
-### R-C — Resolved Query
+### R-C — Resolved Query + Quality State
 
 先实现：
-- review state；
-- resolved fact/list。
 
-理由：已有 P9 result 应最优先避免重复 visual。
+- `ffdf_get_review_state`；
+- `ffdf_get_resolved_fact`；
+- `ffdf_list_resolved_facts`；
+- deterministic quality_state projection。
 
-### R-D — Visual Trigger Matrix
+理由：已有 P9 durable result 必须最优先复用，避免任何重复 visual。
+
+### R-D — Controlled P9 Write-Through
+
+实现：
+
+- `ffdf_prepare_review_overlay`；
+- `ffdf_list_review_tasks`；
+- `ffdf_submit_review_resolution`；
+- `ffdf_materialize_resolved_view`；
+- stale-state / optimistic-concurrency gate；
+- accepted P9 semantics only。
+
+先证明 structured-only review 可以完整闭环，再引入 visual。
+
+### R-E — Visual Trigger Matrix
 
 实现 deterministic trigger evaluator。
 
-### R-E — Missing-Fact Locator
+### R-F — Missing-Fact Locator
 
 实现 P3/P5 locator。
 
-### R-F — Visual Renderer
+### R-G — Visual Renderer
 
-实现 page/table/group + NORMAL/HIGH_DETAIL/tiling。
+实现 page/table/group + NORMAL/HIGH_DETAIL/tiling + in-run dedupe。
 
-### R-G — 002371 Golden
+### R-H — Visual Decision / Run-local Policy
+
+验证四类 decision、derived-use gates、P9 anchor rule。
+
+### R-I — 002371 Q3 Golden
 
 验证 Q3 KPI visual fallback。
 
-### R-H — Run-local Decision Policy
+### R-J — QUALITY_REVIEW End-to-End Golden
 
-验证 derived-use gates。
+至少覆盖：
 
-### R-I — Existing P9 Reuse Golden
+```text
+P7 REVIEW_REQUIRED
+→ prepare
+→ list unresolved supported task
+→ structured/visual review
+→ submit P9
+→ materialize
+→ get_review_state
+→ COMPLETE_REVIEWED
+→ next run no repeated visual
+```
 
-第一次 durable submit后，下一 run直接 Resolved Query，不再截图。
+### R-K — Existing P9 Reuse Golden
 
-### R-J — Diverse CN/HK Golden
+已有 durable submit 的 document 必须直接 Resolved Query，不截图。
 
-覆盖 cross-page/dense/missing fact。
+### R-L — Diverse CN/HK Golden
 
-### R-K — Code Review
+覆盖：
+
+- cross-page；
+- dense table；
+- missing fact；
+- raw extraction defect；
+- ambiguous；
+- unsupported task；
+- same-page multi-task visual dedupe。
+
+### R-M — Formal Code Review
 
 review exact candidate。
 
-### R-L — Acceptance Freeze
+### R-N — Acceptance Freeze
 
-冻结 renderer/runtime/catalog/fixtures。
+冻结 renderer/runtime/catalog/P9 wrapper contract/fixtures。
 
-### R-M — Independent Acceptance
+### R-O — Independent Acceptance
 
-未来 Research MCP Independent Acceptance PASS 后，只授权把该 capability additive 接入已验收的 P10 integration contract。
+Research MCP Independent Acceptance PASS 后，才允许：
 
-P10 core live research不以 R-M 为前置；在 R-M 之前 visual-required case 必须显式返回 capability gap。
+- additive 接入已验收 P10 integration contract；
+- 把 capability manifest 中 `PDF_VISUAL_EVIDENCE` 从 UNAVAILABLE 升级为 AVAILABLE；
+- 对外启用 P9 Review Write-Through MCP tools。
+
+P10 core live research不以 R-O 为前置；在 R-O 之前 visual-required case 必须显式返回 capability gap。
 
 ---
 
@@ -1423,8 +1821,10 @@ separate Semantic Resolver authorization
 
 因此：
 
-- design/29 = **未来 additive visual/resolved-query capability**；
-- design/28 = **未来 deterministic automation architecture**；
+- design/29 v2 = **未来 additive visual / resolved-query / controlled P9 write-through capability**；
+- QUALITY_REVIEW = **数据库完善运行模式**；
+- RESEARCH_FALLBACK = **研究期视觉回退模式**；
+- design/28 = **未来 deterministic semantic automation architecture**；
 - P10 v1 = **当前 accepted P8/P9 structured integration**。
 
 ---
@@ -1433,30 +1833,44 @@ separate Semantic Resolver authorization
 
 至少证明：
 
-1. P8 v1 11 tools unchanged；
-2. source/P3/P5/P6/P7 immutable；
-3. REVIEW_REQUIRED 可继续 research；
-4. Visual Trigger Matrix deterministic；
-5. complete clean fact不会无理由看图；
-6. missing fact可通过 locator找到候选 evidence；
-7. table crop错误可以升级 page；
-8. cross-page group可视觉检查；
-9. dense table可 HIGH_DETAIL/tile；
-10. PDF image来自 immutable source；
-11. VisualRef可审计；
-12. visual source 与 Codex decision明确分层；
-13. EXPLICIT_AND_ANCHORABLE可进入 P9；
-14. EXPLICIT_VISUAL_ONLY只能 run-local；
-15. RAW_EXTRACTION_DEFECT不能被 P9掩盖；
-16. AMBIGUOUS保持 unresolved；
-17. RUN_LOCAL_VERIFIED边界明确；
-18. DERIVED_USE_READY operation gate生效；
-19. run-local数据不进入 Registry reuse；
-20. durable P9 result下次自动通过 Resolved Query获取；
-21. corrupt P9不能 silent fallback；
-22. recurring pattern只形成 rule candidate，不自动改 parser；
-23. 002371 Q3 golden PASS；
-24. missing-fact / cross-page / dense-table golden PASS。
+1. P8 v1 exact 11 tools unchanged；
+2. P9 public semantics / action enum unchanged；
+3. source/P3/P5/P6/P7/Registry immutable；
+4. Codex/Luna 无 direct DB / SQL / artifact path access；
+5. quality_state 由 P7/P9 validated state deterministic 派生；
+6. COMPLETE_BASE 不创建 P9 overlay、不看图；
+7. COMPLETE_REVIEWED 后续 run 不重复 visual；
+8. NEEDS_REVIEW 只枚举 unresolved + SUPPORTED tasks；
+9. UNSUPPORTED task 不交给模型猜测并映射 NEEDS_UPSTREAM_FIX；
+10. prepare/submit/materialize 都是显式 mutation；
+11. read/render tool 绝不产生 durable mutation；
+12. stale expected overlay / base identity 阻断 submit；
+13. submit 只能接受 P9 当前 5 类 action；
+14. submit 不接受 raw numeric/raw metric correction；
+15. materialize 后必须 re-query 才能宣布 COMPLETE_REVIEWED；
+16. REVIEW_REQUIRED 仍可按规则继续 research；
+17. Visual Trigger Matrix deterministic；
+18. complete clean fact不会无理由看图；
+19. same table/page 多 task 不重复 render；
+20. missing fact可通过 locator找到候选 evidence；
+21. table crop错误可以升级 page；
+22. cross-page group可视觉检查；
+23. dense table可 HIGH_DETAIL/tile；
+24. PDF image来自 immutable source；
+25. VisualRef可审计；
+26. visual source 与 Codex/Luna decision明确分层；
+27. EXPLICIT_AND_ANCHORABLE只有在合法 P5/P6 anchor 下可进入 P9；
+28. EXPLICIT_VISUAL_ONLY只能 run-local；
+29. RAW_EXTRACTION_DEFECT不能被 P9掩盖；
+30. AMBIGUOUS保持 unresolved；
+31. RUN_LOCAL_VERIFIED边界明确；
+32. DERIVED_USE_READY operation gate生效；
+33. run-local数据不进入 Registry reuse；
+34. corrupt P9不能 silent fallback；
+35. recurring pattern只形成 rule/parser candidate，不自动改 production；
+36. 002371 Q3 golden PASS；
+37. QUALITY_REVIEW end-to-end golden PASS；
+38. missing-fact / cross-page / dense-table / defect / ambiguous golden PASS。
 
 ---
 
@@ -1480,17 +1894,25 @@ STOP
 
 ## 58. Exit
 
-本 reference design 本身不授权 implementation。
+本 v2 reference design **仍不授权 implementation**。
+
+下一步必须是 design-owner 对本 v2 baseline 的明确授权，之后才允许进入 R-B。
 
 只有未来单独满足：
 
 - Research MCP production authorization；
 - exact implementation plan；
-- Code Review；
+- R-B ～ R-N 全部 gate PASS；
+- Formal Code Review PASS；
 - Acceptance Freeze；
 - Independent Acceptance PASS；
 
-之后，Research MCP Extension 才可把 P10 capability manifest 中 `PDF_VISUAL_EVIDENCE` 从 UNAVAILABLE 改为 AVAILABLE。
+之后：
+
+1. Research MCP Extension 才可把 P10 capability manifest 中 `PDF_VISUAL_EVIDENCE` 从 UNAVAILABLE 改为 AVAILABLE；
+2. 才可对 Codex 暴露 `ffdf_prepare_review_overlay` / `ffdf_submit_review_resolution` / `ffdf_materialize_resolved_view`；
+3. 才可把 QUALITY_REVIEW 作为正式“入库后 Luna 完善数据库”工作流；
+4. 才根据最终 accepted tool schemas 编写 Codex + Luna production Prompt。
 
 P10 始终负责：
 
@@ -1499,7 +1921,14 @@ P10 始终负责：
 - accepted capability选择；
 - Codex reasoning；
 - run-local decisions；
-- optional P9 durable submit；
-- 最终研究输出。
+- final research output。
 
-Research MCP 不成为研究业务规则真源。
+Research MCP 始终负责：
+
+- accepted P8/P9 capability 的安全投影；
+- resolved-first query；
+- deterministic visual trigger / locator / renderer；
+- controlled P9 write-through；
+- quality-state verification。
+
+Research MCP 不成为研究业务规则真源；Luna 也不成为数据库真源。数据库可复用状态仍由 accepted P7/P9 deterministic artifacts 决定。
