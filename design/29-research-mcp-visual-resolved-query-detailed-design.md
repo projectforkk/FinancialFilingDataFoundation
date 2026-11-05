@@ -1,6 +1,6 @@
 # 29 — FFDF Research Review MCP v3：Resolved Query、Visual Evidence 与 Controlled Review Write-Through 详细设计
 
-> 状态：**ACTIVE DESIGN v3 — PRODUCTION IMPLEMENTATION NOT AUTHORIZED**
+> 状态：**ACTIVE DESIGN v3 — PRODUCTION IMPLEMENTATION AUTHORIZED FOR GATED EXECUTION**
 >
 > 当前真实基线：`main@8c6cd75`（`feat: add report-safe MCP interfaces`）
 >
@@ -256,6 +256,308 @@ ffdf MCP
 正常研究用的 `ffdf` profile 默认保持 write-disabled。
 
 如未来部署独立 `ffdf-review` MCP alias，也只能是**同一代码实现的 privileged runtime profile**，不能成为第二套数据架构。
+
+---
+
+## 5A. Research Preflight：正式研究前全期间质量监测
+
+Research Preflight 位于 P8/P9 与正式公司研究之间，是 **Research Orchestration（研究编排）**，不是新的 Raw/Parser 层，也不直接成为 P9 durable truth。
+
+标准位置：
+
+```text
+P8 / Report-Safe / P9
+        ↓
+Research Preflight
+        ↓
+必要的 QUALITY_REVIEW / upstream fix
+        ↓
+Preflight re-run
+        ↓
+正式公司研究
+        ↓
+报告生成
+```
+
+### 5A.1 目标
+
+对用户指定的公司和研究期间执行一次“全量监测”，但这里的“全量”定义为：
+
+- 全量扫描研究期间内的 in-scope filing/document 状态；
+- 全量扫描这些 document 的 P7/P9 quality state；
+- 全量检查本次研究明确要求的数据覆盖；
+- 只对与当前研究相关且未完善的项目建立 repair queue。
+
+明确不等于：
+
+- 全量重新读取所有 PDF；
+- 全量重新检查所有 RawFact；
+- 所有 REVIEW_REQUIRED 都必须看图；
+- 为了研究强制把整个数据库修成 PASS。
+
+### 5A.2 三层 Preflight
+
+#### A. Filing Coverage Scan
+
+回答：
+
+> 目标研究期间内，FFDF 当前 catalog / registry 覆盖了哪些正式财报？是否存在已知 filing coverage gap？
+
+至少输出：
+
+- market
+- ticker
+- requested research period
+- observed filings
+- latest observed filing
+- per filing: fiscal_year / filing_type / document_sha256
+- coverage warnings
+- known missing expected slots（仅在 market-specific deterministic policy 能确认时）
+- coverage_status
+
+重要边界：
+
+- 不得仅凭“catalog 没有”断言“公司没有发布”；
+- 如果当前系统没有足够的 market filing policy 判断预期 filing，刁状态必须是 `NOT_EVALUATED` 或 `CATALOG_COVERAGE_UNCONFIRMED`；
+- periodic filing coverage 不代表临时公告/event coverage。
+
+#### B. Document Quality Scan
+
+对研究期间每份 observed filing 调用/组合：
+
+- base validation
+- review state
+- resolved state
+
+输出每份文档的：
+
+- COMPLETE_BASE
+- COMPLETE_REVIEWED
+- NEEDS_REVIEW
+- NEEDS_MATERIALIZATION
+- NEEDS_UPSTREAM_FIX
+- BLOCKED
+- INVALID_REVIEW_STATE
+
+此步骤默认只读，不触发视觉、不写 P9。
+
+#### C. Research Data Coverage Scan
+
+回答：
+
+> 即使 document 本身可用，本次研究真正需要的数据是否足够？
+
+此步骤是 **consumer/orchestrator run-local contract**，FFDF 不从自然语言 Markdown 自动发明 canonical metric。
+
+研究需求必须由调用方根据已冻结 ResearchSpec / 问题清单显式形成 `ResearchRequirement`，例如：
+
+- requirement_id
+- source_rule_ref
+- description
+- target_periods
+- evidence/query strategy
+- criticality
+
+然后使用现有/未来接口检查：
+
+- Report-Safe direct disclosure
+- P8 raw fact/evidence
+- resolved semantics
+- company search
+- table rows
+- locator（必要时）
+
+每个 requirement 输出：
+
+- AVAILABLE
+- PARTIAL
+- NEEDS_REVIEW
+- NEEDS_UPSTREAM_FIX
+- NOT_DISCLOSED
+- NOT_FOUND
+- AMBIGUOUS
+- NOT_APPLICABLE
+
+Research Data Coverage 结果是 run-local research artifact，不写 Registry/P6/P9。
+
+### 5A.3 Research Repair Queue
+
+Preflight 必须生成最小 repair queue，不把所有非相关 Review Task 都升级为研究阻断。
+
+每项至少包含：
+
+- document_sha256
+- requirement_id（如适用）
+- review_task_id（如适用）
+- reason
+- disposition
+
+disposition 允许：
+
+- `QUALITY_REVIEW`
+- `UPSTREAM_FIX`
+- `RESEARCH_GAP`
+- `NOT_DISCLOSED`
+- `CATALOG_GAP`
+- `NO_ACTION`
+
+标准路由：
+
+```text
+NEEDS_REVIEW + research-relevant + SUPPORTED
+→ QUALITY_REVIEW
+
+RAW_EXTRACTION_DEFECT / P6_MISSING_FACT_CANDIDATE / unsupported
+→ UPSTREAM_FIX
+
+财报明确未披露
+→ NOT_DISCLOSED
+
+catalog 未覆盖但无法证明公司未发布
+→ CATALOG_GAP
+
+与当前研究无关的 non-blocking review
+→ NO_ACTION
+```
+
+### 5A.4 Research Ready 与 Database Complete 分离
+
+严禁使用“所有 Review Task 必须解决”作为正式研究的唯一门槛。
+
+定义：
+
+#### `period_monitoring_complete`
+
+表示目标研究期间内的 observed filings 已完成 Preflight 状态检查。
+
+#### `research_ready`
+
+只有当本次研究的 **critical requirements**：
+
+- 已可可靠使用；或
+- 已明确 NOT_DISCLOSED / NOT_APPLICABLE 且研究规则允许保留缺口；且
+- 不存在会使核心研究结论失真的 unresolved blocker
+
+时为 true。
+
+因此允许：
+
+```text
+document = REVIEW_REQUIRED
+但 remaining issue 与本次研究无关
+且所有 critical requirements 可用
+→ research_ready = true
+```
+
+#### `database_fully_reviewed`
+
+可以作为 run summary 统计概念，但不得新增持久化 `is_complete` 字段，也不得与 `research_ready` 混淆。
+
+### 5A.5 ResearchPreflightResult
+
+建议 run-local schema：
+
+```json
+{
+  "company": {"market": "CN", "ticker": "605117"},
+  "research_period": {"from": 2021, "to": 2026},
+  "filing_coverage": {
+    "observed_document_count": 23,
+    "latest_filing": "2026Q3",
+    "coverage_status": "OBSERVED"
+  },
+  "quality_summary": {
+    "complete_base": 17,
+    "complete_reviewed": 4,
+    "needs_review": 2,
+    "needs_upstream_fix": 0,
+    "blocked": 0
+  },
+  "research_coverage": {
+    "critical_requirement_count": 40,
+    "available": 37,
+    "partial": 2,
+    "not_disclosed": 1,
+    "blocking": 0
+  },
+  "repair_queue": [],
+  "period_monitoring_complete": true,
+  "research_ready": true
+}
+```
+
+该对象：
+
+- 可被 Codex/Sol 用于决定是否开始正式分析；
+- 不进入 Registry；
+- 不改变 P7/P9；
+- 不成为 canonical financial truth；
+- 需要保留 ResearchSpec bundle hash / requirement-set fingerprint 以保证本次 preflight 可追溯。
+
+### 5A.6 Preflight 执行策略
+
+标准算法：
+
+```text
+1. 获取 company filing context
+2. 枚举目标期间 observed filings
+3. 对每份 filing 获取 quality state
+4. 跳过 COMPLETE_BASE / COMPLETE_REVIEWED 的非必要复核
+5. 根据本次 ResearchRequirementSet 检查数据覆盖
+6. 建立最小 repair queue
+7. 仅处理 research-relevant QUALITY_REVIEW 项
+8. 如发现 upstream defect，路由 Parser/P6 修复
+9. 完成必要修复后重新运行 Preflight
+10. research_ready == true 后进入正式研究
+```
+
+### 5A.7 Token / Visual 原则
+
+Research Preflight 本身不得触发“全量视觉审核”。
+
+正确原则：
+
+```text
+全量状态扫描
+→ 最小 repair queue
+→ structured context first
+→ target-related unresolved only
+→ 必要时 visual
+```
+
+必须统计：
+
+- observed_document_count
+- reviewed_document_count
+- skipped_complete_document_count
+- repair_queue_count
+- visual_required_count
+- visual_call_count
+- research_blocker_count
+
+### 5A.8 与 P10 ResearchSpec 的关系
+
+当前 P10 `ResearchSpecBundle` 只冻结研究规则文件的路径、大小、SHA256，不解析 Markdown 语义。
+
+因此 v3 不引入自动“问题清单 → canonical metric”转换。
+
+ResearchRequirementSet 由上层研究编排显式生成，并记录：
+
+- `spec_bundle_hash`
+- `requirement_set_hash`
+
+未来如果要自动从规则文件生成 canonical requirements，属于单独的 Semantic Resolver / Research Planning 设计，不得夹带在本项目中。
+
+### 5A.9 Preflight 不是新的 MCP truth layer
+
+本阶段不新增 `ffdf_run_research_preflight` 这类万能 MCP 工具。
+
+原因：
+
+- Preflight 是对多个既有/未来 MCP 调用的研究编排；
+- requirement semantics 来自上层研究任务，而不是 FFDF parser truth；
+- 先保持各底层工具职责单一、可测试；
+- 等 v3 各能力验收后，如确有必要，再单独设计一个只读 orchestration convenience tool。
 
 ---
 
@@ -1293,9 +1595,19 @@ visual reviewer = runtime-selected model or human
 
 视觉只在 structured evidence 不能唯一判断时触发。
 
-### 35.2 605117 Report-Safe Integration
+### 35.2 605117 Research Preflight + Report-Safe Integration
 
-至少验证：
+先对 2021–2026 in-scope filings 执行 Research Preflight，至少验证：
+
+- observed filing list 稳定、可追溯；
+- COMPLETE_BASE / COMPLETE_REVIEWED / NEEDS_REVIEW 分类正确；
+- 非研究相关的 REVIEW_REQUIRED 不应自动阻断 research_ready；
+- 只对 research-relevant unresolved task 建 repair queue；
+- Preflight 本身不自动 render、不自动写 P9；
+- 修复必要问题后 re-run Preflight，research_ready 能从 false/conditional 正确转为 true；
+- ResearchPreflightResult 记录 spec_bundle_hash / requirement_set_hash。
+
+随后继续验证 Report-Safe：
 
 - 2025FY `新能源行业` direct row 可直接获取；
 - `外销` disclosure label 不被扩写成“海外收入”；
@@ -1359,6 +1671,21 @@ R-A0 的正式产物就是本 design/29 v3。
 - quality-state enum
 - error codes
 - P8/P9 non-regression rules
+
+### R-A2 — Research Preflight Contract
+
+冻结：
+
+- Filing Coverage / Document Quality / Research Data Coverage 三层模型
+- ResearchRequirementSet run-local 输入边界
+- ResearchPreflightResult schema
+- Research Repair Queue disposition
+- research_ready 判定
+- period_monitoring_complete 判定
+- Preflight 不自动写 P9 / 不自动看图
+- Preflight 与 P10 ResearchSpecBundle 的 fingerprint 关系
+
+R-A2 不实现 Semantic Resolver，不创建 canonical metric layer。
 
 ### R-B — Trusted Source Resolver
 
@@ -1543,7 +1870,7 @@ STOP
 
 **DESIGN COMPLETE / PRODUCTION IMPLEMENTATION NOT AUTHORIZED**
 
-下一步若授权实现，应明确使用本 design/29 v3 作为唯一 baseline。
+本设计已于 2026-11-05 获得用户明确授权，允许按 gate 顺序推进 production implementation；任何 gate 仍必须独立通过其设计、测试和证据要求。
 
 不得使用：
 
@@ -1553,4 +1880,4 @@ STOP
 - “P9 MCP”这一不准确表述；
 - “视觉结果可直接写入 P9 evidence”的错误假设。
 
-Production implementation 必须从 R-A1 开始，并严格按 gate 顺序推进。
+Production implementation 从 R-A1 开始，并严格按 R-A1 → R-A2 → R-B ... 的 gate 顺序推进。
