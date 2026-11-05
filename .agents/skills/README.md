@@ -14,3 +14,18 @@
 - validation / export。
 
 Skill 不替代 deterministic parser。
+
+
+## ffdf-research-preflight
+
+正式公司研究前的 Research Preflight 编排 Skill。
+
+调用：
+
+`$ffdf-research-preflight <company> <YYYY-YYYY> <model>`
+
+当前唯一允许的 model：
+
+`luna5.6-max`
+
+Skill 直接编排 FFDF MCP 做全期间结构化监测，只在必要时调用 Luna 5.6 Max，并遵守 P9 / upstream-fix 边界。

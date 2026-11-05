@@ -1,0 +1,7 @@
+interface:
+  display_name: "FFDF研究前预检"
+  short_description: "按公司、年度区间和 Luna 5.6 Max 执行 FFDF Research Preflight"
+  default_prompt: "使用 $ffdf-research-preflight，参数依次为公司、年度区间、模型。例如：$ffdf-research-preflight 605117 2021-2026 luna5.6-max。先通过 FFDF MCP 完成全期间结构化状态监测，只把真正需要模型判断的疑难项交给 Luna 5.6 Max；必要时才看 PDF Visual，按 P9 / upstream-fix 边界处理，最终输出 RESEARCH PREFLIGHT: PASS/FAIL。"
+
+policy:
+  allow_implicit_invocation: false
