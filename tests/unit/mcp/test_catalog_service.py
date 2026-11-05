@@ -551,3 +551,10 @@ def test_company_context_uses_manifest_summary_not_full_bundle(
     )
 
     assert result["data"]["total"] >= 1
+
+
+def test_report_safe_does_not_reach_private_bundle() -> None:
+    source = Path(
+        "src/financial_filing_data_foundation/mcp/report_safe.py"
+    ).read_text(encoding="utf-8")
+    assert "service._bundle" not in source

@@ -507,6 +507,44 @@ class McpQueryService:
             "issue_count": int(p7.get("issue_count") or 0),
         }
 
+    def all_pages_internal(
+        self,
+        document_sha256: str,
+    ) -> tuple[dict[str, Any], ...]:
+        """Return defensive P3 page copies for internal composed services."""
+        bundle = self._bundle(document_sha256)
+        return tuple(copy.deepcopy(item) for item in bundle.pages)
+
+    def all_tables_internal(
+        self,
+        document_sha256: str,
+    ) -> tuple[dict[str, Any], ...]:
+        """Return defensive P5 table copies for internal composed services."""
+        bundle = self._bundle(document_sha256)
+        return tuple(copy.deepcopy(item) for item in bundle.tables)
+
+    def table_group_map_internal(
+        self,
+        document_sha256: str,
+    ) -> dict[str, str]:
+        """Return a defensive table->group mapping for internal services."""
+        bundle = self._bundle(document_sha256)
+        return dict(bundle.table_group_map)
+
+    def validation_status_internal(
+        self,
+        document_sha256: str,
+    ) -> str:
+        """Return the base P7 validation status for internal services."""
+        bundle = self._bundle(document_sha256)
+        return str(
+            getattr(
+                bundle.validation_artifact.validation_status,
+                "value",
+                bundle.validation_artifact.validation_status,
+            )
+        )
+
     def all_raw_facts_internal(
         self,
         document_sha256: str,

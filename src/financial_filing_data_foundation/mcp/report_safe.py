@@ -229,8 +229,8 @@ def search_company(
     documents_with_matches = 0
     for metadata in documents:
         sha = metadata["document_sha256"]
-        detail = service.get_document(sha)["data"]
-        bundle = service._bundle(sha)
+        detail = service.get_document_summary_internal(sha)
+        pages = service.all_pages_internal(sha)
         fts_limit = min(50, max(10, checked_per_document * 4))
         search = service.search_document(
             sha,
@@ -240,7 +240,7 @@ def search_company(
 
         candidates: dict[int, dict[str, Any]] = {}
         query_folded = normalized_query.casefold()
-        for page in bundle.pages:
+        for page in pages:
             text = str(page.get("text", ""))
             if query_folded in text.casefold():
                 page_no = int(page["page_no"])
@@ -393,15 +393,11 @@ def find_table_rows(
     matches: list[dict[str, Any]] = []
     total_matches = 0
     for metadata in documents:
-        bundle = service._bundle(metadata["document_sha256"])
-        validation_status = str(
-            getattr(
-                bundle.validation_artifact.validation_status,
-                "value",
-                bundle.validation_artifact.validation_status,
-            )
-        )
-        for table in sorted(bundle.tables, key=lambda row: (
+        document_sha = metadata["document_sha256"]
+        validation_status = service.validation_status_internal(document_sha)
+        tables = service.all_tables_internal(document_sha)
+        table_group_map = service.table_group_map_internal(document_sha)
+        for table in sorted(tables, key=lambda row: (
             int(row.get("page_no", 0)),
             str(row.get("table_id", "")),
         )):
@@ -436,7 +432,7 @@ def find_table_rows(
                         "validation_status": validation_status,
                         "page_no": int(table.get("page_no", 0)),
                         "table_id": str(table.get("table_id", "")),
-                        "table_group_id": bundle.table_group_map.get(
+                        "table_group_id": table_group_map.get(
                             str(table.get("table_id", ""))
                         ),
                         "row_index": row.get("row_index"),

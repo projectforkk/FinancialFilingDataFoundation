@@ -81,7 +81,13 @@ enabled 只表示 Codex 已启用该 MCP 配置。真正可用还需要完成协
 
 ## 5. 当前 FFDF MCP 工具
 
-FFDF MCP 当前提供 14 个只读工具；原有 11 个 P8 工具保持兼容，新增 3 个 report-safe（报告安全）接口：
+FFDF MCP 当前候选生产接口共 26 个。逻辑上分为三组：
+
+- P8_RAW_V1：11 个冻结的 Raw/Read 工具；
+- REPORT_SAFE_V1：3 个报告安全只读接口；
+- RESEARCH_REVIEW_V1：12 个研究复核接口，其中 9 个 read/render，3 个 P9 write-through。
+
+工具列表：
 
 1. ffdf_list_documents
 2. ffdf_get_document
@@ -97,6 +103,20 @@ FFDF MCP 当前提供 14 个只读工具；原有 11 个 P8 工具保持兼容�
 12. ffdf_get_company_report_context
 13. ffdf_search_company
 14. ffdf_find_table_rows
+15. ffdf_get_review_state
+16. ffdf_get_resolved_fact
+17. ffdf_list_resolved_facts
+18. ffdf_list_review_tasks
+19. ffdf_get_review_context
+20. ffdf_locate_evidence
+21. ffdf_render_table
+22. ffdf_render_table_group
+23. ffdf_render_page
+24. ffdf_prepare_review_overlay
+25. ffdf_submit_review_resolution
+26. ffdf_materialize_resolved_view
+
+默认 `--research-review-profile RESEARCH_FALLBACK`。该 profile 下 24–26 三个写工具虽然在 tool surface 中可见，但调用时会返回 `RESEARCH_MCP_WRITE_DISABLED`。只有显式启动 `QUALITY_REVIEW` profile 才允许通过现有 P9 v1 API 执行 prepare / submit / materialize。
 
 中文注释：
 
@@ -167,7 +187,7 @@ MCP Server 在启动时读取 Catalog，因此新入库后推荐：
 
     FFDF_MCP_HANDSHAKE=PASS
     PROTOCOL=2026-07-28
-    TOOLS=14
+    TOOLS=26
     TICKER=605117
     DOCUMENTS=23
     YEARS=2021,2022,2023,2024,2025,2026
@@ -176,7 +196,7 @@ MCP Server 在启动时读取 Catalog，因此新入库后推荐：
 
 - Codex MCP 配置可启动 FFDF；
 - MCP protocol 握手成功；
-- 14 个工具完整暴露，其中新增3个 report-safe 接口；
+- 26 个工具完整暴露：原11个 P8 + 3个 Report-Safe + 12个 Research Review；
 - 605117 的 23 份本地财报可以被 MCP 查询；
 - 当前 Catalog 与最新批量入库结果一致。
 
