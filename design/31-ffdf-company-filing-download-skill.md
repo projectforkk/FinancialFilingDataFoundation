@@ -2,7 +2,7 @@
 
 ## 状态
 
-**OPTIMIZATION V2 AUTHORIZED / STATUS-FIRST**
+**OPTIMIZATION V2 AUTHORIZED / SKIP-IF-INGESTED + EXPLICIT RELOAD**
 
 ## 目标
 
@@ -146,46 +146,83 @@ FAIL：
 - 不执行 reset/clean/force push；
 - 不提交 `00document/`、`01prompt/`。
 
-## Optimization v2 — Status-First Complete-Slot Skip
+## Optimization v2 — Skip If Already Ingested / Explicit Reload
 
-在每个 `year x period` 调用 `ffdf ingest` 之前，必须先调用：
+用户确认最终语义：
+
+> 只要当期财报已经入库就跳过，除非明确指定“重新读入”。
+
+### Default behavior
+
+每个 `year x period` 先调用：
 
 `ffdf status --market <market> --ticker <ticker> --year <year> --period <period>`
 
-只有同时满足以下全部条件，才把该 slot 判定为：
+正常情况下，只要：
 
-`ALREADY_COMPLETE`
+`p8_catalog_registered == true`
 
-并完全跳过 `ffdf ingest`：
+即视为该当期财报已经完成 FFDF 入库。
 
-1. status 命令成功；
-2. `local_document_status == RESOLVED`；
-3. `document_sha256` 非空；
-4. `raw_path` 非空；
-5. `parsed_runs` 至少存在一个与当前 `document_sha256` 相同的记录；
-6. 该匹配 parsed run 的 `blocking_issue_count == 0`；
-7. `p8_catalog_registered == true`；
-8. `p8_catalog_document.document_sha256 == document_sha256`。
+默认状态：
 
-Validation 可以是 PASS，也可以是 REVIEW_REQUIRED，只要 blocking=0 且已经进入 P8 live catalog，就属于完整入库。
+`SKIPPED_ALREADY_INGESTED`
 
-只要上述任一条件不满足：
+并直接跳过该 slot 的 `ffdf ingest`。
 
-- 不得标记 ALREADY_COMPLETE；
-- 继续执行现有 `ffdf ingest`；
-- 由 ingest 的 acquire / parser / validation / catalog 逻辑决定后续状态。
+不再要求为了默认跳过而重新验证完整 P3-P7 计数或重新计算 P7。
 
-这样可以避免已经完整入库的 filing 再次进入 P7 计算与 P8 upsert，同时仍然允许半成品、缺 catalog、缺 parsed run 或 blocking artifact 自动补齐。
+### Integrity exception
 
-### Summary changes
+如果 status 同时明确报告本地状态为：
 
-新增统计：
+- `CONFLICT`
+- `DRIFTED`
+- `AMBIGUOUS`
 
-- `already_complete_count`
-- per-slot `ALREADY_COMPLETE`
+则不得因为 catalog 中存在记录就静默跳过。
 
-PASS / PARTIAL / FAIL 中，`ALREADY_COMPLETE` 与 `INGESTED` / `REUSED_LOCAL` 同样计为成功 slot。
+必须输出 blocker，并由用户决定是否修复/重新读入。
 
-### Safety
+### Optional reload directive
 
-status-first 只做读取和完整性判断，不修改 Registry、Raw、P3-P8，不绕过既有 validation，也不把缺失状态伪装成成功。
+两个必填参数保持不变：
+
+1. company_code
+2. year_or_range
+
+允许追加一个可选控制词：
+
+`重新读入`
+
+例如：
+
+`$FFDF公司财报下载 605117 2021-2026 重新读入`
+
+它不是第三个必填参数，而是显式 bypass-skip 指令。
+
+指定 `重新读入` 后：
+
+- 即使 `p8_catalog_registered == true`，也不使用 SKIPPED_ALREADY_INGESTED；
+- 对 requested slots 重新调用现有 `ffdf ingest`；
+- FFDF 自身 Raw Store / Registry / artifact 不可变与复用规则继续生效；
+- 不删除 Raw；
+- 不清空 Registry；
+- 不强制重新下载同 SHA PDF；
+- 不使用 destructive reset/rebuild。
+
+因此“重新读入”表示重新执行标准 ingest 流程，不表示破坏性地删除已有底稿后重建。
+
+### Summary
+
+新增：
+
+- `skipped_already_ingested_count`
+- per-slot `SKIPPED_ALREADY_INGESTED`
+- `reload_requested: true|false`
+
+最终 PASS 统计中：
+
+`SKIPPED_ALREADY_INGESTED`
+
+与 `INGESTED` / `REUSED_LOCAL` 同样属于成功 slot。
