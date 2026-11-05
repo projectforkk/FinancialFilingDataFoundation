@@ -15,9 +15,9 @@ description: "根据公司代码和年度/年度区间，批量下载 CN/HK 正�
 
 ## Invocation
 
-只接受两个逻辑参数：
+两个参数为必填；另外允许一个可选控制词 `重新读入`：
 
-`$FFDF公司财报下载 <company_code> <year_or_range>`
+`$FFDF公司财报下载 <company_code> <year_or_range> [重新读入]`
 
 示例：
 
@@ -27,7 +27,7 @@ description: "根据公司代码和年度/年度区间，批量下载 CN/HK 正�
 
 `$FFDF公司财报下载 700 2024`
 
-不得增加 market、period、model 等第三个必填参数。
+不得增加 market、period、model 等第三个必填参数。可选的 `重新读入` 只是控制词，不是第三个必填参数。
 
 ## Parameter 1 — company_code
 
@@ -120,6 +120,73 @@ FFDF CLI 对每个 period 有 deterministic default publication search window。
 
 这不是系统错误，不要人为扩大 window，也不要联网猜公告日期。
 
+## Status-first skip rule
+
+对每个 `year x period`，先执行：
+
+`ffdf status --market <market> --ticker <ticker> --year <year> --period <period>`
+
+如果 shell 中没有直接可用的 `ffdf` 命令，使用当前仓库已安装的等价入口：
+
+`python -m financial_filing_data_foundation.user_cli status ...`
+
+### Default: skip already-ingested filing
+
+如果 status 正常返回：
+
+`p8_catalog_registered == true`
+
+则该当期财报视为已经入库。
+
+默认：
+
+`normalized_status = SKIPPED_ALREADY_INGESTED`
+
+并**不再调用 `ffdf ingest`**。
+
+这意味着默认不会：
+
+- 重复下载；
+- 重复进入 P3-P6；
+- 再次计算 P7；
+- 再次 upsert P8。
+
+### Integrity exception
+
+如果 status 同时显示：
+
+- `local_document_status = CONFLICT`
+- `local_document_status = DRIFTED`
+- `local_document_status = AMBIGUOUS`
+
+则不得仅因为 P8 catalog 有记录就静默跳过。
+
+必须记录 blocker；不要把异常本地状态写成 SKIPPED_ALREADY_INGESTED。
+
+### Optional directive: 重新读入
+
+调用可以显式追加：
+
+`重新读入`
+
+例如：
+
+`$FFDF公司财报下载 605117 2021-2026 重新读入`
+
+指定后：
+
+- 对 requested slots 忽略默认的 already-ingested skip；
+- 即使 `p8_catalog_registered == true` 也重新调用标准 `ffdf ingest`；
+- 不删除 Raw；
+- 不清空 Registry；
+- 不删除 P3-P7；
+- 不强制重新下载已有相同 SHA 的 PDF；
+- FFDF 自身 `INCREMENTAL_FIRST` / immutable artifact 规则继续生效。
+
+因此，`重新读入` 的含义是“重新执行标准 ingest”，不是 destructive rebuild。
+
+如果没有明确出现 `重新读入` 四个字，默认永远跳过已经入库的当期财报。
+
 ## Execution command
 
 对每个 `year x period`，从 FFDF repo root 执行：
@@ -207,6 +274,10 @@ FFDF CLI 对每个 period 有 deterministic default publication search window。
 
 ## Per-slot status normalization
 
+新增首要状态：
+
+- `SKIPPED_ALREADY_INGESTED`
+
 每个 slot 必须记录：
 
 - year
@@ -227,6 +298,21 @@ FFDF CLI 对每个 period 有 deterministic default publication search window。
 - research_ready
 - normalized_status
 - message/reason_code
+
+### SKIPPED_ALREADY_INGESTED
+
+默认 status-first 快速路径。
+
+条件：
+
+- 未指定 `重新读入`；
+- `p8_catalog_registered == true`；
+- 没有明确 local CONFLICT / DRIFTED / AMBIGUOUS。
+
+行为：
+
+- 跳过 `ffdf ingest`；
+- 直接复用当前入库结果。
 
 ### INGESTED
 
@@ -326,7 +412,7 @@ Acquisition/provider 返回 BLOCKED 或其他明确 acquisition blocker。
 
 满足：
 
-- 至少一个 slot 为 INGESTED 或 REUSED_LOCAL；
+- 至少一个 slot 为 SKIPPED_ALREADY_INGESTED、INGESTED 或 REUSED_LOCAL；
 - 不存在 BLOCKED；
 - 不存在 INGEST_BLOCKED；
 - 不存在 ERROR。
@@ -341,7 +427,7 @@ Acquisition/provider 返回 BLOCKED 或其他明确 acquisition blocker。
 
 满足：
 
-- 至少一个 slot 为 INGESTED 或 REUSED_LOCAL；
+- 至少一个 slot 为 SKIPPED_ALREADY_INGESTED、INGESTED 或 REUSED_LOCAL；
 - 但同时存在 BLOCKED / INGEST_BLOCKED / ERROR。
 
 ### FAIL
@@ -350,7 +436,7 @@ Acquisition/provider 返回 BLOCKED 或其他明确 acquisition blocker。
 
 - 参数非法；
 - FFDF CLI/Dayu 环境不可用；
-- requested slots 中没有任何 INGESTED / REUSED_LOCAL；
+- requested slots 中没有任何 SKIPPED_ALREADY_INGESTED / INGESTED / REUSED_LOCAL；
 - 全部 slot 都无法执行成功。
 
 ## Required summary
@@ -387,7 +473,7 @@ market: CN
 normalized_ticker: 605117
 requested_years: 2021-2022
 
-2021 Q1  REUSED_LOCAL
+2021 Q1  SKIPPED_ALREADY_INGESTED
 2021 H1  INGESTED
 2021 Q3  INGESTED
 2021 FY  INGESTED
@@ -398,7 +484,8 @@ requested_years: 2021-2022
 
 attempted_slot_count: 8
 ingested_count: 7
-reused_count: 1
+skipped_already_ingested_count: 1
+reused_count: 0
 not_found_count: 0
 future_not_started_count: 0
 blocked_count: 0
@@ -424,6 +511,7 @@ FINAL STATUS: PASS
 10. FUTURE_WINDOW_NOT_STARTED 时强行扩大 publication window；
 11. P7 blocking>0 时写成 P8 已成功入库；
 12. 把 P7 REVIEW_REQUIRED 自动改成 PASS。
+13. 未指定 `重新读入` 时，对已入库 slot 再次执行 ingest。
 
 ## Completion rule
 

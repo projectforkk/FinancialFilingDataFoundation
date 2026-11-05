@@ -43,4 +43,4 @@ Skill 直接编排 FFDF MCP 做全期间结构化监测，只在必要时调用 
 
 `$FFDF公司财报下载 605117 2021-2026`
 
-Skill 自动识别 CN/HK，逐年逐期调用现有 `ffdf ingest`，完成 Raw、P3-P7、Parsed Registry 和非 blocking P8 live catalog 入库。
+Skill 自动识别 CN/HK，逐年逐期先用 `ffdf status` 跳过已入库财报；只有未入库 slot 才调用 `ffdf ingest`。如明确追加 `重新读入`，则对 requested slots 重新执行标准 ingest。
