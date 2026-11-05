@@ -1,0 +1,7 @@
+interface:
+  display_name: "FFDF公司财报下载"
+  short_description: "按公司代码和年度/年度区间下载正式财报并完成 FFDF P3-P8 解析入库"
+  default_prompt: "使用 $FFDF公司财报下载。参数只有公司代码和年度/年度区间，例如：$FFDF公司财报下载 605117 2021-2026。自动识别 CN/HK，逐年逐期调用现有 ffdf ingest，复用已有 Raw，完成 P3-P7、Registry 和非 blocking P8 live catalog 入库，并汇总每期状态。"
+
+policy:
+  allow_implicit_invocation: false

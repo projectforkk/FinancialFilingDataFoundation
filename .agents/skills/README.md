@@ -29,3 +29,18 @@ Skill 不替代 deterministic parser。
 `luna5.6-max`
 
 Skill 直接编排 FFDF MCP 做全期间结构化监测，只在必要时调用 Luna 5.6 Max，并遵守 P9 / upstream-fix 边界。
+
+
+## FFDF公司财报下载
+
+按公司代码和年度/年度区间批量下载并解析正式财报。
+
+调用：
+
+`$FFDF公司财报下载 <company_code> <year_or_range>`
+
+示例：
+
+`$FFDF公司财报下载 605117 2021-2026`
+
+Skill 自动识别 CN/HK，逐年逐期调用现有 `ffdf ingest`，完成 Raw、P3-P7、Parsed Registry 和非 blocking P8 live catalog 入库。
