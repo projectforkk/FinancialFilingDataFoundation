@@ -2,7 +2,7 @@
 
 ## 状态
 
-**DONE / ACCEPTANCE PASS**
+**OPTIMIZATION V2 AUTHORIZED / STATUS-FIRST**
 
 ## 目标
 
@@ -145,3 +145,47 @@ FAIL：
 - 不改 Raw/P3/P4/P5/P6/P7 内容；
 - 不执行 reset/clean/force push；
 - 不提交 `00document/`、`01prompt/`。
+
+## Optimization v2 — Status-First Complete-Slot Skip
+
+在每个 `year x period` 调用 `ffdf ingest` 之前，必须先调用：
+
+`ffdf status --market <market> --ticker <ticker> --year <year> --period <period>`
+
+只有同时满足以下全部条件，才把该 slot 判定为：
+
+`ALREADY_COMPLETE`
+
+并完全跳过 `ffdf ingest`：
+
+1. status 命令成功；
+2. `local_document_status == RESOLVED`；
+3. `document_sha256` 非空；
+4. `raw_path` 非空；
+5. `parsed_runs` 至少存在一个与当前 `document_sha256` 相同的记录；
+6. 该匹配 parsed run 的 `blocking_issue_count == 0`；
+7. `p8_catalog_registered == true`；
+8. `p8_catalog_document.document_sha256 == document_sha256`。
+
+Validation 可以是 PASS，也可以是 REVIEW_REQUIRED，只要 blocking=0 且已经进入 P8 live catalog，就属于完整入库。
+
+只要上述任一条件不满足：
+
+- 不得标记 ALREADY_COMPLETE；
+- 继续执行现有 `ffdf ingest`；
+- 由 ingest 的 acquire / parser / validation / catalog 逻辑决定后续状态。
+
+这样可以避免已经完整入库的 filing 再次进入 P7 计算与 P8 upsert，同时仍然允许半成品、缺 catalog、缺 parsed run 或 blocking artifact 自动补齐。
+
+### Summary changes
+
+新增统计：
+
+- `already_complete_count`
+- per-slot `ALREADY_COMPLETE`
+
+PASS / PARTIAL / FAIL 中，`ALREADY_COMPLETE` 与 `INGESTED` / `REUSED_LOCAL` 同样计为成功 slot。
+
+### Safety
+
+status-first 只做读取和完整性判断，不修改 Registry、Raw、P3-P8，不绕过既有 validation，也不把缺失状态伪装成成功。
