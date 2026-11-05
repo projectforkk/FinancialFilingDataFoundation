@@ -1515,21 +1515,50 @@ renderer 行为变化必须提升 renderer_version。
 
 ## 32. Reviewer Identity
 
-FFDF correctness contract 不绑定 Luna。
+FFDF correctness contract 不绑定某个模型本身；模型是 runtime policy，不是数据正确性的唯一来源。
 
 角色：
 
 ```text
-orchestrator = Codex / caller
-visual reviewer = runtime-selected model or human
+orchestrator = caller / Codex（如启用）
+visual reviewer = runtime-selected reviewer
 ```
 
-当前可以默认使用 Luna 做高吞吐视觉复核，但：
+### 32.1 当前用户授权的 Codex 模型限制
+
+从 2026-11-05 起，本项目若调用 **Codex**，只能调用 **Luna 5.6**。
+
+明确禁止：
+
+- 通过 Codex 调用其他模型；
+- 为代码实现、代码审查、视觉复核或验收临时切换其他 Codex 模型；
+- 在没有必要时为了“多模型复核”额外调用 Codex。
+
+允许：
+
+- 不调用 Codex，直接执行本地 deterministic code/test；
+- 在确实需要 Codex 时，仅使用 Luna 5.6。
+
+因此，本项目的实现与测试必须做到：
+
+```text
+无需 Codex 也可完成 deterministic correctness 验证
+```
+
+模型判断不能替代：
+
+- P5/P6 authoritative anchor；
+- P7/P9 validation contract；
+- parser/upstream repair；
+- deterministic tests；
+- Independent Acceptance。
+
+### 32.2 Reviewer provenance
 
 - 不新增 `ReviewerType.LUNA`；
-- durable P9 reviewer_type 继续使用已有 enum；
-- 如由 Codex 承载模型复核流程，可使用明确 reviewer_id，例如 `codex/luna-review`；
-- 模型版本单独记录 telemetry。
+- durable P9 reviewer_type 继续使用现有 enum；
+- 如 Luna 5.6 通过 Codex 参与 review，可在允许的 reviewer_id 字段中记录明确来源，例如 `codex/luna-5.6-review`；
+- 具体模型版本、调用次数、token 使用量只进入 run telemetry，不成为 P9 semantic truth。
 
 ---
 
@@ -1777,11 +1806,45 @@ R-A2 不实现 Semantic Resolver，不创建 canonical metric layer。
 
 ### R-Q — P10 Capability Reconciliation
 
-Independent Acceptance PASS 后另行更新 P10 capability manifest：
+只有 Independent Acceptance **R-P PASS** 后才允许执行。
 
-`PDF_VISUAL_EVIDENCE: UNAVAILABLE → AVAILABLE`
+P10 v1 已经是 accepted/frozen contract，因此 **不得原地修改**：
 
-该更新不得提前进入 R-B–R-P。
+- `CAPABILITY_MANIFEST_V1`
+- `INTEGRATION_POLICY_VERSION` 的 v1 语义
+- 已接受的 P8/P9 fingerprints
+
+R-Q 必须采用**版本化增量**：
+
+```text
+P10 accepted v1
+        ↓ 保持不变
+新增 P10 capability manifest v2
+        ↓
+PDF_VISUAL_EVIDENCE = AVAILABLE
+RESEARCH_REVIEW_MCP = AVAILABLE
+RESEARCH_PREFLIGHT = AVAILABLE
+```
+
+建议新增：
+
+- `CAPABILITY_MANIFEST_V2`
+- `INTEGRATION_POLICY_VERSION_V2`
+- 如现有 ResearchContext schema 无法无歧义承载 v2，再新增 `CONTEXT_SCHEMA_VERSION_V2`
+
+v2 仍必须声明：
+
+- `SEMANTIC_RESOLVER = UNAVAILABLE`
+- `CANONICAL_METRIC_LAYER = UNAVAILABLE`
+- `P11_SEC_PROVIDER = UNAVAILABLE`
+
+原因：
+
+- Visual/Review/Preflight 已实现不代表 canonical semantic resolver 已实现；
+- 不得通过修改 V1 让旧 fingerprint 漂移；
+- 调用方必须能够显式选择/识别 v1 或 v2 capability contract。
+
+R-Q 更新完成后必须重新执行 P10 contract/fingerprint tests，并证明 V1 行为仍然完全可复现。
 
 ---
 
