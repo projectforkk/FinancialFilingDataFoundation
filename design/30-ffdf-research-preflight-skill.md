@@ -2,7 +2,7 @@
 
 ## 状态
 
-**OPTIMIZATION V2 AUTHORIZED / SKIP-COMPLETE + EXPLICIT REIMPROVE**
+**OPTIMIZATION V2 DONE / ACCEPTANCE PASS**
 
 用户已明确授权：
 - 将 Research Preflight 编排制作成 Codex Skill；
