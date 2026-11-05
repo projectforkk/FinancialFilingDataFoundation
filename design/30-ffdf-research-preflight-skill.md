@@ -2,7 +2,7 @@
 
 ## 状态
 
-**DONE / ACCEPTANCE PASS**
+**OPTIMIZATION V2 AUTHORIZED / SKIP-COMPLETE + EXPLICIT REIMPROVE**
 
 用户已明确授权：
 - 将 Research Preflight 编排制作成 Codex Skill；
@@ -148,3 +148,118 @@ Skill 文件位于：
 - Preflight / Review Context / Visual / P9 路由关键规则。
 
 所有变更通过独立 Git 分支提交，不提交现有未跟踪 `00document/`、`01prompt/`。
+
+
+## Optimization v2 — 已完善财报默认跳过 / 显式重新完善
+
+用户确认最终语义：
+
+> 已经完善的财报不需要重新完善，除非指定“重新完善”。
+
+### 必填参数保持不变
+
+仍然只有三个必填参数：
+
+1. company
+2. year_range
+3. model
+
+调用：
+
+`$FFDF财报数据完善 <company> <year_range> <model>`
+
+允许追加一个可选控制词：
+
+`重新完善`
+
+例如：
+
+`$FFDF财报数据完善 605117 2021-2026 luna5.6-max 重新完善`
+
+`重新完善` 不是第四个必填参数，只是显式 bypass-skip 控制词。
+
+### 默认 skip-first 规则
+
+对 research period 内每份 observed filing，先调用：
+
+`ffdf_get_review_state`
+
+如果状态为：
+
+- `COMPLETE_BASE`
+- `COMPLETE_REVIEWED`
+
+则默认标记：
+
+`SKIPPED_ALREADY_COMPLETE`
+
+并跳过该财报后续的：
+
+- Review Context 获取；
+- Luna 5.6 Max 语义判断；
+- PDF Visual；
+- P9 write-through；
+- materialize。
+
+这两种状态都视为“已经完善，不需要重复完善”。
+
+### 重新完善
+
+只有用户明确指定 `重新完善` 时，才绕过 `SKIPPED_ALREADY_COMPLETE`。
+
+重新完善的含义是：
+
+- 重新执行本次 Research Preflight / Research Data Coverage；
+- 对目标财报重新读取当前 Review State；
+- 对当前仍存在且 research-relevant 的 Review Task 重新判断；
+- 必要时才调用 Luna 5.6 Max；
+- 必要时才调用 PDF Visual；
+- 只有满足现有 P9 v1 合法条件时才允许新 resolution/materialization。
+
+重新完善不表示：
+
+- 修改 Raw Fact；
+- 创建不存在的 Review Task；
+- 创建不存在的 RawFact；
+- 把 COMPLETE_BASE 强行改成 P9 reviewed；
+- 删除已有 P9 resolution；
+- 破坏性重建 review overlay；
+- 为了“重新完善”而重复截图或重复写入没有变化的结论。
+
+如果重新完善后没有新的合法 Review Task，保持原状态并报告：
+
+`REIMPROVE_NO_ACTION_REQUIRED`
+
+### 异常状态
+
+以下状态永远不能因为“以前完善过”而静默跳过：
+
+- `NEEDS_REVIEW`
+- `NEEDS_MATERIALIZATION`
+- `NEEDS_UPSTREAM_FIX`
+- `BLOCKED`
+- `INVALID_REVIEW_STATE`
+
+必须按照既有 Research Repair Queue 路由处理。
+
+### 输出变化
+
+新增：
+
+- `reimprove_requested: true|false`
+- `skipped_already_complete_count`
+- per-document `SKIPPED_ALREADY_COMPLETE`
+- 必要时 `REIMPROVE_NO_ACTION_REQUIRED`
+
+`SKIPPED_ALREADY_COMPLETE` 计入可直接研究的成功文档，不影响 `research_ready=true`。
+
+### 安全边界
+
+skip-first 只减少重复完善工作，不改变：
+
+- P8 Raw Contract；
+- P9 v1；
+- Research Review MCP；
+- Luna 5.6 Max-only 模型约束；
+- parser/extraction upstream-fix 路由；
+- Raw/P3/P5/P6/P7 immutability。
