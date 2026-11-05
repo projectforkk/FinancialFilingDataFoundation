@@ -1,5 +1,5 @@
 ---
-name: ffdf-research-preflight
+name: FFDF财报数据完善
 description: "在正式公司财报分析前，使用 FFDF MCP 对指定公司和年度区间执行 Research Preflight；只把真正需要模型判断的疑难项交给 Luna 5.6 Max，并按 P9 / upstream-fix 边界处理。"
 ---
 
@@ -33,13 +33,13 @@ description: "在正式公司财报分析前，使用 FFDF MCP 对指定公司�
 
 调用格式：
 
-`$ffdf-research-preflight <company> <year_range> <model>`
+`$FFDF财报数据完善 <company> <year_range> <model>`
 
 示例：
 
-`$ffdf-research-preflight 605117 2021-2026 luna5.6-max`
+`$FFDF财报数据完善 605117 2021-2026 luna5.6-max`
 
-`$ffdf-research-preflight "德业股份" 2021-2026 luna5.6-max`
+`$FFDF财报数据完善 "德业股份" 2021-2026 luna5.6-max`
 
 必须解析为且仅解析为三个逻辑参数：
 

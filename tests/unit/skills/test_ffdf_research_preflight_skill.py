@@ -4,12 +4,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-SKILL = ROOT / ".agents" / "skills" / "ffdf-research-preflight" / "SKILL.md"
+SKILL = ROOT / ".agents" / "skills" / "FFDF财报数据完善" / "SKILL.md"
 AGENT = (
     ROOT
     / ".agents"
     / "skills"
-    / "ffdf-research-preflight"
+    / "FFDF财报数据完善"
     / "agents"
     / "openai.yaml"
 )
@@ -22,8 +22,8 @@ def test_skill_files_exist() -> None:
 
 def test_skill_frontmatter_and_parameter_contract() -> None:
     text = SKILL.read_text(encoding="utf-8")
-    assert "name: ffdf-research-preflight" in text
-    assert "$ffdf-research-preflight <company> <year_range> <model>" in text
+    assert "name: FFDF财报数据完善" in text
+    assert "$FFDF财报数据完善 <company> <year_range> <model>" in text
     assert "company" in text
     assert "year_range" in text
     assert "model" in text
@@ -80,7 +80,7 @@ def test_p9_boundaries_are_locked() -> None:
 
 def test_agent_ui_is_explicit_invocation() -> None:
     text = AGENT.read_text(encoding="utf-8")
-    assert 'display_name: "FFDF研究前预检"' in text
-    assert "$ffdf-research-preflight" in text
+    assert 'display_name: "FFDF财报数据完善"' in text
+    assert "$FFDF财报数据完善" in text
     assert "luna5.6-max" in text
     assert "allow_implicit_invocation: false" in text

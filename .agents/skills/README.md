@@ -16,13 +16,13 @@
 Skill 不替代 deterministic parser。
 
 
-## ffdf-research-preflight
+## FFDF财报数据完善
 
 正式公司研究前的 Research Preflight 编排 Skill。
 
 调用：
 
-`$ffdf-research-preflight <company> <YYYY-YYYY> <model>`
+`$FFDF财报数据完善 <company> <YYYY-YYYY> <model>`
 
 当前唯一允许的 model：
 

@@ -14,7 +14,7 @@
 
 新增一个项目级 Codex Skill：
 
-`ffdf-research-preflight`
+`FFDF财报数据完善`
 
 用于在正式公司财报研究前，编排 FFDF MCP 完成研究期间全量状态监测，并只把真正需要模型判断的疑难项交给 Luna 5.6 Max。
 
@@ -68,13 +68,13 @@ Skill 不自行猜测多个候选；无法唯一解析时停止。
 
 推荐：
 
-`$ffdf-research-preflight <company> <year_range> <model>`
+`$FFDF财报数据完善 <company> <year_range> <model>`
 
 例如：
 
-`$ffdf-research-preflight 605117 2021-2026 luna5.6-max`
+`$FFDF财报数据完善 605117 2021-2026 luna5.6-max`
 
-`$ffdf-research-preflight 德业股份 2021-2026 luna5.6-max`
+`$FFDF财报数据完善 德业股份 2021-2026 luna5.6-max`
 
 ## 执行流程
 
@@ -134,7 +134,7 @@ P9：
 
 Skill 文件位于：
 
-`.agents/skills/ffdf-research-preflight/`
+`.agents/skills/FFDF财报数据完善/`
 
 至少包含：
 - `SKILL.md`

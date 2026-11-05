@@ -14,7 +14,7 @@ Design commit:
 
 Path:
 
-`.agents/skills/ffdf-research-preflight/`
+`.agents/skills/FFDF财报数据完善/`
 
 Files:
 
@@ -35,7 +35,7 @@ Exactly three logical parameters:
 
 Invocation:
 
-`$ffdf-research-preflight <company> <year_range> <model>`
+`$FFDF财报数据完善 <company> <year_range> <model>`
 
 Current only allowed canonical model:
 
