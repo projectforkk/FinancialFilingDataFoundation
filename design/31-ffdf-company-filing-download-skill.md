@@ -2,7 +2,7 @@
 
 ## 状态
 
-**AUTHORIZED / READY_FOR_DEVELOPMENT**
+**DONE / ACCEPTANCE PASS**
 
 ## 目标
 
