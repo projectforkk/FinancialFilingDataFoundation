@@ -33,7 +33,7 @@ description: "在正式公司财报分析前，使用 FFDF MCP 对指定公司�
 
 调用格式：
 
-`$FFDF财报数据完善 <company> <year_range> <model>`
+`$FFDF财报数据完善 <company> <year_range> <model> [重新完善]`
 
 示例：
 
@@ -41,7 +41,13 @@ description: "在正式公司财报分析前，使用 FFDF MCP 对指定公司�
 
 `$FFDF财报数据完善 "德业股份" 2021-2026 luna5.6-max`
 
-必须解析为且仅解析为三个逻辑参数：
+显式重新完善示例：
+
+`$FFDF财报数据完善 605117 2021-2026 luna5.6-max 重新完善`
+
+必须保留三个必填逻辑参数：company、year_range、model。
+
+另外允许一个可选控制词 `重新完善`，它不是第四个必填参数。
 
 ### 1. company
 
@@ -133,6 +139,73 @@ Research Data Coverage 不增加第四个参数。
 - `research_ready` 不得宣称为 true；
 - 输出明确 blocker。
 
+## Skip-first：已完善财报默认不重复完善
+
+对 research period 内每份 observed filing，在 Filing Coverage Scan 之后必须先获取：
+
+`ffdf_get_review_state`
+
+如果该财报当前状态为：
+
+- `COMPLETE_BASE`
+- `COMPLETE_REVIEWED`
+
+并且本次调用没有显式指定 `重新完善`，则标记：
+
+`SKIPPED_ALREADY_COMPLETE`
+
+### SKIPPED_ALREADY_COMPLETE 的含义
+
+该财报仍然参与 Research Data Coverage，仍然可以作为结构化数据 / Evidence 来源，也仍然计入 period monitoring；但不再进入重复完善流程：
+
+- 不创建针对它的 QUALITY_REVIEW Repair Queue；
+- 不调用 `ffdf_get_review_context` 做重复 review；
+- 不调用 Luna 5.6 Max；
+- 不调用 PDF Visual；
+- 不重复提交 P9 resolution；
+- 不重复 materialize 已经完成的 durable review。
+
+`COMPLETE_BASE` 表示当前基础数据已经达到可直接研究状态。默认视为“不需要完善”，不要为了让它变成 `COMPLETE_REVIEWED` 而人为制造 P9 review。
+
+`COMPLETE_REVIEWED` 表示 durable review 已完成。默认直接复用 resolved/effective semantics，不重复 Luna、PDF 或 P9。
+
+### 可选控制词：重新完善
+
+只有用户明确指定 `重新完善` 才绕过上述 skip。
+
+例如：
+
+`$FFDF财报数据完善 605117 2021-2026 luna5.6-max 重新完善`
+
+此时重新运行 Research Preflight、重新读取当前 Review State、重新检查 Research Data Coverage；只有当前实际存在、research-relevant 且仍需处理的 Review Task 才进入 Review Context，结构化证据不足时才调用 Luna 5.6 Max，必要时才调用 PDF Visual，并且只有满足现有 P9 v1 合法条件时才允许新的 resolution / materialization。
+
+`重新完善` 不允许：
+
+- 修改 Raw Fact 数值；
+- 创建不存在的 RawFact；
+- 创建虚假的 Review Task；
+- 把 COMPLETE_BASE 强行改造成 COMPLETE_REVIEWED；
+- 删除现有 P9 resolution；
+- 清空 review overlay；
+- 对没有变化的 durable conclusion 重复写入；
+- 为了“重做”而默认重复截图。
+
+如果重新检查后没有新的合法动作：
+
+`REIMPROVE_NO_ACTION_REQUIRED`
+
+保持现有 COMPLETE_BASE / COMPLETE_REVIEWED 状态即可。
+
+### 不可跳过的异常状态
+
+以下状态不属于“已经完善”，必须继续按既有 Repair Queue 规则处理：
+
+- `NEEDS_REVIEW`
+- `NEEDS_MATERIALIZATION`
+- `NEEDS_UPSTREAM_FIX`
+- `BLOCKED`
+- `INVALID_REVIEW_STATE`
+
 ## Architecture roles
 
 固定职责：
@@ -219,19 +292,23 @@ Research Data Coverage 不增加第四个参数。
 
 #### COMPLETE_BASE
 
-直接可供研究使用。
+直接可供研究使用。默认标记 `SKIPPED_ALREADY_COMPLETE`（除非指定 `重新完善`）。
 
 不要调用 Luna。
 
 不要看 PDF。
 
+不要进入重复完善链路。
+
 #### COMPLETE_REVIEWED
 
-优先使用 resolved/effective 数据。
+优先使用 resolved/effective 数据。默认标记 `SKIPPED_ALREADY_COMPLETE`（除非指定 `重新完善`）。
 
 不要重复 Luna。
 
 不要默认重复看 PDF。
+
+不要重复写 P9 / materialize。
 
 #### NEEDS_REVIEW
 
@@ -549,6 +626,8 @@ P9 v1 禁止：
 - normalized ticker/market（如已解析）；
 - year_range；
 - model；
+- reimprove_requested；
+- skipped_already_complete_count；
 - observed filing count；
 - latest observed filing；
 - COMPLETE_BASE count；
@@ -559,6 +638,7 @@ P9 v1 禁止：
 - critical requirement count；
 - AVAILABLE / PARTIAL / NOT_DISCLOSED / blocking count；
 - Repair Queue；
+- SKIPPED_ALREADY_COMPLETE documents；
 - visual_required_count；
 - visual_call_count；
 - period_monitoring_complete；
@@ -598,7 +678,9 @@ P9 v1 禁止：
 13. 猜测 period / unit / scope；
 14. 把 catalog absence 写成 company not published；
 15. 把 locator hit 当 RawFact；
-16. 把 VisualRef 当 P9 v1 Evidence。
+16. 把 VisualRef 当 P9 v1 Evidence；
+17. 未指定 `重新完善` 时，对 COMPLETE_BASE / COMPLETE_REVIEWED 财报重复执行完善链路；
+18. 指定 `重新完善` 后，为了产生变化而制造 Review Task 或强写 P9。
 
 ## Completion rule
 

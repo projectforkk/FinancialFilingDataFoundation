@@ -23,7 +23,7 @@ def test_skill_files_exist() -> None:
 def test_skill_frontmatter_and_parameter_contract() -> None:
     text = SKILL.read_text(encoding="utf-8")
     assert "name: FFDF财报数据完善" in text
-    assert "$FFDF财报数据完善 <company> <year_range> <model>" in text
+    assert "$FFDF财报数据完善 <company> <year_range> <model> [重新完善]" in text
     assert "company" in text
     assert "year_range" in text
     assert "model" in text
@@ -84,3 +84,40 @@ def test_agent_ui_is_explicit_invocation() -> None:
     assert "$FFDF财报数据完善" in text
     assert "luna5.6-max" in text
     assert "allow_implicit_invocation: false" in text
+
+
+def test_complete_documents_are_skipped_by_default() -> None:
+    text = SKILL.read_text(encoding="utf-8")
+    assert "SKIPPED_ALREADY_COMPLETE" in text
+    assert "COMPLETE_BASE" in text
+    assert "COMPLETE_REVIEWED" in text
+    assert "不再进入重复完善流程" in text
+    assert "仍然参与 Research Data Coverage" in text
+
+
+def test_explicit_reimprove_bypasses_skip_safely() -> None:
+    text = SKILL.read_text(encoding="utf-8")
+    assert "$FFDF财报数据完善 605117 2021-2026 luna5.6-max 重新完善" in text
+    assert "REIMPROVE_NO_ACTION_REQUIRED" in text
+    assert "把 COMPLETE_BASE 强行改造成 COMPLETE_REVIEWED" in text
+    assert "创建虚假的 Review Task" in text
+
+
+def test_noncomplete_states_are_never_skipped() -> None:
+    text = SKILL.read_text(encoding="utf-8")
+    for marker in (
+        "NEEDS_REVIEW",
+        "NEEDS_MATERIALIZATION",
+        "NEEDS_UPSTREAM_FIX",
+        "BLOCKED",
+        "INVALID_REVIEW_STATE",
+    ):
+        assert marker in text
+    assert "不属于“已经完善”" in text
+
+
+def test_output_tracks_skip_and_reimprove() -> None:
+    text = SKILL.read_text(encoding="utf-8")
+    assert "reimprove_requested" in text
+    assert "skipped_already_complete_count" in text
+    assert "SKIPPED_ALREADY_COMPLETE documents" in text

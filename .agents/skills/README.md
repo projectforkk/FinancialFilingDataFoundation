@@ -22,13 +22,15 @@ Skill 不替代 deterministic parser。
 
 调用：
 
-`$FFDF财报数据完善 <company> <YYYY-YYYY> <model>`
+`$FFDF财报数据完善 <company> <YYYY-YYYY> <model> [重新完善]`
 
 当前唯一允许的 model：
 
 `luna5.6-max`
 
 Skill 直接编排 FFDF MCP 做全期间结构化监测，只在必要时调用 Luna 5.6 Max，并遵守 P9 / upstream-fix 边界。
+
+默认对 `COMPLETE_BASE` / `COMPLETE_REVIEWED` 财报跳过重复完善；只有显式追加 `重新完善` 才重新检查该期。
 
 
 ## FFDF公司财报下载
