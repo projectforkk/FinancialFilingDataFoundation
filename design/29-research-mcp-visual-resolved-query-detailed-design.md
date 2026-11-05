@@ -1,726 +1,423 @@
-# 29 — Research MCP Visual Evidence & Resolved Query 详细设计
+# 29 — FFDF Research Review MCP v3：Resolved Query、Visual Evidence 与 Controlled Review Write-Through 详细设计
 
-状态：**ACTIVE FUTURE REFERENCE DESIGN — PRODUCTION NOT AUTHORIZED**
-
-依赖：
-- P8 Local MCP = DONE；
-- P9 v1 Durable Review Overlay = DONE / PASS；
-- accepted P9 merge = `58a1d2236b68a56fc66ddf8b97603e7232c87265`；
-- design/28 = future semantic architecture reference；
-- P10 = Codex Dynamic Research Integration v1 design。
-
-授权状态：
-- 本文件已被 P10 design reconciliation 接纳为 future additive capability reference；
-- Research MCP production = **NOT AUTHORIZED**；
-- P10 v1 不以本设计实现为前置条件。
-
-本设计解决未来问题：
-
-> 当结构化数据不完整、不准确或根本缺失，并且当前 P8/P9 已无法安全满足研究需求时，未来 Research MCP 如何提供 resolved query 与 PDF visual evidence。
-
-在该 production capability 尚未独立验收前，P10 v1 必须返回 `P10_VISUAL_CAPABILITY_REQUIRED`，不得假装本文件中的工具已经存在。
-
-本设计不声称让 FFDF parser 自动完全正确。
+> 状态：**ACTIVE DESIGN v3 — PRODUCTION IMPLEMENTATION NOT AUTHORIZED**
+>
+> 当前真实基线：`main@8c6cd75`（`feat: add report-safe MCP interfaces`）
+>
+> 本文仅完成设计收敛，不授权 production implementation，不改变已验收 P0–P10，不修改 Raw/P3/P5/P6/P7/P9 既有语义。
 
 ---
 
-## 1. 目标
+## 0. 设计重置说明
 
-新增 additive Research MCP Extension，使 Codex 可以：
+本版 v3 是基于当前仓库真实状态重新设计，不继承任何未进入 Git 的会话性“设计完成”声明。
 
-1. 查询 P8 RawFact / Evidence / Table / Validation；
-2. 查询 P9 是否已有 durable reviewed overlay；
-3. 优先消费 Resolved View，避免重复 visual review；
-4. 在 structured evidence 不足时定位原始 PDF 位置；
-5. 获取原始 PDF table/page visual evidence；
-6. 对当前研究做 reviewer decision；
-7. 明确区分 run-local verified 与 durable/canonical reusable；
-8. 在真正满足 P9 evidence contract 时选择性提交 P9；
-9. 将 recurring visual-review patterns 反馈为后续 Semantic Resolver rule candidate。
+特别说明：
 
----
+- 当前仓库不存在此前会话中提到的 `d7ec5aa3f74f3a30ab3f741546668497b008cbf7` 设计提交；
+- 因此该 commit 不是任何实现或验收基线；
+- 当前 design/29 仍属于旧版 future design；
+- 当前实际 MCP server 已在 `main@8c6cd75` 增加 Report-Safe v1 三个工具；
+- 本文将旧 design/29 与现有 14-tool MCP、P9 v1、P10 accepted contract 重新统一。
 
-## 2. 非目标
-
-本层不：
-
-- 修改 P8 v1 现有 11 tools；
-- 修改 RawFact；
-- OCR；
-- arbitrary file read；
-- arbitrary bbox screenshot；
-- shell / SQL / Python execution；
-- network；
-- AI API；
-- 自动生成 canonical metric；
-- 自动注册 reusable parsed data；
-- 自动把 Codex visual decision 当 deterministic parser truth；
-- 自动把 visual pattern 变成 semantic rule；
-- 掩盖 P5/P6 extraction defect。
+设计原则：**以当前 Git 代码为事实源，不以历史会话描述为事实源。**
 
 ---
 
-## 3. 主路径
+## 1. 当前系统事实
 
-```text
-Locate document
-   ↓
-Query P9 review/resolved state
-   ↓
-durable resolved data exists?
-   ├─ YES → use Resolved Query
-   └─ NO  → P8 Raw Structured
-              ↓
-         Visual Trigger Matrix
-              ↓
-       structured sufficient?
-        ├─ YES → research
-        └─ NO
-             ↓
-       Review Context / Locate Evidence
-             ↓
-       render_table
-             ↓
-       context complete?
-        ├─ YES → Codex reviewer decision
-        └─ NO
-             ↓
-       render_table_group / render_page
-             ↓
-       still ambiguous?
-        ├─ YES → remain REVIEW_REQUIRED
-        └─ NO  → run-local verified or P9 durable submit
-```
+### 1.1 P8 Raw Contract v1
 
----
+P10 中冻结的 `P8_TOOL_NAMES_V1` 仍为以下 11 个工具：
 
-## 4. REVIEW_REQUIRED 的消费边界
+1. `ffdf_list_documents`
+2. `ffdf_get_document`
+3. `ffdf_search_document`
+4. `ffdf_read_pages`
+5. `ffdf_list_sections`
+6. `ffdf_list_tables`
+7. `ffdf_get_table`
+8. `ffdf_list_raw_facts`
+9. `ffdf_get_fact`
+10. `ffdf_get_evidence`
+11. `ffdf_get_validation`
 
-`REVIEW_REQUIRED` 表示：
-
-> deterministic FFDF pipeline 尚未证明整份 document 可以 canonical reuse。
-
-它不表示：
-
-`current research forbidden`
-
-Codex 可以继续：
-
-- raw facts；
-- evidence；
-- table；
-- page text；
-- visual evidence。
-
-但必须遵守本设计的 visual trigger / derived-use gate。
-
----
-
-## 5. P8 backward compatibility
-
-P8 v1 原 11 tools contract 不变。
+该 11-tool 集合是 **P8 logical base contract**，必须保持冻结。
 
 特别：
 
-`ffdf_get_fact`
+- `ffdf_get_fact` 永远返回 RawFact；
+- P9 overlay 不得改变 P8 raw response；
+- 不允许把 resolved/effective 值静默塞回 P8 raw contract；
+- P10 当前 fingerprint 继续使用该 11-tool contract。
 
-永远返回 RawFact，不因为后续 overlay 而改变 raw 字段。
+### 1.2 Report-Safe v1 已经进入 production
 
-Research MCP Extension 使用 additive tool surface。
+当前 `ffdf` MCP server 在原 11 个工具之外，已经增加并部署：
+
+12. `ffdf_get_company_report_context`
+13. `ffdf_search_company`
+14. `ffdf_find_table_rows`
+
+因此必须区分：
+
+```text
+P8_RAW_V1 logical contract = 11 tools
+REPORT_SAFE_V1 extension    = 3 tools
+current ffdf MCP surface    = 14 tools
+```
+
+这三个 Report-Safe 工具已经是当前真实 production baseline，不得在 design/29 中忽略或重新发明。
+
+### 1.3 P9 v1
+
+P9 当前 accepted public interface 提供：
+
+- prepare
+- tasks
+- submit
+- resolutions
+- materialize
+- report
+
+P9 ResolutionAction 仅允许：
+
+- `SET_PERIOD`
+- `SET_UNIT`
+- `SET_SCOPE`
+- `CLASSIFY_TABLE_STATEMENT`
+- `ATTEST_ISSUE_RESOLVED`
+
+P9 不允许：
+
+- SET_VALUE
+- SET_METRIC
+- PATCH_FACT
+- 任意修改 raw numeric value
+- 创建不存在的 RawFact
+
+### 1.4 P10 accepted capability manifest
+
+当前 P10 仍明确：
+
+- P8 raw/query = AVAILABLE
+- P9 review/resolved view = AVAILABLE
+- PDF_VISUAL_EVIDENCE = UNAVAILABLE
+- SEMANTIC_RESOLVER = UNAVAILABLE
+- CANONICAL_METRIC_LAYER = UNAVAILABLE
+
+因此 design/29 v3 在 Independent Acceptance 前不得声称 PDF visual 已经成为 accepted production capability。
 
 ---
 
-## 6. 未来新增 tool surface
+## 2. 目标
 
-未来单独授权后建议新增 8 个 additive 工具：
+v3 的目标不是重做解析器，而是在现有 P8/P9/Report-Safe 之上增加一个 **additive Research Review capability group**，解决两类需求。
+
+### 2.1 QUALITY_REVIEW
+
+用于入库后的数据库质量完善：
+
+```text
+已入库财报
+→ 判断是否需要 review
+→ 只处理未完善项
+→ structured evidence first
+→ 必要时视觉核验
+→ 合法的 P9 resolution
+→ materialize
+→ 再验证 effective state
+→ 后续研究复用
+```
+
+目标是：
+
+**一次必要的人工/模型视觉复核，尽可能沉淀为可审计、可复用的 P9 reviewed state。**
+
+### 2.2 RESEARCH_FALLBACK
+
+用于正常公司研究过程中遇到的数据疑问：
+
+```text
+report-safe / P8 structured result
+→ 数据是否足够可靠？
+→ YES：直接研究
+→ NO：读取 review state / context
+→ structured context 不够
+→ 必要才 render PDF
+→ current-run judgment
+```
+
+默认原则：
+
+**RESEARCH_FALLBACK 只读，不产生 durable mutation。**
+
+研究生成流程不能因为“顺手发现问题”就自动写 P9。
+
+---
+
+## 3. 非目标
+
+本项目明确不做：
+
+- 重做 P3/P5/P6 parser；
+- 修改 RawFact；
+- 用 P9 修 raw numeric value；
+- 自动 canonicalize metric；
+- 引入新的 canonical metric layer；
+- 自动抓取网络；
+- arbitrary filesystem read；
+- arbitrary SQL/SQLite query；
+- arbitrary crop/bbox；
+- shell/Python execution；
+- 用视觉结果伪造 P5/P6 evidence；
+- 把视觉判断自动提升为 parser truth；
+- 建立新的 `is_complete=true/false` 持久化布尔字段；
+- 解决临时公告未入库问题；
+- 把 periodic filing catalog 当作完整 Corporate Event feed。
+
+---
+
+## 4. 总体架构：一个 FFDF MCP，实现三个 capability group
+
+未来仍使用同一套 FFDF MCP 实现，不建立第二套互相竞争的数据接口。
+
+```text
+ffdf MCP
+│
+├── P8_RAW_V1                      [accepted / frozen]
+│   └── 11 raw/read-only tools
+│
+├── REPORT_SAFE_V1                 [production]
+│   └── 3 report-safe tools
+│
+└── RESEARCH_REVIEW_V1             [future additive]
+    ├── Resolved Query
+    ├── Review State
+    ├── Review Context
+    ├── Evidence Locator
+    ├── Visual Renderer
+    └── Controlled P9 Write-Through
+```
+
+关键点：
+
+- P8 11-tool logical contract 不变；
+- 当前 server 有 14 tools 不是对 P8 logical contract 的破坏；
+- Future Research Review 工具继续 additive；
+- 不允许为了新增 extension 修改旧工具的 raw semantics。
+
+---
+
+## 5. Runtime Profile 与权限隔离
+
+同一实现支持两种运行 profile。
+
+### 5.1 RESEARCH_FALLBACK
+
+默认 profile，用于正常研究报告生成。
+
+允许：
+
+- 所有 P8 raw read
+- Report-Safe read
+- Review state/query
+- Resolved read
+- Review context
+- Locator
+- Visual render
+- run-local reviewer decision
+
+禁止：
+
+- prepare overlay
+- submit resolution
+- materialize resolved view
+
+写工具即使存在于 tool surface，也必须返回：
+
+`RESEARCH_MCP_WRITE_DISABLED`
+
+### 5.2 QUALITY_REVIEW
+
+显式质量复核 profile。
+
+允许：
+
+- read/query/render
+- prepare
+- submit
+- materialize
+
+必须由显式 runtime 配置启用，例如：
+
+`review_write_enabled=true`
+
+正常研究用的 `ffdf` profile 默认保持 write-disabled。
+
+如未来部署独立 `ffdf-review` MCP alias，也只能是**同一代码实现的 privileged runtime profile**，不能成为第二套数据架构。
+
+---
+
+## 6. Future RESEARCH_REVIEW_V1 Tool Surface
+
+计划新增 12 个 additive tools。
+
+### 6.1 Read / Query
 
 1. `ffdf_get_review_state`
 2. `ffdf_get_resolved_fact`
 3. `ffdf_list_resolved_facts`
-4. `ffdf_get_review_context`
-5. `ffdf_locate_evidence`
-6. `ffdf_render_table`
-7. `ffdf_render_table_group`
-8. `ffdf_render_page`
+4. `ffdf_list_review_tasks`
+5. `ffdf_get_review_context`
+6. `ffdf_locate_evidence`
+7. `ffdf_render_table`
+8. `ffdf_render_table_group`
+9. `ffdf_render_page`
 
-如果实现时 MCP SDK 对 image/list-image response 有协议限制，必须先更新设计，不得静默改成 arbitrary file path 返回。
+### 6.2 Explicit Write-Through
 
----
+10. `ffdf_prepare_review_overlay`
+11. `ffdf_submit_review_resolution`
+12. `ffdf_materialize_resolved_view`
 
-## 7. Visual Trigger Matrix
+所有 read/render tools 必须无 durable side effect。
 
-Visual 不能由“Codex感觉不确定”单独触发。
-
-必须存在至少一个 deterministic trigger，或由明确 research request 缺失 fact 触发。
-
-### 7.1 VISUAL_REQUIRED
-
-以下任一成立：
-
-1. validation issue 直接涉及目标 fact/table；
-2. required semantic field = UNKNOWN；
-3. required semantic field = AMBIGUOUS；
-4. structured evidence 对 period/unit/scope/value role 给出冲突；
-5. value role 未确认；
-6. column/header relationship 未确认；
-7. requested metric 在 P6 facts 中缺失；
-8. reconciliation / cross-fact consistency 明确异常；
-9. RawFact 与 P5 table/header structured context 不一致；
-10. P5 table context不足以解释目标值；
-11. existing P9 overlay 与新的 current base/evidence state 不兼容；
-12. research question要求区分 standalone quarter vs YTD，而 structured context无法证明。
-
----
-
-### 7.2 VISUAL_RECOMMENDED
-
-以下情况可视觉确认，但不强制：
-
-- document = REVIEW_REQUIRED，但目标 fact 自身 required semantics 已完整；
-- warning 与目标 fact无直接关系；
-- non-critical descriptive fact；
-- report text引用而非 derived calculation。
-
-Codex可以直接使用 structured evidence，但必须保留 provenance。
-
----
-
-### 7.3 VISUAL_NOT_REQUIRED
-
-满足全部：
-
-- target fact 存在；
-- required semantics完整；
-- no directly-related REVIEW/FAIL/BLOCKING issue；
-- no evidence conflict；
-- no requested derived-operation ambiguity；
-- no missing-value request；
-- no stale/incompatible P9 state。
-
-此时不得为了“多确认一次”默认 render PDF。
-
-目的：
-
-控制视觉成本，并避免同一 durable decision被反复检查。
-
----
-
-## 8. required semantic fields for research use
-
-当前 Research MCP 不依赖未来完整 Semantic Resolver，但必须按 operation 计算最低 required fields。
-
-至少：
-
-### Raw fact quotation
-
-需要：
-- numeric/raw value；
-- source evidence。
-
-period/unit 可以未知，但输出必须显式标记未知。
-
-### Period-specific fact assertion
-
-需要：
-- value；
-- period；
-- value role；
-- required unit；
-- required scope。
-
-### YoY
-
-两个 operand 必须：
-- compatible metric meaning；
-- subject periods matched as valid comparative periods；
-- compatible scope；
-- compatible unit/dimension；
-- value role = VALUE；
-- no conflict。
-
-### Margin
-
-numerator/denominator 必须：
-- same period；
-- compatible scope；
-- compatible unit scale/currency where monetary；
-- both reviewer-verified or structured-ready。
-
-### Valuation input
-
-必须至少达到：
-- RUN_LOCAL_VERIFIED or durable resolved；
-- period/unit/scope/value role complete；
-- source provenance complete。
-
-不得使用仅 visually guessed、无法定位 source 的值进入 valuation。
-
----
-
-## 9. Missing-Fact Locator
-
-仅有 `raw_fact_id` 不足以覆盖“P6根本没抽到目标数据”。
-
-新增：
-
-`ffdf_locate_evidence`
-
-参数：
-
-```json
-{
-  "document_sha256": "...",
-  "query": "研发费用",
-  "max_results": 10
-}
-```
-
-query 是 research locator，不是 canonical metric mapper。
-
----
-
-## 10. Locate algorithm
-
-只使用现有 trusted artifacts：
-
-```text
-P3 FTS
-→ sections
-→ matching pages
-→ P5 tables intersecting matching pages/regions
-→ P6 facts where available
-→ recommended visual targets
-```
-
-返回：
-
-```json
-{
-  "query": "研发费用",
-  "matches": [
-    {
-      "page_no": 6,
-      "section_id": "...",
-      "table_ids": ["..."],
-      "fact_ids": [],
-      "text_excerpt": "...",
-      "recommended_visual_target": {
-        "type": "TABLE_OR_PAGE",
-        "table_id": "...",
-        "page_no": 6
-      }
-    }
-  ]
-}
-```
-
-不得：
-
-- 创建不存在的 RawFact；
-- canonicalize query；
-- 声称找到的是最终 metric truth。
-
----
-
-## 11. Locator fallback
-
-如果 P3 FTS 无结果：
-
-返回：
-
-`NO_STRUCTURED_MATCH`
-
-而不是猜 page。
-
-Codex可以在研究层判断：
-
-- 是否扩大同义 query；
-- 是否该数据确实未披露。
-
-Research MCP 不自动做 arbitrary synonym search。
-
-未来可由 P10根据运行时研究规范生成多个合法 search terms。
-
----
-
-## 12. Review Context
-
-`ffdf_get_review_context`
-
-输入可以是：
-
-- raw_fact_id；
-- validation issue_id；
-- table_id。
-
-至少一个。
-
-返回：
-
-- document validation summary；
-- target raw fact if present；
-- evidence；
-- table；
-- related issues；
-- semantic gaps；
-- recommended visual targets；
-- P9 current review state。
-
-它不做 Codex reasoning。
-
----
-
-## 13. Trusted PDF source mapping
-
-Visual tool caller 不得传 filesystem path。
-
-唯一 identity：
-
-`document_sha256`
-
-内部从 trusted Registry/Catalog 定位 immutable PDF。
-
-render 前必须重新验证：
-
-1. file exists；
-2. SHA256 == document_sha256；
-3. file size matches registry where available；
-4. PDF opens；
-5. page count == P3 page count；
-6. source identity belongs to current document。
-
-失败：
-
-`RESEARCH_MCP_VISUAL_SOURCE_INVALID`
-
----
-
-## 14. Catalog / Filing identity
-
-未来 Research MCP catalog 必须支持：
-
-- market；
-- company_id；
-- ticker；
-- filing/report class；
-- fiscal_year；
-- raw_fiscal_period；
-- document_sha256；
-- artifact dirs；
-- trusted source document reference。
-
-不得继续只用：
-
-`market + ticker + fiscal_year + filing_type`
-
-区分季度/半年/年度 filing。
-
-Document SHA 是具体文件 identity，不是业务 slot 本身。
-
----
-
-## 15. PDF render source
-
-必须：
-
-```text
-immutable original PDF
-→ PyMuPDF render
-→ MCP ImageContent
-```
+三个 write tools 必须显式调用。
 
 禁止：
 
 ```text
-P3 text
-→ re-layout
-→ image
+get_review_state
+→ 自动 prepare
+→ 自动 submit
+→ 自动 materialize
 ```
 
-因为视觉 fallback 的价值就是恢复 parser 可能丢失的：
-
-- multi-level headers；
-- merged cells；
-- unit/title location；
-- x/y alignment；
-- continuation layout。
-
 ---
 
-## 16. render_page
+## 7. Quality State：动态推导，不新增数据库布尔字段
 
-参数：
+状态必须由 P7 + P9 当前事实动态推导。
 
-```json
-{
-  "document_sha256": "...",
-  "page_no": 1,
-  "detail": "NORMAL"
-}
-```
+定义：
 
-detail：
+### COMPLETE_BASE
 
-- `NORMAL`
-- `HIGH_DETAIL`
+满足：
 
-默认 NORMAL。
+- base validation_status == PASS
+- base reuse_eligible == true
+- 不依赖 unresolved P9 correction
 
-NORMAL 初始：
+含义：
 
-- target ~160 DPI；
-- max dimension ~2200 px。
+基础 deterministic pipeline 已足够复用。
 
-HIGH_DETAIL：
+### COMPLETE_REVIEWED
 
-- higher DPI；
-- 不允许无限扩大；
-- 如果 full-page 超过 payload/detail policy，自动进入 deterministic tiling。
+满足：
 
----
+- valid materialized resolved view
+- resolved_validation_status == PASS
+- resolved_reuse_eligible == true
+- unresolved_review_issue_count == 0
+- unsupported_review_issue_count == 0
 
-## 17. render_table
+含义：
 
-参数：
+经过 P9 review 后已达到可复用状态。
 
-```json
-{
-  "document_sha256": "...",
-  "table_id": "...",
-  "mode": "TABLE_WITH_HEADER",
-  "detail": "NORMAL"
-}
-```
-
-mode：
-
-- TABLE_ONLY；
-- TABLE_WITH_HEADER；
-- TABLE_WITH_SURROUNDING_CONTEXT。
-
-默认：
-
-`TABLE_WITH_HEADER`
-
----
-
-## 18. Table crop policy
-
-P5 bbox 只是定位 hint，不是最终真源。
-
-### TABLE_ONLY
-
-clip = table bbox + deterministic small margin。
-
-### TABLE_WITH_HEADER
-
-向上扩展 deterministic context window：
-
-- enough to include likely table title/header/unit line；
-- no arbitrary caller bbox。
-
-### TABLE_WITH_SURROUNDING_CONTEXT
-
-扩大到更多 section/table context，但仍限制在 current physical page。
-
----
-
-## 19. P5 bbox failure fallback
-
-若出现：
-
-- header明显被 crop；
-- table bbox不包含目标 value；
-- target row不在 crop；
-- visual与 structured table显著不一致；
-
-Codex必须升级：
-
-```text
-render_table
-→ render_page
-```
-
-不得继续基于错误 crop 下结论。
-
-这类情况同时产生：
-
-`P5_CONTEXT_DEFECT_CANDIDATE`
-
-供后续 parser improvement review。
-
----
-
-## 20. render_table_group
-
-跨页核心表必须支持 P5 verified table group。
-
-输入：
-
-```json
-{
-  "document_sha256": "...",
-  "table_group_id": "...",
-  "detail": "NORMAL"
-}
-```
-
-返回 group member pages/crops in page order。
-
-每个 image metadata：
-
-- table_id；
-- page_no；
-- clip_bbox；
-- visual_ref_id；
-- render_sha256。
-
-如果 P5 没有 verified group：
-
-不得自行猜跨页组。
-
-fallback：
-
-`render_page(page_no)`
-
-必要时 Codex根据已有 section/table evidence显式请求相邻合法 page。
-
----
-
-## 21. Adjacent page fallback
-
-只有以下情况允许建议 adjacent page：
-
-- current table位于 page bottom；
-- P5 group存在；
-- section continuation signal；
-- target header/unit疑似在前一页/下一页；
-- Codex当前研究明确需要 continuation context。
-
-Research MCP 可以返回：
-
-`recommended_adjacent_pages`
-
-但不会自动扫描整份 PDF。
-
----
-
-## 22. High-detail / tiling
-
-固定 2200 px 不能成为绝对信息损失点。
-
-对：
-
-- landscape wide table；
-- >N value columns；
-- estimated glyph size too small；
-- very dense annual report table；
-
-允许 deterministic tile mode。
-
-Tile contract：
-
-- caller不能指定 arbitrary crop；
-- system基于 trusted table/page geometry deterministic切片；
-- overlap 固定；
-- tile order 固定；
-- 每 tile 独立 VisualRef；
-- metadata包含 parent page/table identity。
+### NEEDS_REVIEW
 
 例如：
 
-```text
-wide table
-→ tile 1 left
-→ tile 2 center overlap
-→ tile 3 right overlap
-```
+- base == REVIEW_REQUIRED；
+- 存在 unresolved + SUPPORTED task；
+- 尚未完成必要 resolution。
+
+### NEEDS_MATERIALIZATION
+
+存在新的 active resolution，但当前 materialized snapshot 的 overlay hash 与 active set 不一致。
+
+read tool 不得自动 materialize。
+
+### NEEDS_UPSTREAM_FIX
+
+例如：
+
+- unsupported review issue；
+- RAW_EXTRACTION_DEFECT；
+- P6_MISSING_FACT_CANDIDATE；
+- 当前 P9 schema 无合法 target。
+
+### BLOCKED
+
+例如：
+
+- base validation == BLOCKED / FAIL；
+- blocking issue 使当前文档不可安全复用；
+- trusted source 无法验证且当前请求依赖视觉。
+
+### INVALID_REVIEW_STATE
+
+例如：
+
+- P9 store corrupt；
+- supersession graph invalid；
+- snapshot/hash 不一致且无法解释；
+- review base 与当前 P7 base hash 不兼容。
 
 ---
 
-## 23. VisualRef
+## 8. ffdf_get_review_state
 
-```text
-visual_ref_id =
-SHA256(
-  document_sha256
-  + "\0" + page_no
-  + "\0" + normalized clip bbox
-  + "\0" + detail/render profile
-  + "\0" + tile identity
-  + "\0" + renderer version
-)
-```
+输入：
 
-另外：
+- `document_sha256`
 
-`render_sha256 = SHA256(PNG bytes)`
+输出至少包括：
 
-Visual evidence 可重建和审计。
+- document identity
+- base_validation_status
+- base_reuse_eligible
+- base_review_issue_count
+- base_blocking_issue_count
+- has_review_overlay
+- active_resolution_count
+- active_resolution_ids
+- active_overlay_set_hash
+- snapshot_available
+- snapshot_overlay_set_hash
+- resolved_validation_status
+- resolved_reuse_eligible
+- resolved_review_issue_count
+- unresolved_review_issue_count
+- unsupported_review_issue_count
+- quality_state
+- write_profile
+- visual_capability
 
----
+不得：
 
-## 24. Image persistence
+- 自动 prepare；
+- 自动 materialize；
+- 静默回退损坏的 P9 store。
 
-默认：
-
-```text
-PDF
-→ in-memory pixmap
-→ PNG bytes
-→ MCP image response
-```
-
-不写 screenshot cache。
-
-未来若需要 cache，必须 content-addressed 且单独设计。
-
----
-
-## 25. Resolved Query
-
-Codex 不应直接解释 P9 resolution store。
-
-新增：
-
-- `ffdf_get_review_state`
-- `ffdf_get_resolved_fact`
-- `ffdf_list_resolved_facts`
-
-内部只调用 validated P9 APIs / materialized snapshot。
-
-不得重新实现 supersession/active-set semantics。
+P9 corrupt 必须 fail closed。
 
 ---
 
-## 26. get_review_state
+## 9. Resolved Query 语义
 
-返回至少：
+### 9.1 Raw 与 Effective 分离
+
+`ffdf_get_resolved_fact` 必须同时返回：
 
 ```json
 {
-  "document_sha256": "...",
-  "has_review_overlay": true,
-  "active_resolution_count": 2,
-  "active_resolution_ids": ["..."],
-  "overlay_set_hash": "...",
-  "snapshot_available": true,
-  "base_validation_status": "REVIEW_REQUIRED",
-  "resolved_validation_status": "REVIEW_REQUIRED",
-  "resolved_reuse_eligible": false
-}
-```
-
----
-
-## 27. get_resolved_fact
-
-返回 raw 与 effective 分离：
-
-```json
-{
-  "raw_fact_id": "...",
   "raw": {
+    "raw_fact_id": "...",
     "metric_name": "...",
     "value": "...",
     "period": null,
@@ -728,9 +425,10 @@ Codex 不应直接解释 P9 resolution store。
     "scope": null
   },
   "effective": {
+    "value": "...",
     "period": "2026Q3",
     "unit": "CNY",
-    "scope": null
+    "scope": "CONSOLIDATED"
   },
   "review": {
     "applied": true,
@@ -740,116 +438,571 @@ Codex 不应直接解释 P9 resolution store。
 }
 ```
 
-Raw 永远保留。
+强制规则：
+
+- `effective.value` 不得由 P9 修改；
+- raw numeric value 仍来自 P6；
+- P9 只修改其 accepted semantic fields；
+- metric_name 不 canonicalize；
+- raw block 必须保持原样可追溯。
+
+### 9.2 Research Resolved-First
+
+研究层的语义选择规则：
+
+```text
+durable resolved field exists
+→ use effective semantic field
+
+no durable resolution
+→ use base/raw field
+
+raw field unresolved and required
+→ review / fallback
+```
+
+但 “resolved-first” 只适用于**P9允许覆盖的语义字段**。
+
+不得把 resolved-first 理解为：
+
+“用模型结果覆盖 raw value”。
 
 ---
 
-## 28. Corrupt P9 state
+## 10. Report-Safe v1 与 Resolved Query 的关系
 
-若已发现 review store，但 P9 validation失败：
+现有三个 Report-Safe v1 工具保持行为兼容，不在本阶段静默改变 response semantics。
 
-`RESEARCH_MCP_RESOLVED_STORE_INVALID`
+### ffdf_get_company_report_context
+
+继续负责：
+
+- company filing coverage
+- chronology
+- base validation summary
+- report guardrails
+
+它不是 P9 resolved-state 的唯一权威入口。
+
+### ffdf_search_company
+
+继续负责：
+
+- company-wide periodic filing search
+- newest filing first
+- neighboring page context
+- stale-state risk reduction
+
+不负责自动应用 P9 semantic overlay。
+
+### ffdf_find_table_rows
+
+继续返回 P5 direct disclosure rows。
+
+关键：
+
+- 数值仍来自 P5 direct disclosure；
+- 不得因为 P9 出现而修改原始 row cells；
+- 如 unit/period/scope/classification 存在 P9 resolution，研究调用方必须通过 Review/Resolved Query 取得 effective semantics。
+
+未来如果需要 “Report-Safe v2 Effective Adapter”，必须单独设计版本，不得静默改变 v1。
+
+---
+
+## 11. Review Task 选择原则
+
+QUALITY_REVIEW 不扫描整份财报。
+
+标准路径：
+
+```text
+company + target periods
+→ list documents
+→ get review state
+→ COMPLETE_* : skip
+→ NEEDS_REVIEW : prepare if necessary
+→ list unresolved tasks
+→ only SUPPORTED tasks
+```
+
+默认只处理：
+
+- unresolved
+- SUPPORTED
+- 与目标 document 绑定
+- 当前 base hash 匹配
+
+UNSUPPORTED task 不得强行 submit。
+
+---
+
+## 12. Review Context
+
+`ffdf_get_review_context` 输入可按：
+
+- review_task_id
+- raw_fact_id
+- issue_id
+- table_id
+
+返回最小充分上下文：
+
+- review task
+- reason_code
+- supported_actions
+- required_evidence_types
+- base validation summary
+- target raw fact
+- same-table relevant P5 cells
+- P6 evidence
+- related issues
+- current active resolutions
+- effective semantic state
+- relevant P3 page text
+- recommended visual targets
+
+不得返回：
+
+- arbitrary filesystem path
+- AI reasoning
+- guessed semantic mapping
+- invented evidence
+
+---
+
+## 13. Structured-First Visual Trigger Matrix
+
+视觉不是默认动作。
+
+### VISUAL_NOT_REQUIRED
+
+满足：
+
+- target required semantics 已明确；
+- existing structured evidence 一致；
+- 无 target-related unresolved issue；
+- 无相关 evidence conflict；
+- 已存在 durable resolution 且 quality state 可复用。
+
+### VISUAL_REQUIRED
+
+仅在当前任务需要且 structured evidence 无法安全判断时触发，例如：
+
+- period/unit/scope/header role 冲突；
+- row/column relationship 不清；
+- P5 crop/header relationship 有疑问；
+- cross-page table context 必需；
+- P6 fact 与 P5/P3 evidence 冲突；
+- requested fact missing，需要定位 PDF 中是否实际披露；
+- current task 明确依赖原始版式；
+- parser defect suspicion。
+
+重要：
+
+**document == REVIEW_REQUIRED 本身不能自动触发视觉。**
+
+必须是 target-related。
+
+---
+
+## 14. Missing-Fact Locator
+
+`ffdf_locate_evidence` 只使用 trusted structured artifacts：
+
+```text
+P3 FTS / literal search
+→ section
+→ page
+→ intersecting P5 tables
+→ P6 facts where available
+→ recommended visual target
+```
+
+它不是 canonical metric mapper。
+
+禁止：
+
+- arbitrary synonym explosion；
+- 创建不存在的 RawFact；
+- 把 locator hit 当作 fact truth；
+- 自动写 P9。
+
+若 PDF 中明确有值但 P6 没 RawFact：
+
+标记：
+
+`P6_MISSING_FACT_CANDIDATE`
+
+进入 upstream extraction review。
+
+---
+
+## 15. Trusted PDF Source Resolver
+
+调用者永远不能传 filesystem path。
+
+唯一 caller identity：
+
+- `document_sha256`
+
+内部 resolver 必须：
+
+1. 从 Registry 读取 document binding/location；
+2. 选择 live registered source；
+3. 优先并强制位于配置的 trusted raw-store root；
+4. 校验文件存在；
+5. 重新计算 SHA256；
+6. 校验 file_size；
+7. PDF 可打开；
+8. page_count 与 Registry/P3 一致；
+9. document identity 与当前 catalog document 一致。
+
+当前 live ingest 已使用类似：
+
+`workspace/ingest/raw-store/sha256/<prefix>/<sha>.pdf`
+
+P3 `document.json.source_path` 只能作为交叉校验信息，不能成为 caller-controlled source。
+
+如果只有未受信任或漂移路径：
+
+`RESEARCH_MCP_VISUAL_SOURCE_UNTRUSTED`
+
+fail closed。
+
+---
+
+## 16. Visual Renderer
+
+视觉来源固定：
+
+```text
+immutable original PDF
+→ PyMuPDF
+→ deterministic render
+→ MCP ImageContent
+```
 
 禁止：
 
 ```text
-P9 corrupt
-→ silent fallback raw
-→ pretend no overlay
+P3 text
+→ re-layout
+→ fake screenshot
 ```
 
-因为这会隐藏已存在但损坏的 reviewed state。
+### ffdf_render_page
+
+参数：
+
+- document_sha256
+- page_no
+- detail = NORMAL | HIGH_DETAIL
+
+### ffdf_render_table
+
+参数：
+
+- document_sha256
+- table_id
+- mode
+- detail
+
+mode：
+
+- TABLE_ONLY
+- TABLE_WITH_HEADER
+- TABLE_WITH_SURROUNDING_CONTEXT
+
+默认：
+
+- TABLE_WITH_HEADER
+
+### ffdf_render_table_group
+
+仅允许使用 P5 已存在的 table_group_id。
+
+不得模型猜测 table group。
 
 ---
 
-## 29. Codex Visual Decision Classes
+## 17. Crop / Detail / Tile Policy
 
-只允许四类：
+调用者不能传任意 bbox。
+
+clip 只能由 trusted P5 geometry + deterministic margin 计算。
+
+升级顺序固定：
+
+```text
+structured
+→ table NORMAL
+→ table HIGH_DETAIL
+→ table_group
+→ page NORMAL
+→ page HIGH_DETAIL
+→ deterministic tile
+```
+
+不得：
+
+- 默认整页高分辨率；
+- 扫描整份 PDF；
+- 无限前后翻页；
+- 每个 fact 单独重复 render。
+
+同一：
+
+`document_sha256 + page_no/table_id + render_profile`
+
+在同一 run 内必须 dedupe。
+
+---
+
+## 18. VisualRef
+
+VisualRef 是 run evidence identity，不是 P9 v1 evidence type。
+
+```text
+visual_ref_id =
+SHA256(
+  document_sha256
+  + page_no
+  + normalized clip
+  + render profile
+  + tile identity
+  + renderer version
+)
+```
+
+另记录：
+
+- render_sha256
+- renderer_version
+- page_no
+- table_id/group_id
+- clip
+- detail
+- tile identity
+
+默认不把 PNG 落盘。
+
+---
+
+## 19. Visual Decision Classes
+
+视觉后只能形成以下四类。
 
 ### EXPLICIT_AND_ANCHORABLE
 
-视觉结论明确，且可以回链到 P5/P6 authoritative evidence。
+PDF 视觉明确，并且存在合法 P5/P6 authoritative anchor。
 
 允许：
 
-- current research use；
-- 按当前 P9 contract提交 durable semantic resolution。
+- current-run use；
+- 在 QUALITY_REVIEW profile 中，若现有 P9 contract 可表示该 semantic correction，则可 durable submit。
 
----
+重要：
+
+VisualRef 本身不是 P9 v1 evidence。
+
+P9 durable submit 仍必须使用 P9 当前接受的：
+
+- P5_CELL
+- P6_EVIDENCE
+- 以及 ATTEST 的合法 supporting resolutions
 
 ### EXPLICIT_VISUAL_ONLY
 
-PDF视觉明确，但 structured P5/P6 evidence 无法形成当前 P9 anchor。
+PDF 明确，但不存在合法 P5/P6 anchor。
 
 允许：
 
-- current research use；
-- RUN_LOCAL_VERIFIED。
+- current-run verified use；
+- 记录 run-local VisualRef。
 
-当前 P9 v1：
+禁止：
 
-- 不允许 durable submit；
-- canonical reuse false。
-
----
+- durable P9 submit；
+- canonical reuse。
 
 ### RAW_EXTRACTION_DEFECT
 
-视觉证明 P5/P6 raw extraction错误。
+PDF 证明 P5/P6 raw extraction 错误，例如：
 
-处理：
+- 漏位；
+- 小数点错误；
+- OCR 数字错误；
+- 错列；
+- 数值绑定错误。
+
+必须：
 
 ```text
-STOP overlay
+STOP P9
 → parser defect
-→ Design-First fix
-→ rerun P5/P6/P7
+→ Design-First upstream fix
+→ rerun affected stages
 ```
-
-禁止用 P9把错误 raw numeric value“修好”。
-
----
 
 ### AMBIGUOUS
 
-视觉仍无法唯一解释。
+视觉仍不能唯一判断。
 
 保持：
 
-- unresolved；
-- REVIEW_REQUIRED。
+- unresolved
+- REVIEW_REQUIRED
 
-不得猜。
+禁止猜测。
 
 ---
 
-## 30. Visual evidence != truth
+## 20. P9 v1 Evidence Boundary
 
-正式定义：
+当前 P9 direct evidence 只接受既有 trusted evidence 类型，例如：
+
+- `P6_EVIDENCE`
+- `P5_CELL`
+
+因此 v3 不新增 `PDF_VISUAL_EVIDENCE` 到 P9 schema。
+
+理由：
+
+- 不破坏 accepted P9 v1；
+- 不需要为了视觉能力修改 durable semantic truth format；
+- 视觉仅作为 reviewer 辅助证据；
+- durable correction 必须仍有现有合法 anchor。
+
+如果未来确实需要把 VisualRef 持久化为 P9 evidence：
+
+必须单独进行 **P9 Design Amendment v2**，不能夹带在 Research Review MCP 实现中。
+
+---
+
+## 21. ATTEST_ISSUE_RESOLVED 限制
+
+`ATTEST_ISSUE_RESOLVED` 不能成为万能逃生口。
+
+只有同时满足以下条件才允许通过 Research MCP wrapper 提交：
+
+- task.reviewability == SUPPORTED；
+- task.supported_actions 包含 ATTEST；
+- supporting_resolution_ids 非空；
+- supporting resolutions 全部 active；
+- 全部属于同一个 task / issue；
+- supporting resolution 不是另一个 ATTEST；
+- expected_observed_count 精确匹配；
+- inherited evidence 非空；
+- reason_code 不属于 upstream defect / unsupported class。
+
+以下禁止 ATTEST：
+
+- RAW_EXTRACTION_DEFECT
+- P6_MISSING_FACT_CANDIDATE
+- unsupported issue
+- visual-only without anchor
+- corrupt artifact
+- missing trusted source
+- unresolved ambiguity
+
+---
+
+## 22. Controlled P9 Write-Through
+
+写工具只在 QUALITY_REVIEW profile 可用。
+
+### ffdf_prepare_review_overlay
+
+要求：
+
+- explicit document_sha256；
+- idempotent；
+- 不覆盖已有有效 overlay；
+- base P7 hash 必须匹配当前 document。
+
+### ffdf_submit_review_resolution
+
+wrapper 必须在调用现有 P9 public API 前重新检查：
+
+- review_task_id
+- expected_base_validation_report_sha256
+- expected_overlay_set_hash_before
+- current active resolution set
+- task still unresolved
+- task still SUPPORTED
+- action in task.supported_actions
+- evidence contract valid
+
+如果状态已经变化：
+
+`RESEARCH_MCP_REVIEW_STATE_CHANGED`
+
+不得继续写。
+
+### ffdf_materialize_resolved_view
+
+必须显式调用。
+
+submit 成功只代表：
+
+“resolution immutable artifact 已写入”
+
+不代表：
+
+“document 已完善”。
+
+最终必须：
 
 ```text
-PDF Visual Source = authoritative source evidence
-Codex interpretation = reviewer decision
+submit
+→ materialize
+→ get_review_state
 ```
 
-即使视觉看起来清晰，也不能把“模型看到了”自动等同 deterministic parser truth。
+只有 quality_state == COMPLETE_REVIEWED 才表示复核后可复用。
 
 ---
 
-## 31. Run-local Visual Fact
+## 23. Research Fallback 不自动写库
+
+正常报告生成中：
+
+```text
+structured result
+→ resolved state if available
+→ visual fallback if needed
+→ run-local judgment
+```
+
+即使判断非常明确，也不得自动调用：
+
+- prepare
+- submit
+- materialize
+
+研究任务可输出：
+
+- review candidate
+- parser defect candidate
+- missing fact candidate
+
+然后由单独 QUALITY_REVIEW 任务处理。
+
+这样保持：
+
+**研究职责与数据治理职责分离。**
+
+---
+
+## 24. Run-Local Verified
 
 对于 `EXPLICIT_VISUAL_ONLY`：
 
 ```json
 {
-  "research_run_id": "...",
   "decision_class": "EXPLICIT_VISUAL_ONLY",
   "document_sha256": "...",
-  "raw_fact_id": "...",
-  "effective_period": "...",
-  "effective_unit": "...",
-  "effective_scope": "...",
-  "effective_value_role": "...",
+  "page_no": 10,
   "visual_ref_ids": ["..."],
   "usability": "RUN_LOCAL_VERIFIED",
   "durable": false,
@@ -857,649 +1010,547 @@ Codex interpretation = reviewer decision
 }
 ```
 
----
+run-local decision：
 
-## 32. RUN_LOCAL_VERIFIED 边界
-
-允许：
-
-- 当前报告中的事实陈述；
-- 当前 research run 的必要计算；
-- YoY / margin / other derived result，**仅当所有 operands 均满足 DERIVED_USE_READY**；
-- 当前估值输入，若所有必要 semantic/provenance 条件满足并显式记录为 run-local。
-
-不允许：
-
-- 注册为 reusable parsed data；
-- 下次研究无条件复用；
-- 覆盖 P6 raw；
-- 自动升级为 canonical metric；
-- 省略 provenance。
+- 可用于当前报告中的事实判断；
+- 必须保留 provenance；
+- 不进入 Registry；
+- 不进入 P6；
+- 不进入 P9 v1；
+- 下一次研究不能自动视为已复核。
 
 ---
 
-## 33. DERIVED_USE_READY
+## 25. Derived-Use Gate
 
-一个 operand 只有在以下全部满足时才可进入 current-run derived calculation：
+视觉确认不等于任何派生计算都可用。
 
-1. numeric value verified；
-2. period verified；
-3. value_role verified；
-4. required unit/dimension verified；
-5. required scope verified；
-6. no unresolved conflict；
-7. source provenance exists；
-8. 若来源为 visual-only，至少一个 VisualRef + document SHA + page identity；
-9. operation-specific compatibility checks PASS。
+如用于 YoY / margin / QoQ / TTM 等，必须逐项检查：
 
----
-
-## 34. Operation-specific gates
+- numeric value
+- period
+- value role
+- unit/dimension
+- scope
+- no unresolved conflict
+- provenance
 
 ### YoY
 
 必须：
-- same semantic metric；
-- correct comparative period；
-- same/compatible scope；
-- same dimension；
-- compatible currency/scale where monetary。
+
+- same semantic metric
+- compatible comparative period
+- compatible scope
+- compatible dimension/currency/scale
+- value role = VALUE
 
 ### Margin
 
 必须：
-- same period；
-- compatible scope；
-- compatible monetary basis。
+
+- numerator/denominator same period
+- compatible scope
+- compatible monetary basis
 
 ### QoQ
 
-不得把：
-- YTD 与 standalone quarter；
+禁止：
 
-直接相除或比较。
+- YTD 与 standalone quarter 直接做 QoQ
 
 ### TTM
 
-必须来自：
-- 四个 compatible quarter facts；
-- 或明确可证明的 duration decomposition。
-
-### Valuation
-
-run-local visual verified 输入可以参与当前估值，但：
-- 必须在 research provenance 中标记；
-- 不得因此成为 canonical reusable data。
+必须证明 duration decomposition 兼容。
 
 ---
 
-## 35. Missing fact + Visual-only
+## 26. 与最新报告生成流程的推荐关系
 
-如果 `ffdf_locate_evidence` 找到 PDF 中目标数据，但 P6 没有 RawFact：
-
-decision 可是：
-
-`EXPLICIT_VISUAL_ONLY`
-
-此时 raw_fact_id 可以为空，必须保存：
-
-- document SHA；
-- page；
-- table/section if available；
-- visual refs；
-- literal observed text/value；
-- current-run interpretation。
-
-它不能提交当前 P9 v1 FACT_FIELD resolution，因为没有合法 raw target。
-
-同时产生：
-
-`P6_MISSING_FACT_CANDIDATE`
-
-用于 parser improvement。
-
----
-
-## 36. Future PDF_VISUAL_EVIDENCE in P9
-
-长期可以新增 P9 evidence type：
-
-`PDF_VISUAL_EVIDENCE`
-
-要求：
-
-- document_sha256；
-- page_no；
-- deterministic render profile；
-- clip/tile identity；
-- renderer version；
-- render_sha256；
-- visual_ref_id。
-
-但当前 P9 v1 closeout 前不得实现。
-
-必须后续 Design Amendment。
-
-默认只允许支持 semantic overlay。
-
-不得轻易允许改变 raw numeric value。
-
----
-
-## 37. Long-term correction loop
-
-每次 visual decision 可记录：
-
-- trigger reason；
-- structured gap type；
-- visual result class；
-- related table/header pattern；
-- parser defect candidate；
-- rule candidate fingerprint。
-
-周期性治理：
+正常公司研究建议：
 
 ```text
-many repeated visual decisions
-→ cluster recurring pattern
-→ design review
-→ Semantic Resolver rule candidate
-→ Golden
-→ implementation
-→ acceptance
+ffdf_get_company_report_context
+→ ffdf_search_company
+→ ffdf_find_table_rows
+→ per-document ffdf_get_review_state
+→ durable resolved exists? use resolved semantics
+→ structured ambiguity? ffdf_get_review_context
+→ visual only if required
+→ report generation
 ```
 
-Codex decision 本身不自动训练/修改 production rule。
+P8 raw tools继续用于：
+
+- evidence tracing
+- raw audit
+- parser diagnosis
+
+而不是让研究层静默把 raw 当 effective。
 
 ---
 
-## 38. Visual trigger telemetry
+## 27. Event Coverage Boundary
 
-为长期优化记录：
+design/29 v3 只解决：
 
-- visual_calls_per_document；
-- trigger reason counts；
-- render_table vs page vs group；
-- repeated same-pattern count；
-- decision classes；
-- percentage resolved without visual；
-- percentage visual-only；
-- parser defect candidates；
-- ambiguous rate。
+**已入库正式文档的结构化数据/语义疑问与视觉复核。**
 
-这些是工程指标，不是 correctness proof。
+它不解决：
 
----
-
-## 39. 002371 Q3 Golden
-
-Document：
-
-- ticker: 002371；
-- source: CNINFO；
-- source_id: 1225641389；
-- SHA256: `a0f8d84ab724f7c62b690d6504215602a623fc185c53c9e1079cd40653c600b9`。
-
-第一页 KPI table：
-
-Codex 必须能够通过：
-
-```text
-Raw facts
-→ review context
-→ render table/header
-```
-
-识别：
-
-```text
-本报告期
-本报告期比上年同期增减
-年初至报告期末
-年初至报告期末比上年同期增减
-```
-
-并区分：
-
-```text
-11,305,675,488.89 → current-quarter VALUE
-1.31%              → current-quarter YOY_PERCENT
-31,467,092,379.45 → YTD VALUE
-15.26%             → YTD YOY_PERCENT
-```
-
-不能把四列当成同一种金额。
-
----
-
-## 40. Missing-Fact Golden
-
-必须增加至少一个 fixture：
-
-- 原 PDF 存在目标披露；
-- P3 FTS 能定位；
-- P6 没有对应 RawFact。
-
-验证：
-
-```text
-research asks metric
-→ list_raw_facts misses
-→ locate_evidence
-→ recommended table/page
-→ render
-→ run-local visual decision
-→ P6 missing-fact candidate
-```
-
----
-
-## 41. Cross-page Golden
-
-必须覆盖：
-
-- table group 2+ pages；
-- page 2 missing full header；
-- render_table_group returns ordered evidence；
-- Codex can inspect inherited visual context；
-- no group → no guessed group；
-- page fallback works。
-
----
-
-## 42. Dense-table Golden
-
-至少一个：
-
-- landscape；
-- small font；
-- >8 value columns。
-
-验证：
-
-NORMAL不足时可以 deterministic HIGH_DETAIL/tile。
-
-不能因为 max-dimension压缩导致 acceptance无法读。
-
----
-
-## 43. Security
-
-禁止工具：
-
-- read_file(path)；
-- render_file(path)；
-- arbitrary crop/bbox；
-- list_directory；
-- sqlite_query；
-- shell；
-- execute_python。
-
-Caller 只能使用 domain identity：
-
-- document_sha256；
-- raw_fact_id；
-- issue_id；
-- table_id；
-- table_group_id；
-- page_no；
-- locator query。
-
----
-
-## 44. Determinism
-
-相同：
-
-- PDF；
-- artifact state；
-- render args/profile；
-- P9 state；
-
-必须：
-
-- same VisualRef；
-- same render bytes/hash for same pinned renderer/runtime；
-- same review state；
-- same ResolvedFact response；
-- same locator ordering。
-
-Codex interpretation本身不是 deterministic artifact，因此不能纳入 FFDF deterministic equality claim。
-
----
-
-## 45. Renderer/runtime pin
-
-Visual acceptance 必须冻结：
-
-- PyMuPDF exact version；
-- Python runtime；
-- render profile；
-- output format；
-- color/alpha policy；
-- DPI/tiling algorithm。
-
-Renderer升级会改变 render hash，必须形成新的 renderer version。
-
----
-
-## 46. Performance gates
-
-初始：
-
-- get_review_state warm <= 2s；
-- get_resolved_fact warm <= 3s；
-- locate_evidence warm <= 3s；
-- get_review_context warm <= 3s；
-- render_table NORMAL <= 3s；
-- render_page NORMAL <= 5s；
-- render_table_group representative 2-page <= 6s；
-- HIGH_DETAIL/tile单页 <= 8s。
-
-不包含 Codex推理时间。
-
----
-
-## 47. Error codes
-
-至少：
-
-```text
-RESEARCH_MCP_DOCUMENT_NOT_FOUND
-RESEARCH_MCP_FACT_NOT_FOUND
-RESEARCH_MCP_ISSUE_NOT_FOUND
-RESEARCH_MCP_TABLE_NOT_FOUND
-RESEARCH_MCP_TABLE_GROUP_NOT_FOUND
-RESEARCH_MCP_PAGE_INVALID
-RESEARCH_MCP_VISUAL_SOURCE_INVALID
-RESEARCH_MCP_RENDER_FAILED
-RESEARCH_MCP_PAYLOAD_LIMIT
-RESEARCH_MCP_REVIEW_STATE_INVALID
-RESEARCH_MCP_RESOLVED_STORE_INVALID
-RESEARCH_MCP_RESOLVED_FACT_NOT_FOUND
-RESEARCH_MCP_LOCATOR_NO_MATCH
-```
-
-不得输出普通 client Python traceback。
-
----
-
-## 48. Immutability
-
-Research MCP 调用前后必须证明：
-
-- source PDF unchanged；
-- P3 unchanged；
-- P5 unchanged；
-- P6 unchanged；
-- P7 unchanged；
-- Registry unchanged；
-- P9 store unchanged unless caller explicitly执行 authorized P9 submit。
-
-render tool 永远 read-only。
-
----
-
-## 49. Tests — Visual Trigger Matrix
-
-至少：
-
-1. null period → required；
-2. null unit where required → required；
-3. unrelated warning → not required；
-4. target-related review issue → required；
-5. conflicting period evidence → required；
-6. complete clean resolved fact → not required；
-7. requested missing metric → required locator path；
-8. reconciliation inconsistency → required；
-9. YTD/Q3 ambiguity → required；
-10. existing durable reviewed resolution → no repeated visual by default。
-
----
-
-## 50. Tests — Locator
-
-至少：
-
-1. FTS hit + table；
-2. FTS hit no table；
-3. multiple pages deterministic order；
-4. no match；
-5. query limits；
-6. no arbitrary path；
-7. no fabricated fact；
-8. missing-fact golden。
-
----
-
-## 51. Tests — Render
-
-至少：
-
-1. registered immutable PDF only；
-2. SHA mismatch blocked；
-3. page bounds；
-4. table belongs document；
-5. deterministic table crop；
-6. header context；
-7. P5 bbox-failure page fallback；
-8. table-group ordering；
-9. no guessed group；
-10. HIGH_DETAIL；
-11. deterministic tiling；
-12. VisualRef stable；
-13. PNG hash stable under frozen runtime；
-14. no screenshot file persisted；
-15. source/upstream immutable；
-16. 002371 live visual golden。
-
----
-
-## 52. Tests — Resolved Query
-
-至少：
-
-1. no P9 overlay → raw/effective equivalent；
-2. period overlay；
-3. unit overlay；
-4. scope overlay；
-5. multiple compatible overlays；
-6. superseded excluded；
-7. corrupt store blocks；
-8. raw unchanged；
-9. provenance returned；
-10. deterministic response；
-11. resolved REVIEW_REQUIRED；
-12. resolved PASS；
-13. Registry not mutated；
-14. P8 raw tools unchanged；
-15. existing overlay avoids repeat visual.
-
----
-
-## 53. Tests — Run-local / Derived Use
-
-至少：
-
-1. visual-only fact quotation；
-2. visual-only complete fact → RUN_LOCAL_VERIFIED；
-3. missing period → not DERIVED_USE_READY；
-4. YoY compatible operands；
-5. YoY incompatible period blocked；
-6. margin scope mismatch blocked；
-7. valuation run-local allowed with provenance；
-8. run-local never Registry reusable；
-9. next run does not treat run-local as durable；
-10. durable P9 state is reused next run。
-
----
-
-## 54. Implementation gates
-
-### R-A — Future Design Baseline
-
-design/28 + design/29 可以作为 reference design 冻结。
-
-**R-B 及以后全部保持 CLOSED，直到 P10 closeout 或后续 design-owner 以新 baseline 明确授权 Research MCP production。**
-
-### R-B — Trusted Source & Period-aware Catalog
-
-- raw PDF mapping；
-- filing period identity；
-- path security；
-- SHA/page validation。
-
-### R-C — Resolved Query
-
-先实现：
-- review state；
-- resolved fact/list。
-
-理由：已有 P9 result 应最优先避免重复 visual。
-
-### R-D — Visual Trigger Matrix
-
-实现 deterministic trigger evaluator。
-
-### R-E — Missing-Fact Locator
-
-实现 P3/P5 locator。
-
-### R-F — Visual Renderer
-
-实现 page/table/group + NORMAL/HIGH_DETAIL/tiling。
-
-### R-G — 002371 Golden
-
-验证 Q3 KPI visual fallback。
-
-### R-H — Run-local Decision Policy
-
-验证 derived-use gates。
-
-### R-I — Existing P9 Reuse Golden
-
-第一次 durable submit后，下一 run直接 Resolved Query，不再截图。
-
-### R-J — Diverse CN/HK Golden
-
-覆盖 cross-page/dense/missing fact。
-
-### R-K — Code Review
-
-review exact candidate。
-
-### R-L — Acceptance Freeze
-
-冻结 renderer/runtime/catalog/fixtures。
-
-### R-M — Independent Acceptance
-
-未来 Research MCP Independent Acceptance PASS 后，只授权把该 capability additive 接入已验收的 P10 integration contract。
-
-P10 core live research不以 R-M 为前置；在 R-M 之前 visual-required case 必须显式返回 capability gap。
-
----
-
-## 55. design/28 / design/29 implementation order
-
-明确顺序：
-
-```text
-P10 core accepted P8/P9 dynamic integration
-       ↓
-structured-sufficient research immediately usable
-       ↓
-explicit P10_VISUAL_CAPABILITY_REQUIRED where visual is truly needed
-       ↓
-separate Research MCP authorization / implementation / acceptance
-       ↓
-visual capability becomes additive to P10
-       ↓
-collect reviewed visual patterns
-       ↓
-separate Semantic Resolver authorization
-```
+- 临时公告未入库；
+- 权益分派实施公告缺失；
+- 股东大会决议公告缺失；
+- 回购进展公告缺失；
+- 重大合同公告缺失；
+- 其他 Corporate Event feed 缺失。
 
 因此：
 
-- design/29 = **未来 additive visual/resolved-query capability**；
-- design/28 = **未来 deterministic automation architecture**；
-- P10 v1 = **当前 accepted P8/P9 structured integration**。
+`latest periodic filing != latest real-world event state`
+
+未来如需解决，另立：
+
+**CorporateEvent / DisclosureEvent ingestion design**
+
+不得把 event ingestion 偷渡进 Research Review MCP。
 
 ---
 
-## 56. Acceptance criteria
+## 28. Security
 
-至少证明：
+禁止工具：
 
-1. P8 v1 11 tools unchanged；
-2. source/P3/P5/P6/P7 immutable；
-3. REVIEW_REQUIRED 可继续 research；
-4. Visual Trigger Matrix deterministic；
-5. complete clean fact不会无理由看图；
-6. missing fact可通过 locator找到候选 evidence；
-7. table crop错误可以升级 page；
-8. cross-page group可视觉检查；
-9. dense table可 HIGH_DETAIL/tile；
-10. PDF image来自 immutable source；
-11. VisualRef可审计；
-12. visual source 与 Codex decision明确分层；
-13. EXPLICIT_AND_ANCHORABLE可进入 P9；
-14. EXPLICIT_VISUAL_ONLY只能 run-local；
-15. RAW_EXTRACTION_DEFECT不能被 P9掩盖；
-16. AMBIGUOUS保持 unresolved；
-17. RUN_LOCAL_VERIFIED边界明确；
-18. DERIVED_USE_READY operation gate生效；
-19. run-local数据不进入 Registry reuse；
-20. durable P9 result下次自动通过 Resolved Query获取；
-21. corrupt P9不能 silent fallback；
-22. recurring pattern只形成 rule candidate，不自动改 parser；
-23. 002371 Q3 golden PASS；
-24. missing-fact / cross-page / dense-table golden PASS。
+- read_file(path)
+- render_file(path)
+- list_directory
+- sqlite_query
+- shell
+- execute_python
+- arbitrary crop
+- arbitrary raw-store path
+
+caller 只能使用 domain identity：
+
+- document_sha256
+- raw_fact_id
+- review_task_id
+- issue_id
+- table_id
+- table_group_id
+- page_no
+- locator query
+
+所有 filesystem resolution 在 trusted internal resolver 内完成。
 
 ---
 
-## 57. Issue rule
+## 29. Determinism
 
-发现设计或实现问题：
+在固定：
+
+- PDF bytes
+- P3/P5/P6/P7 artifacts
+- P9 state
+- renderer runtime
+- render profile
+
+条件下必须保证：
+
+- same ReviewState
+- same ResolvedFact
+- same locator ordering
+- same VisualRef
+- same render SHA
+- same recommended visual target ordering
+
+模型 reviewer interpretation 不属于 deterministic artifact equality。
+
+---
+
+## 30. Renderer Freeze
+
+Independent Acceptance 前必须冻结：
+
+- Python exact runtime
+- PyMuPDF exact version
+- image format
+- DPI
+- alpha/color policy
+- table margin policy
+- HIGH_DETAIL profile
+- tiling algorithm
+- overlap
+- tile ordering
+- renderer_version
+
+renderer 行为变化必须提升 renderer_version。
+
+---
+
+## 31. Telemetry
+
+至少统计：
+
+- review_state_call_count
+- visual_call_count
+- rendered_unique_page_count
+- rendered_unique_table_count
+- structured_sufficient_count
+- visual_required_count
+- EXPLICIT_AND_ANCHORABLE count
+- EXPLICIT_VISUAL_ONLY count
+- RAW_EXTRACTION_DEFECT count
+- AMBIGUOUS count
+- durable_resolution_submit_count
+- repeated_visual_avoided_count
+
+这些用于成本优化和设计反馈，不作为 correctness truth。
+
+模型名称/token 只进入 run telemetry，不进入 P9 semantic truth。
+
+---
+
+## 32. Reviewer Identity
+
+FFDF correctness contract 不绑定 Luna。
+
+角色：
+
+```text
+orchestrator = Codex / caller
+visual reviewer = runtime-selected model or human
+```
+
+当前可以默认使用 Luna 做高吞吐视觉复核，但：
+
+- 不新增 `ReviewerType.LUNA`；
+- durable P9 reviewer_type 继续使用已有 enum；
+- 如由 Codex 承载模型复核流程，可使用明确 reviewer_id，例如 `codex/luna-review`；
+- 模型版本单独记录 telemetry。
+
+---
+
+## 33. Internal Service Boundary
+
+未来 extension 不应继续扩大对 private `McpQueryService._bundle` 的依赖。
+
+当前 Report-Safe v1 已使用 `service._bundle`，这是已知技术债。
+
+在 Research Review implementation 前应提供最小 public/internal service accessor，例如：
+
+- trusted document bundle read
+- P5 table iteration
+- P6 fact/evidence indexes
+
+要求：
+
+- 不暴露 arbitrary paths；
+- 不改变 public MCP contract；
+- 不复制 artifact loading logic；
+- Report-Safe 和 Research Review 共享同一受控 service layer。
+
+---
+
+## 34. Error Codes
+
+至少定义：
+
+- `RESEARCH_MCP_WRITE_DISABLED`
+- `RESEARCH_MCP_DOCUMENT_NOT_FOUND`
+- `RESEARCH_MCP_FACT_NOT_FOUND`
+- `RESEARCH_MCP_REVIEW_TASK_NOT_FOUND`
+- `RESEARCH_MCP_ISSUE_NOT_FOUND`
+- `RESEARCH_MCP_TABLE_NOT_FOUND`
+- `RESEARCH_MCP_TABLE_GROUP_NOT_FOUND`
+- `RESEARCH_MCP_PAGE_INVALID`
+- `RESEARCH_MCP_VISUAL_SOURCE_UNTRUSTED`
+- `RESEARCH_MCP_VISUAL_SOURCE_INVALID`
+- `RESEARCH_MCP_RENDER_FAILED`
+- `RESEARCH_MCP_PAYLOAD_LIMIT`
+- `RESEARCH_MCP_REVIEW_STATE_CHANGED`
+- `RESEARCH_MCP_REVIEW_STATE_INVALID`
+- `RESEARCH_MCP_RESOLVED_STORE_INVALID`
+- `RESEARCH_MCP_LOCATOR_NO_MATCH`
+- `RESEARCH_MCP_UPSTREAM_FIX_REQUIRED`
+
+禁止直接向 client 暴露 Python traceback。
+
+---
+
+## 35. Golden Cases
+
+### 35.1 002371 2026Q3
+
+保留现有 live evidence 作为 period/value-role golden。
+
+必须正确区分：
+
+- current-quarter VALUE
+- current-quarter YOY_PERCENT
+- YTD VALUE
+- YTD YOY_PERCENT
+
+视觉只在 structured evidence 不能唯一判断时触发。
+
+### 35.2 605117 Report-Safe Integration
+
+至少验证：
+
+- 2025FY `新能源行业` direct row 可直接获取；
+- `外销` disclosure label 不被扩写成“海外收入”；
+- 2025FY KAM 跨 p105/p106 能读取完整上下文；
+- newer periodic filing state 可覆盖 older filing state；
+- 若临时公告未入库，系统不得声称已知最新现实事件状态；
+- Report-Safe v1 行为不得因 Research Review extension 改变。
+
+### 35.3 Existing P9 Reuse
+
+证明：
+
+```text
+REVIEW_REQUIRED
+→ supported resolution
+→ materialize
+→ COMPLETE_REVIEWED
+→ next run uses durable resolved
+→ no repeated visual by default
+```
+
+### 35.4 其他必须 Golden
+
+- cross-page table
+- dense table
+- missing fact
+- raw extraction defect
+- visual-only no anchor
+- ambiguous
+- unsupported task
+- same-page multi-task visual dedupe
+- corrupt P9
+- stale snapshot / active overlay mismatch
+- source SHA drift
+- write disabled in RESEARCH_FALLBACK
+
+---
+
+## 36. Implementation Gates
+
+### R-A0 — Current Main Reconciliation
+
+本 v3 已完成的设计输入：
+
+- main@8c6cd75
+- P8 11-tool frozen logical contract
+- current 14-tool server
+- Report-Safe v1 production
+- P9 v1 accepted API/schema
+- P10 PDF visual unavailable
+
+R-A0 的正式产物就是本 design/29 v3。
+
+### R-A1 — Contract Freeze
+
+冻结：
+
+- 三 capability group
+- 12 future tool names
+- runtime profile
+- quality-state enum
+- error codes
+- P8/P9 non-regression rules
+
+### R-B — Trusted Source Resolver
+
+实现：
+
+- Registry → trusted raw-store path
+- SHA/file_size/page_count verification
+- caller path prohibition
+
+### R-C — Review State + Resolved Query
+
+实现：
+
+- get_review_state
+- get_resolved_fact
+- list_resolved_facts
+- quality state machine
+
+不实现 visual。
+
+### R-D — Review Tasks + Context
+
+实现：
+
+- list_review_tasks
+- get_review_context
+- shared service accessor
+
+### R-E — Controlled P9 Write-Through
+
+实现：
+
+- prepare
+- submit
+- materialize
+- mode gate
+- optimistic state verification
+- ATTEST restrictions
+
+此阶段仍不需要 visual。
+
+### R-F — Locator
+
+实现：
+
+- locate_evidence
+- no fabricated fact
+
+### R-G — Visual Trigger Policy
+
+实现 deterministic target-related trigger evaluator。
+
+### R-H — Renderer
+
+实现：
+
+- page
+- table
+- group
+- high detail
+- tiling
+- VisualRef
+
+### R-I — Run-Local Decision Policy
+
+实现：
+
+- four visual decision classes
+- derived-use gate
+- no durable write in research mode
+
+### R-J — 002371 Golden
+
+### R-K — 605117 Report-Safe Integration Golden
+
+### R-L — Existing P9 Reuse Golden
+
+### R-M — Diverse CN/HK + Security + Corruption Golden
+
+### R-N — Formal Code Review
+
+### R-O — Acceptance Freeze
+
+冻结 runtime / renderer / fixtures / candidate commit。
+
+### R-P — Independent Acceptance
+
+只有 R-P PASS 后，才允许讨论 production enablement。
+
+### R-Q — P10 Capability Reconciliation
+
+Independent Acceptance PASS 后另行更新 P10 capability manifest：
+
+`PDF_VISUAL_EVIDENCE: UNAVAILABLE → AVAILABLE`
+
+该更新不得提前进入 R-B–R-P。
+
+---
+
+## 37. Non-Regression Requirements
+
+实现全过程必须保证：
+
+1. P8 11-tool logical contract fingerprint 不变；
+2. `ffdf_get_fact` raw contract 不变；
+3. Report-Safe v1 三工具原有字段和行为不被静默改变；
+4. P9 v1 schema/version 不变；
+5. P9 ResolutionAction 不扩展；
+6. Raw/P3/P5/P6/P7/Registry source artifacts 不被 render/read 工具修改；
+7. 默认 research profile 无 durable write；
+8. run-local visual decision 不进入 canonical reuse；
+9. corrupt P9 不 silent fallback raw；
+10. source SHA drift fail closed；
+11. temporary-announcement coverage limitation继续明确存在。
+
+---
+
+## 38. Testing Requirements
+
+每个 gate 至少执行：
+
+- focused unit tests
+- compile/import
+- contract tests
+- security/path tests
+- immutability tests
+- deterministic repeat tests
+
+涉及 write-through：
+
+- stale-state tests
+- supersession tests
+- P9 store integrity tests
+- concurrent/optimistic state tests
+
+涉及 render：
+
+- trusted source only
+- SHA mismatch
+- page bounds
+- deterministic crop
+- header context
+- cross-page group
+- high detail
+- tiling
+- VisualRef stable
+- render SHA stable under frozen runtime
+- no screenshot persistence
+
+最终：
+
+- full unit suite
+- integration
+- golden
+- independent acceptance
+
+所有结果记录 PASS / FAIL / SKIP。
+
+---
+
+## 39. Design Issue Rule
+
+实现过程中发现设计与真实代码冲突：
 
 ```text
 STOP
-→ facts/root cause
-→ update design/28 or design/29
-→ commit/push design baseline
+→ establish facts
+→ root cause
+→ update design/29
+→ design-only commit
 → assess invalidated gates
-→ implementation
-→ rerun
+→ resume implementation
 ```
 
-禁止 code-first/design-later。
+禁止 code-first / design-later。
 
 ---
 
-## 58. Exit
+## 40. Production Authorization Boundary
 
-本 reference design 本身不授权 implementation。
+本文完成后状态仍是：
 
-只有未来单独满足：
+**DESIGN COMPLETE / PRODUCTION IMPLEMENTATION NOT AUTHORIZED**
 
-- Research MCP production authorization；
-- exact implementation plan；
-- Code Review；
-- Acceptance Freeze；
-- Independent Acceptance PASS；
+下一步若授权实现，应明确使用本 design/29 v3 作为唯一 baseline。
 
-之后，Research MCP Extension 才可把 P10 capability manifest 中 `PDF_VISUAL_EVIDENCE` 从 UNAVAILABLE 改为 AVAILABLE。
+不得使用：
 
-P10 始终负责：
+- 旧 design/29；
+- 不存在的 d7ec5aa 会话性 commit；
+- 旧“P8 永远只有11个 server tools”的错误假设；
+- “P9 MCP”这一不准确表述；
+- “视觉结果可直接写入 P9 evidence”的错误假设。
 
-- 当前研究规范读取；
-- 信息需求规划；
-- accepted capability选择；
-- Codex reasoning；
-- run-local decisions；
-- optional P9 durable submit；
-- 最终研究输出。
-
-Research MCP 不成为研究业务规则真源。
+Production implementation 必须从 R-A1 开始，并严格按 gate 顺序推进。
