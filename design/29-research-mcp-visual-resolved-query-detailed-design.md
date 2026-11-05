@@ -1,6 +1,6 @@
 # 29 — FFDF Research Review MCP v3：Resolved Query、Visual Evidence 与 Controlled Review Write-Through 详细设计
 
-> 状态：**ACTIVE DESIGN v3 — PRODUCTION IMPLEMENTATION AUTHORIZED FOR GATED EXECUTION**
+> 状态：**IMPLEMENTATION COMPLETE — INDEPENDENT ACCEPTANCE PASS — R-Q COMPLETE**
 >
 > 当前真实基线：`main@8c6cd75`（`feat: add report-safe MCP interfaces`）
 >
@@ -1929,18 +1929,35 @@ STOP
 
 ## 40. Production Authorization Boundary
 
-本文完成后状态仍是：
+截至 2026-11-05：
 
-**DESIGN COMPLETE / PRODUCTION IMPLEMENTATION NOT AUTHORIZED**
+- R-A0 ～ R-Q 全部完成；
+- R-P Independent Acceptance = PASS；
+- R-Q P10 Capability Reconciliation v2 = PASS；
+- P8 accepted v1 logical contract 保持冻结；
+- P9 v1 schema/actions 保持冻结；
+- Research Review MCP v1 已通过 26-tool stdio、CN/HK、605117、002371、P9 durable reuse、安全/不可变性验证；
+- P10 v1 保持历史兼容，P10 v2 正式声明 PDF Visual / Research Review MCP / Research Preflight 为 AVAILABLE；
+- Semantic Resolver / Canonical Metric Layer / P11 SEC Provider 仍为 UNAVAILABLE。
 
-本设计已于 2026-11-05 获得用户明确授权，允许按 gate 顺序推进 production implementation；任何 gate 仍必须独立通过其设计、测试和证据要求。
+本设计当前结论：
 
-不得使用：
+**IMPLEMENTATION COMPLETE / INDEPENDENT ACCEPTANCE PASS / PRODUCTION ENABLEMENT AUTHORIZED**
 
-- 旧 design/29；
-- 不存在的 d7ec5aa 会话性 commit；
-- 旧“P8 永远只有11个 server tools”的错误假设；
-- “P9 MCP”这一不准确表述；
-- “视觉结果可直接写入 P9 evidence”的错误假设。
+生产使用仍必须遵守：
 
-Production implementation 从 R-A1 开始，并严格按 R-A1 → R-A2 → R-B ... 的 gate 顺序推进。
+- 默认 RESEARCH_FALLBACK 只读；
+- P9 durable write 仅在显式 QUALITY_REVIEW profile；
+- Research Fallback 不自动写 P9；
+- VisualRef 不是 P9 v1 evidence；
+- Raw numeric defect 必须回 Parser/Extraction 修复；
+- missing fact 无合法 RawFact target 时不得通过 P9 伪造；
+- arbitrary filesystem path / arbitrary bbox / network / SQL / shell 仍禁止；
+- 如果调用 Codex，只允许 Luna 5.6。
+
+后续任何新能力必须另立设计，不得把本项目的 PASS 扩张解释为：
+
+- Semantic Resolver 已完成；
+- Canonical Metric Layer 已完成；
+- CorporateEvent/DisclosureEvent ingestion 已完成；
+- P11 SEC Provider 已完成。

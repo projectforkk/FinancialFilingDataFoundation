@@ -2,8 +2,13 @@
 
 from .context import (
     CAPABILITY_MANIFEST_V1,
+    CAPABILITY_MANIFEST_V2,
     CONTEXT_SCHEMA_VERSION,
+    CONTEXT_SCHEMA_VERSION_V1,
+    CONTEXT_SCHEMA_VERSION_V2,
     INTEGRATION_POLICY_VERSION,
+    INTEGRATION_POLICY_VERSION_V1,
+    INTEGRATION_POLICY_VERSION_V2,
     P8_CATALOG_SCHEMA_VERSION_V1,
     P8_RESULT_SCHEMA_VERSION_V1,
     P8_SERVER_VERSION_V1,
@@ -16,6 +21,7 @@ from .context import (
     P9PolicyContract,
     ResearchContext,
     build_research_context,
+    build_research_context_v2,
 )
 from .models import (
     P10Error,
@@ -41,8 +47,13 @@ from .spec import freeze_research_spec, verify_research_spec
 
 __all__ = [
     "CAPABILITY_MANIFEST_V1",
+    "CAPABILITY_MANIFEST_V2",
     "CONTEXT_SCHEMA_VERSION",
+    "CONTEXT_SCHEMA_VERSION_V1",
+    "CONTEXT_SCHEMA_VERSION_V2",
     "INTEGRATION_POLICY_VERSION",
+    "INTEGRATION_POLICY_VERSION_V1",
+    "INTEGRATION_POLICY_VERSION_V2",
     "LEDGER_SCHEMA_VERSION",
     "PROVENANCE_VALIDATION_SCHEMA_VERSION",
     "P10Error",
@@ -70,6 +81,7 @@ __all__ = [
     "ResearchSpecInput",
     "SPEC_BUNDLE_SCHEMA_VERSION",
     "build_research_context",
+    "build_research_context_v2",
     "freeze_research_spec",
     "validate_evidence_ledger",
     "verify_research_spec",

@@ -25,6 +25,12 @@ from .spec import _canonical_json_bytes, verify_research_spec
 CONTEXT_SCHEMA_VERSION = "p10-research-context-v1"
 INTEGRATION_POLICY_VERSION = "p10-dynamic-research-v1"
 
+# Explicit aliases preserve the accepted v1 contract while allowing additive v2.
+CONTEXT_SCHEMA_VERSION_V1 = CONTEXT_SCHEMA_VERSION
+INTEGRATION_POLICY_VERSION_V1 = INTEGRATION_POLICY_VERSION
+CONTEXT_SCHEMA_VERSION_V2 = "p10-research-context-v2"
+INTEGRATION_POLICY_VERSION_V2 = "p10-dynamic-research-v2"
+
 P8_SERVER_VERSION_V1 = "p8-local-mcp-v1"
 P8_CATALOG_SCHEMA_VERSION_V1 = "p8-mcp-catalog-v1"
 P8_RESULT_SCHEMA_VERSION_V1 = "p8-mcp-result-v1"
@@ -58,6 +64,24 @@ CAPABILITY_MANIFEST_V1 = (
     ("P9_REVIEW", "AVAILABLE"),
     ("P9_RESOLVED_VIEW", "AVAILABLE"),
     ("PDF_VISUAL_EVIDENCE", "UNAVAILABLE"),
+    ("SEMANTIC_RESOLVER", "UNAVAILABLE"),
+    ("CANONICAL_METRIC_LAYER", "UNAVAILABLE"),
+    ("P11_SEC_PROVIDER", "UNAVAILABLE"),
+)
+
+
+# v2 is additive. V1 remains byte-for-byte semantically frozen.
+CAPABILITY_MANIFEST_V2 = (
+    ("P8_RAW_QUERY", "AVAILABLE"),
+    ("P8_PAGE_TEXT", "AVAILABLE"),
+    ("P8_TABLE_STRUCTURED", "AVAILABLE"),
+    ("P8_EVIDENCE", "AVAILABLE"),
+    ("P8_VALIDATION", "AVAILABLE"),
+    ("P9_REVIEW", "AVAILABLE"),
+    ("P9_RESOLVED_VIEW", "AVAILABLE"),
+    ("PDF_VISUAL_EVIDENCE", "AVAILABLE"),
+    ("RESEARCH_REVIEW_MCP", "AVAILABLE"),
+    ("RESEARCH_PREFLIGHT", "AVAILABLE"),
     ("SEMANTIC_RESOLVER", "UNAVAILABLE"),
     ("CANONICAL_METRIC_LAYER", "UNAVAILABLE"),
     ("P11_SEC_PROVIDER", "UNAVAILABLE"),
@@ -351,6 +375,53 @@ def build_research_context(
     return ResearchContext(
         schema_version=CONTEXT_SCHEMA_VERSION,
         integration_policy_version=INTEGRATION_POLICY_VERSION,
+        spec_bundle_hash=spec_bundle.spec_bundle_hash,
+        p8_catalog_sha256=p8_catalog_sha256,
+        p8_tool_contract=p8_contract,
+        p8_tool_contract_fingerprint=p8_fingerprint,
+        p9_policy_contract=p9_contract,
+        p9_policy_fingerprint=p9_fingerprint,
+        p9_review_root=canonical_review_root,
+        capabilities=capabilities,
+        capability_manifest_hash=capability_hash,
+        research_context_id=context_id,
+    )
+
+def build_research_context_v2(
+    spec_bundle: ResearchSpecBundle,
+    p8_catalog: McpCatalog,
+    p9_review_root: str | Path,
+) -> ResearchContext:
+    """Build additive P10 v2 capability context without mutating accepted v1."""
+    project_root = _context_project_root(p8_catalog)
+    verify_research_spec(project_root, spec_bundle)
+    _, p8_catalog_sha256 = _catalog_identity(p8_catalog)
+
+    p8_contract = _accepted_p8_contract()
+    p8_fingerprint = _fingerprint(p8_contract.to_dict())
+
+    p9_contract = _accepted_p9_contract()
+    p9_fingerprint = _fingerprint(p9_contract.to_dict())
+
+    canonical_review_root = _canonical_review_root(project_root, p9_review_root)
+
+    capabilities = CAPABILITY_MANIFEST_V2
+    capability_hash = _fingerprint(dict(capabilities))
+
+    context_id = _research_context_id(
+        schema_version=CONTEXT_SCHEMA_VERSION_V2,
+        integration_policy_version=INTEGRATION_POLICY_VERSION_V2,
+        spec_bundle_hash=spec_bundle.spec_bundle_hash,
+        p8_catalog_sha256=p8_catalog_sha256,
+        p8_tool_contract_fingerprint=p8_fingerprint,
+        p9_policy_fingerprint=p9_fingerprint,
+        p9_review_root=canonical_review_root,
+        capability_manifest_hash=capability_hash,
+    )
+
+    return ResearchContext(
+        schema_version=CONTEXT_SCHEMA_VERSION_V2,
+        integration_policy_version=INTEGRATION_POLICY_VERSION_V2,
         spec_bundle_hash=spec_bundle.spec_bundle_hash,
         p8_catalog_sha256=p8_catalog_sha256,
         p8_tool_contract=p8_contract,

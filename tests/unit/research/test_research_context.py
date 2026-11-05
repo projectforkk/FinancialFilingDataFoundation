@@ -13,13 +13,17 @@ import financial_filing_data_foundation.research.context as context_module
 from financial_filing_data_foundation.mcp import McpCatalog
 from financial_filing_data_foundation.research import (
     CAPABILITY_MANIFEST_V1,
+    CAPABILITY_MANIFEST_V2,
     CONTEXT_SCHEMA_VERSION,
+    CONTEXT_SCHEMA_VERSION_V2,
     INTEGRATION_POLICY_VERSION,
+    INTEGRATION_POLICY_VERSION_V2,
     P10Error,
     P8ToolContract,
     P9PolicyContract,
     ResearchSpecInput,
     build_research_context,
+    build_research_context_v2,
     freeze_research_spec,
 )
 
@@ -27,9 +31,11 @@ from financial_filing_data_foundation.research import (
 P8_FINGERPRINT = "bbeb600e732d5ca567193602d2a2b067fcedeabf9cb5d7cfdf5598671c267bc8"
 P9_FINGERPRINT = "9b7a1078ab2365862dc5061c3b2a76a43f865553eb4df5938b96ffe9bbd4ff36"
 CAPABILITY_HASH = "30df28e273379e91c245222b751aaab1504b6c725ca4170a8fb6168082735935"
+CAPABILITY_HASH_V2 = "86273bdf6b9e88bce7411daf7aa3fff5b167f601a42691fa7ea83ee16685dc57"
 KNOWN_SPEC_HASH = "021830ab8ded8e8e5eeeef4aa190cf3ffa86ff73a97556f1ebc80f5245288371"
 KNOWN_CATALOG_HASH = "149a9ec1ed42763860358d44f5d2f6b65115fc5bcf32190b8ca14e3b457de05d"
 KNOWN_CONTEXT_ID = "a06bbce2a58e6af4b84e5259c41439b4bae0567e3076e2320d26e3d08661d9eb"
+KNOWN_CONTEXT_ID_V2 = "58938548333c956d7fd489590388d0b623dece2f0f747e99f6b2c19c01bbb10c"
 
 
 def _write(root: Path, relative: str, data: bytes) -> Path:
@@ -501,3 +507,63 @@ def test_import_resolves_to_exact_candidate_source() -> None:
         / "__init__.py"
     ).resolve()
     assert source_path == expected
+
+
+def test_v2_is_additive_and_v1_known_fingerprints_remain_unchanged(
+    tmp_path: Path,
+) -> None:
+    root, catalog = _fixture_root(tmp_path)
+    bundle = _bundle(root)
+
+    v1 = build_research_context(bundle, catalog, "reviews/a")
+    v2 = build_research_context_v2(bundle, catalog, "reviews/a")
+
+    # Accepted v1 remains unchanged.
+    assert v1.schema_version == CONTEXT_SCHEMA_VERSION
+    assert v1.integration_policy_version == INTEGRATION_POLICY_VERSION
+    assert v1.p8_tool_contract_fingerprint == P8_FINGERPRINT
+    assert v1.p9_policy_fingerprint == P9_FINGERPRINT
+    assert v1.capability_manifest_hash == CAPABILITY_HASH
+    assert v1.research_context_id == KNOWN_CONTEXT_ID
+
+    # V2 reuses the same accepted P8/P9 contracts but advertises new capability.
+    assert v2.schema_version == CONTEXT_SCHEMA_VERSION_V2
+    assert v2.integration_policy_version == INTEGRATION_POLICY_VERSION_V2
+    assert v2.p8_tool_contract_fingerprint == P8_FINGERPRINT
+    assert v2.p9_policy_fingerprint == P9_FINGERPRINT
+    assert v2.research_context_id != v1.research_context_id
+
+    caps = dict(v2.capabilities)
+    assert caps == dict(CAPABILITY_MANIFEST_V2)
+    assert caps["PDF_VISUAL_EVIDENCE"] == "AVAILABLE"
+    assert caps["RESEARCH_REVIEW_MCP"] == "AVAILABLE"
+    assert caps["RESEARCH_PREFLIGHT"] == "AVAILABLE"
+    assert caps["SEMANTIC_RESOLVER"] == "UNAVAILABLE"
+    assert caps["CANONICAL_METRIC_LAYER"] == "UNAVAILABLE"
+    assert caps["P11_SEC_PROVIDER"] == "UNAVAILABLE"
+    assert v2.capability_manifest_hash == CAPABILITY_HASH_V2
+    assert v2.capability_manifest_hash == _canonical_hash(
+        dict(CAPABILITY_MANIFEST_V2)
+    )
+    assert v2.research_context_id == KNOWN_CONTEXT_ID_V2
+
+
+def test_v2_is_deterministic(tmp_path: Path) -> None:
+    root, catalog = _fixture_root(tmp_path)
+    bundle = _bundle(root)
+
+    first = build_research_context_v2(bundle, catalog, "reviews/a")
+    second = build_research_context_v2(bundle, catalog, "reviews/a")
+
+    assert first == second
+    assert first.to_dict() == second.to_dict()
+
+
+def test_research_package_exports_v2_without_removing_v1() -> None:
+    assert research_package.CAPABILITY_MANIFEST_V1 == CAPABILITY_MANIFEST_V1
+    assert research_package.CAPABILITY_MANIFEST_V2 == CAPABILITY_MANIFEST_V2
+    assert research_package.build_research_context is build_research_context
+    assert (
+        research_package.build_research_context_v2
+        is build_research_context_v2
+    )
