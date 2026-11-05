@@ -518,3 +518,36 @@ def test_report_safe_find_table_rows_preserves_source_label(service_fixture) -> 
     assert first["disclosure_label"] == "营业收入"
     assert first["exact_match"] is True
     assert first["direct_disclosure"] is True
+
+
+def test_manifest_summary_matches_full_document_summary(service_fixture) -> None:
+    _, _, _, _, service = service_fixture
+    docs = service.list_documents()["data"]["documents"]
+    assert docs
+    sha = docs[0]["document_sha256"]
+
+    light = service.get_document_summary_internal(sha)
+    full = service.get_document(sha)["data"]
+
+    assert light == full
+
+
+def test_company_context_uses_manifest_summary_not_full_bundle(
+    service_fixture,
+    monkeypatch,
+) -> None:
+    _, _, _, _, service = service_fixture
+
+    def fail(*args, **kwargs):
+        raise AssertionError("full get_document must not be used")
+
+    monkeypatch.setattr(service, "get_document", fail)
+    result = get_company_report_context(
+        service,
+        "CN",
+        "TEST",
+        None,
+        None,
+    )
+
+    assert result["data"]["total"] >= 1

@@ -450,6 +450,123 @@ class McpQueryService:
             },
         )
 
+    def get_document_summary_internal(
+        self,
+        document_sha256: str,
+    ) -> dict[str, Any]:
+        """Read manifest-level document counts/status without loading JSONL bodies."""
+        try:
+            normalized = normalize_sha256(document_sha256)
+        except CatalogError as exc:
+            raise McpServiceError(exc.reason_code, str(exc)) from exc
+        document = self.catalog.get(normalized)
+        if document is None:
+            raise McpServiceError(
+                "P8_DOCUMENT_NOT_FOUND",
+                f"document not found: {normalized}",
+            )
+
+        def load(path: Path, label: str) -> dict[str, Any]:
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise McpServiceError(
+                    "P8_ARTIFACT_INVALID",
+                    f"cannot read {label} manifest",
+                ) from exc
+            if not isinstance(raw, dict):
+                raise McpServiceError(
+                    "P8_ARTIFACT_INVALID",
+                    f"{label} manifest root must be an object",
+                )
+            if str(raw.get("document_sha256") or "") != normalized:
+                raise McpServiceError(
+                    "P8_ARTIFACT_INVALID",
+                    f"{label} document_sha256 mismatch",
+                )
+            return raw
+
+        p3 = load(document.p3_artifact_dir / "document.json", "P3")
+        p5 = load(document.p5_artifact_dir / "table_manifest.json", "P5")
+        p6 = load(document.p6_artifact_dir / "fact_manifest.json", "P6")
+        p7 = load(document.p7_artifact_dir / "validation_report.json", "P7")
+        return {
+            **document.metadata(),
+            "page_count": int(p3.get("page_count") or 0),
+            "table_count": int(p5.get("table_count") or 0),
+            "table_group_count": int(p5.get("group_count") or 0),
+            "raw_fact_count": int(p6.get("fact_count") or 0),
+            "evidence_count": int(p6.get("evidence_count") or 0),
+            "validation_status": str(p7.get("validation_status") or ""),
+            "compatibility_status": str(p7.get("compatibility_status") or ""),
+            "reuse_eligible": bool(p7.get("reuse_eligible")),
+            "blocking_issue_count": int(p7.get("blocking_issue_count") or 0),
+            "failure_issue_count": int(p7.get("failure_issue_count") or 0),
+            "review_issue_count": int(p7.get("review_issue_count") or 0),
+            "warning_issue_count": int(p7.get("warning_issue_count") or 0),
+            "issue_count": int(p7.get("issue_count") or 0),
+        }
+
+    def all_raw_facts_internal(
+        self,
+        document_sha256: str,
+    ) -> tuple[dict[str, Any], ...]:
+        """Return defensive copies for internal composed services only."""
+        bundle = self._bundle(document_sha256)
+        return tuple(copy.deepcopy(item) for item in bundle.facts)
+
+    def get_table_group_internal(
+        self,
+        document_sha256: str,
+        table_group_id: str,
+    ) -> dict[str, Any]:
+        """Resolve one deterministic P5 table group for internal services."""
+        bundle = self._bundle(document_sha256)
+        normalized = _required_text(
+            table_group_id,
+            "table_group_id",
+            256,
+        )
+        for group in bundle.groups:
+            group_id = str(group.get("group_id") or group.get("table_group_id") or "")
+            if group_id == normalized:
+                return copy.deepcopy(group)
+        raise McpServiceError(
+            "P8_TABLE_NOT_FOUND",
+            f"table group not found: {normalized}",
+        )
+
+    def literal_page_search_internal(
+        self,
+        document_sha256: str,
+        query: str,
+        limit: int = 20,
+    ) -> tuple[dict[str, Any], ...]:
+        """Casefold literal P3 page scan for composed local services."""
+        bundle = self._bundle(document_sha256)
+        normalized_query = _required_text(query, "query", 512)
+        checked_limit = _bounded_limit(limit, 20, 100)
+        needle = normalized_query.casefold()
+        rows: list[dict[str, Any]] = []
+        for page in bundle.pages:
+            page_text = str(page.get("text") or "")
+            position = page_text.casefold().find(needle)
+            if position < 0:
+                continue
+            start = max(0, position - 240)
+            end = min(len(page_text), position + len(normalized_query) + 360)
+            rows.append(
+                {
+                    "page_no": int(page.get("page_no") or 0),
+                    "match_type": "LITERAL",
+                    "snippet": page_text[start:end],
+                    "match_offset": position,
+                }
+            )
+            if len(rows) >= checked_limit:
+                break
+        return tuple(rows)
+
     def _bundle(self, document_sha256: str) -> _DocumentBundle:
         try:
             normalized = normalize_sha256(document_sha256)
