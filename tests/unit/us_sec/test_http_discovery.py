@@ -9,6 +9,7 @@ import pytest
 from financial_filing_data_foundation.us_sec.discovery import (
     discover_filings,
     parse_submissions,
+    select_filing,
 )
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import (
@@ -212,6 +213,157 @@ def test_discovery_uses_fiscal_year_end_and_chronology_for_non_calendar_issuers(
     assert discover_filings(submissions, fiscal_year=2025, period="Q2")[0].report_period == "2025-03-29"
     assert discover_filings(submissions, fiscal_year=2025, period="Q3")[0].report_period == "2025-06-28"
     assert discover_filings(submissions, fiscal_year=2025, period="FY")[0].report_period == "2025-09-27"
+
+
+def _rolling_53_week_submissions() -> dict[str, object]:
+    rows = [
+        ("0000123456-23-000001", "2023-11-03", "2023-09-30", "10-K", "fy23.htm"),
+        ("0000123456-24-000001", "2024-02-01", "2023-12-30", "10-Q", "q1-24.htm"),
+        ("0000123456-24-000002", "2024-05-01", "2024-03-30", "10-Q", "q2-24.htm"),
+        ("0000123456-24-000003", "2024-08-01", "2024-06-29", "10-Q", "q3-24.htm"),
+        ("0000123456-24-000004", "2024-11-01", "2024-09-28", "10-K", "fy24.htm"),
+        ("0000123456-25-000001", "2025-02-01", "2024-12-28", "10-Q", "q1-25.htm"),
+        ("0000123456-25-000002", "2025-05-01", "2025-03-29", "10-Q", "q2-25.htm"),
+        ("0000123456-25-000003", "2025-08-01", "2025-06-28", "10-Q", "q3-25.htm"),
+        ("0000123456-25-000004", "2025-10-31", "2025-09-27", "10-K", "fy25.htm"),
+        ("0000123456-26-000001", "2026-10-30", "2026-09-26", "10-K", "fy26.htm"),
+    ]
+    return {
+        "cik": "0000123456",
+        "fiscalYearEnd": "0926",
+        "filings": {
+            "recent": {
+                "accessionNumber": [row[0] for row in rows],
+                "filingDate": [row[1] for row in rows],
+                "reportDate": [row[2] for row in rows],
+                "form": [row[3] for row in rows],
+                "primaryDocument": [row[4] for row in rows],
+            }
+        },
+    }
+
+
+def test_discovery_uses_exact_historical_annual_end_for_53_week_fiscal_year() -> None:
+    company = sec_company(cik="123456", ticker="ROLL", allow_development=True)
+    submissions = parse_submissions(_rolling_53_week_submissions(), company=company)
+
+    assert discover_filings(submissions, fiscal_year=2024, period="FY")[0].report_period == "2024-09-28"
+    assert discover_filings(submissions, fiscal_year=2024, period="Q1")[0].report_period == "2023-12-30"
+    assert discover_filings(submissions, fiscal_year=2024, period="Q2")[0].report_period == "2024-03-30"
+    assert discover_filings(submissions, fiscal_year=2024, period="Q3")[0].report_period == "2024-06-29"
+    assert discover_filings(submissions, fiscal_year=2025, period="FY")[0].report_period == "2025-09-27"
+
+
+def test_discovery_resolves_historical_quarters_by_chronology_not_duration_ratio() -> None:
+    company = sec_company(cik="123456", ticker="ROLL", allow_development=True)
+    submissions = parse_submissions(_rolling_53_week_submissions(), company=company)
+
+    resolved = [
+        discover_filings(submissions, fiscal_year=2025, period=period)[0].report_period
+        for period in ("Q1", "Q2", "Q3")
+    ]
+    assert resolved == ["2024-12-28", "2025-03-29", "2025-06-28"]
+
+
+def test_discovery_handles_in_progress_non_calendar_fiscal_year_by_chronology() -> None:
+    payload = {
+        "cik": "0000123456",
+        "fiscalYearEnd": "0925",
+        "filings": {
+            "recent": {
+                "accessionNumber": [
+                    "0000123456-26-000001",
+                    "0000123456-27-000001",
+                    "0000123456-27-000002",
+                ],
+                "filingDate": ["2026-10-30", "2027-02-01", "2027-05-01"],
+                "reportDate": ["2026-09-26", "2026-12-26", "2027-03-27"],
+                "form": ["10-K", "10-Q", "10-Q"],
+                "primaryDocument": ["fy26.htm", "q1-27.htm", "q2-27.htm"],
+            }
+        },
+    }
+    company = sec_company(cik="123456", ticker="ROLL", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    assert discover_filings(submissions, fiscal_year=2027, period="Q1")[0].report_period == "2026-12-26"
+    assert discover_filings(submissions, fiscal_year=2027, period="Q2")[0].report_period == "2027-03-27"
+    assert discover_filings(submissions, fiscal_year=2027, period="FY") == ()
+
+
+def test_discovery_groups_amendment_with_same_report_period() -> None:
+    payload = {
+        "cik": "0000123456",
+        "fiscalYearEnd": "1231",
+        "filings": {
+            "recent": {
+                "accessionNumber": [
+                    "0000123456-23-000001",
+                    "0000123456-24-000001",
+                    "0000123456-24-000002",
+                    "0000123456-24-000003",
+                    "0000123456-24-000004",
+                    "0000123456-24-000005",
+                ],
+                "filingDate": [
+                    "2023-11-01",
+                    "2024-02-01",
+                    "2024-05-01",
+                    "2024-05-05",
+                    "2024-08-01",
+                    "2025-02-01",
+                ],
+                "reportDate": [
+                    "2023-12-31",
+                    "2024-03-31",
+                    "2024-06-30",
+                    "2024-06-30",
+                    "2024-09-30",
+                    "2024-12-31",
+                ],
+                "form": ["10-K", "10-Q", "10-Q", "10-Q/A", "10-Q", "10-K"],
+                "primaryDocument": ["fy23.htm", "q1.htm", "q2.htm", "q2a.htm", "q3.htm", "fy24.htm"],
+            }
+        },
+    }
+    company = sec_company(cik="123456", ticker="CAL", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    assert discover_filings(submissions, fiscal_year=2024, period="Q1")[0].report_period == "2024-03-31"
+    candidates = discover_filings(submissions, fiscal_year=2024, period="Q2")
+    assert len(candidates) == 2
+    assert {candidate.report_period for candidate in candidates} == {"2024-06-30"}
+    assert discover_filings(submissions, fiscal_year=2024, period="Q3")[0].report_period == "2024-09-30"
+    assert discover_filings(submissions, fiscal_year=2024, period="FY")[0].report_period == "2024-12-31"
+    with pytest.raises(SecError) as error:
+        select_filing(candidates)
+    assert error.value.reason_code == P11Reason.P11_AMENDED_VARIANT_PRESENT
+
+
+def test_discovery_uses_exact_fpi_annual_endpoint_for_history() -> None:
+    payload = {
+        "cik": "0000000001",
+        "fiscalYearEnd": "0627",
+        "filings": {
+            "recent": {
+                "accessionNumber": [
+                    "0000000001-23-000001",
+                    "0000000001-24-000001",
+                    "0000000001-25-000001",
+                ],
+                "filingDate": ["2023-09-01", "2024-09-01", "2025-09-01"],
+                "reportDate": ["2023-06-30", "2024-06-29", "2025-06-28"],
+                "form": ["20-F", "20-F", "20-F"],
+                "primaryDocument": ["fy23.htm", "fy24.htm", "fy25.htm"],
+            }
+        },
+    }
+    company = sec_company(cik="1", ticker="FPI", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    annual = discover_filings(submissions, fiscal_year=2024, period="FY")
+    assert len(annual) == 1
+    assert annual[0].report_period == "2024-06-29"
 
 
 def test_discovery_supports_fpi_non_december_fiscal_year() -> None:

@@ -165,8 +165,11 @@ def validate_sec_artifacts(
         locator = str(evidence.get("xml_locator" if locator_kind == "XML_PATH" else "dom_locator", ""))
         if not locator.startswith("/") or not evidence.get("source_member_sha256"):
             issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "evidence source locator is not valid", evidence_id=evidence.get("evidence_id")))
-        if locator_kind == "DOM_PATH" and str(evidence.get("block_id") or "") not in blocks_by_id:
-            issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "evidence block_id is not a normalized source block", evidence_id=evidence.get("evidence_id")))
+        if locator_kind == "DOM_PATH":
+            if str(evidence.get("block_id") or "") not in blocks_by_id:
+                issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "evidence block_id is not a normalized source block", evidence_id=evidence.get("evidence_id")))
+            if not str(evidence.get("block_dom_locator") or "").startswith("/"):
+                issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "visible evidence block locator is missing", evidence_id=evidence.get("evidence_id")))
         if package is not None:
             try:
                 verify_sec_evidence(package, parsed.pages, evidence)

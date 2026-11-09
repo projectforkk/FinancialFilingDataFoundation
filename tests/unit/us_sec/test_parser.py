@@ -81,6 +81,115 @@ def test_html_parser_creates_stable_virtual_pages_dom_tables_and_evidence(tmp_pa
     assert loaded.facts == result.facts
 
 
+def _hidden_fact_package() -> object:
+    html = b"""
+    <html><head><title>Hidden facts</title></head><body>
+      <ix:header>
+        <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context>
+        <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
+        <ix:hidden>
+          <ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction>
+          <ix:nonnumeric name="ex:Note" contextRef="c1">Hidden note</ix:nonnumeric>
+        </ix:hidden>
+      </ix:header>
+      <h1>Visible statement</h1>
+      <p><ix:nonfraction name="us-gaap:Assets" contextRef="c1" unitRef="USD" decimals="0">200</ix:nonfraction></p>
+    </body></html>
+    """
+    return build_package(
+        cik="0000320193",
+        accession="0000320193-25-000003",
+        form="10-Q",
+        fiscal_year=2025,
+        period="Q2",
+        members=(
+            SecPackageMember(
+                relative_name="hidden.htm",
+                role=SecMemberRole.PRIMARY_DOCUMENT,
+                content_type="text/html",
+                source_url="https://www.sec.gov/Archives/edgar/data/320193/hidden.htm",
+                body=html,
+            ),
+        ),
+    )
+
+
+def test_hidden_inline_numeric_and_nonnumeric_facts_are_valid_source_evidence(tmp_path: Path) -> None:
+    package = _hidden_fact_package()
+    result = parse_sec_package(package, tmp_path / "p11")
+
+    hidden = [fact for fact in result.facts if fact["hidden"]]
+    assert {fact["raw_qname"] for fact in hidden} == {"us-gaap:Revenues", "ex:Note"}
+    assert all(fact["block_id"] is None for fact in hidden)
+    assert all(fact["block_dom_locator"] is None for fact in hidden)
+    assert all(fact["evidence_id"] for fact in hidden)
+    hidden_evidence = [row for row in result.evidence if row["raw_fact_id"] in {fact["raw_fact_id"] for fact in hidden}]
+    assert len(hidden_evidence) == 2
+    assert all(row["locator_kind"] == "DOM_HIDDEN_FACT" for row in hidden_evidence)
+    assert all(row["block_id"] is None for row in hidden_evidence)
+    assert all(row["block_dom_locator"] is None for row in hidden_evidence)
+
+    validation = validate_sec_artifacts(result, tmp_path / "p7", package=package)
+    assert validation.validation_status == "PASS"
+    assert validation.blocking_issue_count == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("dom_locator", "/html[1]/body[1]/ix:hidden[1]/ix:nonfraction[99]"),
+        ("member_sha256", "1" * 64),
+        ("fragment_hash", "2" * 64),
+    ),
+)
+def test_hidden_fact_corrupt_locator_or_hash_is_blocked(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    package = _hidden_fact_package()
+    parsed = parse_sec_package(package, tmp_path / "p11")
+    hidden_evidence_index = next(index for index, row in enumerate(parsed.evidence) if row["locator_kind"] == "DOM_HIDDEN_FACT")
+    evidence = [dict(row) for row in parsed.evidence]
+    evidence[hidden_evidence_index][field] = value
+
+    validation = validate_sec_artifacts(replace(parsed, evidence=tuple(evidence)), tmp_path / "p7", package=package)
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value for issue in validation.issues) or any(
+        issue["code"] == P11Reason.P11_MEMBER_HASH_MISMATCH.value for issue in validation.issues
+    )
+
+
+def test_visible_inline_fact_still_requires_a_block_anchor(tmp_path: Path) -> None:
+    package = _hidden_fact_package()
+    parsed = parse_sec_package(package, tmp_path / "p11")
+    visible_index = next(index for index, row in enumerate(parsed.evidence) if row["locator_kind"] == "DOM_PATH")
+    evidence = [dict(row) for row in parsed.evidence]
+    evidence[visible_index]["block_id"] = None
+
+    validation = validate_sec_artifacts(replace(parsed, evidence=tuple(evidence)), tmp_path / "p7", package=package)
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value for issue in validation.issues)
+
+
+def test_parser_does_not_reuse_artifact_from_previous_normalizer_version(tmp_path: Path) -> None:
+    package = _hidden_fact_package()
+    legacy_dir = tmp_path / "p11" / package.package_sha256
+    legacy_dir.mkdir(parents=True)
+    (legacy_dir / "manifest.json").write_text(
+        '{"schema_version":"p11-sec-artifacts-v1","parser_version":"VIRTUAL_HTML_V2"}\n',
+        encoding="utf-8",
+    )
+
+    result = parse_sec_package(package, tmp_path / "p11")
+
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V3"
+    assert result.artifact_dir != legacy_dir
+    assert result.artifact_dir.is_dir()
+
+
 def test_virtual_page_normalization_is_repeatable(tmp_path: Path) -> None:
     package = _package()
     first = parse_sec_package(package, tmp_path / "first")

@@ -19,7 +19,7 @@ from .package import SecFilingPackage, SecMemberRole
 
 
 SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v1"
-VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V2"
+VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V3"
 _MAX_BLOCKS_PER_PAGE = 48
 _MAX_CHARS_PER_PAGE = 6000
 
@@ -315,7 +315,7 @@ def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
     }
     candidates: list[_Node] = []
     for node in _descendants(root):
-        if node.tag not in block_tags or _under(node, {"ix:header", "header"}):
+        if node.tag not in block_tags or _under(node, {"ix:header", "header", "hidden", "ix:hidden"}):
             continue
         value = _text(node)
         if not value:
@@ -653,10 +653,11 @@ def _facts(
         raw_value = _text(node)
         parsed_numeric_candidate = _numeric_candidate(raw_value)
         fragment_hash = _sha256(f"{primary.member_sha256}|fact|{locator}|{raw_value}".encode())
-        source_block = _source_block_for_node(node, blocks_by_locator)
+        hidden = _under(node, {"hidden", "ix:hidden"})
+        source_block = None if hidden else _source_block_for_node(node, blocks_by_locator)
         block_id = source_block.get("block_id") if source_block else None
         block_dom_locator = source_block.get("dom_locator") if source_block else None
-        if source_block is None:
+        if source_block is None and not hidden:
             issues.append(
                 {
                     "code": P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value,
@@ -688,7 +689,7 @@ def _facts(
             "format": _attr(node, "format"),
             "nil": (_attr(node, "nil") or "").casefold() in {"true", "1"},
             "continued_at": _attr(node, "continuedat") or _attr(node, "continued_at"),
-            "hidden": _under(node, {"hidden", "ix:hidden"}),
+            "hidden": hidden,
             "dom_locator": locator,
             "virtual_page_no": page_no,
             "table_cell_id": cell_id,
@@ -719,7 +720,8 @@ def _facts(
                 "raw_text": raw_value,
                 "text": raw_value,
                 "raw_fact_id": fact_id,
-                "locator_kind": "DOM_PATH",
+                "locator_kind": "DOM_HIDDEN_FACT" if hidden else "DOM_PATH",
+                "hidden": hidden,
                 "table_id": table_metadata.get("table_id"),
                 "row_index": table_metadata.get("row_index"),
                 "column_index": table_metadata.get("column_index"),
@@ -885,7 +887,7 @@ def verify_sec_evidence(
         if node is None:
             raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML evidence locator does not resolve")
         actual_text = _xml_text(node)
-    elif locator_kind == "DOM_PATH":
+    elif locator_kind in {"DOM_PATH", "DOM_HIDDEN_FACT"}:
         locator = str(evidence.get("dom_locator") or "")
         try:
             html = member.body.decode("utf-8-sig")
@@ -901,18 +903,24 @@ def verify_sec_evidence(
         if node is None:
             raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "HTML evidence locator does not resolve")
         actual_text = _text(node)
-        block_id = str(evidence.get("block_id") or "")
-        blocks = [block for page in pages for block in (page.get("blocks") or [])]
-        block = next((row for row in blocks if str(row.get("block_id")) == block_id), None)
-        if block is None or str(block.get("source_member_sha256")) != member_sha:
-            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence block_id does not resolve to a source block")
-        block_locator = str(evidence.get("block_dom_locator") or block.get("dom_locator") or "")
-        block_node = _resolve_dom_locator(dom_parser.root, block_locator)
-        if block_node is None or _text(block_node) != str(block.get("text", "")):
-            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence block locator does not resolve")
-        expected_block_fragment = _sha256(f"{member_sha}|block|{block_locator}|{block.get('text', '')}".encode())
-        if str(block.get("fragment_sha256", "")) != expected_block_fragment:
-            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "source block fragment hash is invalid")
+        if locator_kind == "DOM_HIDDEN_FACT":
+            if _local(node.tag) not in {"nonfraction", "nonnumeric"} or not _under(node, {"hidden", "ix:hidden"}):
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "hidden evidence locator does not resolve to a hidden Inline XBRL fact")
+        else:
+            block_id = str(evidence.get("block_id") or "")
+            blocks = [block for page in pages for block in (page.get("blocks") or [])]
+            block = next((row for row in blocks if str(row.get("block_id")) == block_id), None)
+            if block is None or str(block.get("source_member_sha256")) != member_sha:
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence block_id does not resolve to a source block")
+            block_locator = str(evidence.get("block_dom_locator") or "")
+            if not block_locator.startswith("/"):
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence block locator is missing")
+            block_node = _resolve_dom_locator(dom_parser.root, block_locator)
+            if block_node is None or _text(block_node) != str(block.get("text", "")):
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence block locator does not resolve")
+            expected_block_fragment = _sha256(f"{member_sha}|block|{block_locator}|{block.get('text', '')}".encode())
+            if str(block.get("fragment_sha256", "")) != expected_block_fragment:
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "source block fragment hash is invalid")
     else:
         raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "unsupported SEC evidence locator kind")
 
@@ -1023,7 +1031,7 @@ def load_sec_artifacts(artifact_dir: str | Path) -> SecParseResult:
 
 def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> SecParseResult:
     root = Path(artifact_root).expanduser().resolve()
-    final_dir = root / package.package_sha256
+    final_dir = root / f"{package.package_sha256}.{VIRTUAL_HTML_NORMALIZER_VERSION}"
     if final_dir.exists():
         loaded = load_sec_artifacts(final_dir)
         if loaded.package_sha256 != package.package_sha256:

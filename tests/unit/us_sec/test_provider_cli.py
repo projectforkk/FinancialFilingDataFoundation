@@ -23,11 +23,15 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
         "fiscalYearEnd": "1231",
         "filings": {
             "recent": {
-                "accessionNumber": ["0000320193-25-000001"],
-                "filingDate": ["2025-08-01"],
-                "reportDate": ["2025-06-30"],
-                "form": ["10-Q"],
-                "primaryDocument": ["example.htm"],
+                "accessionNumber": [
+                    "0000320193-24-000001",
+                    "0000320193-25-000000",
+                    "0000320193-25-000001",
+                ],
+                "filingDate": ["2024-11-01", "2025-05-01", "2025-08-01"],
+                "reportDate": ["2024-12-31", "2025-03-31", "2025-06-30"],
+                "form": ["10-K", "10-Q", "10-Q"],
+                "primaryDocument": ["fy.htm", "q1.htm", "example.htm"],
             }
         },
     }
@@ -64,11 +68,16 @@ def test_sec_acquirer_does_not_silently_select_amendment(tmp_path: Path) -> None
             "fiscalYearEnd": "1231",
             "filings": {
                 "recent": {
-                    "accessionNumber": ["0000320193-25-000001", "0000320193-25-000002"],
-                    "filingDate": ["2025-08-01", "2025-08-02"],
-                    "reportDate": ["2025-06-30", "2025-06-30"],
-                    "form": ["10-Q", "10-Q/A"],
-                    "primaryDocument": ["example.htm", "example-amend.htm"],
+                    "accessionNumber": [
+                        "0000320193-24-000001",
+                        "0000320193-25-000000",
+                        "0000320193-25-000001",
+                        "0000320193-25-000002",
+                    ],
+                    "filingDate": ["2024-11-01", "2025-05-01", "2025-08-01", "2025-08-02"],
+                    "reportDate": ["2024-12-31", "2025-03-31", "2025-06-30", "2025-06-30"],
+                    "form": ["10-K", "10-Q", "10-Q", "10-Q/A"],
+                    "primaryDocument": ["fy.htm", "q1.htm", "example.htm", "example-amend.htm"],
                 }
             },
         }

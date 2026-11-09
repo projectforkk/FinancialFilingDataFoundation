@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Iterable
 
 from .errors import P11Reason, SecError
@@ -146,89 +146,74 @@ def _report_date(report_period: str | None) -> date | None:
         return None
 
 
-def _fiscal_year_for_report_date(report_period: str | None, fiscal_year_end: str) -> int | None:
-    report_date = _report_date(report_period)
-    if report_date is None:
-        return None
-    end_month = int(fiscal_year_end[:2])
-    end_day = int(fiscal_year_end[2:])
-    return report_date.year + int((report_date.month, report_date.day) > (end_month, end_day))
+def _matches_issuer_kind(candidate: SecFilingCandidate, issuer_kind: SecIssuerKind | None) -> bool:
+    return issuer_kind is None or issuer_kind is SecIssuerKind.UNKNOWN or candidate.issuer_kind is issuer_kind
 
 
-def _quarter_for_report_date(
-    report_period: str | None,
-    *,
-    fiscal_year: int,
-    fiscal_year_end: str,
-) -> str | None:
-    report_date = _report_date(report_period)
-    if report_date is None:
-        return None
-    end_month = int(fiscal_year_end[:2])
-    end_day = int(fiscal_year_end[2:])
-    try:
-        fiscal_end = date(fiscal_year, end_month, end_day)
-        fiscal_start = date(fiscal_year - 1, end_month, end_day) + timedelta(days=1)
-    except ValueError:
-        return None
-    if not fiscal_start <= report_date <= fiscal_end:
-        return None
-    total_days = (fiscal_end - fiscal_start).days + 1
-    elapsed_days = (report_date - fiscal_start).days + 1
-    quarter_number = (elapsed_days * 4 + total_days - 1) // total_days
-    return f"Q{quarter_number}" if 1 <= quarter_number <= 3 else None
-
-
-def _fiscal_year_end_for_request(
+def _annual_candidates(
     submissions: SecSubmissions,
     *,
     fiscal_year: int,
     issuer_kind: SecIssuerKind | None,
-) -> str | None:
-    if submissions.fiscal_year_end:
-        return submissions.fiscal_year_end
-
+) -> tuple[SecFilingCandidate, ...]:
     annuals: list[SecFilingCandidate] = []
     for candidate in submissions.candidates:
         if candidate.base_form not in {"10-K", "20-F", "40-F"}:
             continue
-        if issuer_kind is not None and candidate.issuer_kind is not issuer_kind:
+        if not _matches_issuer_kind(candidate, issuer_kind):
             continue
         report_date = _report_date(candidate.report_period)
         if report_date is not None and report_date.year == fiscal_year:
             annuals.append(candidate)
-    end_dates: set[str] = set()
-    for candidate in annuals:
-        report_date = _report_date(candidate.report_period)
-        if report_date is not None:
-            end_dates.add(f"{report_date.month:02d}{report_date.day:02d}")
-    return next(iter(end_dates)) if len(end_dates) == 1 else None
+    return tuple(annuals)
 
 
-def _quarter_slots(
+def _unique_annual_end(candidates: Iterable[SecFilingCandidate]) -> date | None:
+    report_dates = sorted(
+        {
+            report_date
+            for candidate in candidates
+            if (report_date := _report_date(candidate.report_period)) is not None
+        }
+    )
+    return report_dates[0] if len(report_dates) == 1 else None
+
+
+def _annual_end_for_year(
     submissions: SecSubmissions,
     *,
     fiscal_year: int,
-    fiscal_year_end: str,
     issuer_kind: SecIssuerKind | None,
+) -> date | None:
+    return _unique_annual_end(
+        _annual_candidates(submissions, fiscal_year=fiscal_year, issuer_kind=issuer_kind)
+    )
+
+
+def _quarter_slots_between(
+    submissions: SecSubmissions,
+    *,
+    prior_annual_end: date | None,
+    next_annual_end: date,
+    issuer_kind: SecIssuerKind | None,
+    require_complete: bool,
 ) -> dict[str, str]:
-    report_periods: dict[str, str] = {}
+    grouped: set[date] = set()
     for candidate in submissions.candidates:
         if candidate.base_form != "10-Q":
             continue
-        if issuer_kind is not None and candidate.issuer_kind is not issuer_kind:
+        if not _matches_issuer_kind(candidate, issuer_kind):
             continue
         report_date = _report_date(candidate.report_period)
-        if report_date is None or _fiscal_year_for_report_date(candidate.report_period, fiscal_year_end) != fiscal_year:
+        if report_date is None or report_date >= next_annual_end:
             continue
-        quarter = _quarter_for_report_date(
-            candidate.report_period,
-            fiscal_year=fiscal_year,
-            fiscal_year_end=fiscal_year_end,
-        )
-        if quarter is not None:
-            report_periods[report_date.isoformat()] = quarter
-    return report_periods
+        if prior_annual_end is not None and report_date <= prior_annual_end:
+            continue
+        grouped.add(report_date)
+    ordered_dates = sorted(grouped)
+    if len(ordered_dates) == 0 or len(ordered_dates) > 3 or (require_complete and len(ordered_dates) != 3):
+        return {}
+    return {report_date.isoformat(): f"Q{index}" for index, report_date in enumerate(ordered_dates, start=1)}
 
 
 def discover_filings(
@@ -241,22 +226,63 @@ def discover_filings(
     normalized_period = period.strip().upper()
     if normalized_period not in {"Q1", "Q2", "Q3", "FY"}:
         raise SecError(P11Reason.P11_FORM_POLICY_MISMATCH, f"unsupported US period: {period}")
-    fiscal_year_end = _fiscal_year_end_for_request(
+    annual_candidates = _annual_candidates(
         submissions,
         fiscal_year=fiscal_year,
         issuer_kind=issuer_kind,
     )
-    if fiscal_year_end is None:
-        return ()
-    quarter_slots = _quarter_slots(
-        submissions,
-        fiscal_year=fiscal_year,
-        fiscal_year_end=fiscal_year_end,
-        issuer_kind=issuer_kind,
-    )
+    target_annual_end = _unique_annual_end(annual_candidates)
+    if normalized_period == "FY":
+        if target_annual_end is None:
+            return ()
+        quarter_slots: dict[str, str] = {}
+    elif target_annual_end is not None:
+        prior_annual_end = _annual_end_for_year(
+            submissions,
+            fiscal_year=fiscal_year - 1,
+            issuer_kind=issuer_kind,
+        )
+        # A short recent-history fixture may omit the prior annual.  Accept it
+        # only when exactly three unique 10-Q report periods precede the exact
+        # target annual endpoint; this is chronology, not a date estimate.
+        quarter_slots = _quarter_slots_between(
+            submissions,
+            prior_annual_end=prior_annual_end,
+            next_annual_end=target_annual_end,
+            issuer_kind=issuer_kind,
+            require_complete=True,
+        )
+    else:
+        # For an in-progress year the prior completed annual and the official
+        # current fiscalYearEnd metadata are both required.  The metadata is
+        # only the current-year upper boundary; quarter slots are chronological.
+        prior_annual_end = _annual_end_for_year(
+            submissions,
+            fiscal_year=fiscal_year - 1,
+            issuer_kind=issuer_kind,
+        )
+        if prior_annual_end is None or not submissions.fiscal_year_end:
+            return ()
+        try:
+            next_annual_end = date(
+                fiscal_year,
+                int(submissions.fiscal_year_end[:2]),
+                int(submissions.fiscal_year_end[2:]),
+            )
+        except ValueError:
+            return ()
+        if next_annual_end <= prior_annual_end:
+            return ()
+        quarter_slots = _quarter_slots_between(
+            submissions,
+            prior_annual_end=prior_annual_end,
+            next_annual_end=next_annual_end,
+            issuer_kind=issuer_kind,
+            require_complete=False,
+        )
     matches: list[SecFilingCandidate] = []
     for candidate in submissions.candidates:
-        kind = issuer_kind or candidate.issuer_kind
+        kind = candidate.issuer_kind if issuer_kind in {None, SecIssuerKind.UNKNOWN} else issuer_kind
         if kind is SecIssuerKind.UNKNOWN:
             continue
         try:
@@ -265,11 +291,9 @@ def discover_filings(
             continue
         if candidate.base_form not in allowed_forms:
             continue
-        if _fiscal_year_for_report_date(candidate.report_period, fiscal_year_end) != fiscal_year:
-            continue
         report_date = _report_date(candidate.report_period)
         if normalized_period == "FY":
-            is_target_slot = candidate.base_form in {"10-K", "20-F", "40-F"}
+            is_target_slot = report_date == target_annual_end
         else:
             is_target_slot = report_date is not None and quarter_slots.get(report_date.isoformat()) == normalized_period
         if not is_target_slot:
