@@ -190,6 +190,21 @@ def _annual_end_for_year(
     )
 
 
+def _latest_annual_end(
+    submissions: SecSubmissions,
+    *,
+    issuer_kind: SecIssuerKind | None,
+) -> date | None:
+    annual_ends = [
+        report_date
+        for candidate in submissions.candidates
+        if candidate.base_form in {"10-K", "20-F", "40-F"}
+        and _matches_issuer_kind(candidate, issuer_kind)
+        and (report_date := _report_date(candidate.report_period)) is not None
+    ]
+    return max(annual_ends, default=None)
+
+
 def _quarter_slots_between(
     submissions: SecSubmissions,
     *,
@@ -261,7 +276,11 @@ def discover_filings(
             fiscal_year=fiscal_year - 1,
             issuer_kind=issuer_kind,
         )
-        if prior_annual_end is None or not submissions.fiscal_year_end:
+        if (
+            prior_annual_end is None
+            or _latest_annual_end(submissions, issuer_kind=issuer_kind) != prior_annual_end
+            or not submissions.fiscal_year_end
+        ):
             return ()
         try:
             next_annual_end = date(

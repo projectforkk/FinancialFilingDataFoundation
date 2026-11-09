@@ -291,6 +291,45 @@ def test_discovery_handles_in_progress_non_calendar_fiscal_year_by_chronology() 
     assert discover_filings(submissions, fiscal_year=2027, period="FY") == ()
 
 
+def test_historical_year_missing_target_annual_does_not_use_in_progress_fallback() -> None:
+    payload = {
+        "cik": "0000123456",
+        "fiscalYearEnd": "0926",
+        "filings": {
+            "recent": {
+                "accessionNumber": [
+                    "0000123456-23-000001",
+                    "0000123456-24-000001",
+                    "0000123456-24-000002",
+                    "0000123456-24-000003",
+                    "0000123456-25-000001",
+                ],
+                "filingDate": [
+                    "2023-11-03",
+                    "2024-02-01",
+                    "2024-05-01",
+                    "2024-08-01",
+                    "2025-10-31",
+                ],
+                "reportDate": [
+                    "2023-09-30",
+                    "2023-12-30",
+                    "2024-03-30",
+                    "2024-06-29",
+                    "2025-09-27",
+                ],
+                "form": ["10-K", "10-Q", "10-Q", "10-Q", "10-K"],
+                "primaryDocument": ["fy23.htm", "q1-24.htm", "q2-24.htm", "q3-24.htm", "fy25.htm"],
+            }
+        },
+    }
+    company = sec_company(cik="123456", ticker="ROLL", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    for period in ("Q1", "Q2", "Q3", "FY"):
+        assert discover_filings(submissions, fiscal_year=2024, period=period) == ()
+
+
 def test_discovery_groups_amendment_with_same_report_period() -> None:
     payload = {
         "cik": "0000123456",
