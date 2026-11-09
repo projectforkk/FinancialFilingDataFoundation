@@ -25,7 +25,11 @@ from financial_filing_data_foundation.registry.models import (
 )
 
 
+# The accepted CN/HK schema remains at v1 for backward compatibility.  P11's
+# additive SEC extension has its own versioned table contract so opening an old
+# registry never rewrites the legacy rows or changes their semantics.
 REGISTRY_SCHEMA_VERSION = 1
+SEC_REGISTRY_SCHEMA_VERSION = 2
 
 _REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
     "documents": frozenset(
@@ -95,6 +99,66 @@ class RegistrySchemaUnsupported(RuntimeError):
     reason_code = "REGISTRY_SCHEMA_UNSUPPORTED"
 
 
+_SEC_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    "source_packages": frozenset(
+        {
+            "package_sha256",
+            "provider",
+            "accession",
+            "cik",
+            "form",
+            "filed_date",
+            "accepted_at",
+            "report_period",
+            "primary_document",
+            "manifest_schema_version",
+            "first_seen_at",
+        }
+    ),
+    "package_members": frozenset(
+        {
+            "package_sha256",
+            "member_sha256",
+            "relative_name",
+            "role",
+            "content_type",
+            "byte_length",
+            "source_url",
+        }
+    ),
+    "sec_filing_bindings": frozenset(
+        {
+            "binding_id",
+            "package_sha256",
+            "company_id",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "accession",
+            "form",
+            "amended",
+            "binding_status",
+            "artifact_path",
+            "created_at",
+        }
+    ),
+    "sec_parsed_data": frozenset(
+        {
+            "parse_run_id",
+            "package_sha256",
+            "company_id",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "parser_version",
+            "schema_version",
+            "validation_status",
+            "blocking_issue_count",
+            "artifact_path",
+            "created_at",
+        }
+    ),
+}
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -153,6 +217,7 @@ class SQLiteRegistry:
                         + ", ".join(sorted(existing_user_tables))
                     )
                 self._create_schema(conn)
+                self._create_sec_schema(conn)
                 conn.execute(f"PRAGMA user_version = {REGISTRY_SCHEMA_VERSION}")
                 conn.commit()
             elif version != REGISTRY_SCHEMA_VERSION:
@@ -161,6 +226,8 @@ class SQLiteRegistry:
                 )
 
             self._validate_schema_v1(conn)
+            self._create_sec_schema(conn)
+            self._validate_sec_schema(conn)
 
     @staticmethod
     def _validate_schema_v1(conn: sqlite3.Connection) -> None:
@@ -190,6 +257,35 @@ class SQLiteRegistry:
         if missing_columns:
             raise RegistrySchemaUnsupported(
                 "registry schema version 1 is incomplete; missing columns: "
+                + ", ".join(missing_columns)
+            )
+
+    @staticmethod
+    def _validate_sec_schema(conn: sqlite3.Connection) -> None:
+        rows = conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            """
+        ).fetchall()
+        existing_tables = {str(row["name"]) for row in rows}
+        missing_tables = sorted(set(_SEC_REQUIRED_SCHEMA_COLUMNS) - existing_tables)
+        if missing_tables:
+            raise RegistrySchemaUnsupported(
+                "SEC registry extension is incomplete; missing tables: "
+                + ", ".join(missing_tables)
+            )
+        missing_columns: list[str] = []
+        for table, required_columns in _SEC_REQUIRED_SCHEMA_COLUMNS.items():
+            columns = {
+                str(row["name"])
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
+            for column in sorted(required_columns - columns):
+                missing_columns.append(f"{table}.{column}")
+        if missing_columns:
+            raise RegistrySchemaUnsupported(
+                "SEC registry extension is incomplete; missing columns: "
                 + ", ".join(missing_columns)
             )
 
@@ -288,9 +384,271 @@ class SQLiteRegistry:
             """
         )
 
+    @staticmethod
+    def _create_sec_schema(conn: sqlite3.Connection) -> None:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS source_packages (
+                package_sha256 TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                accession TEXT NOT NULL,
+                cik TEXT NOT NULL,
+                form TEXT NOT NULL,
+                filed_date TEXT,
+                accepted_at TEXT,
+                report_period TEXT,
+                primary_document TEXT NOT NULL,
+                manifest_schema_version TEXT NOT NULL,
+                first_seen_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS package_members (
+                package_sha256 TEXT NOT NULL,
+                member_sha256 TEXT NOT NULL,
+                relative_name TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                byte_length INTEGER NOT NULL,
+                source_url TEXT NOT NULL,
+                PRIMARY KEY(package_sha256, relative_name),
+                FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_package_members_sha
+            ON package_members(member_sha256);
+
+            CREATE TABLE IF NOT EXISTS sec_filing_bindings (
+                binding_id TEXT PRIMARY KEY,
+                package_sha256 TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                fiscal_year INTEGER NOT NULL,
+                raw_fiscal_period TEXT NOT NULL,
+                accession TEXT NOT NULL,
+                form TEXT NOT NULL,
+                amended INTEGER NOT NULL CHECK (amended IN (0, 1)),
+                binding_status TEXT NOT NULL,
+                artifact_path TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sec_bindings_slot
+            ON sec_filing_bindings(company_id, fiscal_year, raw_fiscal_period);
+
+            CREATE TABLE IF NOT EXISTS sec_parsed_data (
+                parse_run_id TEXT PRIMARY KEY,
+                package_sha256 TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                fiscal_year INTEGER NOT NULL,
+                raw_fiscal_period TEXT NOT NULL,
+                parser_version TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                validation_status TEXT NOT NULL,
+                blocking_issue_count INTEGER NOT NULL,
+                artifact_path TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sec_parsed_slot
+            ON sec_parsed_data(company_id, fiscal_year, raw_fiscal_period);
+            """
+        )
+
     def schema_version(self) -> int:
         with self._connect() as conn:
             return int(conn.execute("PRAGMA user_version").fetchone()[0])
+
+    def sec_schema_version(self) -> int:
+        """Return the additive P11 SEC extension version."""
+
+        with self._connect() as conn:
+            self._validate_sec_schema(conn)
+        return SEC_REGISTRY_SCHEMA_VERSION
+
+    def register_sec_package(self, package: object) -> None:
+        manifest = package.manifest()
+        package_sha = str(manifest["package_sha256"]).lower()
+        now = _utc_now()
+        members = tuple(package.canonical_members())
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT * FROM source_packages WHERE package_sha256 = ?",
+                (package_sha,),
+            ).fetchone()
+            package_values = (
+                package_sha,
+                "sec",
+                str(manifest["accession"]),
+                str(manifest["cik"]),
+                str(manifest["form"]),
+                manifest.get("filing_date"),
+                manifest.get("accepted_at"),
+                manifest.get("report_period"),
+                str(manifest.get("primary_document") or ""),
+                str(manifest["schema_version"]),
+            )
+            if existing is not None:
+                existing_values = tuple(existing[key] for key in (
+                    "package_sha256", "provider", "accession", "cik", "form",
+                    "filed_date", "accepted_at", "report_period", "primary_document",
+                    "manifest_schema_version",
+                ))
+                if existing_values != package_values:
+                    raise ValueError("P11 source package identity drift")
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO source_packages(
+                        package_sha256, provider, accession, cik, form, filed_date,
+                        accepted_at, report_period, primary_document,
+                        manifest_schema_version, first_seen_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (*package_values, now),
+                )
+
+            for member in members:
+                values = (
+                    package_sha,
+                    member.member_sha256,
+                    member.relative_name,
+                    member.role.value,
+                    member.content_type,
+                    len(member.body),
+                    member.source_url,
+                )
+                prior = conn.execute(
+                    """
+                    SELECT package_sha256, member_sha256, relative_name, role,
+                           content_type, byte_length, source_url
+                    FROM package_members
+                    WHERE package_sha256 = ? AND relative_name = ?
+                    """,
+                    (package_sha, member.relative_name),
+                ).fetchone()
+                if prior is not None and tuple(prior) != values:
+                    raise ValueError("P11 source package member drift")
+                if prior is None:
+                    conn.execute(
+                        """
+                        INSERT INTO package_members(
+                            package_sha256, member_sha256, relative_name, role,
+                            content_type, byte_length, source_url
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        values,
+                    )
+            conn.commit()
+
+    def register_sec_binding(
+        self,
+        package: object,
+        *,
+        company_id: str,
+        fiscal_year: int,
+        period: str,
+        artifact_path: str | None = None,
+        binding_status: str = "SOURCE_CONFIRMED",
+    ) -> str:
+        self.register_sec_package(package)
+        manifest = package.manifest()
+        package_sha = str(manifest["package_sha256"]).lower()
+        accession = str(manifest["accession"])
+        form = str(manifest["form"]).upper()
+        amended = int(form.endswith("/A"))
+        binding_id = hashlib.sha256(
+            f"{package_sha}|{company_id}|{fiscal_year}|{period}|{amended}".encode()
+        ).hexdigest()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO sec_filing_bindings(
+                    binding_id, package_sha256, company_id, fiscal_year,
+                    raw_fiscal_period, accession, form, amended,
+                    binding_status, artifact_path, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(binding_id) DO UPDATE SET
+                    binding_status = excluded.binding_status,
+                    artifact_path = COALESCE(excluded.artifact_path, artifact_path)
+                """,
+                (
+                    binding_id,
+                    package_sha,
+                    company_id,
+                    int(fiscal_year),
+                    period.upper(),
+                    accession,
+                    form,
+                    amended,
+                    binding_status,
+                    artifact_path,
+                    _utc_now(),
+                ),
+            )
+            conn.commit()
+        return binding_id
+
+    def register_sec_parsed_data(
+        self,
+        *,
+        parse_run_id: str,
+        package_sha256: str,
+        company_id: str,
+        fiscal_year: int,
+        period: str,
+        parser_version: str,
+        schema_version: str,
+        validation_status: str,
+        blocking_issue_count: int,
+        artifact_path: str | None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO sec_parsed_data(
+                    parse_run_id, package_sha256, company_id, fiscal_year,
+                    raw_fiscal_period, parser_version, schema_version,
+                    validation_status, blocking_issue_count, artifact_path, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(parse_run_id) DO UPDATE SET
+                    validation_status = excluded.validation_status,
+                    blocking_issue_count = excluded.blocking_issue_count,
+                    artifact_path = excluded.artifact_path
+                """,
+                (
+                    parse_run_id,
+                    package_sha256.lower(),
+                    company_id,
+                    int(fiscal_year),
+                    period.upper(),
+                    parser_version,
+                    schema_version,
+                    validation_status,
+                    int(blocking_issue_count),
+                    artifact_path,
+                    _utc_now(),
+                ),
+            )
+            conn.commit()
+
+    def list_sec_bindings(
+        self,
+        *,
+        company_id: str,
+        fiscal_year: int,
+        period: str,
+    ) -> tuple[sqlite3.Row, ...]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM sec_filing_bindings
+                WHERE company_id = ? AND fiscal_year = ? AND raw_fiscal_period = ?
+                ORDER BY amended ASC, accession ASC
+                """,
+                (company_id, int(fiscal_year), period.upper()),
+            ).fetchall()
+        return tuple(rows)
 
     def register_document(
         self,
