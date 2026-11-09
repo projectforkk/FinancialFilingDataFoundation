@@ -1,0 +1,145 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from financial_filing_data_foundation.mcp.catalog import McpCatalog
+from financial_filing_data_foundation.mcp.service import McpQueryService
+from financial_filing_data_foundation.registry import SQLiteRegistry
+
+from .identity import sec_company
+from .package import SecFilingPackage, SecPackageStore
+from .parser import SecParseResult, parse_sec_package
+from .registry import register_sec_package, register_sec_parsed_run, register_sec_slot
+from .validation import SecValidationResult, validate_sec_artifacts
+
+
+@dataclass(frozen=True, slots=True)
+class SecIngestResult:
+    package: SecFilingPackage
+    parsed: SecParseResult
+    validation: SecValidationResult
+    catalog_status: str
+    research_ready: bool
+    registry_path: Path
+    catalog_path: Path
+
+
+def _relative(root: Path, path: Path) -> str:
+    return path.resolve().relative_to(root.resolve()).as_posix()
+
+
+def _upsert_catalog(
+    root: Path,
+    package: SecFilingPackage,
+    ticker: str,
+    parsed: SecParseResult,
+    validation: SecValidationResult,
+    *,
+    catalog_path: Path,
+    period: str,
+    publish: bool,
+) -> str:
+    if not publish:
+        return "NOT_REGISTERED_REVIEW_CONFLICT"
+    if catalog_path.exists():
+        payload = json.loads(catalog_path.read_text(encoding="utf-8"))
+    else:
+        payload = {"schema_version": "p8-mcp-catalog-v1", "documents": []}
+    if payload.get("schema_version") != "p8-mcp-catalog-v1" or not isinstance(payload.get("documents"), list):
+        raise ValueError("P8 catalog schema is invalid")
+    document = {
+        "document_sha256": package.package_sha256,
+        "package_sha256": package.package_sha256,
+        "source_kind": "SEC",
+        "market": "US",
+        "ticker": ticker,
+        "fiscal_year": package.fiscal_year,
+        "filing_type": period.upper(),
+        "raw_fiscal_period": period.upper(),
+        "sec_artifact_dir": _relative(root, parsed.artifact_dir),
+    }
+    identity = ("US", ticker.upper(), package.fiscal_year, period.upper())
+    documents = payload["documents"]
+    replacement: int | None = None
+    for index, row in enumerate(documents):
+        row_identity = (
+            str(row.get("market", "")).upper(),
+            str(row.get("ticker", "")).upper(),
+            int(row.get("fiscal_year", 0)),
+            str(row.get("raw_fiscal_period", row.get("filing_type", ""))).upper(),
+        )
+        if str(row.get("document_sha256", "")).lower() == package.package_sha256 and row_identity != identity:
+            raise ValueError("P8 catalog package SHA is bound to a different filing identity")
+        if row_identity == identity:
+            if str(row.get("document_sha256", "")).lower() != package.package_sha256:
+                raise ValueError("P8 SEC slot already points to another package")
+            replacement = index
+            break
+    if replacement is None:
+        documents.append(document)
+        action = "ADDED"
+    else:
+        documents[replacement] = document
+        action = "ALREADY_REGISTERED"
+    documents.sort(key=lambda row: (str(row.get("market", "")), str(row.get("ticker", "")), int(row.get("fiscal_year", 0)), str(row.get("raw_fiscal_period", "")), str(row.get("document_sha256", ""))))
+    candidate = {"schema_version": "p8-mcp-catalog-v1", "documents": documents}
+    catalog_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="\n", dir=catalog_path.parent, prefix=".p8-sec.", suffix=".tmp", delete=False) as handle:
+        temp_path = Path(handle.name)
+        handle.write(json.dumps(candidate, ensure_ascii=False, indent=2) + "\n")
+    try:
+        catalog = McpCatalog.load(root, temp_path)
+        McpQueryService(catalog).get_document(package.package_sha256)
+        os.replace(temp_path, catalog_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+    return action
+
+
+def ingest_sec_package(
+    package: SecFilingPackage,
+    *,
+    root: str | Path,
+    ticker: str,
+    period: str,
+    amendment_conflict: bool = False,
+) -> SecIngestResult:
+    project_root = Path(root).expanduser().resolve()
+    base = project_root / "workspace" / "ingest" / "us"
+    store = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store")
+    store.put(package)
+    parsed = parse_sec_package(package, base / "p11")
+    validation = validate_sec_artifacts(parsed, base / "p7", amendment_conflict=amendment_conflict)
+    registry_path = project_root / "workspace" / "ingest" / "registry.sqlite"
+    registry = SQLiteRegistry(registry_path)
+    register_sec_package(registry, package)
+    binding_status = "REVIEW_REQUIRED" if amendment_conflict else "SOURCE_CONFIRMED"
+    register_sec_slot(registry, package, fiscal_year=package.fiscal_year, period=period, artifact_path=str(parsed.artifact_dir), binding_status=binding_status)
+    parse_run_id = hashlib.sha256(f"{package.package_sha256}|{parsed.parser_version}".encode()).hexdigest()
+    register_sec_parsed_run(
+        registry,
+        parse_run_id=parse_run_id,
+        package_sha256=package.package_sha256,
+        company_id=f"US:CIK{package.cik}",
+        fiscal_year=package.fiscal_year,
+        period=period,
+        parser_version=parsed.parser_version,
+        schema_version="p11-sec-artifacts-v1",
+        validation_status=validation.validation_status,
+        blocking_issue_count=validation.blocking_issue_count,
+        artifact_path=str(parsed.artifact_dir),
+    )
+    ready = validation.blocking_issue_count == 0 and not amendment_conflict
+    catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
+    catalog_status = _upsert_catalog(root=project_root, package=package, ticker=ticker, parsed=parsed, validation=validation, catalog_path=catalog_path, period=period, publish=ready)
+    return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
+
+
+__all__ = ["SecIngestResult", "ingest_sec_package"]

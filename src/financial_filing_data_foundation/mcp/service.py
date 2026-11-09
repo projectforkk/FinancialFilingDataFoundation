@@ -5,6 +5,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Iterable
 
 from financial_filing_data_foundation.facts import load_raw_facts
@@ -12,6 +13,8 @@ from financial_filing_data_foundation.native import load_native_document
 from financial_filing_data_foundation.native.search import search_pages
 from financial_filing_data_foundation.tables import load_reconstructed_tables
 from financial_filing_data_foundation.validation import load_validation_result
+from financial_filing_data_foundation.us_sec.parser import load_sec_artifacts
+from financial_filing_data_foundation.us_sec.validation import load_sec_validation
 
 from .catalog import CatalogDocument, CatalogError, McpCatalog, normalize_sha256
 
@@ -139,13 +142,31 @@ class McpQueryService:
         normalized_query = _required_text(query, "query", 512)
         checked_limit = _bounded_limit(limit, 10, 50)
         try:
-            rows = list(
-                search_pages(
-                    bundle.native.search_db_path,
-                    normalized_query,
-                    checked_limit,
+            if bundle.catalog.source_kind.upper() == "SEC":
+                needle = normalized_query.casefold()
+                rows = []
+                for page in bundle.pages:
+                    text_value = str(page.get("text", ""))
+                    position = text_value.casefold().find(needle)
+                    if position >= 0:
+                        rows.append(
+                            {
+                                "page_no": int(page.get("page_no", 0)),
+                                "match_type": "LITERAL",
+                                "snippet": text_value[max(0, position - 240): position + len(normalized_query) + 360],
+                                "match_offset": position,
+                            }
+                        )
+                        if len(rows) >= checked_limit:
+                            break
+            else:
+                rows = list(
+                    search_pages(
+                        bundle.native.search_db_path,
+                        normalized_query,
+                        checked_limit,
+                    )
                 )
-            )
         except (sqlite3.Error, ValueError) as exc:
             raise McpServiceError(
                 "P8_INVALID_ARGUMENT",
@@ -189,6 +210,8 @@ class McpQueryService:
                     "native_text_available": bool(
                         page.get("native_text_available")
                     ),
+                    "pagination_kind": page.get("pagination_kind", "PHYSICAL_PDF"),
+                    "normalizer_version": page.get("normalizer_version"),
                     "word_count": int(page.get("word_count", 0)),
                     "block_count": int(page.get("block_count", 0)),
                     "image_count": int(page.get("image_count", 0)),
@@ -466,6 +489,41 @@ class McpQueryService:
                 f"document not found: {normalized}",
             )
 
+        if document.source_kind.upper() == "SEC":
+            if document.sec_artifact_dir is None:
+                raise McpServiceError(
+                    "P8_ARTIFACT_INVALID",
+                    "SEC catalog entry has no artifact directory",
+                )
+            try:
+                parsed = load_sec_artifacts(document.sec_artifact_dir)
+                validation = load_sec_validation(
+                    document.sec_artifact_dir.parent.parent
+                    / "p7"
+                    / parsed.package_sha256
+                )
+            except Exception as exc:
+                raise McpServiceError(
+                    "P8_ARTIFACT_INVALID",
+                    "cannot read SEC artifact summary",
+                ) from exc
+            return {
+                **document.metadata(),
+                "page_count": len(parsed.pages),
+                "table_count": len(parsed.tables),
+                "table_group_count": 0,
+                "raw_fact_count": len(parsed.facts),
+                "evidence_count": len(parsed.evidence),
+                "validation_status": validation.validation_status,
+                "compatibility_status": validation.compatibility_status,
+                "reuse_eligible": validation.reuse_eligible,
+                "blocking_issue_count": validation.blocking_issue_count,
+                "failure_issue_count": validation.failure_issue_count,
+                "review_issue_count": validation.review_issue_count,
+                "warning_issue_count": validation.warning_issue_count,
+                "issue_count": validation.issue_count,
+            }
+
         def load(path: Path, label: str) -> dict[str, Any]:
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
@@ -630,6 +688,8 @@ class McpQueryService:
 
 
 def _load_bundle(document: CatalogDocument) -> _DocumentBundle:
+    if document.source_kind.upper() == "SEC":
+        return _load_sec_bundle(document)
     try:
         native = load_native_document(document.p3_artifact_dir)
         tables_artifact = load_reconstructed_tables(document.p5_artifact_dir)
@@ -727,6 +787,73 @@ def _load_bundle(document: CatalogDocument) -> _DocumentBundle:
         validation_report=report,
         validation_issues=issues,
         table_group_map=group_map,
+        page_index=page_index,
+        table_index=table_index,
+        fact_index=fact_index,
+        evidence_index=evidence_index,
+    )
+
+
+def _load_sec_bundle(document: CatalogDocument) -> _DocumentBundle:
+    if document.sec_artifact_dir is None:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog entry has no artifact directory",
+        )
+    try:
+        parsed = load_sec_artifacts(document.sec_artifact_dir)
+        validation = load_sec_validation(document.sec_artifact_dir.parent.parent / "p7" / parsed.package_sha256)
+    except Exception:
+        # The catalog normally points at the P11 artifact directory and keeps P7
+        # beside it.  A direct validation artifact is also accepted for small
+        # local fixtures.
+        try:
+            parsed = load_sec_artifacts(document.sec_artifact_dir)
+            validation = load_sec_validation(document.sec_artifact_dir)
+        except Exception as exc:
+            raise McpServiceError(
+                "P8_UPSTREAM_ARTIFACT_INVALID",
+                f"SEC upstream artifact validation failed for {document.document_sha256}: {exc}",
+            ) from exc
+    if parsed.package_sha256 != document.document_sha256:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "catalog/SEC package identity mismatch",
+        )
+    tables = tuple(parsed.tables)
+    facts = tuple(parsed.facts)
+    evidence = tuple(parsed.evidence)
+    pages = tuple(parsed.pages)
+    sections = tuple(parsed.sections)
+    issues = tuple(validation.issues)
+    table_index = {str(row["table_id"]): row for row in tables}
+    fact_index = {str(row["raw_fact_id"]): row for row in facts}
+    evidence_index = {str(row["evidence_id"]): row for row in evidence}
+    page_index = {int(row["page_no"]): row for row in pages}
+    if len(page_index) != len(pages) or len(table_index) != len(tables) or len(fact_index) != len(facts) or len(evidence_index) != len(evidence):
+        raise McpServiceError("P8_UPSTREAM_ARTIFACT_INVALID", "duplicate SEC artifact identity")
+    native = SimpleNamespace(
+        document_sha256=parsed.package_sha256,
+        page_count=len(pages),
+        search_db_path=None,
+    )
+    tables_artifact = SimpleNamespace(table_count=len(tables), group_count=0)
+    facts_artifact = SimpleNamespace(fact_count=len(facts), evidence_count=len(evidence))
+    return _DocumentBundle(
+        catalog=document,
+        native=native,
+        tables_artifact=tables_artifact,
+        facts_artifact=facts_artifact,
+        validation_artifact=validation,
+        pages=pages,
+        sections=sections,
+        tables=tables,
+        groups=(),
+        facts=facts,
+        evidence=evidence,
+        validation_report=validation.to_dict(),
+        validation_issues=issues,
+        table_group_map={},
         page_index=page_index,
         table_index=table_index,
         fact_index=fact_index,

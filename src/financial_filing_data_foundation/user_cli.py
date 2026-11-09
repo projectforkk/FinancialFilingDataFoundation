@@ -34,9 +34,17 @@ from financial_filing_data_foundation.validation import (
     build_parsed_data_record,
     validate_document_artifacts,
 )
+from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer
+from financial_filing_data_foundation.us_sec.errors import SecError
+from financial_filing_data_foundation.us_sec.feature_gate import require_us_development
+from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig
+from financial_filing_data_foundation.us_sec.identity import normalize_cik, resolve_ticker, sec_company
+from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
+from financial_filing_data_foundation.us_sec.package import SecPackageStore
+from financial_filing_data_foundation.us_sec.ticker_map import parse_ticker_map
 
 
-_PERIODS = ("Q1", "H1", "Q3", "FY")
+_PERIODS = ("Q1", "Q2", "H1", "Q3", "FY")
 _IDENTITY_FILING_TYPE = {
     "Q1": "QUARTERLY_REPORT",
     "H1": "INTERIM_REPORT",
@@ -112,6 +120,9 @@ def _default_window(year: int, period: str) -> tuple[str, str]:
     if period == "Q1":
         start = date(year, 3, 1)
         end = date(year, 5, 31)
+    elif period == "Q2":
+        start = date(year, 6, 1)
+        end = date(year, 8, 31)
     elif period == "H1":
         start = date(year, 6, 1)
         end = date(year, 9, 30)
@@ -148,6 +159,12 @@ def _window(args: argparse.Namespace) -> tuple[str, str]:
 
 def _request(args: argparse.Namespace) -> AcquisitionRequest:
     market = args.market.upper()
+    if market not in {"CN", "HK"}:
+        raise ValueError("US requests use the SEC provider path")
+    if args.period == "Q2":
+        raise ValueError("Q2 is supported only by the gated US SEC provider")
+    if not args.ticker or not args.ticker.strip():
+        raise ValueError("--ticker is required for CN/HK")
     ticker = args.ticker.strip()
     company_id = args.company_id or f"{market}:{ticker}"
     filing_type = args.filing_type or _IDENTITY_FILING_TYPE[args.period]
@@ -326,11 +343,149 @@ def _common_payload(request: AcquisitionRequest) -> dict[str, Any]:
     }
 
 
+def _us_company_and_client(args: argparse.Namespace) -> tuple[Any, SecHttpClient]:
+    require_us_development()
+    client = SecHttpClient(SecHttpConfig.from_env())
+    ticker = args.ticker.strip().upper() if args.ticker else None
+    if args.cik:
+        cik = normalize_cik(args.cik)
+        if ticker:
+            mapping_response = client.fetch(
+                "https://www.sec.gov/files/company_tickers.json",
+                expected_content_types=("application/json",),
+                max_bytes=client.config.submissions_max_bytes,
+            )
+            mapped = parse_ticker_map(mapping_response.body, ticker)
+            if mapped != cik:
+                raise SecError(
+                    "P11_INVALID_US_IDENTITY",
+                    "--cik and --ticker resolve to different SEC identities",
+                )
+        company = sec_company(cik=cik, ticker=ticker, allow_development=True)
+        return company, client
+    if not ticker:
+        raise SecError("P11_INVALID_US_IDENTITY", "US requires --cik or --ticker")
+    mapping_response = client.fetch(
+        "https://www.sec.gov/files/company_tickers.json",
+        expected_content_types=("application/json",),
+        max_bytes=client.config.submissions_max_bytes,
+    )
+    cik = parse_ticker_map(mapping_response.body, ticker)
+    return sec_company(cik=cik, ticker=ticker, allow_development=True), client
+
+
+def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths]:
+    root = _project_root()
+    paths = _runtime_paths(root)
+    company, client = _us_company_and_client(args)
+    acquirer = SecAcquirer(
+        client,
+        SecPackageStore(paths.raw_store),
+    )
+    result = acquirer.acquire(company, fiscal_year=args.year, period=args.period)
+    return company, result, paths
+
+
+def _us_acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, dict[str, Any], Any, RuntimePaths, SQLiteRegistry]:
+    company, result, paths = _us_acquire_result(args)
+    registry = SQLiteRegistry(paths.registry)
+    payload = {
+        "command": "acquire",
+        "market": "US",
+        "ticker": company.ticker,
+        "cik": company.cik,
+        "company_id": company.company_id,
+        "fiscal_year": args.year,
+        "period": args.period,
+        "status": "REUSED_LOCAL" if result.reused else "DOWNLOADED",
+        "reason_code": None,
+        "accession": result.candidate.accession,
+        "form": result.candidate.form,
+        "package_sha256": result.package.package_sha256,
+        "raw_path": str(SecPackageStore(paths.raw_store).package_dir(result.package.package_sha256)),
+        "provider": "sec",
+        "source_id": result.candidate.accession,
+    }
+    if not quiet:
+        _print(payload)
+    return 0, payload, result, paths, registry
+
+
+def _us_ingest(args: argparse.Namespace) -> int:
+    _, acquire_payload, result, paths, _ = _us_acquire(args, quiet=True)
+    ingested = ingest_sec_package(
+        result.package,
+        root=paths.root,
+        ticker=result.candidate.ticker,
+        period=args.period,
+    )
+    _print(
+        {
+            "command": "ingest",
+            "market": "US",
+            "ticker": result.candidate.ticker,
+            "cik": result.candidate.cik,
+            "fiscal_year": args.year,
+            "period": args.period,
+            "accession": result.candidate.accession,
+            "package_sha256": result.package.package_sha256,
+            "validation_status": ingested.validation.validation_status,
+            "blocking_issue_count": ingested.validation.blocking_issue_count,
+            "review_issue_count": ingested.validation.review_issue_count,
+            "p8_catalog": ingested.catalog_status,
+            "research_ready": ingested.research_ready,
+            "artifact_dir": str(ingested.parsed.artifact_dir),
+            "catalog_path": str(ingested.catalog_path),
+        }
+    )
+    return 0 if ingested.research_ready else 6
+
+
+def _us_status(args: argparse.Namespace) -> int:
+    root = _project_root()
+    company, _ = _us_company_and_client(args)
+    paths = _runtime_paths(root)
+    registry = SQLiteRegistry(paths.registry)
+    bindings = registry.list_sec_bindings(
+        company_id=company.company_id,
+        fiscal_year=args.year,
+        period=args.period,
+    )
+    catalog_document: dict[str, Any] | None = None
+    if paths.catalog.exists():
+        payload = json.loads(paths.catalog.read_text(encoding="utf-8"))
+        for row in payload.get("documents", []):
+            if (
+                str(row.get("market", "")).upper() == "US"
+                and str(row.get("ticker", "")).upper() == company.ticker.upper()
+                and int(row.get("fiscal_year", 0)) == args.year
+                and str(row.get("raw_fiscal_period", "")).upper() == args.period
+            ):
+                catalog_document = row
+                break
+    _print(
+        {
+            "command": "status",
+            "market": "US",
+            "ticker": company.ticker,
+            "cik": company.cik,
+            "fiscal_year": args.year,
+            "period": args.period,
+            "bindings": [dict(row) for row in bindings],
+            "p8_catalog_registered": catalog_document is not None,
+            "p8_catalog_document": catalog_document,
+        }
+    )
+    return 0
+
+
 def _print(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
 
 
 def _acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, dict[str, Any], AcquisitionRequest, RuntimePaths, SQLiteRegistry]:
+    if args.market.upper() == "US":
+        return _us_acquire(args, quiet=quiet)  # type: ignore[return-value]
     root = _project_root()
     paths = _runtime_paths(root)
     request = _request(args)
@@ -377,6 +532,8 @@ def _acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, dic
 
 
 def _ingest(args: argparse.Namespace) -> int:
+    if args.market.upper() == "US":
+        return _us_ingest(args)
     code, acquire_payload, request, paths, registry = _acquire(args, quiet=True)
     if code != 0:
         _print(
@@ -486,6 +643,8 @@ def _ingest(args: argparse.Namespace) -> int:
 
 
 def _status(args: argparse.Namespace) -> int:
+    if args.market.upper() == "US":
+        return _us_status(args)
     root = _project_root()
     paths = _runtime_paths(root)
     request = _request(args)
@@ -537,8 +696,9 @@ def _status(args: argparse.Namespace) -> int:
 
 
 def _add_filing_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--market", required=True, choices=("CN", "HK"))
-    parser.add_argument("--ticker", required=True)
+    parser.add_argument("--market", required=True, choices=("CN", "HK", "US"))
+    parser.add_argument("--ticker")
+    parser.add_argument("--cik")
     parser.add_argument("--year", required=True, type=int)
     parser.add_argument("--period", required=True, type=_period)
     parser.add_argument("--window-start")
@@ -557,7 +717,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ffdf",
         description=(
-            "Financial Filing Data Foundation user CLI for CN/HK official filings."
+            "Financial Filing Data Foundation user CLI for official CN/HK filings and gated US SEC development."
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -594,7 +754,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
-    except (AcquisitionError, FileNotFoundError, RuntimeError, ValueError) as exc:
+    except (AcquisitionError, SecError, FileNotFoundError, RuntimeError, ValueError) as exc:
         payload = {
             "command": getattr(args, "command", None),
             "status": "ERROR",

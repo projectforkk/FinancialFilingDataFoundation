@@ -216,7 +216,9 @@ class SecPackageStore:
                 raise SecError(P11Reason.P11_SOURCE_DRIFT, "existing SEC package differs from requested bytes")
             return final_dir
 
-        temp_dir = final_dir.parent / f".{package_sha}.{uuid.uuid4().hex}.tmp"
+        # Keep the staging name short: Windows MAX_PATH is still relevant for
+        # test workspaces nested below the project root.
+        temp_dir = final_dir.parent / f".{uuid.uuid4().hex}.tmp"
         temp_dir.mkdir(parents=True, exist_ok=False)
         try:
             members_dir = temp_dir / "members"
@@ -296,6 +298,20 @@ class SecPackageStore:
         if package.identity_package_sha256 != package_sha256.lower():
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC package identity hash mismatch")
         return package
+
+    def find_by_accession(self, accession: str) -> SecFilingPackage | None:
+        manifests_root = self.root / "packages" / "sha256"
+        if not manifests_root.is_dir():
+            return None
+        for manifest_path in sorted(manifests_root.glob("*" + "/*/manifest.json")):
+            try:
+                raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if str(raw.get("accession", "")) != accession:
+                continue
+            return self.load(str(raw.get("package_sha256", "")))
+        return None
 
 
 __all__ = [

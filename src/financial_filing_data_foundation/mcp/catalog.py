@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from financial_filing_data_foundation.us_sec.feature_gate import is_us_development_enabled
+
 
 CATALOG_SCHEMA_VERSION = "p8-mcp-catalog-v1"
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -24,10 +26,14 @@ class CatalogDocument:
     ticker: str
     fiscal_year: int
     filing_type: str
-    p3_artifact_dir: Path
-    p5_artifact_dir: Path
-    p6_artifact_dir: Path
-    p7_artifact_dir: Path
+    p3_artifact_dir: Path | None = None
+    p5_artifact_dir: Path | None = None
+    p6_artifact_dir: Path | None = None
+    p7_artifact_dir: Path | None = None
+    source_kind: str = "PDF"
+    package_sha256: str | None = None
+    sec_artifact_dir: Path | None = None
+    raw_fiscal_period: str | None = None
 
     @property
     def filing_identity(self) -> tuple[str, str, int, str]:
@@ -39,13 +45,22 @@ class CatalogDocument:
         )
 
     def metadata(self) -> dict[str, Any]:
-        return {
+        result = {
             "document_sha256": self.document_sha256,
             "market": self.market,
             "ticker": self.ticker,
             "fiscal_year": self.fiscal_year,
             "filing_type": self.filing_type,
         }
+        if self.source_kind.upper() != "PDF":
+            result.update(
+                {
+                    "source_kind": self.source_kind,
+                    "package_sha256": self.package_sha256,
+                    "raw_fiscal_period": self.raw_fiscal_period,
+                }
+            )
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,6 +251,44 @@ def _parse_document(
     ticker = _required_text(raw, "ticker", index)
     filing_type = _required_text(raw, "filing_type", index).upper()
     fiscal_year = _required_year(raw, index)
+
+    source_kind = str(raw.get("source_kind", "PDF")).strip().upper()
+    if source_kind in {"SEC", "US_SEC"}:
+        if market != "US":
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}] SEC source must use market US",
+            )
+        if not is_us_development_enabled():
+            raise CatalogError(
+                "P11_INVALID_US_IDENTITY",
+                "US SEC catalog entries require FFDF_P11_US_DEV=1",
+            )
+        package_sha256 = normalize_sha256(
+            _required_text(raw, "package_sha256", index)
+        )
+        if package_sha256 != document_sha256:
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}] document_sha256 must equal package_sha256 for SEC",
+            )
+        raw_period = _required_text(raw, "raw_fiscal_period", index).upper()
+        if raw_period not in {"Q1", "Q2", "Q3", "FY"}:
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}].raw_fiscal_period is invalid",
+            )
+        return CatalogDocument(
+            document_sha256=document_sha256,
+            market=market,
+            ticker=ticker,
+            fiscal_year=fiscal_year,
+            filing_type=filing_type,
+            source_kind="SEC",
+            package_sha256=package_sha256,
+            sec_artifact_dir=_artifact_path(root, raw, "sec_artifact_dir", index),
+            raw_fiscal_period=raw_period,
+        )
 
     return CatalogDocument(
         document_sha256=document_sha256,

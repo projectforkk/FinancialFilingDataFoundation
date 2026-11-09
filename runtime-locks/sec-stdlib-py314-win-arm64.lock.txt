@@ -1,0 +1,7 @@
+# FFDF P11 SEC provider runtime lock
+# Python: CPython 3.14.9 ARM64 on Windows
+# Runtime policy: standard library only; no remote LLM/API dependency
+# Transport: urllib.request with TLS verification and allowlisted redirects
+# Parser: html.parser + xml.etree-compatible source handling
+
+# No third-party packages are required by the gated SEC provider.
