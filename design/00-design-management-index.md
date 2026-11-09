@@ -116,8 +116,13 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
+| 26-p11-sec-provider-design.md | P11 US SEC Provider | ACTIVE / DESIGN READY |
+| 27-p11-implementation-plan.md | P11 implementation plan | ACTIVE / DEVELOPMENT NEXT |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
+| 30-project-final-cn-hk-scope.md | 2026-11-05 closeout scope | ACCEPTED HISTORICAL SCOPE |
+| 31-user-cli-design.md | CN/HK operational CLI | ACCEPTED POST-CLOSEOUT |
+| 32-p11-us-scope-reopening.md | 2026-11-09 P11 scope reopening | ACTIVE CURRENT SCOPE |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -161,7 +166,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | historical branch only | historical branch only | N/A | OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED |
+| P11 | 26 + 32 | 27 | TBD | REOPENED / DESIGN READY |
 
 ---
 
@@ -292,7 +297,14 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`PROJECT_CLOSED / CN_HK_SCOPE_COMPLETE / P0_P10_DONE_PASS`
+`P11_REOPENED / DESIGN_READY / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+
+P11 current design:
+- scope reopening = `design/32-p11-us-scope-reopening.md`;
+- detailed design = `design/26-p11-sec-provider-design.md`;
+- implementation plan = `design/27-p11-implementation-plan.md`;
+- authorization = `development/147-p11-us-scope-reopening-authorization.md`;
+- next action = P11-A environment/interface audit; production code must follow the ordered plan.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
@@ -438,3 +450,11 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 127. closeout decision = `development/144-final-cn-hk-project-scope-closeout.md`.
 128. P0-P10 accepted behavior remains frozen; future market expansion requires a new explicit scope lifecycle.
 129. final full repository design/code consistency review = `development/145-final-full-repository-consistency-review.md` = PASS.
+
+
+## 14. P11 Reopening Note — 2026-11-09
+
+The 2026-11-05 CN/HK project closeout remains accepted history. User authority on
+2026-11-09 reopened P11. For current P11 work, design/32 + design/26 + design/27 are
+the active design truth. Historical unaccepted P11 branches are not implementation
+baselines.
