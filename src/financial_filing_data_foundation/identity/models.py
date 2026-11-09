@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Iterable
 
@@ -22,10 +22,13 @@ class CompanyRef:
     market: str
     company_id: str
     ticker: str
+    allow_development_us: bool = field(default=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         market = self.market.strip().upper()
-        if market not in _ALLOWED_MARKETS:
+        if market not in _ALLOWED_MARKETS and not (
+            market == "US" and self.allow_development_us
+        ):
             raise ValueError(f"unsupported P1 market: {self.market!r}")
         object.__setattr__(self, "market", market)
         object.__setattr__(self, "company_id", _clean_text(self.company_id, "company_id"))
@@ -72,15 +75,21 @@ class FilingSlotKey:
     filing_type: str
     fiscal_year: int
     raw_fiscal_period: str
+    allow_development_us: bool = field(default=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         market = self.market.strip().upper()
-        if market not in _ALLOWED_MARKETS:
+        if market not in _ALLOWED_MARKETS and not (
+            market == "US" and self.allow_development_us
+        ):
             raise ValueError(f"unsupported P1 market: {self.market!r}")
         if self.fiscal_year < 1900 or self.fiscal_year > 2200:
             raise ValueError(f"fiscal_year out of supported range: {self.fiscal_year}")
         period = self.raw_fiscal_period.strip().upper()
-        if period not in _ALLOWED_PERIODS:
+        allowed_periods = _ALLOWED_PERIODS
+        if market == "US" and self.allow_development_us:
+            allowed_periods = allowed_periods | {"Q2"}
+        if period not in allowed_periods:
             raise ValueError(f"unsupported P1 fiscal period: {period!r}")
         object.__setattr__(self, "market", market)
         object.__setattr__(self, "company_id", _clean_text(self.company_id, "company_id"))
