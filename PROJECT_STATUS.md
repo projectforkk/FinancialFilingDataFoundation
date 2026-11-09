@@ -714,3 +714,22 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
 - P11 — US SEC Provider: `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`
+
+
+## P11 short execution workflow
+
+Current execution model:
+
+```text
+Design Freeze
+→ PC Agent one-pass development
+→ exact Git production candidate
+→ ChatGPT code review
+→ ChatGPT formal test plan
+→ PC Agent one-pass formal test
+→ Git test evidence
+→ ChatGPT independent verification
+→ merge / closeout
+```
+
+No artificial component-by-component development phases are required. A repair loop is used only when an actual design/code/test defect is found.
