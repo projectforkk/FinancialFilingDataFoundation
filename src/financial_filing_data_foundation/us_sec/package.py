@@ -314,6 +314,8 @@ class SecPackageStore:
         )
         if package.identity_package_sha256 != package_sha256.lower():
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC package identity hash mismatch")
+        if package.manifest() != manifest:
+            raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC package manifest identity mismatch")
         return package
 
     def find_by_accession(self, accession: str) -> SecFilingPackage | None:

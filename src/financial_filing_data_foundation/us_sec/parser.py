@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
@@ -11,13 +12,14 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import quote
 
 from .errors import P11Reason, SecError
 from .package import SecFilingPackage, SecMemberRole
 
 
 SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v1"
-VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V1"
+VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V2"
 _MAX_BLOCKS_PER_PAGE = 48
 _MAX_CHARS_PER_PAGE = 6000
 
@@ -160,6 +162,110 @@ def _node_page(node: _Node, page_by_locator: dict[str, int]) -> int:
     return 1
 
 
+def _resolve_dom_locator(root: _Node, locator: str) -> _Node | None:
+    if not isinstance(locator, str) or not locator.startswith("/"):
+        return None
+    current = root
+    for component in locator.strip("/").split("/"):
+        match = re.fullmatch(r"(.+)\[(\d+)\]", component)
+        if match is None:
+            return None
+        tag, raw_index = match.groups()
+        index = int(raw_index)
+        matching = [child for child in current.children if child.tag == tag]
+        if index < 1 or index > len(matching):
+            return None
+        current = matching[index - 1]
+    return current
+
+
+def _source_block_for_node(node: _Node, blocks_by_locator: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    current: _Node | None = node
+    while current is not None:
+        block = blocks_by_locator.get(_path(current))
+        if block is not None:
+            return block
+        current = current.parent
+    return None
+
+
+def _xml_namespace_map(body: bytes) -> dict[str, str]:
+    namespaces: dict[str, str] = {}
+    try:
+        for _, value in ET.iterparse(io.BytesIO(body), events=("start-ns",)):
+            prefix, uri = value
+            namespaces.setdefault(str(uri), str(prefix))
+    except ET.ParseError:
+        return {}
+    return namespaces
+
+
+def _xml_tag_label(tag: str) -> str:
+    text = str(tag)
+    if text.startswith("{") and "}" in text:
+        uri, local = text[1:].split("}", 1)
+        return "{" + quote(uri, safe="") + "}" + local
+    return text
+
+
+def _xml_qname(tag: str, namespaces: dict[str, str]) -> str:
+    text = str(tag)
+    if not text.startswith("{") or "}" not in text:
+        return text
+    uri, local = text[1:].split("}", 1)
+    prefix = namespaces.get(uri)
+    return f"{prefix}:{local}" if prefix else local
+
+
+def _xml_walk(root: ET.Element) -> Iterable[tuple[ET.Element, str]]:
+    def walk(node: ET.Element, locator: str) -> Iterable[tuple[ET.Element, str]]:
+        yield node, locator
+        counts: dict[str, int] = {}
+        for child in list(node):
+            label = _xml_tag_label(str(child.tag))
+            counts[label] = counts.get(label, 0) + 1
+            yield from walk(child, f"{locator}/{label}[{counts[label]}]")
+
+    root_label = _xml_tag_label(str(root.tag))
+    yield from walk(root, f"/{root_label}[1]")
+
+
+def _resolve_xml_locator(root: ET.Element, locator: str) -> ET.Element | None:
+    if not isinstance(locator, str) or not locator.startswith("/"):
+        return None
+    current = root
+    components = locator.strip("/").split("/")
+    if not components:
+        return None
+    first = re.fullmatch(r"(.+)\[(\d+)\]", components[0])
+    if first is None or first.group(1) != _xml_tag_label(str(current.tag)) or int(first.group(2)) != 1:
+        return None
+    for component in components[1:]:
+        match = re.fullmatch(r"(.+)\[(\d+)\]", component)
+        if match is None:
+            return None
+        tag, raw_index = match.groups()
+        index = int(raw_index)
+        matching = [child for child in list(current) if _xml_tag_label(str(child.tag)) == tag]
+        if index < 1 or index > len(matching):
+            return None
+        current = matching[index - 1]
+    return current
+
+
+def _xml_text(element: ET.Element) -> str:
+    return " ".join(" ".join(element.itertext()).split())
+
+
+def _numeric_candidate(raw_value: str) -> str | None:
+    numeric_text = raw_value.strip().replace(",", "")
+    if not re.fullmatch(r"\(?[+-]?\d+(?:\.\d+)?\)?", numeric_text):
+        return None
+    if numeric_text.startswith("(") and numeric_text.endswith(")"):
+        return "-" + numeric_text[1:-1]
+    return numeric_text
+
+
 @dataclass(frozen=True, slots=True)
 class SecParseResult:
     artifact_dir: Path
@@ -190,7 +296,23 @@ def _primary_member(package: SecFilingPackage) -> tuple[Any, str]:
 
 
 def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
-    block_tags = {"h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "caption", "td", "th", "title", "pre"}
+    block_tags = {
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+        "li",
+        "caption",
+        "td",
+        "th",
+        "title",
+        "pre",
+        "ix:nonfraction",
+        "ix:nonnumeric",
+    }
     candidates: list[_Node] = []
     for node in _descendants(root):
         if node.tag not in block_tags or _under(node, {"ix:header", "header"}):
@@ -206,7 +328,7 @@ def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
     for index, node in enumerate(candidates):
         locator = _path(node)
         text = _text(node)
-        fragment = _sha256(f"{member_sha}|{locator}|{text}".encode())
+        fragment = _sha256(f"{member_sha}|block|{locator}|{text}".encode())
         blocks.append(
             {
                 "block_id": fragment,
@@ -437,14 +559,14 @@ def _contexts_and_units(
         for member in package.members:
             if member.role not in {SecMemberRole.XBRL_INSTANCE, SecMemberRole.OTHER}:
                 continue
-            if not member.relative_name.casefold().endswith(".xml"):
+            if member.role is SecMemberRole.OTHER and not member.relative_name.casefold().endswith((".xml", ".xbrl")):
                 continue
             try:
                 xml_root = ET.fromstring(member.body)
             except ET.ParseError:
                 continue
             for element in xml_root.iter():
-                local = _local(str(element.tag))
+                local = _xml_local(str(element.tag))
                 if local == "context":
                     context_id = element.attrib.get("id")
                     if not context_id or context_id in contexts:
@@ -453,7 +575,7 @@ def _contexts_and_units(
                     identifier: str | None = None
                     dimensions: list[dict[str, Any]] = []
                     for child in element.iter():
-                        child_local = _local(str(child.tag))
+                        child_local = _xml_local(str(child.tag))
                         text = "" if child.text is None else " ".join(child.text.split())
                         if child_local in {"instant", "startdate", "enddate"}:
                             period[child_local] = text
@@ -483,7 +605,7 @@ def _contexts_and_units(
                         "measures": [
                             "" if child.text is None else " ".join(child.text.split())
                             for child in element.iter()
-                            if _local(str(child.tag)) == "measure"
+                            if _xml_local(str(child.tag)) == "measure"
                         ],
                         "source_member_sha256": member.member_sha256,
                     }
@@ -496,6 +618,7 @@ def _facts(
     page_by_locator: dict[str, int],
     cell_by_locator: dict[str, str],
     cell_metadata: dict[str, dict[str, Any]],
+    blocks_by_locator: dict[str, dict[str, Any]],
     contexts: dict[str, dict[str, Any]],
     units: dict[str, dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -528,15 +651,20 @@ def _facts(
         context_period = dict((resolved_context or {}).get("period") or {})
         table_metadata = cell_metadata.get(str(cell_id), {}) if cell_id else {}
         raw_value = _text(node)
-        parsed_numeric_candidate: str | None = None
-        numeric_text = raw_value.strip().replace(",", "")
-        if re.fullmatch(r"\(?[+-]?\d+(?:\.\d+)?\)?", numeric_text):
-            parsed_numeric_candidate = (
-                "-" + numeric_text[1:-1]
-                if numeric_text.startswith("(") and numeric_text.endswith(")")
-                else numeric_text
+        parsed_numeric_candidate = _numeric_candidate(raw_value)
+        fragment_hash = _sha256(f"{primary.member_sha256}|fact|{locator}|{raw_value}".encode())
+        source_block = _source_block_for_node(node, blocks_by_locator)
+        block_id = source_block.get("block_id") if source_block else None
+        block_dom_locator = source_block.get("dom_locator") if source_block else None
+        if source_block is None:
+            issues.append(
+                {
+                    "code": P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value,
+                    "severity": "BLOCKING",
+                    "dom_locator": locator,
+                    "message": "Inline XBRL fact has no normalized source block",
+                }
             )
-        fragment_hash = _sha256(f"{primary.member_sha256}|{locator}|{raw_value}".encode())
         fact = {
             "raw_fact_id": fact_id,
             "evidence_id": evidence_id,
@@ -567,6 +695,8 @@ def _facts(
             "table_id": table_metadata.get("table_id"),
             "row_index": table_metadata.get("row_index"),
             "column_index": table_metadata.get("column_index"),
+            "block_id": block_id,
+            "block_dom_locator": block_dom_locator,
             "package_sha256": package.package_sha256,
             "member_sha256": primary.member_sha256,
             "fragment_hash": fragment_hash,
@@ -581,8 +711,10 @@ def _facts(
                 "package_sha256": package.package_sha256,
                 "member_sha256": primary.member_sha256,
                 "dom_locator": locator,
+                "fact_dom_locator": locator,
+                "block_dom_locator": block_dom_locator,
                 "virtual_page_no": page_no,
-                "block_id": fragment_hash,
+                "block_id": block_id,
                 "fragment_hash": fragment_hash,
                 "raw_text": raw_value,
                 "text": raw_value,
@@ -595,6 +727,200 @@ def _facts(
         )
         facts.append(fact)
     return facts, evidence, issues
+
+
+def _xml_local(tag: str) -> str:
+    text = str(tag)
+    if text.startswith("{") and "}" in text:
+        return text.split("}", 1)[1].casefold()
+    return _local(text)
+
+
+def _xml_facts(
+    package: SecFilingPackage,
+    contexts: dict[str, dict[str, Any]],
+    units: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    facts: list[dict[str, Any]] = []
+    evidence: list[dict[str, Any]] = []
+    issues: list[dict[str, Any]] = []
+    ignored_elements = {
+        "context",
+        "unit",
+        "schemaref",
+        "linkbaseref",
+        "footnotelink",
+        "roleref",
+        "arcroleref",
+    }
+    for member in package.members:
+        if member.role is not SecMemberRole.XBRL_INSTANCE:
+            continue
+        try:
+            xml_root = ET.fromstring(member.body)
+        except ET.ParseError:
+            continue
+        namespaces = _xml_namespace_map(member.body)
+        for index, (element, locator) in enumerate(_xml_walk(xml_root)):
+            attrs = {str(key).casefold(): str(value) for key, value in element.attrib.items()}
+            context_ref = attrs.get("contextref") or attrs.get("context_ref")
+            if not context_ref or _xml_local(str(element.tag)) in ignored_elements:
+                continue
+            unit_ref = attrs.get("unitref") or attrs.get("unit_ref")
+            raw_qname = _xml_qname(str(element.tag), namespaces)
+            raw_value = _xml_text(element)
+            nil = attrs.get("nil", "").casefold() in {"true", "1"}
+            parsed_numeric_candidate = None if nil else _numeric_candidate(raw_value)
+            resolved_context = contexts.get(context_ref)
+            resolved_unit = units.get(unit_ref or "") if unit_ref else None
+            if resolved_context is None:
+                issues.append(
+                    {
+                        "code": P11Reason.P11_XBRL_CONTEXT_UNRESOLVED.value,
+                        "severity": "REVIEW",
+                        "xml_locator": locator,
+                        "context_ref": context_ref,
+                    }
+                )
+            if unit_ref and resolved_unit is None:
+                issues.append(
+                    {
+                        "code": P11Reason.P11_XBRL_UNIT_UNRESOLVED.value,
+                        "severity": "REVIEW",
+                        "xml_locator": locator,
+                        "unit_ref": unit_ref,
+                    }
+                )
+            context_period = dict((resolved_context or {}).get("period") or {})
+            fact_id = _sha256(f"{package.package_sha256}|xml-fact|{member.member_sha256}|{locator}|{index}".encode())
+            evidence_id = _sha256(f"{fact_id}|evidence|{member.member_sha256}".encode())
+            fragment_hash = _sha256(f"{member.member_sha256}|fact|{locator}|{raw_value}".encode())
+            fact = {
+                "raw_fact_id": fact_id,
+                "evidence_id": evidence_id,
+                "raw_qname": raw_qname,
+                "fact_kind": "NUMERIC" if unit_ref or parsed_numeric_candidate is not None else "NONNUMERIC",
+                "raw_value": raw_value,
+                "parsed_numeric_candidate": parsed_numeric_candidate,
+                "context_ref": context_ref,
+                "context": resolved_context,
+                "instant": context_period.get("instant"),
+                "start_date": context_period.get("startdate"),
+                "end_date": context_period.get("enddate"),
+                "entity": (resolved_context or {}).get("entity_identifier"),
+                "dimensions": list((resolved_context or {}).get("dimensions") or ()),
+                "unit_ref": unit_ref,
+                "unit": resolved_unit,
+                "decimals": attrs.get("decimals"),
+                "precision": attrs.get("precision"),
+                "scale": attrs.get("scale"),
+                "sign": attrs.get("sign"),
+                "format": attrs.get("format"),
+                "nil": nil,
+                "continued_at": attrs.get("continuedat") or attrs.get("continued_at"),
+                "hidden": False,
+                "dom_locator": None,
+                "xml_locator": locator,
+                "locator_kind": "XML_PATH",
+                "virtual_page_no": None,
+                "table_cell_id": None,
+                "table_id": None,
+                "row_index": None,
+                "column_index": None,
+                "block_id": None,
+                "block_dom_locator": None,
+                "package_sha256": package.package_sha256,
+                "member_sha256": member.member_sha256,
+                "fragment_hash": fragment_hash,
+                "source_member_sha256": member.member_sha256,
+                "raw_attributes": attrs,
+            }
+            evidence.append(
+                {
+                    "evidence_id": evidence_id,
+                    "source_member_sha256": member.member_sha256,
+                    "source_member_relative_name": member.relative_name,
+                    "package_sha256": package.package_sha256,
+                    "member_sha256": member.member_sha256,
+                    "xml_locator": locator,
+                    "fragment_hash": fragment_hash,
+                    "raw_text": raw_value,
+                    "text": raw_value,
+                    "raw_fact_id": fact_id,
+                    "locator_kind": "XML_PATH",
+                    "block_id": None,
+                    "table_id": None,
+                    "row_index": None,
+                    "column_index": None,
+                }
+            )
+            facts.append(fact)
+    return facts, evidence, issues
+
+
+def verify_sec_evidence(
+    package: SecFilingPackage,
+    pages: Iterable[dict[str, Any]],
+    evidence: dict[str, Any],
+) -> None:
+    """Verify one P11 evidence row against immutable package bytes and anchors."""
+
+    member_sha = str(evidence.get("member_sha256") or evidence.get("source_member_sha256") or "")
+    member = next((item for item in package.members if item.member_sha256 == member_sha), None)
+    if member is None:
+        raise SecError(P11Reason.P11_MEMBER_HASH_MISMATCH, "evidence member is not present in SEC package")
+    source_member_sha = str(evidence.get("source_member_sha256") or member_sha)
+    if source_member_sha != member_sha or str(evidence.get("package_sha256") or package.package_sha256) != package.package_sha256:
+        raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence package/member identity is invalid")
+
+    locator_kind = str(evidence.get("locator_kind") or "DOM_PATH").upper()
+    expected_text = str(evidence.get("raw_text", evidence.get("text", "")))
+    if locator_kind == "XML_PATH":
+        locator = str(evidence.get("xml_locator") or "")
+        try:
+            root = ET.fromstring(member.body)
+        except ET.ParseError as exc:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML evidence source is not parseable") from exc
+        node = _resolve_xml_locator(root, locator)
+        if node is None:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML evidence locator does not resolve")
+        actual_text = _xml_text(node)
+    elif locator_kind == "DOM_PATH":
+        locator = str(evidence.get("dom_locator") or "")
+        try:
+            html = member.body.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "HTML evidence source is not UTF-8") from exc
+        dom_parser = _DomParser()
+        try:
+            dom_parser.feed(html)
+            dom_parser.close()
+        except (AssertionError, ValueError) as exc:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "HTML evidence source is not parseable") from exc
+        node = _resolve_dom_locator(dom_parser.root, locator)
+        if node is None:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "HTML evidence locator does not resolve")
+        actual_text = _text(node)
+        block_id = str(evidence.get("block_id") or "")
+        blocks = [block for page in pages for block in (page.get("blocks") or [])]
+        block = next((row for row in blocks if str(row.get("block_id")) == block_id), None)
+        if block is None or str(block.get("source_member_sha256")) != member_sha:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence block_id does not resolve to a source block")
+        block_locator = str(evidence.get("block_dom_locator") or block.get("dom_locator") or "")
+        block_node = _resolve_dom_locator(dom_parser.root, block_locator)
+        if block_node is None or _text(block_node) != str(block.get("text", "")):
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence block locator does not resolve")
+        expected_block_fragment = _sha256(f"{member_sha}|block|{block_locator}|{block.get('text', '')}".encode())
+        if str(block.get("fragment_sha256", "")) != expected_block_fragment:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "source block fragment hash is invalid")
+    else:
+        raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "unsupported SEC evidence locator kind")
+
+    if actual_text != expected_text:
+        raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence raw text does not match source node")
+    expected_fragment = _sha256(f"{member_sha}|fact|{locator}|{actual_text}".encode())
+    if str(evidence.get("fragment_hash", "")) != expected_fragment:
+        raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence fragment hash does not match source node")
 
 
 def _attach_facts_to_tables(tables: list[dict[str, Any]], facts: list[dict[str, Any]]) -> None:
@@ -718,7 +1044,21 @@ def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> S
     sections = _sections(root_node, page_by_locator, primary.member_sha256)
     tables, cell_by_locator, cell_metadata = _tables(root_node, page_by_locator, primary.member_sha256)
     contexts, units = _contexts_and_units(root_node, package)
-    facts, evidence, issues = _facts(root_node, package, page_by_locator, cell_by_locator, cell_metadata, contexts, units)
+    blocks_by_locator = {str(row["dom_locator"]): row for row in blocks}
+    facts, evidence, issues = _facts(
+        root_node,
+        package,
+        page_by_locator,
+        cell_by_locator,
+        cell_metadata,
+        blocks_by_locator,
+        contexts,
+        units,
+    )
+    xml_facts, xml_evidence, xml_issues = _xml_facts(package, contexts, units)
+    facts.extend(xml_facts)
+    evidence.extend(xml_evidence)
+    issues.extend(xml_issues)
     _attach_facts_to_tables(tables, facts)
     root.mkdir(parents=True, exist_ok=True)
     temp_dir = root / f".{package.package_sha256}.{uuid.uuid4().hex}.tmp"
@@ -742,4 +1082,5 @@ __all__ = [
     "VIRTUAL_HTML_NORMALIZER_VERSION",
     "load_sec_artifacts",
     "parse_sec_package",
+    "verify_sec_evidence",
 ]

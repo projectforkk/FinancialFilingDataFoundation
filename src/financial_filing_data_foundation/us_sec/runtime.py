@@ -90,6 +90,7 @@ class SecSubprocessTransport:
         timeout: float,
         *,
         max_bytes: int,
+        max_redirects: int = 3,
     ) -> SecResponse:
         validate_sec_url(url)
         result = run_sec_runner(
@@ -100,6 +101,7 @@ class SecSubprocessTransport:
                 "headers": headers,
                 "timeout": timeout,
                 "max_bytes": max_bytes,
+                "max_redirects": max_redirects,
             },
             timeout_seconds=timeout + 30.0,
         )

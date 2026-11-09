@@ -91,7 +91,12 @@ class SecAcquirer:
                 historical = parse_submissions(history_payload, company=company, source_url=history_url)
                 historical_candidates.extend(historical.candidates)
                 candidates = discover_filings(
-                    SecSubmissions(company=company, candidates=tuple(historical_candidates)),
+                    SecSubmissions(
+                        company=company,
+                        candidates=tuple(historical_candidates),
+                        fiscal_year_end=submissions.fiscal_year_end or historical.fiscal_year_end,
+                        history_files=submissions.history_files,
+                    ),
                     fiscal_year=fiscal_year,
                     period=period,
                 )

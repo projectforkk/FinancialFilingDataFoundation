@@ -20,6 +20,7 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
     calls: list[str] = []
     submissions = {
         "cik": "0000320193",
+        "fiscalYearEnd": "1231",
         "filings": {
             "recent": {
                 "accessionNumber": ["0000320193-25-000001"],
@@ -60,6 +61,7 @@ def test_sec_acquirer_does_not_silently_select_amendment(tmp_path: Path) -> None
     def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
         payload = {
             "cik": "0000320193",
+            "fiscalYearEnd": "1231",
             "filings": {
                 "recent": {
                     "accessionNumber": ["0000320193-25-000001", "0000320193-25-000002"],

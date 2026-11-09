@@ -14,6 +14,8 @@ from financial_filing_data_foundation.native.search import search_pages
 from financial_filing_data_foundation.tables import load_reconstructed_tables
 from financial_filing_data_foundation.validation import load_validation_result
 from financial_filing_data_foundation.us_sec.parser import load_sec_artifacts
+from financial_filing_data_foundation.us_sec.parser import verify_sec_evidence
+from financial_filing_data_foundation.us_sec.package import SecPackageStore
 from financial_filing_data_foundation.us_sec.validation import load_sec_validation
 
 from .catalog import CatalogDocument, CatalogError, McpCatalog, normalize_sha256
@@ -673,6 +675,13 @@ class McpQueryService:
             ) from exc
         bundle = self._bundles.get(normalized)
         if bundle is not None:
+            if bundle.catalog.source_kind.upper() == "SEC":
+                _verify_sec_source_chain(
+                    bundle.catalog,
+                    self.catalog.project_root,
+                    bundle.pages,
+                    bundle.evidence,
+                )
             return bundle
 
         document = self.catalog.get(normalized)
@@ -682,14 +691,17 @@ class McpQueryService:
                 f"document not found: {normalized}",
             )
 
-        bundle = _load_bundle(document)
+        bundle = _load_bundle(document, self.catalog.project_root)
         self._bundles[normalized] = bundle
         return bundle
 
 
-def _load_bundle(document: CatalogDocument) -> _DocumentBundle:
+def _load_bundle(document: CatalogDocument, project_root: Path | None = None) -> _DocumentBundle:
     if document.source_kind.upper() == "SEC":
-        return _load_sec_bundle(document)
+        inferred_root = project_root
+        if inferred_root is None and document.sec_artifact_dir is not None and len(document.sec_artifact_dir.parents) >= 5:
+            inferred_root = document.sec_artifact_dir.parents[4]
+        return _load_sec_bundle(document, inferred_root)
     try:
         native = load_native_document(document.p3_artifact_dir)
         tables_artifact = load_reconstructed_tables(document.p5_artifact_dir)
@@ -794,7 +806,34 @@ def _load_bundle(document: CatalogDocument) -> _DocumentBundle:
     )
 
 
-def _load_sec_bundle(document: CatalogDocument) -> _DocumentBundle:
+def _verify_sec_source_chain(
+    document: CatalogDocument,
+    project_root: Path | None,
+    pages: tuple[dict[str, Any], ...],
+    evidence: tuple[dict[str, Any], ...],
+) -> Any:
+    if project_root is None or not document.package_sha256:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog entry has no trusted raw package identity",
+        )
+    try:
+        package = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store").load(document.package_sha256)
+        member_hashes = {member.member_sha256 for member in package.members}
+        for row in evidence:
+            member_sha = str(row.get("member_sha256") or row.get("source_member_sha256") or "")
+            if member_sha not in member_hashes:
+                raise ValueError("SEC evidence member hash is not present in verified raw package")
+            verify_sec_evidence(package, pages, row)
+        return package
+    except Exception as exc:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            f"SEC raw package/source evidence verification failed for {document.document_sha256}: {exc}",
+        ) from exc
+
+
+def _load_sec_bundle(document: CatalogDocument, project_root: Path | None = None) -> _DocumentBundle:
     if document.sec_artifact_dir is None:
         raise McpServiceError(
             "P8_UPSTREAM_ARTIFACT_INVALID",
@@ -820,10 +859,16 @@ def _load_sec_bundle(document: CatalogDocument) -> _DocumentBundle:
             "P8_UPSTREAM_ARTIFACT_INVALID",
             "catalog/SEC package identity mismatch",
         )
+    if validation.package_sha256 != parsed.package_sha256:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC validation/package identity mismatch",
+        )
     tables = tuple(parsed.tables)
     facts = tuple(parsed.facts)
     evidence = tuple(parsed.evidence)
     pages = tuple(parsed.pages)
+    _verify_sec_source_chain(document, project_root, pages, evidence)
     sections = tuple(parsed.sections)
     issues = tuple(validation.issues)
     table_index = {str(row["table_id"]): row for row in tables}

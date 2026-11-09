@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import json
+from urllib.error import HTTPError
 
 import pytest
 
@@ -10,6 +12,8 @@ from financial_filing_data_foundation.us_sec.discovery import (
 )
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import (
+    _AllowlistedRedirectHandler,
+    _network_transport,
     SecHttpClient,
     SecHttpConfig,
     SecRateLimiter,
@@ -24,6 +28,7 @@ def _submissions() -> dict[str, object]:
     return {
         "name": "Example Corp",
         "cik": "123456789",
+        "fiscalYearEnd": "1231",
         "tickers": ["EXM"],
         "exchanges": ["NASDAQ"],
         "filings": {
@@ -33,18 +38,29 @@ def _submissions() -> dict[str, object]:
                     "0000123456-25-000002",
                     "0000123456-25-000003",
                     "0000123456-25-000004",
+                    "0000123456-25-000005",
                 ],
-                "filingDate": ["2025-02-20", "2025-05-01", "2025-08-01", "2025-08-02"],
-                "reportDate": ["2024-12-31", "2025-03-31", "2025-06-30", "2025-06-30"],
-                "form": ["10-K", "10-Q", "10-Q", "10-Q/A"],
-                "primaryDocument": ["annual.htm", "q1.htm", "q2.htm", "q2-amend.htm"],
-                "primaryDocDescription": ["Annual", "Q1", "Q2", "Q2 amended"],
-                "items": ["", "", "", "5.07"],
-                "size": [100, 100, 100, 100],
-                "isXBRL": [1, 1, 1, 1],
-                "isInlineXBRL": [1, 1, 1, 1],
-                "isXBRL": [1, 1, 1, 1],
-                "isXBRL": [1, 1, 1, 1],
+                "filingDate": [
+                    "2025-02-20",
+                    "2025-05-01",
+                    "2025-05-02",
+                    "2025-08-01",
+                    "2025-11-20",
+                ],
+                "reportDate": [
+                    "2025-03-31",
+                    "2025-06-30",
+                    "2025-06-30",
+                    "2025-09-30",
+                    "2025-12-31",
+                ],
+                "form": ["10-Q", "10-Q", "10-Q/A", "10-Q", "10-K"],
+                "primaryDocument": ["q1.htm", "q2.htm", "q2-amend.htm", "q3.htm", "annual.htm"],
+                "primaryDocDescription": ["Q1", "Q2", "Q2 amended", "Q3", "Annual"],
+                "items": ["", "", "5.07", "", ""],
+                "size": [100, 100, 100, 100, 100],
+                "isXBRL": [1, 1, 1, 1, 1],
+                "isInlineXBRL": [1, 1, 1, 1, 1],
             }
         },
     }
@@ -87,6 +103,7 @@ def test_http_client_declares_user_agent_and_enforces_size_and_content_type() ->
     assert result.body == b'{"ok":true}'
     assert "FFDF" in requests[0]["User-Agent"]
     assert "ops@example.org" in requests[0]["User-Agent"]
+    assert "Accept-Encoding" not in requests[0]
 
     with pytest.raises(SecError) as content:
         client.fetch(
@@ -94,6 +111,16 @@ def test_http_client_declares_user_agent_and_enforces_size_and_content_type() ->
             expected_content_types=("application/xml",),
         )
     assert content.value.reason_code == P11Reason.P11_CONTENT_TYPE_INVALID
+
+
+def test_http_client_rejects_unhandled_content_encoding() -> None:
+    def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
+        return SecResponse(200, {"Content-Encoding": "gzip"}, b"compressed", url)
+
+    client = SecHttpClient(SecHttpConfig(contact_email="ops@example.org"), transport=transport)
+    with pytest.raises(SecError) as error:
+        client.fetch("https://data.sec.gov/submissions/CIK0000123456.json")
+    assert error.value.reason_code == P11Reason.P11_CONTENT_ENCODING_UNSUPPORTED
 
 
 def test_rate_limiter_and_retry_after_are_deterministic() -> None:
@@ -157,6 +184,138 @@ def test_ticker_mapping_and_submission_discovery_are_fail_closed() -> None:
     )
     assert len(candidates) == 2
     assert {item.amended for item in candidates} == {False, True}
+
+
+def test_discovery_uses_fiscal_year_end_and_chronology_for_non_calendar_issuers() -> None:
+    payload = {
+        "cik": "0000123456",
+        "fiscalYearEnd": "0930",
+        "filings": {
+            "recent": {
+                "accessionNumber": [
+                    "0000123456-25-000001",
+                    "0000123456-25-000002",
+                    "0000123456-25-000003",
+                    "0000123456-25-000004",
+                ],
+                "filingDate": ["2025-02-01", "2025-05-01", "2025-08-01", "2025-11-20"],
+                "reportDate": ["2024-12-28", "2025-03-29", "2025-06-28", "2025-09-27"],
+                "form": ["10-Q", "10-Q", "10-Q", "10-K"],
+                "primaryDocument": ["q1.htm", "q2.htm", "q3.htm", "annual.htm"],
+            }
+        },
+    }
+    company = sec_company(cik="123456", ticker="EXM", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    assert discover_filings(submissions, fiscal_year=2025, period="Q1")[0].report_period == "2024-12-28"
+    assert discover_filings(submissions, fiscal_year=2025, period="Q2")[0].report_period == "2025-03-29"
+    assert discover_filings(submissions, fiscal_year=2025, period="Q3")[0].report_period == "2025-06-28"
+    assert discover_filings(submissions, fiscal_year=2025, period="FY")[0].report_period == "2025-09-27"
+
+
+def test_discovery_supports_fpi_non_december_fiscal_year() -> None:
+    payload = {
+        "cik": "0000000001",
+        "fiscalYearEnd": "0630",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0000000001-25-000001"],
+                "filingDate": ["2025-09-15"],
+                "reportDate": ["2025-06-28"],
+                "form": ["20-F"],
+                "primaryDocument": ["annual20.htm"],
+            }
+        },
+    }
+    company = sec_company(cik="1", ticker="FPI", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    annual = discover_filings(submissions, fiscal_year=2025, period="FY")
+    assert len(annual) == 1
+    assert annual[0].form == "20-F"
+
+
+def test_redirect_handler_checks_each_hop_and_configures_redirect_limit() -> None:
+    from urllib.request import Request
+
+    handler = _AllowlistedRedirectHandler(max_redirects=1)
+    request = Request("https://www.sec.gov/Archives/edgar/data/1/a.htm")
+    assert handler.max_redirections == 1
+    assert handler.redirect_request(
+        request,
+        None,
+        302,
+        "Found",
+        {},
+        "https://www.sec.gov/Archives/edgar/data/1/b.htm",
+    ) is not None
+
+    with pytest.raises(SecError) as rejected:
+        handler.redirect_request(
+            request,
+            None,
+            302,
+            "Found",
+            {},
+            "https://example.com/Archives/edgar/data/1/b.htm",
+        )
+    assert rejected.value.reason_code == P11Reason.P11_ARCHIVE_HOST_REJECTED
+
+
+def test_network_transport_enforces_redirect_limit_and_bounded_error_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: list[object] = []
+
+    class Opener:
+        def open(self, request: object, timeout: float) -> object:
+            raise __import__("urllib.error", fromlist=["HTTPError"]).HTTPError(
+                "https://www.sec.gov/Archives/edgar/data/1/a.htm",
+                302,
+                "redirect limit exceeded",
+                {},
+                __import__("io").BytesIO(b"too much error body"),
+            )
+
+    def build(handler: object) -> Opener:
+        captured.append(handler)
+        return Opener()
+
+    monkeypatch.setattr("financial_filing_data_foundation.us_sec.http.build_opener", build)
+    with pytest.raises(SecError) as redirected:
+        _network_transport(
+            "https://www.sec.gov/Archives/edgar/data/1/a.htm",
+            {},
+            1.0,
+            max_bytes=4,
+            max_redirects=2,
+        )
+    assert redirected.value.reason_code == P11Reason.P11_SEC_REDIRECT_LIMIT_EXCEEDED
+    assert getattr(captured[0], "max_redirections") == 2
+
+
+def test_network_transport_bounds_non_redirect_http_error_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Opener:
+        def open(self, request: object, timeout: float) -> object:
+            raise HTTPError(
+                "https://www.sec.gov/Archives/edgar/data/1/a.htm",
+                500,
+                "server error",
+                {},
+                io.BytesIO(b"0123456789"),
+            )
+
+    monkeypatch.setattr(
+        "financial_filing_data_foundation.us_sec.http.build_opener",
+        lambda handler: Opener(),
+    )
+    with pytest.raises(SecError) as error:
+        _network_transport(
+            "https://www.sec.gov/Archives/edgar/data/1/a.htm",
+            {},
+            1.0,
+            max_bytes=4,
+        )
+    assert error.value.reason_code == P11Reason.P11_SIZE_LIMIT_EXCEEDED
 
 
 def test_fpi_20f_and_40f_are_annual_candidates_only() -> None:

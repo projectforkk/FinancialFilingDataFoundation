@@ -136,7 +136,7 @@ def ingest_sec_package(
         blocking_issue_count=validation.blocking_issue_count,
         artifact_path=str(parsed.artifact_dir),
     )
-    ready = validation.blocking_issue_count == 0 and not amendment_conflict
+    ready = validation.validation_status == "PASS" and not amendment_conflict
     catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_status = _upsert_catalog(root=project_root, package=package, ticker=ticker, parsed=parsed, validation=validation, catalog_path=catalog_path, period=period, publish=ready)
     return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)

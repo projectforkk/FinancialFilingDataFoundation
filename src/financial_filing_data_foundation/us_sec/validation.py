@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import P11Reason, SecError
-from .parser import SecParseResult
+from .parser import SecParseResult, verify_sec_evidence
 
 
 SEC_VALIDATION_SCHEMA = "p11-sec-validation-v1"
@@ -112,9 +112,6 @@ def validate_sec_artifacts(
         for evidence in parsed.evidence:
             if str(evidence.get("member_sha256") or evidence.get("source_member_sha256") or "") not in member_hashes:
                 issues.append(_issue(P11Reason.P11_MEMBER_HASH_MISMATCH.value, "BLOCKING", "evidence member hash is not in source package", evidence_id=evidence.get("evidence_id")))
-        report_period = str(package.report_period or "")
-        if report_period and not report_period.startswith(str(package.fiscal_year)):
-            issues.append(_issue(P11Reason.P11_FORM_POLICY_MISMATCH.value, "REVIEW", "source report period year differs from requested fiscal year"))
     if amendment_conflict:
         issues.append(_issue(P11Reason.P11_AMENDED_VARIANT_PRESENT.value, "REVIEW", "original and amended SEC variants are both present"))
 
@@ -124,15 +121,57 @@ def validate_sec_artifacts(
         issues.append(_issue("P11_ARTIFACT_INCOMPLETE_OR_CORRUPT", "BLOCKING", "virtual page sequence is not contiguous"))
     fact_ids = {str(row.get("raw_fact_id", "")) for row in parsed.facts}
     evidence_ids = {str(row.get("evidence_id", "")) for row in parsed.evidence}
+    evidence_by_id = {str(row.get("evidence_id", "")): row for row in parsed.evidence}
+    blocks_by_id = {
+        str(block.get("block_id", "")): block
+        for page in parsed.pages
+        for block in (page.get("blocks") or [])
+    }
+    if not parsed.facts:
+        issues.append(
+            _issue(
+                P11Reason.P11_STRUCTURED_FACTS_MISSING.value,
+                "REVIEW",
+                "periodic SEC filing has no structured XBRL Raw Facts",
+            )
+        )
+    elif package is None:
+        issues.append(
+            _issue(
+                P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value,
+                "BLOCKING",
+                "source package is required to validate structured SEC evidence",
+            )
+        )
+    elif not parsed.evidence:
+        issues.append(
+            _issue(
+                P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value,
+                "BLOCKING",
+                "structured SEC Raw Facts have no Evidence",
+            )
+        )
     for fact in parsed.facts:
-        if not fact.get("raw_fact_id") or not fact.get("evidence_id") or str(fact.get("evidence_id")) not in evidence_ids:
+        fact_evidence_id = str(fact.get("evidence_id", ""))
+        if not fact.get("raw_fact_id") or not fact_evidence_id or fact_evidence_id not in evidence_ids:
             issues.append(_issue("P11_ARTIFACT_INCOMPLETE_OR_CORRUPT", "BLOCKING", "raw fact does not resolve to evidence"))
+        evidence = evidence_by_id.get(fact_evidence_id)
+        if evidence is not None and str(evidence.get("raw_fact_id", "")) != str(fact.get("raw_fact_id", "")):
+            issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "Evidence does not point back to its Raw Fact", evidence_id=fact_evidence_id))
     if len(fact_ids) != len(parsed.facts) or len(evidence_ids) != len(parsed.evidence):
         issues.append(_issue("P11_ARTIFACT_INCOMPLETE_OR_CORRUPT", "BLOCKING", "duplicate raw fact or evidence identity"))
     for evidence in parsed.evidence:
-        locator = str(evidence.get("dom_locator", ""))
+        locator_kind = str(evidence.get("locator_kind") or "DOM_PATH").upper()
+        locator = str(evidence.get("xml_locator" if locator_kind == "XML_PATH" else "dom_locator", ""))
         if not locator.startswith("/") or not evidence.get("source_member_sha256"):
-            issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "evidence DOM locator is not valid", evidence_id=evidence.get("evidence_id")))
+            issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "evidence source locator is not valid", evidence_id=evidence.get("evidence_id")))
+        if locator_kind == "DOM_PATH" and str(evidence.get("block_id") or "") not in blocks_by_id:
+            issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "evidence block_id is not a normalized source block", evidence_id=evidence.get("evidence_id")))
+        if package is not None:
+            try:
+                verify_sec_evidence(package, parsed.pages, evidence)
+            except SecError as exc:
+                issues.append(_issue(exc.reason_code, "BLOCKING", str(exc), evidence_id=evidence.get("evidence_id")))
 
     status, blocking, failures, review, warning = _status(issues)
     directory = Path(validation_root).expanduser().resolve() / parsed.package_sha256

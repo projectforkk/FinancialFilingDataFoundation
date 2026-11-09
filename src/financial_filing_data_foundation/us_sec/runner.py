@@ -30,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
             {str(key): str(value) for key, value in dict(payload.get("headers") or {}).items()},
             float(payload.get("timeout", 30.0)),
             max_bytes=int(payload.get("max_bytes", 512 * 1024 * 1024)),
+            max_redirects=int(payload.get("max_redirects", 3)),
         )
         print(
             json.dumps(

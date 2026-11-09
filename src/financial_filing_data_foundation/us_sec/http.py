@@ -25,6 +25,8 @@ SEC_ALLOWED_HOSTS = frozenset({SEC_DATA_HOST, SEC_WWW_HOST})
 SUBMISSIONS_MAX_BYTES = 32 * 1024 * 1024
 MEMBER_MAX_BYTES = 128 * 1024 * 1024
 PACKAGE_MAX_BYTES = 512 * 1024 * 1024
+ERROR_BODY_MAX_BYTES = 1024 * 1024
+_REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
 
 
 def _allowed_path(host: str, path: str) -> bool:
@@ -138,6 +140,12 @@ Transport = Callable[[str, dict[str, str], float], SecResponse]
 
 
 class _AllowlistedRedirectHandler(HTTPRedirectHandler):
+    def __init__(self, *, max_redirects: int) -> None:
+        super().__init__()
+        if max_redirects < 0:
+            raise ValueError("max_redirects must be non-negative")
+        self.max_redirections = max_redirects
+
     def redirect_request(self, req: Request, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> Request | None:
         validate_sec_url(newurl)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
@@ -149,9 +157,12 @@ def _network_transport(
     timeout: float,
     *,
     max_bytes: int = PACKAGE_MAX_BYTES,
+    max_redirects: int = 3,
 ) -> SecResponse:
+    if max_redirects < 0:
+        raise ValueError("max_redirects must be non-negative")
     request = Request(url, headers=headers, method="GET")
-    opener = build_opener(_AllowlistedRedirectHandler())
+    opener = build_opener(_AllowlistedRedirectHandler(max_redirects=max_redirects))
     try:
         with opener.open(request, timeout=timeout) as response:
             declared_length = response.headers.get("Content-Length")
@@ -185,10 +196,21 @@ def _network_transport(
                 final_url=str(response.geturl()),
             )
     except HTTPError as exc:
+        if int(exc.code) in _REDIRECT_CODES:
+            raise SecError(
+                P11Reason.P11_SEC_REDIRECT_LIMIT_EXCEEDED,
+                f"SEC redirect limit exceeded after {max_redirects} hops",
+            ) from exc
+        error_limit = min(max_bytes, ERROR_BODY_MAX_BYTES)
         try:
-            body = exc.read()
+            body = exc.read(error_limit + 1)
         except OSError:
             body = b""
+        if len(body) > error_limit:
+            raise SecError(
+                P11Reason.P11_SIZE_LIMIT_EXCEEDED,
+                f"SEC error response exceeds {error_limit} bytes",
+            ) from exc
         return SecResponse(
             status=int(exc.code),
             headers=dict(exc.headers.items()) if exc.headers else {},
@@ -274,7 +296,6 @@ class SecHttpClient:
             try:
                 request_headers = {
                     "User-Agent": self.config.user_agent,
-                    "Accept-Encoding": "gzip",
                 }
                 if self.transport is _network_transport:
                     response = _network_transport(
@@ -282,6 +303,7 @@ class SecHttpClient:
                         request_headers,
                         self.config.timeout_seconds,
                         max_bytes=limit,
+                        max_redirects=self.config.max_redirects,
                     )
                 elif hasattr(self.transport, "fetch"):
                     response = self.transport.fetch(  # type: ignore[attr-defined]
@@ -289,6 +311,7 @@ class SecHttpClient:
                         request_headers,
                         self.config.timeout_seconds,
                         max_bytes=limit,
+                        max_redirects=self.config.max_redirects,
                     )
                 else:
                     response = self.transport(
@@ -304,6 +327,12 @@ class SecHttpClient:
             validate_sec_url(response.final_url)
             last_status = response.status
             if response.status == 200:
+                content_encoding = _header(response.headers, "Content-Encoding")
+                if content_encoding and content_encoding.strip().casefold() not in {"identity"}:
+                    raise SecError(
+                        P11Reason.P11_CONTENT_ENCODING_UNSUPPORTED,
+                        f"unsupported SEC content encoding: {content_encoding}",
+                    )
                 if len(response.body) > limit:
                     raise SecError(
                         P11Reason.P11_SIZE_LIMIT_EXCEEDED,
