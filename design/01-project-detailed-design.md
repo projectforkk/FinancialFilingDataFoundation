@@ -1059,3 +1059,19 @@ Semantic Resolver
 P9 不是 `REVIEW_REQUIRED` 的强制修复器；不得用 overlay 掩盖 raw extraction defect。
 
 US SEC Provider is outside the final project scope. Research MCP production and Semantic Resolver production remain unauthorized.
+
+
+## P11 Current Scope Reopening
+
+2026-11-09 user authority reopens P11 US SEC Provider.
+
+Current active contracts:
+
+- `design/32-p11-us-scope-reopening.md`
+- `design/26-p11-sec-provider-design.md`
+- `design/27-p11-implementation-plan.md`
+
+Accepted production remains CN/HK until P11 independent acceptance. P11 must use
+official SEC filing packages and HTML/Inline-XBRL-first parsing; it must not weaken
+P0-P10 accepted CN/HK behavior or treat historical unaccepted P11 branches as
+production baseline.
