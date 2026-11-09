@@ -6,11 +6,19 @@
 
 ## Current state
 
-**PROJECT_CLOSED / CN_HK_SCOPE_COMPLETE / P0_P10_DONE_PASS**
+**P11_REOPENED / DESIGN_READY / P0_P10_ACCEPTED_BASELINE_PRESERVED**
 
-Final production markets: `CN`, `HK`.
+Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
-P11 US SEC Provider is superseded by the final scope decision and is `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`. Historical P11 design artifacts remain audit history only.
+P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
+
+`P11 = REOPENED / DESIGN READY / PRODUCTION NOT YET IMPLEMENTED`
+
+Current P11 design:
+- scope reopening: `design/32-p11-us-scope-reopening.md`;
+- detailed design: `design/26-p11-sec-provider-design.md`;
+- implementation plan: `design/27-p11-implementation-plan.md`;
+- authorization: `development/147-p11-us-scope-reopening-authorization.md`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -163,21 +171,27 @@ Post-closeout operational user CLI (2026-11-05): `ffdf acquire`, `ffdf ingest`, 
 - design/28: future semantic reference / implementation not authorized
 - design/29: future Research MCP reference / production not authorized
 
-## Final project scope
+## Current project scope
 
-**CN/HK ONLY — NO FURTHER PHASE AUTHORIZED**
+**CN/HK ACCEPTED PRODUCTION + P11 US SEC REOPENED FOR NEW LIFECYCLE**
 
-Final scope contract:
+Historical closeout scope contract:
 
 `design/30-project-final-cn-hk-scope.md`
 
-Closeout decision:
+Historical closeout decision:
 
 `development/144-final-cn-hk-project-scope-closeout.md`
 
-Historical P11 design authorization:
+Both remain valid historical records for the 2026-11-05 closeout, but are superseded for current P11 execution by:
 
-`development/143-p11-design-authorization.md` — superseded for current execution; retained for audit history only.
+`design/32-p11-us-scope-reopening.md`
+
+Current authorization:
+
+`development/147-p11-us-scope-reopening-authorization.md`
+
+The older `development/143-p11-design-authorization.md` is retained as audit history and is not the new development baseline.
 
 P10-C is closed:
 
