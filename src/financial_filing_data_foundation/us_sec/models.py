@@ -16,6 +16,7 @@ class SecCompanyRef:
     ticker: str
     company_id: str
     company_name: str | None = None
+    issuer_kind: SecIssuerKind = SecIssuerKind.UNKNOWN
 
 
 @dataclass(frozen=True, slots=True)
