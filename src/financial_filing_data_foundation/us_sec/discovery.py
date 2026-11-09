@@ -18,6 +18,7 @@ _SAFE_MEMBER_RE = re.compile(r"^[^/\\]+$")
 class SecSubmissions:
     company: SecCompanyRef
     candidates: tuple[SecFilingCandidate, ...]
+    history_files: tuple[str, ...] = ()
     raw_sha256: str | None = None
     source_url: str | None = None
 
@@ -61,6 +62,9 @@ def parse_submissions(
         raise SecError(P11Reason.P11_INVALID_US_IDENTITY, "SEC submissions CIK does not match requested CIK")
     filings = payload.get("filings")
     recent = filings.get("recent") if isinstance(filings, dict) else None
+    if recent is None and "accessionNumber" in payload:
+        # SEC historical submissions chunks use the array shape directly.
+        recent = payload
     if not isinstance(recent, dict):
         raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC submissions recent history is missing")
     accessions = recent.get("accessionNumber")
@@ -99,7 +103,18 @@ def parse_submissions(
                 issuer_kind=kind,
             )
         )
-    return SecSubmissions(company=company, candidates=tuple(candidates), raw_sha256=raw_sha256, source_url=source_url)
+    history_files: list[str] = []
+    if isinstance(filings, dict) and isinstance(filings.get("files"), list):
+        for item in filings["files"]:
+            if isinstance(item, dict) and isinstance(item.get("name"), str):
+                history_files.append(item["name"])
+    return SecSubmissions(
+        company=company,
+        candidates=tuple(candidates),
+        history_files=tuple(sorted(set(history_files))),
+        raw_sha256=raw_sha256,
+        source_url=source_url,
+    )
 
 
 def _period_for_report_date(report_period: str | None) -> str | None:

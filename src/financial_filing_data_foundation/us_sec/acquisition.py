@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
-from .discovery import discover_filings, parse_submissions, select_filing
+from .discovery import SecSubmissions, discover_filings, parse_submissions, select_filing
 from .http import SecHttpClient
 from .models import SecCompanyRef, SecFilingCandidate
 from .package import SecFilingPackage, SecMemberRole, SecPackageMember, SecPackageStore, build_package
@@ -73,6 +73,30 @@ class SecAcquirer:
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC submissions response is invalid JSON") from exc
         submissions = parse_submissions(payload, company=company, source_url=submissions_url)
         candidates = discover_filings(submissions, fiscal_year=fiscal_year, period=period)
+        if not candidates and submissions.history_files:
+            historical_candidates = list(submissions.candidates)
+            for history_name in submissions.history_files:
+                history_url = f"https://data.sec.gov/submissions/{history_name}"
+                history_response = self.client.fetch(
+                    history_url,
+                    expected_content_types=("application/json",),
+                    max_bytes=self.client.config.submissions_max_bytes,
+                )
+                try:
+                    history_payload = json.loads(history_response.body.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    from .errors import P11Reason, SecError
+
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC historical submissions response is invalid JSON") from exc
+                historical = parse_submissions(history_payload, company=company, source_url=history_url)
+                historical_candidates.extend(historical.candidates)
+                candidates = discover_filings(
+                    SecSubmissions(company=company, candidates=tuple(historical_candidates)),
+                    fiscal_year=fiscal_year,
+                    period=period,
+                )
+                if candidates:
+                    break
         candidate = select_filing(candidates)
         existing = self.package_store.find_by_accession(candidate.accession)
         if existing is not None:

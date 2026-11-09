@@ -41,6 +41,7 @@ from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpC
 from financial_filing_data_foundation.us_sec.identity import normalize_cik, resolve_ticker, sec_company
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
+from financial_filing_data_foundation.us_sec.runtime import SecRuntimeDescriptor, SecSubprocessTransport
 from financial_filing_data_foundation.us_sec.ticker_map import parse_ticker_map
 
 
@@ -345,7 +346,11 @@ def _common_payload(request: AcquisitionRequest) -> dict[str, Any]:
 
 def _us_company_and_client(args: argparse.Namespace) -> tuple[Any, SecHttpClient]:
     require_us_development()
-    client = SecHttpClient(SecHttpConfig.from_env())
+    runtime = SecRuntimeDescriptor.for_project(_project_root())
+    client = SecHttpClient(
+        SecHttpConfig.from_env(),
+        transport=SecSubprocessTransport(runtime),
+    )
     ticker = args.ticker.strip().upper() if args.ticker else None
     if args.cik:
         cik = normalize_cik(args.cik)
@@ -443,7 +448,11 @@ def _us_ingest(args: argparse.Namespace) -> int:
 
 def _us_status(args: argparse.Namespace) -> int:
     root = _project_root()
-    company, _ = _us_company_and_client(args)
+    require_us_development()
+    if args.cik and not args.ticker:
+        company = sec_company(cik=normalize_cik(args.cik), ticker=None, allow_development=True)
+    else:
+        company, _ = _us_company_and_client(args)
     paths = _runtime_paths(root)
     registry = SQLiteRegistry(paths.registry)
     bindings = registry.list_sec_bindings(

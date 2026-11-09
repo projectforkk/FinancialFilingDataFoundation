@@ -253,6 +253,11 @@ def _parse_document(
     fiscal_year = _required_year(raw, index)
 
     source_kind = str(raw.get("source_kind", "PDF")).strip().upper()
+    if source_kind not in {"PDF", "SEC", "US_SEC"}:
+        raise CatalogError(
+            "P8_CATALOG_INVALID",
+            f"documents[{index}].source_kind is unsupported",
+        )
     if source_kind in {"SEC", "US_SEC"}:
         if market != "US":
             raise CatalogError(

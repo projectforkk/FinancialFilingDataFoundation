@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 from .errors import P11Reason, SecError
+from .http import validate_sec_url
 
 
 PACKAGE_MANIFEST_SCHEMA = "p11-sec-package-v1"
@@ -61,6 +62,10 @@ class SecPackageMember:
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "package member content_type is required")
         if not self.source_url.strip():
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "package member source_url is required")
+        try:
+            validate_sec_url(self.source_url)
+        except SecError as exc:
+            raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "package member source URL is not allowlisted") from exc
         if not isinstance(self.body, (bytes, bytearray)):
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "package member body must be bytes")
         object.__setattr__(self, "body", bytes(self.body))
@@ -162,13 +167,17 @@ def build_package(
     report_period: str | None = None,
     primary_document: str | None = None,
 ) -> SecFilingPackage:
+    member_tuple = tuple(members)
+    if primary_document is None:
+        primary_rows = [member.relative_name for member in member_tuple if member.role is SecMemberRole.PRIMARY_DOCUMENT]
+        primary_document = primary_rows[0] if primary_rows else None
     package = SecFilingPackage(
         cik=cik,
         accession=accession,
         form=form.upper(),
         fiscal_year=fiscal_year,
         period=period.upper(),
-        members=tuple(members),
+        members=member_tuple,
         filing_date=filing_date,
         accepted_at=accepted_at,
         report_period=report_period,
@@ -209,6 +218,12 @@ class SecPackageStore:
         total = sum(len(member.body) for member in package.members)
         if total > self.package_max_bytes:
             raise SecError(P11Reason.P11_SIZE_LIMIT_EXCEEDED, "SEC package exceeds package size limit")
+        existing_accession = self.find_by_accession(package.accession)
+        if existing_accession is not None and existing_accession.package_sha256 != package_sha:
+            raise SecError(
+                P11Reason.P11_SOURCE_DRIFT,
+                f"SEC source drift: accession already exists with different package bytes: {package.accession}",
+            )
         final_dir = self.package_dir(package_sha)
         if final_dir.exists():
             loaded = self.load(package_sha)
@@ -282,6 +297,8 @@ class SecPackageStore:
                     body=body,
                 )
             )
+        if sum(len(member.body) for member in members) > self.package_max_bytes:
+            raise SecError(P11Reason.P11_SIZE_LIMIT_EXCEEDED, "SEC package exceeds package size limit")
         package = SecFilingPackage(
             cik=str(manifest.get("cik", "")),
             accession=str(manifest.get("accession", "")),

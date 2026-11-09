@@ -116,7 +116,7 @@ def ingest_sec_package(
     store = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store")
     store.put(package)
     parsed = parse_sec_package(package, base / "p11")
-    validation = validate_sec_artifacts(parsed, base / "p7", amendment_conflict=amendment_conflict)
+    validation = validate_sec_artifacts(parsed, base / "p7", amendment_conflict=amendment_conflict, package=package)
     registry_path = project_root / "workspace" / "ingest" / "registry.sqlite"
     registry = SQLiteRegistry(registry_path)
     register_sec_package(registry, package)

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .errors import P11Reason, SecError
-from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, VIRTUAL_HTML_NORMALIZER_VERSION
+from .parser import SecParseResult
 
 
 SEC_VALIDATION_SCHEMA = "p11-sec-validation-v1"
@@ -56,10 +57,14 @@ def _issue(code: str, severity: str, message: str, **extra: Any) -> dict[str, An
 
 def _write(result: SecValidationResult) -> None:
     result.artifact_dir.mkdir(parents=True, exist_ok=True)
-    result.report_path.write_text(json.dumps(result.to_dict(), ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     with result.issues_path.open("w", encoding="utf-8", newline="\n") as handle:
         for row in result.issues:
             handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
+    payload = result.to_dict()
+    payload["artifact_hashes"] = {
+        "issues_file": hashlib.sha256(result.issues_path.read_bytes()).hexdigest(),
+    }
+    result.report_path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
 
 def _status(issues: list[dict[str, Any]]) -> tuple[str, int, int, int, int]:
@@ -91,8 +96,25 @@ def validate_sec_artifacts(
     validation_root: str | Path,
     *,
     amendment_conflict: bool = False,
+    package: Any | None = None,
 ) -> SecValidationResult:
     issues = [dict(row) for row in parsed.issues]
+    if package is not None:
+        if str(package.package_sha256) != parsed.package_sha256:
+            issues.append(_issue(P11Reason.P11_SOURCE_DRIFT.value, "BLOCKING", "parsed artifact package identity differs from source package"))
+        if not str(package.cik).isdigit() or len(str(package.cik)) != 10:
+            issues.append(_issue(P11Reason.P11_INVALID_US_IDENTITY.value, "BLOCKING", "source package CIK is not normalized"))
+        if not str(package.accession).strip() or not str(package.form).strip():
+            issues.append(_issue(P11Reason.P11_PACKAGE_INVALID.value, "BLOCKING", "source package accession/form is missing"))
+        if not any(member.role.value == "PRIMARY_DOCUMENT" for member in package.members):
+            issues.append(_issue(P11Reason.P11_PRIMARY_DOCUMENT_MISSING.value, "BLOCKING", "source package primary document is missing"))
+        member_hashes = {member.member_sha256 for member in package.members}
+        for evidence in parsed.evidence:
+            if str(evidence.get("member_sha256") or evidence.get("source_member_sha256") or "") not in member_hashes:
+                issues.append(_issue(P11Reason.P11_MEMBER_HASH_MISMATCH.value, "BLOCKING", "evidence member hash is not in source package", evidence_id=evidence.get("evidence_id")))
+        report_period = str(package.report_period or "")
+        if report_period and not report_period.startswith(str(package.fiscal_year)):
+            issues.append(_issue(P11Reason.P11_FORM_POLICY_MISMATCH.value, "REVIEW", "source report period year differs from requested fiscal year"))
     if amendment_conflict:
         issues.append(_issue(P11Reason.P11_AMENDED_VARIANT_PRESENT.value, "REVIEW", "original and amended SEC variants are both present"))
 
@@ -144,6 +166,9 @@ def load_sec_validation(artifact_dir: str | Path) -> SecValidationResult:
         raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation artifact is invalid") from exc
     if report.get("schema_version") != SEC_VALIDATION_SCHEMA:
         raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation schema mismatch")
+    hashes = report.get("artifact_hashes")
+    if not isinstance(hashes, dict) or str(hashes.get("issues_file", "")) != hashlib.sha256(issues_path.read_bytes()).hexdigest():
+        raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation issue hash mismatch")
     result = SecValidationResult(
         artifact_dir=directory,
         package_sha256=str(report.get("package_sha256", "")),

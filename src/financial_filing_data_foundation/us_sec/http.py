@@ -143,15 +143,45 @@ class _AllowlistedRedirectHandler(HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def _network_transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
+def _network_transport(
+    url: str,
+    headers: dict[str, str],
+    timeout: float,
+    *,
+    max_bytes: int = PACKAGE_MAX_BYTES,
+) -> SecResponse:
     request = Request(url, headers=headers, method="GET")
     opener = build_opener(_AllowlistedRedirectHandler())
     try:
         with opener.open(request, timeout=timeout) as response:
+            declared_length = response.headers.get("Content-Length")
+            if declared_length:
+                try:
+                    if int(declared_length) > max_bytes:
+                        raise SecError(
+                            P11Reason.P11_SIZE_LIMIT_EXCEEDED,
+                            f"SEC response exceeds {max_bytes} bytes",
+                        )
+                except ValueError:
+                    pass
+            chunks: list[bytes] = []
+            remaining = max_bytes + 1
+            while remaining > 0:
+                chunk = response.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            body = b"".join(chunks)
+            if len(body) > max_bytes:
+                raise SecError(
+                    P11Reason.P11_SIZE_LIMIT_EXCEEDED,
+                    f"SEC response exceeds {max_bytes} bytes",
+                )
             return SecResponse(
                 status=int(response.status),
                 headers=dict(response.headers.items()),
-                body=response.read(),
+                body=body,
                 final_url=str(response.geturl()),
             )
     except HTTPError as exc:
@@ -242,13 +272,32 @@ class SecHttpClient:
         for attempt in range(self.config.max_attempts):
             self.limiter.wait()
             try:
-                response = self.transport(
-                    validated_url,
-                    {"User-Agent": self.config.user_agent, "Accept-Encoding": "gzip"},
-                    self.config.timeout_seconds,
-                )
-            except SecError:
-                if attempt + 1 >= self.config.max_attempts:
+                request_headers = {
+                    "User-Agent": self.config.user_agent,
+                    "Accept-Encoding": "gzip",
+                }
+                if self.transport is _network_transport:
+                    response = _network_transport(
+                        validated_url,
+                        request_headers,
+                        self.config.timeout_seconds,
+                        max_bytes=limit,
+                    )
+                elif hasattr(self.transport, "fetch"):
+                    response = self.transport.fetch(  # type: ignore[attr-defined]
+                        validated_url,
+                        request_headers,
+                        self.config.timeout_seconds,
+                        max_bytes=limit,
+                    )
+                else:
+                    response = self.transport(
+                        validated_url,
+                        request_headers,
+                        self.config.timeout_seconds,
+                    )
+            except SecError as exc:
+                if not exc.retryable or attempt + 1 >= self.config.max_attempts:
                     raise
                 self.sleep(min(2.0**attempt, 8.0))
                 continue

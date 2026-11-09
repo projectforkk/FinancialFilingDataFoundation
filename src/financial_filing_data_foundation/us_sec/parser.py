@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import uuid
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
@@ -310,9 +312,14 @@ def _sections(root: _Node, page_by_locator: dict[str, int], member_sha: str) -> 
     return rows
 
 
-def _tables(root: _Node, page_by_locator: dict[str, int], member_sha: str) -> tuple[list[dict[str, Any]], dict[str, str]]:
+def _tables(
+    root: _Node,
+    page_by_locator: dict[str, int],
+    member_sha: str,
+) -> tuple[list[dict[str, Any]], dict[str, str], dict[str, dict[str, Any]]]:
     tables: list[dict[str, Any]] = []
     cell_by_locator: dict[str, str] = {}
+    cell_metadata: dict[str, dict[str, Any]] = {}
     for table_node in (node for node in _descendants(root) if node.tag == "table"):
         locator = _path(table_node)
         table_id = _sha256(f"{member_sha}|table|{locator}".encode())
@@ -349,6 +356,11 @@ def _tables(root: _Node, page_by_locator: dict[str, int], member_sha: str) -> tu
                 }
                 origin_cells.append(row_record)
                 cell_by_locator[cell_locator] = cell_id
+                cell_metadata[cell_id] = {
+                    "table_id": table_id,
+                    "row_index": row_index,
+                    "column_index": col,
+                }
                 for r_offset in range(row_span):
                     while len(grid) <= row_index + r_offset:
                         grid.append({})
@@ -377,7 +389,7 @@ def _tables(root: _Node, page_by_locator: dict[str, int], member_sha: str) -> tu
                 "quality_signals": [],
             }
         )
-    return tables, cell_by_locator
+    return tables, cell_by_locator, cell_metadata
 
 
 def _ancestors(node: _Node) -> Iterable[_Node]:
@@ -387,7 +399,10 @@ def _ancestors(node: _Node) -> Iterable[_Node]:
         current = current.parent
 
 
-def _contexts_and_units(root: _Node) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+def _contexts_and_units(
+    root: _Node,
+    package: SecFilingPackage | None = None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     contexts: dict[str, dict[str, Any]] = {}
     units: dict[str, dict[str, Any]] = {}
     for node in _descendants(root):
@@ -418,6 +433,60 @@ def _contexts_and_units(root: _Node) -> tuple[dict[str, dict[str, Any]], dict[st
                 continue
             measures = [_text(child) for child in _descendants(node) if _local(child.tag) == "measure"]
             units[unit_id] = {"id": unit_id, "measures": measures}
+    if package is not None:
+        for member in package.members:
+            if member.role not in {SecMemberRole.XBRL_INSTANCE, SecMemberRole.OTHER}:
+                continue
+            if not member.relative_name.casefold().endswith(".xml"):
+                continue
+            try:
+                xml_root = ET.fromstring(member.body)
+            except ET.ParseError:
+                continue
+            for element in xml_root.iter():
+                local = _local(str(element.tag))
+                if local == "context":
+                    context_id = element.attrib.get("id")
+                    if not context_id or context_id in contexts:
+                        continue
+                    period: dict[str, Any] = {}
+                    identifier: str | None = None
+                    dimensions: list[dict[str, Any]] = []
+                    for child in element.iter():
+                        child_local = _local(str(child.tag))
+                        text = "" if child.text is None else " ".join(child.text.split())
+                        if child_local in {"instant", "startdate", "enddate"}:
+                            period[child_local] = text
+                        elif child_local == "identifier":
+                            identifier = text
+                        elif child_local in {"explicitmember", "typedmember"}:
+                            dimensions.append(
+                                {
+                                    "dimension": child.attrib.get("dimension"),
+                                    "member": text,
+                                    "member_qname": text,
+                                }
+                            )
+                    contexts[context_id] = {
+                        "id": context_id,
+                        "entity_identifier": identifier,
+                        "period": period,
+                        "dimensions": dimensions,
+                        "source_member_sha256": member.member_sha256,
+                    }
+                elif local == "unit":
+                    unit_id = element.attrib.get("id")
+                    if not unit_id or unit_id in units:
+                        continue
+                    units[unit_id] = {
+                        "id": unit_id,
+                        "measures": [
+                            "" if child.text is None else " ".join(child.text.split())
+                            for child in element.iter()
+                            if _local(str(child.tag)) == "measure"
+                        ],
+                        "source_member_sha256": member.member_sha256,
+                    }
     return contexts, units
 
 
@@ -426,6 +495,7 @@ def _facts(
     package: SecFilingPackage,
     page_by_locator: dict[str, int],
     cell_by_locator: dict[str, str],
+    cell_metadata: dict[str, dict[str, Any]],
     contexts: dict[str, dict[str, Any]],
     units: dict[str, dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -455,14 +525,32 @@ def _facts(
         if unit_ref and resolved_unit is None:
             issues.append({"code": P11Reason.P11_XBRL_UNIT_UNRESOLVED.value, "severity": "REVIEW", "dom_locator": locator, "unit_ref": unit_ref})
         raw_attrs = dict(node.attrs)
+        context_period = dict((resolved_context or {}).get("period") or {})
+        table_metadata = cell_metadata.get(str(cell_id), {}) if cell_id else {}
+        raw_value = _text(node)
+        parsed_numeric_candidate: str | None = None
+        numeric_text = raw_value.strip().replace(",", "")
+        if re.fullmatch(r"\(?[+-]?\d+(?:\.\d+)?\)?", numeric_text):
+            parsed_numeric_candidate = (
+                "-" + numeric_text[1:-1]
+                if numeric_text.startswith("(") and numeric_text.endswith(")")
+                else numeric_text
+            )
+        fragment_hash = _sha256(f"{primary.member_sha256}|{locator}|{raw_value}".encode())
         fact = {
             "raw_fact_id": fact_id,
             "evidence_id": evidence_id,
             "raw_qname": raw_qname,
             "fact_kind": "NUMERIC" if _local(node.tag) == "nonfraction" else "NONNUMERIC",
-            "raw_value": _text(node),
+            "raw_value": raw_value,
+            "parsed_numeric_candidate": parsed_numeric_candidate,
             "context_ref": context_ref,
             "context": resolved_context,
+            "instant": context_period.get("instant"),
+            "start_date": context_period.get("startdate"),
+            "end_date": context_period.get("enddate"),
+            "entity": (resolved_context or {}).get("entity_identifier"),
+            "dimensions": list((resolved_context or {}).get("dimensions") or ()),
             "unit_ref": unit_ref,
             "unit": resolved_unit,
             "decimals": _attr(node, "decimals"),
@@ -476,6 +564,12 @@ def _facts(
             "dom_locator": locator,
             "virtual_page_no": page_no,
             "table_cell_id": cell_id,
+            "table_id": table_metadata.get("table_id"),
+            "row_index": table_metadata.get("row_index"),
+            "column_index": table_metadata.get("column_index"),
+            "package_sha256": package.package_sha256,
+            "member_sha256": primary.member_sha256,
+            "fragment_hash": fragment_hash,
             "source_member_sha256": primary.member_sha256,
             "raw_attributes": raw_attrs,
         }
@@ -484,11 +578,19 @@ def _facts(
                 "evidence_id": evidence_id,
                 "source_member_sha256": primary.member_sha256,
                 "source_member_relative_name": primary.relative_name,
+                "package_sha256": package.package_sha256,
+                "member_sha256": primary.member_sha256,
                 "dom_locator": locator,
                 "virtual_page_no": page_no,
-                "text": _text(node),
+                "block_id": fragment_hash,
+                "fragment_hash": fragment_hash,
+                "raw_text": raw_value,
+                "text": raw_value,
                 "raw_fact_id": fact_id,
                 "locator_kind": "DOM_PATH",
+                "table_id": table_metadata.get("table_id"),
+                "row_index": table_metadata.get("row_index"),
+                "column_index": table_metadata.get("column_index"),
             }
         )
         facts.append(fact)
@@ -524,6 +626,17 @@ def _write_artifacts(
     _write_jsonl(directory / "raw_facts.jsonl", facts)
     _write_jsonl(directory / "evidence.jsonl", evidence)
     _write_jsonl(directory / "issues.jsonl", issues)
+    file_names = {
+        "pages_file": "pages.jsonl",
+        "sections_file": "sections.jsonl",
+        "tables_file": "tables.jsonl",
+        "facts_file": "raw_facts.jsonl",
+        "evidence_file": "evidence.jsonl",
+        "issues_file": "issues.jsonl",
+    }
+    artifact_hashes = {
+        key: _sha256((directory / name).read_bytes()) for key, name in file_names.items()
+    }
     manifest = {
         "schema_version": SEC_ARTIFACT_SCHEMA,
         "parser_version": VIRTUAL_HTML_NORMALIZER_VERSION,
@@ -531,12 +644,8 @@ def _write_artifacts(
         "document_sha256": package.package_sha256,
         "pagination_kind": "VIRTUAL_HTML",
         "normalizer_version": VIRTUAL_HTML_NORMALIZER_VERSION,
-        "pages_file": "pages.jsonl",
-        "sections_file": "sections.jsonl",
-        "tables_file": "tables.jsonl",
-        "facts_file": "raw_facts.jsonl",
-        "evidence_file": "evidence.jsonl",
-        "issues_file": "issues.jsonl",
+        **file_names,
+        "artifact_hashes": artifact_hashes,
         "page_count": len(pages),
         "section_count": len(sections),
         "table_count": len(tables),
@@ -556,6 +665,21 @@ def load_sec_artifacts(artifact_dir: str | Path) -> SecParseResult:
     if manifest.get("schema_version") != SEC_ARTIFACT_SCHEMA or manifest.get("parser_version") != VIRTUAL_HTML_NORMALIZER_VERSION:
         raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC parse artifact schema/version mismatch")
     package_sha = str(manifest.get("package_sha256", ""))
+    file_names = {
+        "pages_file": "pages.jsonl",
+        "sections_file": "sections.jsonl",
+        "tables_file": "tables.jsonl",
+        "facts_file": "raw_facts.jsonl",
+        "evidence_file": "evidence.jsonl",
+        "issues_file": "issues.jsonl",
+    }
+    hashes = manifest.get("artifact_hashes")
+    if not isinstance(hashes, dict):
+        raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC artifact hashes are missing")
+    for key, name in file_names.items():
+        path = directory / name
+        if not path.is_file() or str(hashes.get(key, "")) != _sha256(path.read_bytes()):
+            raise SecError(P11Reason.P11_PACKAGE_INVALID, f"SEC artifact hash mismatch: {name}")
     rows = {
         "pages": tuple(_read_jsonl(directory / "pages.jsonl")),
         "sections": tuple(_read_jsonl(directory / "sections.jsonl")),
@@ -592,9 +716,9 @@ def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> S
     blocks = _blocks(root_node, primary.member_sha256)
     pages, page_by_locator = _pages(blocks)
     sections = _sections(root_node, page_by_locator, primary.member_sha256)
-    tables, cell_by_locator = _tables(root_node, page_by_locator, primary.member_sha256)
-    contexts, units = _contexts_and_units(root_node)
-    facts, evidence, issues = _facts(root_node, package, page_by_locator, cell_by_locator, contexts, units)
+    tables, cell_by_locator, cell_metadata = _tables(root_node, page_by_locator, primary.member_sha256)
+    contexts, units = _contexts_and_units(root_node, package)
+    facts, evidence, issues = _facts(root_node, package, page_by_locator, cell_by_locator, cell_metadata, contexts, units)
     _attach_facts_to_tables(tables, facts)
     root.mkdir(parents=True, exist_ok=True)
     temp_dir = root / f".{package.package_sha256}.{uuid.uuid4().hex}.tmp"

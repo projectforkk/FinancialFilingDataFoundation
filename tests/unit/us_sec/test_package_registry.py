@@ -84,6 +84,27 @@ def test_package_hash_is_canonical_and_store_is_immutable(tmp_path: Path) -> Non
         store.load(package.package_sha256)
     assert "hash" in str(exc_info.value).lower() or "immutable" in str(exc_info.value).lower()
 
+    drifted = build_package(
+        cik="0000320193",
+        accession="0000320193-25-000001",
+        form="10-Q",
+        fiscal_year=2025,
+        period="Q2",
+        members=(
+            SecPackageMember(
+                relative_name="example.htm",
+                role=SecMemberRole.PRIMARY_DOCUMENT,
+                content_type="text/html",
+                source_url="https://www.sec.gov/Archives/edgar/data/1/example.htm",
+                body=b"<html><body>changed</body></html>",
+            ),
+        ),
+    )
+    with pytest.raises(Exception) as drift:
+        SecPackageStore(tmp_path / "raw-store-drift").put(package)
+        SecPackageStore(tmp_path / "raw-store-drift").put(drifted)
+    assert "drift" in str(drift.value).lower()
+
 
 def test_registry_adds_sec_tables_without_rewriting_legacy_rows(tmp_path: Path) -> None:
     db = tmp_path / "registry.sqlite"

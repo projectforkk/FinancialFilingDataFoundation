@@ -158,3 +158,22 @@ def test_ticker_mapping_and_submission_discovery_are_fail_closed() -> None:
     assert len(candidates) == 2
     assert {item.amended for item in candidates} == {False, True}
 
+
+def test_fpi_20f_and_40f_are_annual_candidates_only() -> None:
+    payload = {
+        "cik": "0000000001",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0000000001-25-000001", "0000000001-25-000002"],
+                "filingDate": ["2025-03-01", "2025-03-02"],
+                "reportDate": ["2024-12-31", "2024-12-31"],
+                "form": ["20-F", "40-F"],
+                "primaryDocument": ["annual20.htm", "annual40.htm"],
+            }
+        },
+    }
+    company = sec_company(cik="1", ticker="FPI", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+    annual = discover_filings(submissions, fiscal_year=2024, period="FY")
+    assert {candidate.form for candidate in annual} == {"20-F", "40-F"}
+
