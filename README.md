@@ -1,19 +1,25 @@
 # Financial Filing Data Foundation
 
-Financial Filing Data Foundation (FFDF) is a local, deterministic financial-filing data foundation for **CN and HK markets only**.
+Financial Filing Data Foundation (FFDF) is a local, deterministic financial-filing data foundation.
+
+Accepted production currently supports **CN and HK**. **P11 US SEC Provider has been reopened for a new design/development lifecycle and is not yet production-available.**
 
 ## Final project status
 
-**PROJECT CLOSED / CN-HK SCOPE COMPLETE / US SEC OUT OF SCOPE**
+**P0-P10 ACCEPTED / CN-HK PRODUCTION / P11 US SEC REOPENED — DESIGN READY**
 
-The accepted production baseline is P0-P10. P11 US SEC Provider was authorized for design exploration only and is now superseded by the final CN/HK scope decision. No SEC provider production is part of this project closeout.
+The accepted production baseline remains P0-P10 plus the accepted CN/HK user CLI. The 2026-11-05 CN/HK closeout remains historical evidence, but the user reopened P11 on 2026-11-09. Current P11 design uses official SEC submissions/Archives and an HTML/Inline-XBRL-first filing-package model. Production US support remains unavailable until independent P11 acceptance.
 
 ## Supported markets
 
+Accepted production:
 - CN — mainland China official filings, acquired through the accepted CNINFO/Dayu path.
 - HK — Hong Kong official filings, acquired through the accepted HKEX/Dayu path.
 
-The production identity contract exposes `SUPPORTED_MARKETS = ("CN", "HK")`. Other markets are rejected by the accepted identity/planner/acquisition boundary.
+Active development target:
+- US — SEC/EDGAR filing packages (P11), **not yet accepted production**.
+
+Until P11 acceptance, the production identity contract continues to expose `SUPPORTED_MARKETS = ("CN", "HK")`.
 
 ## What FFDF provides
 
@@ -29,14 +35,16 @@ The production identity contract exposes `SUPPORTED_MARKETS = ("CN", "HK")`. Oth
 
 ## Explicit non-goals
 
-- US SEC HTML / Inline XBRL / XBRL provider;
+- EDGAR filing submission / filer-management APIs;
+- treating every SEC filing as a PDF;
+- automatic standardized quarterly mapping for every foreign private issuer 6-K without deterministic evidence;
 - UK filing provider;
 - remote AI calls from MCP or production parsing code;
 - mutation of original source documents;
 - silent guessing of filing identity, periods, facts or evidence;
 - production Semantic Resolver or Research MCP beyond the accepted P8/P9/P10 boundary.
 
-The P10 capability manifest intentionally continues to report `P11_SEC_PROVIDER = UNAVAILABLE` for accepted-contract compatibility.
+The P10 capability manifest correctly continues to report `P11_SEC_PROVIDER = UNAVAILABLE` until P11 passes independent acceptance and main integration.
 
 ## Project root
 
