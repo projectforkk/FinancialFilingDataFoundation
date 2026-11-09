@@ -91,7 +91,7 @@
 
 ## P11 — US SEC Provider
 
-状态：`REOPENED / DESIGN READY / DEVELOPMENT NEXT`
+状态：`REOPENED / DESIGN READY / ONE-PASS DEVELOPMENT NEXT`
 
 当前真源：
 
@@ -137,3 +137,20 @@ CN/HK accepted baseline
 ↓
 P11 US SEC redesign/development/review/acceptance
 ```
+
+
+### P11 简化执行流程
+
+P11 不再拆成大量独立开发子阶段。默认执行链：
+
+```text
+设计冻结
+→ PC Agent 一次开发完成并提交 Git candidate
+→ ChatGPT Review exact candidate
+→ ChatGPT 制定正式测试计划
+→ PC Agent 一次执行测试并提交 Git 测试证据
+→ ChatGPT 独立验证
+→ PASS 后合并 / closeout
+```
+
+只有发现真实 defect 时才进入一次 repair loop；不得为了流程形式人为拆分多个开发阶段。
