@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**PROJECT CLOSED / CN-HK SCOPE COMPLETE / P0-P10 DONE / PASS**
+状态：**P11 REOPENED / DESIGN READY / P0-P10 DONE PASS**
 
 ## 总原则
 
@@ -14,14 +14,14 @@
 
 不得 code-first / design-later。
 
-## Final scope
+## Current scope
 
-本项目最终生产范围严格限定为：
+当前 accepted production 仍为：
 
 - `CN`
 - `HK`
 
-US SEC Provider 不再属于 FFDF 当前项目目标。历史 P11 设计授权与设计分支保留为审计记录，但 P11 production 不执行。
+2026-11-09 用户重新授权 P11 US SEC Provider。P11 进入全新的 design/development/review/acceptance lifecycle；2026-11-05 的 CN/HK closeout 保留为历史记录，不删除、不改写。
 
 ## P0 — Native PDF Parsing Feasibility Probe
 
@@ -91,15 +91,22 @@ US SEC Provider 不再属于 FFDF 当前项目目标。历史 P11 设计授权�
 
 ## P11 — US SEC Provider
 
-状态：`OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`
+状态：`REOPENED / DESIGN READY / DEVELOPMENT NEXT`
 
-说明：
+当前真源：
 
-- `development/143-p11-design-authorization.md` 是历史设计授权；
-- P11 production 从未进入 accepted main baseline；
-- 最终 CN/HK scope decision supersedes 后续 P11 开发；
-- 已存在的 P11 design/task branches 仅作为历史审计资料保留；
-- 如未来需要 US 市场，应作为新的 scope reopening / 新项目阶段重新设计、review 与 acceptance，不能直接继承未验收 P11 candidate。
+- `design/32-p11-us-scope-reopening.md`
+- `design/26-p11-sec-provider-design.md`
+- `design/27-p11-implementation-plan.md`
+- `development/147-p11-us-scope-reopening-authorization.md`
+
+原则：
+
+- 从当前 accepted main 重新开发；
+- 历史 P11 branch/probe 仅可作为参考证据，不能直接继承为 production candidate；
+- 采用 SEC filing package + HTML/Inline XBRL first；
+- P0-P10 CN/HK accepted behavior 必须保持回归兼容；
+- US 只有在 independent acceptance PASS 后才进入 public supported markets。
 
 ## 最终执行顺序
 
@@ -126,5 +133,7 @@ P9
 ↓
 P10
 ↓
-PROJECT CLOSEOUT — CN/HK
+CN/HK accepted baseline
+↓
+P11 US SEC redesign/development/review/acceptance
 ```
