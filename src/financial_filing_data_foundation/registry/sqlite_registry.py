@@ -29,7 +29,7 @@ from financial_filing_data_foundation.registry.models import (
 # additive SEC extension has its own versioned table contract so opening an old
 # registry never rewrites the legacy rows or changes their semantics.
 REGISTRY_SCHEMA_VERSION = 1
-SEC_REGISTRY_SCHEMA_VERSION = 2
+SEC_REGISTRY_SCHEMA_VERSION = 3
 
 _REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
     "documents": frozenset(
@@ -100,6 +100,7 @@ class RegistrySchemaUnsupported(RuntimeError):
 
 
 _SEC_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    "sec_schema_metadata": frozenset({"key", "value"}),
     "source_packages": frozenset(
         {
             "package_sha256",
@@ -158,6 +159,11 @@ _SEC_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
         }
     ),
 }
+
+_SEC_CORE_TABLES = frozenset(
+    {"source_packages", "package_members", "sec_filing_bindings", "sec_parsed_data"}
+)
+_SEC_SCHEMA_VERSION_KEY = "schema_version"
 
 
 def _utc_now() -> str:
@@ -219,6 +225,7 @@ class SQLiteRegistry:
                     )
                 self._create_schema(conn)
                 self._create_sec_schema(conn)
+                self._write_sec_schema_version(conn, SEC_REGISTRY_SCHEMA_VERSION)
                 conn.execute(f"PRAGMA user_version = {REGISTRY_SCHEMA_VERSION}")
                 conn.commit()
             elif version != REGISTRY_SCHEMA_VERSION:
@@ -227,7 +234,7 @@ class SQLiteRegistry:
                 )
 
             self._validate_schema_v1(conn)
-            self._create_sec_schema(conn)
+            self._ensure_sec_schema(conn)
             self._validate_sec_schema(conn)
 
     @staticmethod
@@ -288,6 +295,117 @@ class SQLiteRegistry:
             raise RegistrySchemaUnsupported(
                 "SEC registry extension is incomplete; missing columns: "
                 + ", ".join(missing_columns)
+            )
+
+    @staticmethod
+    def _sec_table_names(conn: sqlite3.Connection) -> set[str]:
+        rows = conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            """
+        ).fetchall()
+        return {str(row["name"]) for row in rows}
+
+    @staticmethod
+    def _read_sec_schema_version(conn: sqlite3.Connection) -> int | None:
+        row = conn.execute(
+            "SELECT value FROM sec_schema_metadata WHERE key = ?",
+            (_SEC_SCHEMA_VERSION_KEY,),
+        ).fetchone()
+        if row is None:
+            return None
+        raw = str(row["value"])
+        try:
+            version = int(raw)
+        except ValueError as exc:
+            raise RegistrySchemaUnsupported(
+                f"SEC registry schema version is invalid: {raw!r}"
+            ) from exc
+        if version <= 0:
+            raise RegistrySchemaUnsupported(
+                f"SEC registry schema version is invalid: {version}"
+            )
+        if version > SEC_REGISTRY_SCHEMA_VERSION:
+            raise RegistrySchemaUnsupported(
+                f"SEC registry schema version {version} is newer than supported "
+                f"{SEC_REGISTRY_SCHEMA_VERSION}"
+            )
+        return version
+
+    @staticmethod
+    def _write_sec_schema_version(conn: sqlite3.Connection, version: int) -> None:
+        conn.execute(
+            """
+            INSERT INTO sec_schema_metadata(key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (_SEC_SCHEMA_VERSION_KEY, str(int(version))),
+        )
+
+    @classmethod
+    def _migrate_sec_v2_to_v3(cls, conn: sqlite3.Connection) -> None:
+        if not conn.in_transaction:
+            conn.execute("BEGIN")
+        try:
+            columns = {
+                str(row["name"])
+                for row in conn.execute("PRAGMA table_info('sec_parsed_data')").fetchall()
+            }
+            if "compatibility_status" not in columns:
+                conn.execute(
+                    "ALTER TABLE sec_parsed_data ADD COLUMN compatibility_status TEXT NOT NULL DEFAULT 'INCOMPATIBLE'"
+                )
+            # A v2 row has no independently persisted compatibility proof.  It
+            # must remain fail-closed even when an older runtime had already
+            # populated the additive column.
+            conn.execute(
+                "UPDATE sec_parsed_data SET compatibility_status = 'INCOMPATIBLE'"
+            )
+            cls._write_sec_schema_version(conn, SEC_REGISTRY_SCHEMA_VERSION)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    @classmethod
+    def _ensure_sec_schema(cls, conn: sqlite3.Connection) -> None:
+        tables_before = cls._sec_table_names(conn)
+        core_before = tables_before & _SEC_CORE_TABLES
+        if core_before and core_before != _SEC_CORE_TABLES:
+            missing = sorted(_SEC_CORE_TABLES - core_before)
+            raise RegistrySchemaUnsupported(
+                "SEC registry extension is incomplete; missing tables: "
+                + ", ".join(missing)
+            )
+        if "sec_schema_metadata" in tables_before and not core_before:
+            raise RegistrySchemaUnsupported(
+                "SEC registry extension is incomplete; SEC core tables are missing"
+            )
+
+        cls._create_sec_schema(conn)
+        stored_version = cls._read_sec_schema_version(conn)
+        if not core_before:
+            if stored_version is not None:
+                raise RegistrySchemaUnsupported(
+                    "SEC registry metadata exists without a legacy SEC schema"
+                )
+            cls._write_sec_schema_version(conn, SEC_REGISTRY_SCHEMA_VERSION)
+            conn.commit()
+            return
+        if stored_version is None:
+            # Existing SEC v2 databases did not persist their extension
+            # version.  The old shape is inferred from the SEC core tables and
+            # migrated without touching package/binding identity fields.
+            cls._migrate_sec_v2_to_v3(conn)
+            return
+        if stored_version == 2:
+            cls._migrate_sec_v2_to_v3(conn)
+            return
+        if stored_version != SEC_REGISTRY_SCHEMA_VERSION:
+            raise RegistrySchemaUnsupported(
+                f"unsupported SEC registry schema version: {stored_version}"
             )
 
     @staticmethod
@@ -454,6 +572,11 @@ class SQLiteRegistry:
 
             CREATE INDEX IF NOT EXISTS idx_sec_parsed_slot
             ON sec_parsed_data(company_id, fiscal_year, raw_fiscal_period);
+
+            CREATE TABLE IF NOT EXISTS sec_schema_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """
         )
         sec_parsed_columns = {
@@ -467,7 +590,6 @@ class SQLiteRegistry:
             conn.execute(
                 "ALTER TABLE sec_parsed_data ADD COLUMN compatibility_status TEXT NOT NULL DEFAULT 'INCOMPATIBLE'"
             )
-            conn.commit()
 
     def schema_version(self) -> int:
         with self._connect() as conn:
@@ -478,7 +600,12 @@ class SQLiteRegistry:
 
         with self._connect() as conn:
             self._validate_sec_schema(conn)
-        return SEC_REGISTRY_SCHEMA_VERSION
+            version = self._read_sec_schema_version(conn)
+        if version != SEC_REGISTRY_SCHEMA_VERSION:
+            raise RegistrySchemaUnsupported(
+                f"unsupported SEC registry schema version: {version}"
+            )
+        return version
 
     def register_sec_package(self, package: object) -> None:
         manifest = package.manifest()
@@ -619,10 +746,10 @@ class SQLiteRegistry:
         compatibility_status: str | None = None,
     ) -> None:
         with self._connect() as conn:
-            normalized_compatibility = compatibility_status or (
-                "COMPATIBLE"
-                if str(validation_status).upper() == "PASS" and int(blocking_issue_count) == 0
-                else "INCOMPATIBLE"
+            normalized_compatibility = (
+                "INCOMPATIBLE"
+                if compatibility_status is None
+                else str(compatibility_status).upper()
             )
             conn.execute(
                 """

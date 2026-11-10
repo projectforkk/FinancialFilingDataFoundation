@@ -14,9 +14,9 @@ from financial_filing_data_foundation.registry import SQLiteRegistry
 
 from .identity import sec_company
 from .package import SecFilingPackage, SecPackageStore
-from .parser import SecParseResult, parse_sec_package
+from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, load_sec_artifacts, parse_sec_package
 from .registry import register_sec_package, register_sec_parsed_run, register_sec_slot
-from .validation import SecValidationResult, validate_sec_artifacts
+from .validation import SecValidationResult, load_sec_validation, validate_sec_artifacts
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,7 +150,7 @@ def ingest_sec_package(
         fiscal_year=package.fiscal_year,
         period=period,
         parser_version=parsed.parser_version,
-        schema_version="p11-sec-artifacts-v1",
+        schema_version=SEC_ARTIFACT_SCHEMA,
         validation_status=validation.validation_status,
         compatibility_status=validation.compatibility_status,
         blocking_issue_count=validation.blocking_issue_count,
@@ -162,4 +162,62 @@ def ingest_sec_package(
     return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
 
 
-__all__ = ["SecIngestResult", "ingest_sec_package"]
+def reuse_sec_package(
+    package: SecFilingPackage,
+    *,
+    root: str | Path,
+    ticker: str,
+    period: str,
+    parsed_artifact_dir: str | Path,
+    amendment_conflict: bool = False,
+    company_id: str | None = None,
+    ticker_source_url: str | None = None,
+    ticker_source_sha256: str | None = None,
+    ticker_retrieved_at: str | None = None,
+) -> SecIngestResult:
+    """Reuse a verified current SEC artifact without parsing or downloading."""
+
+    project_root = Path(root).expanduser().resolve()
+    parsed = load_sec_artifacts(parsed_artifact_dir)
+    validation = load_sec_validation(
+        project_root / "workspace" / "ingest" / "us" / "p7" / package.package_sha256
+    )
+    if parsed.package_sha256 != package.package_sha256 or validation.package_sha256 != package.package_sha256:
+        raise ValueError("SEC reuse artifact identity differs from source package")
+    registry_path = project_root / "workspace" / "ingest" / "registry.sqlite"
+    registry = SQLiteRegistry(registry_path)
+    register_sec_package(registry, package)
+    binding_status = "REVIEW_REQUIRED" if amendment_conflict else "SOURCE_CONFIRMED"
+    register_sec_slot(
+        registry,
+        package,
+        fiscal_year=package.fiscal_year,
+        period=period,
+        artifact_path=str(parsed.artifact_dir),
+        binding_status=binding_status,
+    )
+    ready = (
+        validation.validation_status == "PASS"
+        and validation.compatibility_status == "COMPATIBLE"
+        and validation.blocking_issue_count == 0
+        and not amendment_conflict
+    )
+    catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
+    catalog_status = _upsert_catalog(
+        root=project_root,
+        package=package,
+        ticker=ticker,
+        parsed=parsed,
+        validation=validation,
+        catalog_path=catalog_path,
+        period=period,
+        publish=ready,
+        company_id=company_id,
+        ticker_source_url=ticker_source_url,
+        ticker_source_sha256=ticker_source_sha256,
+        ticker_retrieved_at=ticker_retrieved_at,
+    )
+    return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
+
+
+__all__ = ["SecIngestResult", "ingest_sec_package", "reuse_sec_package"]

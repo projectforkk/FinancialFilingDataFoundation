@@ -336,9 +336,17 @@ class SecPackageStore:
     def find_by_slot(self, *, cik: str, fiscal_year: int, period: str) -> SecFilingPackage | None:
         """Return a unique local package for a SEC slot without network access."""
 
+        matches = self.find_all_by_slot(cik=cik, fiscal_year=fiscal_year, period=period)
+        if len(matches) != 1:
+            return None
+        return matches[0]
+
+    def find_all_by_slot(self, *, cik: str, fiscal_year: int, period: str) -> tuple[SecFilingPackage, ...]:
+        """Return all valid local packages matching a SEC slot, deterministically."""
+
         manifests_root = self.root / "packages" / "sha256"
         if not manifests_root.is_dir():
-            return None
+            return ()
         matches: list[SecFilingPackage] = []
         normalized_cik = str(cik).zfill(10)
         normalized_period = str(period).strip().upper()
@@ -355,9 +363,7 @@ class SecPackageStore:
             except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError, SecError):
                 continue
         unique = {package.package_sha256: package for package in matches}
-        if len(unique) != 1:
-            return None
-        return next(iter(unique.values()))
+        return tuple(unique[key] for key in sorted(unique))
 
 
 __all__ = [

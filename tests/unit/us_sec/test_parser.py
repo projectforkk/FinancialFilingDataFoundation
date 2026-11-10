@@ -182,18 +182,72 @@ def test_visible_inline_fact_still_requires_a_block_anchor(tmp_path: Path) -> No
 
 def test_parser_does_not_reuse_artifact_from_previous_normalizer_version(tmp_path: Path) -> None:
     package = _hidden_fact_package()
-    legacy_dir = tmp_path / "p11" / package.package_sha256
+    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V3"
     legacy_dir.mkdir(parents=True)
-    (legacy_dir / "manifest.json").write_text(
-        '{"schema_version":"p11-sec-artifacts-v1","parser_version":"VIRTUAL_HTML_V2"}\n',
+    legacy_manifest = legacy_dir / "manifest.json"
+    legacy_manifest.write_text(
+        '{"schema_version":"p11-sec-artifacts-v1","parser_version":"VIRTUAL_HTML_V3"}\n',
         encoding="utf-8",
     )
+    before = legacy_manifest.read_bytes()
 
     result = parse_sec_package(package, tmp_path / "p11")
 
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V3"
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V4"
     assert result.artifact_dir != legacy_dir
     assert result.artifact_dir.is_dir()
+    assert legacy_manifest.read_bytes() == before
+
+
+def test_v3_parsed_artifact_is_invalidated_by_v4_normalizer(tmp_path: Path) -> None:
+    package = _hidden_fact_package()
+    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V3"
+    legacy_dir.mkdir(parents=True)
+    legacy_manifest = legacy_dir / "manifest.json"
+    legacy_manifest.write_text(
+        '{"schema_version":"p11-sec-artifacts-v1","parser_version":"VIRTUAL_HTML_V3","package_sha256":"legacy"}\n',
+        encoding="utf-8",
+    )
+    before = legacy_manifest.read_bytes()
+
+    result = parse_sec_package(package, tmp_path / "p11")
+
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V4"
+    assert result.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V4"
+    assert result.artifact_dir.is_dir()
+    assert legacy_manifest.read_bytes() == before
+
+
+def test_html5_header_is_visible_but_ix_header_remains_hidden(tmp_path: Path) -> None:
+    html = b"""
+    <html><body>
+      <header><p>Ordinary filing narrative in an HTML5 header.</p></header>
+      <ix:header><p>Inline XBRL metadata is not ordinary narrative.</p></ix:header>
+      <h1>Visible statement</h1>
+    </body></html>
+    """
+    package = build_package(
+        cik="0000320193",
+        accession="0000320193-25-000005",
+        form="10-Q",
+        fiscal_year=2025,
+        period="Q2",
+        members=(
+            SecPackageMember(
+                relative_name="header.htm",
+                role=SecMemberRole.PRIMARY_DOCUMENT,
+                content_type="text/html",
+                source_url="https://www.sec.gov/Archives/edgar/data/320193/header.htm",
+                body=html,
+            ),
+        ),
+    )
+
+    result = parse_sec_package(package, tmp_path / "p11")
+    texts = [block["text"] for page in result.pages for block in page["blocks"]]
+
+    assert any("Ordinary filing narrative" in text for text in texts)
+    assert not any("Inline XBRL metadata" in text for text in texts)
 
 
 def test_virtual_page_normalization_is_repeatable(tmp_path: Path) -> None:

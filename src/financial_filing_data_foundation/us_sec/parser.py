@@ -19,7 +19,7 @@ from .package import SecFilingPackage, SecMemberRole
 
 
 SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v1"
-VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V3"
+VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V4"
 _MAX_BLOCKS_PER_PAGE = 48
 _MAX_CHARS_PER_PAGE = 6000
 
@@ -187,7 +187,7 @@ def _text_cached(node: _Node, cache: dict[int, str]) -> str:
 def _is_hidden(node: _Node) -> bool:
     current: _Node | None = node
     while current is not None:
-        if _local(current.tag) in {"script", "style", "header", "hidden"} or current.tag in {"ix:header", "ix:hidden"}:
+        if _local(current.tag) in {"script", "style", "hidden"} or current.tag in {"ix:header", "ix:hidden"}:
             return True
         aria_hidden = _attr(current, "aria-hidden")
         if _attr(current, "hidden") is not None or (aria_hidden is not None and aria_hidden.casefold() == "true"):
@@ -214,7 +214,7 @@ def _is_hidden_cached(node: _Node, cache: dict[int, bool]) -> bool:
             result = current_cached
             break
         chain.append(current)
-        if _local(current.tag) in {"script", "style", "header", "hidden"} or current.tag in {"ix:header", "ix:hidden"}:
+        if _local(current.tag) in {"script", "style", "hidden"} or current.tag in {"ix:header", "ix:hidden"}:
             result = True
             break
         aria_hidden = _attr(current, "aria-hidden")

@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .errors import P11Reason, SecError
-from .parser import SecParseResult, verify_sec_evidence
+from .compatibility import sec_artifact_compatibility
+from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, verify_sec_evidence
 
 
 SEC_VALIDATION_SCHEMA = "p11-sec-validation-v1"
@@ -253,8 +254,19 @@ def validate_sec_artifacts(
         artifact_dir=directory,
         package_sha256=parsed.package_sha256,
         validation_status=status,
-        compatibility_status="COMPATIBLE" if status == "PASS" and blocking == 0 else "INCOMPATIBLE",
-        reuse_eligible=status == "PASS" and blocking == 0,
+        compatibility_status=sec_artifact_compatibility(
+            parser_version=parsed.parser_version,
+            schema_version=SEC_ARTIFACT_SCHEMA,
+        ),
+        reuse_eligible=(
+            status == "PASS"
+            and sec_artifact_compatibility(
+                parser_version=parsed.parser_version,
+                schema_version=SEC_ARTIFACT_SCHEMA,
+            )
+            == "COMPATIBLE"
+            and blocking == 0
+        ),
         blocking_issue_count=blocking,
         failure_issue_count=failures,
         review_issue_count=review,

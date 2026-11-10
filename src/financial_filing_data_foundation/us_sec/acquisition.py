@@ -115,7 +115,7 @@ class SecAcquirer:
                 package=local,
                 candidate=candidate_from_package(local, company),
                 reused=True,
-                plan_action="REUSE_DATA" if local.period.upper() == str(period).upper() else "PARSE_LOCAL",
+                plan_action="PARSE_LOCAL",
             )
         submissions_url = f"https://data.sec.gov/submissions/CIK{company.cik}.json"
         response = self.client.fetch(

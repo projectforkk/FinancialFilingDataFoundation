@@ -41,12 +41,18 @@ from financial_filing_data_foundation.us_sec.errors import SecError
 from financial_filing_data_foundation.us_sec.feature_gate import require_us_development
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig
 from financial_filing_data_foundation.us_sec.identity import normalize_cik, sec_company
-from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
+from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package, reuse_sec_package
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
+from financial_filing_data_foundation.us_sec.parser import (
+    SEC_ARTIFACT_SCHEMA,
+    VIRTUAL_HTML_NORMALIZER_VERSION,
+    load_sec_artifacts,
+)
 from financial_filing_data_foundation.us_sec.planner import SecPlan, SecPlanAction, plan_sec_slot
 from financial_filing_data_foundation.us_sec.registry import register_sec_package, register_sec_slot
 from financial_filing_data_foundation.us_sec.runtime import SecRuntimeDescriptor, SecSubprocessTransport
 from financial_filing_data_foundation.us_sec.ticker_map import parse_ticker_map, snapshot_ticker_map
+from financial_filing_data_foundation.us_sec.validation import load_sec_validation
 
 
 _PERIODS = ("Q1", "Q2", "H1", "Q3", "FY")
@@ -491,29 +497,84 @@ def _us_plan_slot(
             continue
         packages[package.package_sha256] = package
     if not packages:
-        local = store.find_by_slot(cik=company.cik, fiscal_year=args.year, period=args.period)
-        if local is not None:
+        local_packages = store.find_all_by_slot(cik=company.cik, fiscal_year=args.year, period=args.period)
+        if len(local_packages) > 1:
+            return SecPlan(SecPlanAction.REVIEW_REQUIRED, "P11_LOCAL_PACKAGE_CONFLICT"), None
+        if len(local_packages) == 1:
+            local = local_packages[0]
             packages[local.package_sha256] = local
+    if amendment_conflict:
+        return SecPlan(SecPlanAction.REVIEW_REQUIRED, "P11_AMENDED_VARIANT_PRESENT"), None
+    if len(packages) > 1:
+        return SecPlan(SecPlanAction.REVIEW_REQUIRED, "P11_LOCAL_PACKAGE_CONFLICT"), None
     parsed_rows = registry.list_sec_parsed_data(
         company_id=company.company_id,
         fiscal_year=args.year,
         period=args.period,
     )
-    parsed_available = bool(packages) and any(
-        str(row["validation_status"]).upper() == "PASS"
-        and str(row["compatibility_status"]).upper() == "COMPATIBLE"
-        and int(row["blocking_issue_count"] or 0) == 0
-        and str(row["artifact_path"] or "").strip()
-        and (paths.root / str(row["artifact_path"])).resolve().is_dir()
-        for row in parsed_rows
+    package_values = list(packages.values())
+    package = package_values[0] if len(package_values) == 1 else None
+    parsed_available = (
+        package is not None
+        and _current_reusable_sec_artifacts(
+            package=package,
+            parsed_rows=parsed_rows,
+            paths=paths,
+        )
+        is not None
     )
     plan = plan_sec_slot(
         parsed_available=parsed_available,
         package_available=bool(packages),
         amendment_conflict=amendment_conflict,
     )
-    package = next(iter(packages.values()), None)
     return plan, package
+
+
+def _registry_path(root: Path, value: str) -> Path:
+    candidate = Path(value).expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (root / candidate).resolve()
+
+
+def _current_reusable_sec_artifacts(
+    *,
+    package: Any,
+    parsed_rows: tuple[Any, ...],
+    paths: RuntimePaths,
+) -> tuple[Any, Any] | None:
+    for row in parsed_rows:
+        if str(row["package_sha256"]).lower() != str(package.package_sha256).lower():
+            continue
+        if str(row["parser_version"]) != VIRTUAL_HTML_NORMALIZER_VERSION:
+            continue
+        if str(row["schema_version"]) != SEC_ARTIFACT_SCHEMA:
+            continue
+        if str(row["validation_status"]).upper() != "PASS":
+            continue
+        if str(row["compatibility_status"]).upper() != "COMPATIBLE":
+            continue
+        if int(row["blocking_issue_count"] or 0) != 0:
+            continue
+        raw_artifact_path = str(row["artifact_path"] or "").strip()
+        if not raw_artifact_path:
+            continue
+        try:
+            parsed = load_sec_artifacts(_registry_path(paths.root, raw_artifact_path))
+            validation = load_sec_validation(
+                paths.ingest_root / "us" / "p7" / str(package.package_sha256)
+            )
+        except Exception:
+            continue
+        if parsed.package_sha256.lower() != package.package_sha256.lower():
+            continue
+        if validation.package_sha256.lower() != package.package_sha256.lower():
+            continue
+        if not validation.reuse_eligible:
+            continue
+        return parsed, validation
+    return None
 
 
 def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths]:
@@ -595,16 +656,42 @@ def _us_ingest(args: argparse.Namespace) -> int:
         "status": "REUSED_LOCAL" if result.reused else "DOWNLOADED",
         "planner_action": result.plan_action,
     }
-    ingested = ingest_sec_package(
-        result.package,
-        root=paths.root,
-        ticker=result.candidate.ticker,
-        period=args.period,
-        company_id=result.candidate.cik and f"US:CIK{result.candidate.cik}",
-        ticker_source_url=getattr(company, "ticker_source_url", None),
-        ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
-        ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
-    )
+    if result.plan_action == SecPlanAction.REUSE_DATA.value:
+        registry = SQLiteRegistry(paths.registry)
+        parsed_rows = registry.list_sec_parsed_data(
+            company_id=company.company_id,
+            fiscal_year=args.year,
+            period=args.period,
+        )
+        reusable = _current_reusable_sec_artifacts(
+            package=result.package,
+            parsed_rows=parsed_rows,
+            paths=paths,
+        )
+        if reusable is None:
+            raise SecError("P11_REUSE_ARTIFACT_INVALID", "SEC planner selected REUSE_DATA but the current artifact could not be loaded")
+        ingested = reuse_sec_package(
+            result.package,
+            root=paths.root,
+            ticker=result.candidate.ticker,
+            period=args.period,
+            parsed_artifact_dir=reusable[0].artifact_dir,
+            company_id=company.company_id,
+            ticker_source_url=getattr(company, "ticker_source_url", None),
+            ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
+            ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
+        )
+    else:
+        ingested = ingest_sec_package(
+            result.package,
+            root=paths.root,
+            ticker=result.candidate.ticker,
+            period=args.period,
+            company_id=result.candidate.cik and f"US:CIK{result.candidate.cik}",
+            ticker_source_url=getattr(company, "ticker_source_url", None),
+            ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
+            ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
+        )
     _print(
         {
             "command": "ingest",

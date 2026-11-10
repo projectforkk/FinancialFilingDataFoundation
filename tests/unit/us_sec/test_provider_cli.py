@@ -9,7 +9,7 @@ from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer, _me
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig, SecResponse
 from financial_filing_data_foundation.us_sec.identity import sec_company
-from financial_filing_data_foundation.us_sec.package import SecPackageStore
+from financial_filing_data_foundation.us_sec.package import SecMemberRole, SecPackageMember, SecPackageStore, build_package
 
 
 def test_generic_xml_is_not_misclassified_as_xbrl_instance() -> None:
@@ -70,6 +70,33 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
     assert next(member for member in first.package.members if member.relative_name == "example.htm").content_type == "text/html"
     assert calls.count(primary_url) == 1
     assert calls.count(schema_url) == 1
+
+
+def test_sec_acquirer_local_package_is_parse_local_not_reuse_data(tmp_path: Path) -> None:
+    package = build_package(
+        cik="0000320193",
+        accession="0000320193-25-000079",
+        form="10-K",
+        fiscal_year=2025,
+        period="FY",
+        members=(
+            SecPackageMember(
+                relative_name="annual.htm",
+                role=SecMemberRole.PRIMARY_DOCUMENT,
+                content_type="text/html",
+                source_url="https://www.sec.gov/Archives/edgar/data/320193/annual.htm",
+                body=b"<html><body><p>annual</p></body></html>",
+            ),
+        ),
+    )
+    store = SecPackageStore(tmp_path / "raw-store")
+    store.put(package)
+    company = sec_company(cik="320193", ticker="EXM", allow_development=True)
+
+    result = SecAcquirer(object(), store).acquire(company, fiscal_year=2025, period="FY")
+
+    assert result.reused is True
+    assert result.plan_action == "PARSE_LOCAL"
 
 
 def test_sec_acquirer_does_not_silently_select_amendment(tmp_path: Path) -> None:

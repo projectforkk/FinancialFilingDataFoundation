@@ -152,6 +152,7 @@ def test_periodic_zero_facts_is_review_required_and_not_research_ready(
     result = ingest_sec_package(package, root=tmp_path, ticker="AAPL", period="Q2")
     assert result.research_ready is False
     assert result.catalog_status != "ADDED"
+    assert validation.compatibility_status == "COMPATIBLE"
     assert validation.reuse_eligible is False
 
 
