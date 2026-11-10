@@ -60,6 +60,7 @@ class _Node:
     parent: "_Node | None"
     order: int
     locator: str = ""
+    sibling_index: int = 0
     children: list["_Node"] = field(default_factory=list)
     data: list[str] = field(default_factory=list)
     content: list[object] = field(default_factory=list)
@@ -91,12 +92,12 @@ class _DomParser(HTMLParser):
         self._order += 1
         normalized_tag = tag.casefold()
         parent = self._stack[-1]
+        indexes = self._child_indexes.setdefault(id(parent), {})
+        child_index = indexes.get(normalized_tag, 0) + 1
+        indexes[normalized_tag] = child_index
         if self._locator_targets is None:
             locator = ""
         else:
-            indexes = self._child_indexes.setdefault(id(parent), {})
-            child_index = indexes.get(normalized_tag, 0) + 1
-            indexes[normalized_tag] = child_index
             candidate = f"{parent.locator}/{normalized_tag}[{child_index}]" if parent.locator else f"/{normalized_tag}[{child_index}]"
             locator = candidate if candidate in self._locator_prefixes else ""
         node = _Node(
@@ -105,14 +106,14 @@ class _DomParser(HTMLParser):
             parent,
             self._order,
             locator,
+            child_index,
         )
         parent.children.append(node)
         parent.content.append(node)
         if self._locator_targets is not None and locator in self._locator_targets:
             self.locator_index[locator] = node
         if push:
-            if self._locator_targets is not None and locator:
-                self._child_indexes.setdefault(id(node), {})
+            self._child_indexes.setdefault(id(node), {})
             self._stack.append(node)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -199,6 +200,38 @@ def _is_hidden(node: _Node) -> bool:
     return False
 
 
+def _is_hidden_cached(node: _Node, cache: dict[int, bool]) -> bool:
+    key = id(node)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    chain: list[_Node] = []
+    current: _Node | None = node
+    result = False
+    while current is not None:
+        current_cached = cache.get(id(current))
+        if current_cached is not None:
+            result = current_cached
+            break
+        chain.append(current)
+        if _local(current.tag) in {"script", "style", "header", "hidden"} or current.tag in {"ix:header", "ix:hidden"}:
+            result = True
+            break
+        aria_hidden = _attr(current, "aria-hidden")
+        if _attr(current, "hidden") is not None or (aria_hidden is not None and aria_hidden.casefold() == "true"):
+            result = True
+            break
+        style = re.sub(r"\s+", "", _attr(current, "style") or "").casefold()
+        classes = (_attr(current, "class") or "").casefold().split()
+        if "display:none" in style or "visibility:hidden" in style or "hidden" in classes:
+            result = True
+            break
+        current = current.parent
+    for item in reversed(chain):
+        cache[id(item)] = result
+    return result
+
+
 def _visible_text(node: _Node) -> str:
     if _is_hidden(node):
         return ""
@@ -213,6 +246,35 @@ def _visible_text(node: _Node) -> str:
     return " ".join(" ".join(values).split())
 
 
+def _visible_text_cached(
+    node: _Node,
+    text_cache: dict[int, str],
+    hidden_cache: dict[int, bool],
+) -> str:
+    key = id(node)
+    cached = text_cache.get(key)
+    if cached is not None:
+        return cached
+    if _is_hidden_cached(node, hidden_cache):
+        text_cache[key] = ""
+        return ""
+    if node.content:
+        values = [
+            item if isinstance(item, str) else _visible_text_cached(item, text_cache, hidden_cache)
+            for item in node.content
+        ]
+    else:
+        values = list(node.data)
+        values.extend(
+            child_text
+            for child in node.children
+            if (child_text := _visible_text_cached(child, text_cache, hidden_cache))
+        )
+    value = " ".join(" ".join(values).split())
+    text_cache[key] = value
+    return value
+
+
 def _descendants(node: _Node) -> Iterable[_Node]:
     for child in node.children:
         yield child
@@ -222,17 +284,29 @@ def _descendants(node: _Node) -> Iterable[_Node]:
 def _path(node: _Node) -> str:
     if node.locator:
         return node.locator
-    pieces: list[str] = []
+    chain: list[tuple[_Node, int]] = []
     current: _Node | None = node
     while current is not None and current.tag != "#document":
         if current.parent is None:
             index = 1
+        elif current.sibling_index:
+            index = current.sibling_index
         else:
-            siblings = [child for child in current.parent.children if child.tag == current.tag]
-            index = siblings.index(current) + 1
-        pieces.append(f"{current.tag}[{index}]")
+            index = 0
+            for child in current.parent.children:
+                if child.tag != current.tag:
+                    continue
+                index += 1
+                if child is current:
+                    break
+        chain.append((current, index))
         current = current.parent
-    return "/" + "/".join(reversed(pieces))
+    prefix = ""
+    for item, index in reversed(chain):
+        prefix += f"/{item.tag}[{index}]"
+        if not item.locator:
+            item.locator = prefix
+    return node.locator
 
 
 def _under(node: _Node, tags: set[str]) -> bool:
@@ -297,19 +371,27 @@ def _index_dom_locators(root: _Node) -> dict[str, _Node]:
     return index
 
 
-def _source_block_for_node(node: _Node, blocks_by_locator: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+def _source_block_for_node(
+    node: _Node,
+    blocks_by_locator: dict[str, dict[str, Any]],
+    blocks_by_prefix: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     current: _Node | None = node
     while current is not None:
         block = blocks_by_locator.get(_path(current))
         if block is not None:
             return block
         current = current.parent
-    prefix = _path(node) + "/"
-    descendants = [
-        block
-        for locator, block in blocks_by_locator.items()
-        if locator.startswith(prefix)
-    ]
+    node_locator = _path(node)
+    if blocks_by_prefix is not None:
+        return blocks_by_prefix.get(node_locator)
+    else:
+        prefix = node_locator + "/"
+        descendants = [
+            block
+            for locator, block in blocks_by_locator.items()
+            if locator.startswith(prefix)
+        ]
     if descendants:
         return min(
             descendants,
@@ -433,6 +515,27 @@ def _primary_member(package: SecFilingPackage) -> tuple[Any, str]:
     return member, text
 
 
+def _is_inline_wrapper(node: _Node) -> bool:
+    if node.tag not in {"div", "span"}:
+        return False
+    style = re.sub(r"\s+", "", _attr(node, "style") or "").casefold()
+    return re.search(r"(?:^|;)display:inline(?:;|$)", style) is not None
+
+
+def _under_nested_inline_wrapper(node: _Node, structural_block_tags: set[str]) -> bool:
+    current = node.parent
+    while current is not None:
+        if _is_inline_wrapper(current):
+            outer = current.parent
+            while outer is not None:
+                if outer.tag in structural_block_tags and not _is_inline_wrapper(outer):
+                    return True
+                outer = outer.parent
+            return False
+        current = current.parent
+    return False
+
+
 def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
     block_tags = {
         "h1",
@@ -460,11 +563,15 @@ def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
     structural_block_tags = block_tags - {"span"}
     fact_tags = {"ix:nonfraction", "ix:nonnumeric"}
     candidates: list[_Node] = []
+    visible_text_cache: dict[int, str] = {}
+    hidden_cache: dict[int, bool] = {}
     for node in _descendants(root):
-        if node.tag not in block_tags and node.tag not in fact_tags or _is_hidden(node):
+        if node.tag not in block_tags and node.tag not in fact_tags or _is_hidden_cached(node, hidden_cache):
             continue
-        value = _visible_text(node)
+        value = _visible_text_cached(node, visible_text_cache, hidden_cache)
         if not value:
+            continue
+        if _under_nested_inline_wrapper(node, structural_block_tags):
             continue
         if node.tag in fact_tags and any(ancestor.tag in structural_block_tags for ancestor in _ancestors(node)):
             # A fact inside a paragraph/cell/table block is anchored by that
@@ -477,14 +584,20 @@ def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
         # child blocks still suppress the parent to avoid duplicate text.
         if node.tag == "span" and any(ancestor.tag in structural_block_tags for ancestor in _ancestors(node)):
             continue
-        if any(child.tag in structural_block_tags and child.tag not in fact_tags for child in node.children):
+        if any(
+            child.tag in structural_block_tags
+            and child.tag not in fact_tags
+            and not _is_inline_wrapper(child)
+            and _visible_text_cached(child, visible_text_cache, hidden_cache)
+            for child in node.children
+        ):
             continue
         candidates.append(node)
     candidates.sort(key=lambda node: node.order)
     blocks: list[dict[str, Any]] = []
     for index, node in enumerate(candidates):
         locator = _path(node)
-        text = _visible_text(node)
+        text = _visible_text_cached(node, visible_text_cache, hidden_cache)
         fragment = _sha256(f"{member_sha}|block|{locator}|{text}".encode())
         blocks.append(
             {
@@ -614,14 +727,27 @@ def _tables(
     tables: list[dict[str, Any]] = []
     cell_by_locator: dict[str, str] = {}
     cell_metadata: dict[str, dict[str, Any]] = {}
+    hidden_cache: dict[int, bool] = {}
+    visible_text_cache: dict[int, str] = {}
+    source_text_cache: dict[int, str] = {}
+    heading_nodes = [
+        node
+        for node in _descendants(root)
+        if _heading_level(node) is not None and not _is_hidden_cached(node, hidden_cache)
+    ]
     for table_node in (node for node in _descendants(root) if node.tag == "table"):
         locator = _path(table_node)
         table_id = _sha256(f"{member_sha}|table|{locator}".encode())
         caption_node = next((node for node in _descendants(table_node) if node.tag == "caption"), None)
-        heading_context = _nearest_heading_context(root, table_node)
+        heading_context = _nearest_heading_context(
+            heading_nodes,
+            table_node,
+            visible_text_cache=visible_text_cache,
+            hidden_cache=hidden_cache,
+        )
         nested_table_present = any(node.tag == "table" for node in _descendants(table_node))
         inline_xbrl_fact_present = any(_local(node.tag) in {"nonfraction", "nonnumeric"} for node in _descendants(table_node))
-        visibility_signals = _visibility_signals(table_node)
+        visibility_signals = _visibility_signals(table_node, hidden_cache=hidden_cache)
         style_signals = _style_signals(table_node)
         candidate_signals: list[str] = []
         if caption_node is not None:
@@ -659,11 +785,11 @@ def _tables(
                     "row_span": row_span,
                     "col_span": col_span,
                     "role": "HEADER" if cell.tag == "th" or row_index == 0 else "BODY",
-                    "text": _visible_text(cell),
-                    "source_text": _text(cell),
+                    "text": _visible_text_cached(cell, visible_text_cache, hidden_cache),
+                    "source_text": _text_cached(cell, source_text_cache),
                     "dom_locator": cell_locator,
                     "source_member_sha256": member_sha,
-                    "visibility_signals": _visibility_signals(cell),
+                    "visibility_signals": _visibility_signals(cell, hidden_cache=hidden_cache),
                     "style_signals": _style_signals(cell),
                     "inline_xbrl_fact_present": any(_local(child.tag) in {"nonfraction", "nonnumeric"} for child in _descendants(cell)),
                     "raw_fact_ids": [],
@@ -695,7 +821,11 @@ def _tables(
                 "dom_locator": locator,
                 "bbox": None,
                 "heading_context": heading_context,
-                "caption": _visible_text(caption_node) if caption_node is not None else None,
+                "caption": (
+                    _visible_text_cached(caption_node, visible_text_cache, hidden_cache)
+                    if caption_node is not None
+                    else None
+                ),
                 "nested_table_present": nested_table_present,
                 "inline_xbrl_fact_present": inline_xbrl_fact_present,
                 "visibility_signals": visibility_signals,
@@ -715,17 +845,31 @@ def _tables(
     return tables, cell_by_locator, cell_metadata
 
 
-def _nearest_heading_context(root: _Node, table_node: _Node) -> dict[str, Any] | None:
-    headings = [node for node in _descendants(root) if node.order < table_node.order and _heading_level(node) is not None and not _is_hidden(node)]
+def _nearest_heading_context(
+    heading_nodes: Iterable[_Node],
+    table_node: _Node,
+    *,
+    visible_text_cache: dict[int, str] | None = None,
+    hidden_cache: dict[int, bool] | None = None,
+) -> dict[str, Any] | None:
+    headings = [node for node in heading_nodes if node.order < table_node.order]
     if not headings:
         return None
     node = max(headings, key=lambda item: item.order)
-    return {"title": _visible_text(node), "level": _heading_level(node), "dom_locator": _path(node)}
+    if visible_text_cache is not None and hidden_cache is not None:
+        title = _visible_text_cached(node, visible_text_cache, hidden_cache)
+    else:
+        title = _visible_text(node)
+    return {"title": title, "level": _heading_level(node), "dom_locator": _path(node)}
 
 
-def _visibility_signals(node: _Node) -> list[str]:
+def _visibility_signals(
+    node: _Node,
+    *,
+    hidden_cache: dict[int, bool] | None = None,
+) -> list[str]:
     signals: list[str] = []
-    if _is_hidden(node):
+    if (_is_hidden_cached(node, hidden_cache) if hidden_cache is not None else _is_hidden(node)):
         signals.append("HIDDEN")
     if (_attr(node, "aria-hidden") or "").casefold() == "true":
         signals.append("ARIA_HIDDEN")
@@ -868,13 +1012,16 @@ def _facts(
     cell_by_locator: dict[str, str],
     cell_metadata: dict[str, dict[str, Any]],
     blocks_by_locator: dict[str, dict[str, Any]],
+    blocks_by_prefix: dict[str, dict[str, Any]] | None,
     contexts: dict[str, dict[str, Any]],
     units: dict[str, dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     primary = next(member for member in package.members if member.role is SecMemberRole.PRIMARY_DOCUMENT)
+    primary_sha = primary.member_sha256
     facts: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
     issues: list[dict[str, Any]] = []
+    hidden_cache: dict[int, bool] = {}
     for index, node in enumerate(_descendants(root)):
         if _local(node.tag) not in {"nonfraction", "nonnumeric"}:
             continue
@@ -883,7 +1030,7 @@ def _facts(
         unit_ref = _attr(node, "unitref") or _attr(node, "unit_ref")
         raw_qname = _attr(node, "name") or ""
         fact_id = _sha256(f"{package.package_sha256}|fact|{locator}|{index}".encode())
-        evidence_id = _sha256(f"{fact_id}|evidence|{primary.member_sha256}".encode())
+        evidence_id = _sha256(f"{fact_id}|evidence|{primary_sha}".encode())
         page_no = _node_page(node, page_by_locator)
         cell_id = None
         for ancestor in (node, *_ancestors(node)):
@@ -901,9 +1048,9 @@ def _facts(
         table_metadata = cell_metadata.get(str(cell_id), {}) if cell_id else {}
         raw_value = _text(node)
         parsed_numeric_candidate = _numeric_candidate(raw_value)
-        fragment_hash = _sha256(f"{primary.member_sha256}|fact|{locator}|{raw_value}".encode())
-        hidden = _is_hidden(node)
-        source_block = None if hidden else _source_block_for_node(node, blocks_by_locator)
+        fragment_hash = _sha256(f"{primary_sha}|fact|{locator}|{raw_value}".encode())
+        hidden = _is_hidden_cached(node, hidden_cache)
+        source_block = None if hidden else _source_block_for_node(node, blocks_by_locator, blocks_by_prefix)
         block_id = source_block.get("block_id") if source_block else None
         block_dom_locator = source_block.get("dom_locator") if source_block else None
         if source_block is None and not hidden:
@@ -950,18 +1097,18 @@ def _facts(
             "block_id": block_id,
             "block_dom_locator": block_dom_locator,
             "package_sha256": package.package_sha256,
-            "member_sha256": primary.member_sha256,
+            "member_sha256": primary_sha,
             "fragment_hash": fragment_hash,
-            "source_member_sha256": primary.member_sha256,
+            "source_member_sha256": primary_sha,
             "raw_attributes": raw_attrs,
         }
         evidence.append(
             {
                 "evidence_id": evidence_id,
-                "source_member_sha256": primary.member_sha256,
+                "source_member_sha256": primary_sha,
                 "source_member_relative_name": primary.relative_name,
                 "package_sha256": package.package_sha256,
-                "member_sha256": primary.member_sha256,
+                "member_sha256": primary_sha,
                 "dom_locator": locator,
                 "fact_dom_locator": locator,
                 "block_dom_locator": block_dom_locator,
@@ -1009,6 +1156,7 @@ def _xml_facts(
     for member in package.members:
         if member.role is not SecMemberRole.XBRL_INSTANCE:
             continue
+        member_sha = member.member_sha256
         try:
             xml_root = ET.fromstring(member.body)
         except ET.ParseError:
@@ -1045,9 +1193,9 @@ def _xml_facts(
                     }
                 )
             context_period = dict((resolved_context or {}).get("period") or {})
-            fact_id = _sha256(f"{package.package_sha256}|xml-fact|{member.member_sha256}|{locator}|{index}".encode())
-            evidence_id = _sha256(f"{fact_id}|evidence|{member.member_sha256}".encode())
-            fragment_hash = _sha256(f"{member.member_sha256}|fact|{locator}|{raw_value}".encode())
+            fact_id = _sha256(f"{package.package_sha256}|xml-fact|{member_sha}|{locator}|{index}".encode())
+            evidence_id = _sha256(f"{fact_id}|evidence|{member_sha}".encode())
+            fragment_hash = _sha256(f"{member_sha}|fact|{locator}|{raw_value}".encode())
             fact = {
                 "raw_fact_id": fact_id,
                 "evidence_id": evidence_id,
@@ -1085,18 +1233,18 @@ def _xml_facts(
                 "block_id": None,
                 "block_dom_locator": None,
                 "package_sha256": package.package_sha256,
-                "member_sha256": member.member_sha256,
+                "member_sha256": member_sha,
                 "fragment_hash": fragment_hash,
-                "source_member_sha256": member.member_sha256,
+                "source_member_sha256": member_sha,
                 "raw_attributes": attrs,
             }
             evidence.append(
                 {
                     "evidence_id": evidence_id,
-                    "source_member_sha256": member.member_sha256,
+                    "source_member_sha256": member_sha,
                     "source_member_relative_name": member.relative_name,
                     "package_sha256": package.package_sha256,
-                    "member_sha256": member.member_sha256,
+                    "member_sha256": member_sha,
                     "xml_locator": locator,
                     "fragment_hash": fragment_hash,
                     "raw_text": raw_value,
@@ -1123,7 +1271,12 @@ def verify_sec_evidence(
     """Verify one P11 evidence row against immutable package bytes and anchors."""
 
     member_sha = str(evidence.get("member_sha256") or evidence.get("source_member_sha256") or "")
-    member = next((item for item in package.members if item.member_sha256 == member_sha), None)
+    member_map = source_cache.get(("MEMBER_MAP", package.package_sha256)) if source_cache is not None else None
+    if not isinstance(member_map, dict):
+        member_map = {item.member_sha256: item for item in package.members}
+        if source_cache is not None:
+            source_cache[("MEMBER_MAP", package.package_sha256)] = member_map
+    member = member_map.get(member_sha)
     if member is None:
         raise SecError(P11Reason.P11_MEMBER_HASH_MISMATCH, "evidence member is not present in SEC package")
     source_member_sha = str(evidence.get("source_member_sha256") or member_sha)
@@ -1343,6 +1496,22 @@ def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> S
     tables, cell_by_locator, cell_metadata = _tables(root_node, page_by_locator, primary.member_sha256, package.package_sha256)
     contexts, units = _contexts_and_units(root_node, package)
     blocks_by_locator = {str(row["dom_locator"]): row for row in blocks}
+    blocks_by_prefix: dict[str, dict[str, Any]] = {}
+    for locator, block in blocks_by_locator.items():
+        prefix = ""
+        for component in locator.strip("/").split("/"):
+            if not component:
+                continue
+            prefix += f"/{component}"
+            existing = blocks_by_prefix.get(prefix)
+            if existing is None or (
+                len(str(block.get("dom_locator", ""))),
+                int(block.get("source_order_index", 0)),
+            ) < (
+                len(str(existing.get("dom_locator", ""))),
+                int(existing.get("source_order_index", 0)),
+            ):
+                blocks_by_prefix[prefix] = block
     facts, evidence, issues = _facts(
         root_node,
         package,
@@ -1350,6 +1519,7 @@ def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> S
         cell_by_locator,
         cell_metadata,
         blocks_by_locator,
+        blocks_by_prefix,
         contexts,
         units,
     )

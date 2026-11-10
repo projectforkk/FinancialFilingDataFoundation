@@ -233,6 +233,79 @@ def test_div_span_narrative_and_inline_fact_parent_are_preserved_without_duplica
     assert not any(issue["code"] == "P11_EVIDENCE_LOCATOR_INVALID" for issue in result.issues)
 
 
+def test_visible_fact_in_empty_positioning_wrappers_gets_a_cell_source_block(tmp_path: Path) -> None:
+    html = b"""<html><body>
+    <ix:header>
+      <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context>
+      <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
+    </ix:header>
+    <table><tr><td><div style="display:inline;"></div>
+      <ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD">100</ix:nonfraction>
+      <div style="display:inline;"></div></td></tr></table>
+    </body></html>"""
+    package = build_package(
+        cik="0000000001",
+        accession="0000000001-25-000004",
+        form="10-Q",
+        fiscal_year=2025,
+        period="Q2",
+        members=(
+            SecPackageMember(
+                relative_name="positioned.htm",
+                role=SecMemberRole.PRIMARY_DOCUMENT,
+                content_type="text/html",
+                source_url="https://www.sec.gov/Archives/edgar/data/1/positioned.htm",
+                body=html,
+            ),
+        ),
+    )
+
+    result = parse_sec_package(package, tmp_path / "p11")
+
+    fact = next(row for row in result.facts if row["raw_qname"] == "us-gaap:Revenues")
+    assert fact["block_id"]
+    assert fact["block_dom_locator"].endswith("/td[1]")
+    assert not any(issue["code"] == P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value for issue in result.issues)
+
+
+def test_visible_fact_with_inline_positioning_text_gets_the_outer_narrative_block(tmp_path: Path) -> None:
+    html = b"""<html><body>
+    <ix:header>
+      <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context>
+      <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
+    </ix:header>
+    <table><tr><td><div class="narrative">
+      <div style="display:inline;"><div>Revenue was </div></div>
+      <ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD">100</ix:nonfraction>
+      <div style="display:inline;"><div> million.</div></div>
+    </div></td></tr></table>
+    </body></html>"""
+    package = build_package(
+        cik="0000000001",
+        accession="0000000001-25-000005",
+        form="10-Q",
+        fiscal_year=2025,
+        period="Q2",
+        members=(
+            SecPackageMember(
+                relative_name="inline-positioned.htm",
+                role=SecMemberRole.PRIMARY_DOCUMENT,
+                content_type="text/html",
+                source_url="https://www.sec.gov/Archives/edgar/data/1/inline-positioned.htm",
+                body=html,
+            ),
+        ),
+    )
+
+    result = parse_sec_package(package, tmp_path / "p11")
+
+    fact = next(row for row in result.facts if row["raw_qname"] == "us-gaap:Revenues")
+    assert fact["block_id"]
+    assert fact["block_dom_locator"].endswith("/div[1]")
+    assert any("Revenue was 100 million." in page["text"] for page in result.pages)
+    assert not any(issue["code"] == P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value for issue in result.issues)
+
+
 def test_namespaced_nil_and_explicit_typed_dimensions_are_preserved(tmp_path: Path) -> None:
     xml = b'''<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ex="http://example.test/ex" xmlns:dim="http://example.test/dim">
       <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period><xbrli:scenario><xbrldi:explicitMember xmlns:xbrldi="http://xbrl.org/2006/xbrldi" dimension="dim:RegionAxis">ex:North</xbrldi:explicitMember><xbrldi:typedMember xmlns:xbrldi="http://xbrl.org/2006/xbrldi" dimension="dim:CustomAxis"><ex:MemberText>North</ex:MemberText></xbrldi:typedMember></xbrli:scenario></xbrli:context>
