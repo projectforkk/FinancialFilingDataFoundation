@@ -7,11 +7,12 @@ import shutil
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, Iterable
 
 from .errors import P11Reason, SecError
 from .http import validate_sec_url
+from .path_policy import normalize_archive_relative_name, validate_archive_member_url
 
 
 PACKAGE_MANIFEST_SCHEMA = "p11-sec-package-v1"
@@ -25,6 +26,8 @@ class SecMemberRole(StrEnum):
     XBRL_PRESENTATION = "XBRL_PRESENTATION"
     XBRL_CALCULATION = "XBRL_CALCULATION"
     XBRL_LABEL = "XBRL_LABEL"
+    XBRL_DEFINITION = "XBRL_DEFINITION"
+    XBRL_REFERENCE = "XBRL_REFERENCE"
     FILING_SUMMARY = "FILING_SUMMARY"
     COMPLETE_SUBMISSION_TEXT = "COMPLETE_SUBMISSION_TEXT"
     OTHER = "OTHER"
@@ -35,16 +38,7 @@ def _sha256(data: bytes) -> str:
 
 
 def _safe_relative_name(value: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise SecError(P11Reason.P11_PACKAGE_INVALID, "package member name is required")
-    raw = value.replace("\\", "/").strip()
-    path = PurePosixPath(raw)
-    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
-        raise SecError(P11Reason.P11_PACKAGE_INVALID, f"unsafe package member path: {value}")
-    normalized = path.as_posix()
-    if normalized != raw:
-        raise SecError(P11Reason.P11_PACKAGE_INVALID, f"non-canonical package member path: {value}")
-    return normalized
+    return normalize_archive_relative_name(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,15 +51,18 @@ class SecPackageMember:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "relative_name", _safe_relative_name(self.relative_name))
-        object.__setattr__(self, "content_type", self.content_type.strip().lower())
+        object.__setattr__(self, "content_type", self.content_type.split(";", 1)[0].strip().lower())
         if not self.content_type:
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "package member content_type is required")
-        if not self.source_url.strip():
+        normalized_source_url = self.source_url.strip()
+        if not normalized_source_url or normalized_source_url != self.source_url:
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "package member source_url is required")
         try:
-            validate_sec_url(self.source_url)
+            validate_sec_url(normalized_source_url)
+            validate_archive_member_url(normalized_source_url)
         except SecError as exc:
             raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "package member source URL is not allowlisted") from exc
+        object.__setattr__(self, "source_url", normalized_source_url)
         if not isinstance(self.body, (bytes, bytearray)):
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "package member body must be bytes")
         object.__setattr__(self, "body", bytes(self.body))
@@ -240,6 +237,10 @@ class SecPackageStore:
             members_dir.mkdir()
             for member in package.canonical_members():
                 target = members_dir / member.relative_name
+                try:
+                    target.resolve().relative_to(members_dir.resolve())
+                except ValueError as exc:
+                    raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC package member escapes package root") from exc
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(member.body)
             _write_json(temp_dir / "manifest.json", package.manifest())
@@ -331,6 +332,32 @@ class SecPackageStore:
                 continue
             return self.load(str(raw.get("package_sha256", "")))
         return None
+
+    def find_by_slot(self, *, cik: str, fiscal_year: int, period: str) -> SecFilingPackage | None:
+        """Return a unique local package for a SEC slot without network access."""
+
+        manifests_root = self.root / "packages" / "sha256"
+        if not manifests_root.is_dir():
+            return None
+        matches: list[SecFilingPackage] = []
+        normalized_cik = str(cik).zfill(10)
+        normalized_period = str(period).strip().upper()
+        for manifest_path in sorted(manifests_root.glob("*" + "/*/manifest.json")):
+            try:
+                raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if (
+                    str(raw.get("cik", "")) != normalized_cik
+                    or int(raw.get("fiscal_year", -1)) != int(fiscal_year)
+                    or str(raw.get("period", "")).upper() != normalized_period
+                ):
+                    continue
+                matches.append(self.load(str(raw.get("package_sha256", ""))))
+            except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError, SecError):
+                continue
+        unique = {package.package_sha256: package for package in matches}
+        if len(unique) != 1:
+            return None
+        return next(iter(unique.values()))
 
 
 __all__ = [

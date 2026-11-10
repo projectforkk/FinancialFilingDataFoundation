@@ -38,7 +38,8 @@ def _package() -> object:
                     b'</xbrli:period></xbrli:context>'
                     b'<xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>'
                     b'</ix:header><h1>Revenue</h1><p><ix:nonfraction name="us-gaap:Revenues" '
-                    b'contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>'
+                    b'contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p>'
+                    b'<table><tr><th>Metric</th><th>Value</th></tr><tr><td>Revenue</td><td>100</td></tr></table></body></html>'
                 ),
             ),
         ),
@@ -114,6 +115,17 @@ def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPa
     assert detail["data"]["validation_status"] == validation.validation_status
     assert service.read_pages(package.package_sha256, [1])["data"]["pages"][0]["pagination_kind"] == "VIRTUAL_HTML"
     assert service.search_document(package.package_sha256, "Revenue")["data"]["returned"] >= 1
+    assert service.list_sections(package.package_sha256)["data"]["returned"] >= 1
+    tables = service.list_tables(package.package_sha256)["data"]["tables"]
+    assert tables
+    table = service.get_table(package.package_sha256, tables[0]["table_id"])["data"]
+    assert table["document_sha256"] == package.package_sha256
+    fact_rows = service.list_raw_facts(package.package_sha256, page_no=1, metric_contains="Revenues")["data"]["facts"]
+    assert fact_rows
+    fact_id = fact_rows[0]["raw_fact_id"]
+    assert service.get_fact(package.package_sha256, fact_id)["data"]["raw_qname"] == "us-gaap:Revenues"
+    evidence_id = fact_rows[0]["evidence_id"]
+    assert service.get_evidence(package.package_sha256, evidence_id)["data"]["raw_fact_id"] == fact_id
     assert service.get_validation(package.package_sha256)["data"]["report"]["validation_status"] == "PASS"
 
 
@@ -140,6 +152,7 @@ def test_periodic_zero_facts_is_review_required_and_not_research_ready(
     result = ingest_sec_package(package, root=tmp_path, ticker="AAPL", period="Q2")
     assert result.research_ready is False
     assert result.catalog_status != "ADDED"
+    assert validation.reuse_eligible is False
 
 
 def test_facts_without_evidence_are_blocked(tmp_path: Path) -> None:

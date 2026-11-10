@@ -60,6 +60,12 @@ def test_html_parser_creates_stable_virtual_pages_dom_tables_and_evidence(tmp_pa
     assert all(page["pagination_kind"] == "VIRTUAL_HTML" for page in result.pages)
     assert result.tables[0]["rows"][0]["cells"][0]["row_span"] == 2
     assert result.tables[0]["rows"][0]["cells"][1]["col_span"] == 2
+    assert result.tables[0]["column_count"] == 3
+    assert result.tables[0]["document_sha256"] == package.package_sha256
+    assert result.tables[0]["source_member_sha256"] == package.members[0].member_sha256
+    assert result.tables[0]["heading_context"]["title"] == "Condensed Statements"
+    assert result.tables[0]["inline_xbrl_fact_present"] is True
+    assert "INLINE_XBRL_FACT" in result.tables[0]["candidate_signals"]
     assert result.facts
     assert {fact["raw_qname"] for fact in result.facts} >= {"us-gaap:Revenues", "ex:CustomMetric", "ex:Note"}
     revenue = next(fact for fact in result.facts if fact["raw_qname"] == "us-gaap:Revenues")
@@ -197,6 +203,55 @@ def test_virtual_page_normalization_is_repeatable(tmp_path: Path) -> None:
     assert first.pages == second.pages
     assert first.tables == second.tables
     assert first.facts == second.facts
+
+
+def test_div_span_narrative_and_inline_fact_parent_are_preserved_without_duplicates(tmp_path: Path) -> None:
+    html = b"""<html><body><div class='narrative'><span>Operating performance improved.</span></div>
+    <div class='narrative'>Revenue <span>was</span> <span>strong.</span></div>
+    <p>Revenue was <ix:nonfraction name='ex:Revenue' contextRef='c1' unitRef='USD'>100</ix:nonfraction> million.</p>
+    <ix:nonfraction name='ex:TopLevelFact' contextRef='c1' unitRef='USD'><div>300</div></ix:nonfraction>
+    <div style='display:none'><ix:nonfraction name='ex:HiddenStyleFact' contextRef='c1' unitRef='USD'>999</ix:nonfraction></div>
+    <ix:header><xbrli:context id='c1'><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id='USD'><xbrli:measure>USD</xbrli:measure></xbrli:unit></ix:header>
+    </body></html>"""
+    package = build_package(
+        cik="0000000001",
+        accession="0000000001-25-000001",
+        form="10-Q",
+        fiscal_year=2025,
+        period="Q2",
+        members=(SecPackageMember(relative_name="rich.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url="https://www.sec.gov/Archives/edgar/data/1/rich.htm", body=html),),
+    )
+    result = parse_sec_package(package, tmp_path / "p11")
+    texts = [block["text"] for page in result.pages for block in page["blocks"]]
+    assert any("Operating performance improved." in text for text in texts)
+    assert any("Revenue was strong." in text for text in texts)
+    assert any("Revenue was 100 million." in text for text in texts)
+    assert any("300" == text for text in texts)
+    assert sum("Operating performance improved." in text for text in texts) == 1
+    hidden_style = next(fact for fact in result.facts if fact["raw_qname"] == "ex:HiddenStyleFact")
+    assert hidden_style["hidden"] is True
+    assert not any(issue["code"] == "P11_EVIDENCE_LOCATOR_INVALID" for issue in result.issues)
+
+
+def test_namespaced_nil_and_explicit_typed_dimensions_are_preserved(tmp_path: Path) -> None:
+    xml = b'''<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ex="http://example.test/ex" xmlns:dim="http://example.test/dim">
+      <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period><xbrli:scenario><xbrldi:explicitMember xmlns:xbrldi="http://xbrl.org/2006/xbrldi" dimension="dim:RegionAxis">ex:North</xbrldi:explicitMember><xbrldi:typedMember xmlns:xbrldi="http://xbrl.org/2006/xbrldi" dimension="dim:CustomAxis"><ex:MemberText>North</ex:MemberText></xbrldi:typedMember></xbrli:scenario></xbrli:context>
+      <ex:Amount contextRef="c1" xsi:nil="true"/>
+    </xbrli:xbrl>'''
+    package = build_package(cik="0000000001", accession="0000000001-25-000002", form="10-Q", fiscal_year=2025, period="Q2", members=(
+        SecPackageMember(relative_name="nil.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url="https://www.sec.gov/Archives/edgar/data/1/nil.htm", body=b"<html><body><p>source</p></body></html>"),
+        SecPackageMember(relative_name="nil.xbrl", role=SecMemberRole.XBRL_INSTANCE, content_type="application/xml", source_url="https://www.sec.gov/Archives/edgar/data/1/nil.xbrl", body=xml),
+    ))
+    result = parse_sec_package(package, tmp_path / "p11")
+    fact = result.facts[0]
+    assert fact["nil"] is True
+    assert fact["parsed_numeric_candidate"] is None
+    dimensions = fact["dimensions"]
+    assert {row["dimension_kind"] for row in dimensions} == {"EXPLICIT", "TYPED"}
+    assert next(row for row in dimensions if row["dimension_kind"] == "EXPLICIT")["member_qname"] == "ex:North"
+    typed = next(row for row in dimensions if row["dimension_kind"] == "TYPED")
+    assert typed["member_qname"] is None
+    assert "North" in typed["typed_value"]
 
 
 def _xml_package() -> object:

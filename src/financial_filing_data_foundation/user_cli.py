@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import json
 import os
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -34,15 +36,17 @@ from financial_filing_data_foundation.validation import (
     build_parsed_data_record,
     validate_document_artifacts,
 )
-from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer
+from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer, candidate_from_package
 from financial_filing_data_foundation.us_sec.errors import SecError
 from financial_filing_data_foundation.us_sec.feature_gate import require_us_development
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig
-from financial_filing_data_foundation.us_sec.identity import normalize_cik, resolve_ticker, sec_company
+from financial_filing_data_foundation.us_sec.identity import normalize_cik, sec_company
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
+from financial_filing_data_foundation.us_sec.planner import SecPlan, SecPlanAction, plan_sec_slot
+from financial_filing_data_foundation.us_sec.registry import register_sec_package, register_sec_slot
 from financial_filing_data_foundation.us_sec.runtime import SecRuntimeDescriptor, SecSubprocessTransport
-from financial_filing_data_foundation.us_sec.ticker_map import parse_ticker_map
+from financial_filing_data_foundation.us_sec.ticker_map import parse_ticker_map, snapshot_ticker_map
 
 
 _PERIODS = ("Q1", "Q2", "H1", "Q3", "FY")
@@ -117,6 +121,14 @@ def _period(value: str) -> str:
     return period
 
 
+def _validate_market_period(args: argparse.Namespace) -> None:
+    market = str(args.market).strip().upper()
+    period = str(args.period).strip().upper()
+    allowed = {"Q1", "Q2", "Q3", "FY"} if market == "US" else {"Q1", "H1", "Q3", "FY"}
+    if period not in allowed:
+        raise ValueError(f"period {period} is not supported for market {market}")
+
+
 def _default_window(year: int, period: str) -> tuple[str, str]:
     if period == "Q1":
         start = date(year, 3, 1)
@@ -160,10 +172,9 @@ def _window(args: argparse.Namespace) -> tuple[str, str]:
 
 def _request(args: argparse.Namespace) -> AcquisitionRequest:
     market = args.market.upper()
+    _validate_market_period(args)
     if market not in {"CN", "HK"}:
         raise ValueError("US requests use the SEC provider path")
-    if args.period == "Q2":
-        raise ValueError("Q2 is supported only by the gated US SEC provider")
     if not args.ticker or not args.ticker.strip():
         raise ValueError("--ticker is required for CN/HK")
     ticker = args.ticker.strip()
@@ -344,50 +355,211 @@ def _common_payload(request: AcquisitionRequest) -> dict[str, Any]:
     }
 
 
-def _us_company_and_client(args: argparse.Namespace) -> tuple[Any, SecHttpClient]:
+def _persist_ticker_map_snapshot(root: Path, snapshot: Any) -> Path:
+    directory = root / "workspace" / "ingest" / "us" / "ticker-map"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{snapshot.source_sha256}.json"
+    if not path.exists():
+        path.write_text(
+            json.dumps(snapshot.to_dict(), ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return path
+
+
+def _cached_ticker_resolution(root: Path, ticker: str) -> tuple[str, dict[str, str | None]] | None:
+    """Resolve a ticker from a previously persisted, byte-provenanced map."""
+
+    normalized = ticker.strip().upper()
+    directory = root / "workspace" / "ingest" / "us" / "ticker-map"
+    matches: list[tuple[str, dict[str, str | None]]] = []
+    if not directory.is_dir():
+        return None
+    for path in sorted(directory.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        mapping = payload.get("mapping") if isinstance(payload, dict) else None
+        values = mapping.get(normalized) if isinstance(mapping, dict) else None
+        if isinstance(values, str):
+            values = [values]
+        if not isinstance(values, list):
+            continue
+        try:
+            ciks = sorted({normalize_cik(str(value)) for value in values})
+        except SecError:
+            continue
+        if len(ciks) > 1:
+            raise SecError("P11_TICKER_CIK_AMBIGUOUS", f"cached ticker maps to multiple CIKs: {normalized}")
+        if not ciks:
+            continue
+        source_sha256 = str(payload.get("source_sha256") or "").strip().lower()
+        source_bytes_b64 = payload.get("source_bytes_b64")
+        if not source_sha256 or not isinstance(source_bytes_b64, str):
+            continue
+        try:
+            source_bytes = base64.b64decode(source_bytes_b64, validate=True)
+        except (ValueError, TypeError):
+            continue
+        if hashlib.sha256(source_bytes).hexdigest() != source_sha256:
+            continue
+        matches.append(
+            (
+                ciks[0],
+                {
+                    "source_url": str(payload.get("source_url") or "").strip() or None,
+                    "source_sha256": source_sha256,
+                    "retrieved_at": str(payload.get("retrieved_at") or "").strip() or None,
+                },
+            )
+        )
+    if not matches:
+        return None
+    ciks = {cik for cik, _ in matches}
+    if len(ciks) != 1:
+        raise SecError("P11_TICKER_CIK_AMBIGUOUS", f"cached ticker maps to multiple CIKs: {normalized}")
+    return max(matches, key=lambda item: (item[1].get("retrieved_at") or "", item[1].get("source_sha256") or ""))
+
+
+def _us_company_and_client(args: argparse.Namespace) -> tuple[Any, SecHttpClient | None]:
     require_us_development()
     runtime = SecRuntimeDescriptor.for_project(_project_root())
-    client = SecHttpClient(
-        SecHttpConfig.from_env(),
-        transport=SecSubprocessTransport(runtime),
-    )
+    client: SecHttpClient | None = None
     ticker = args.ticker.strip().upper() if args.ticker else None
     if args.cik:
         cik = normalize_cik(args.cik)
-        if ticker:
-            mapping_response = client.fetch(
-                "https://www.sec.gov/files/company_tickers.json",
-                expected_content_types=("application/json",),
-                max_bytes=client.config.submissions_max_bytes,
-            )
-            mapped = parse_ticker_map(mapping_response.body, ticker)
-            if mapped != cik:
-                raise SecError(
-                    "P11_INVALID_US_IDENTITY",
-                    "--cik and --ticker resolve to different SEC identities",
-                )
         company = sec_company(cik=cik, ticker=ticker, allow_development=True)
         return company, client
     if not ticker:
         raise SecError("P11_INVALID_US_IDENTITY", "US requires --cik or --ticker")
+    cached = _cached_ticker_resolution(_project_root(), ticker)
+    if cached is not None:
+        cik, provenance = cached
+        return sec_company(
+            cik=cik,
+            ticker=ticker,
+            allow_development=True,
+            ticker_source_url=provenance["source_url"],
+            ticker_source_sha256=provenance["source_sha256"],
+            ticker_retrieved_at=provenance["retrieved_at"],
+        ), client
+    client = SecHttpClient(
+        SecHttpConfig.from_env(),
+        transport=SecSubprocessTransport(runtime),
+    )
     mapping_response = client.fetch(
         "https://www.sec.gov/files/company_tickers.json",
         expected_content_types=("application/json",),
         max_bytes=client.config.submissions_max_bytes,
     )
     cik = parse_ticker_map(mapping_response.body, ticker)
-    return sec_company(cik=cik, ticker=ticker, allow_development=True), client
+    snapshot = snapshot_ticker_map(
+        mapping_response.body,
+        source_url="https://www.sec.gov/files/company_tickers.json",
+    )
+    _persist_ticker_map_snapshot(_project_root(), snapshot)
+    return sec_company(
+        cik=cik,
+        ticker=ticker,
+        allow_development=True,
+        ticker_source_url=snapshot.source_url,
+        ticker_source_sha256=snapshot.source_sha256,
+        ticker_retrieved_at=snapshot.retrieved_at,
+    ), client
+
+
+def _us_plan_slot(
+    company: Any,
+    args: argparse.Namespace,
+    paths: RuntimePaths,
+    registry: SQLiteRegistry,
+) -> tuple[SecPlan, Any | None]:
+    bindings = registry.list_sec_bindings(
+        company_id=company.company_id,
+        fiscal_year=args.year,
+        period=args.period,
+    )
+    amendment_flags = {bool(int(row["amended"] or 0)) for row in bindings}
+    amendment_conflict = bool(bindings) and amendment_flags == {False, True}
+    store = SecPackageStore(paths.raw_store)
+    packages: dict[str, Any] = {}
+    for row in bindings:
+        try:
+            package = store.load(str(row["package_sha256"]))
+        except Exception:
+            continue
+        packages[package.package_sha256] = package
+    if not packages:
+        local = store.find_by_slot(cik=company.cik, fiscal_year=args.year, period=args.period)
+        if local is not None:
+            packages[local.package_sha256] = local
+    parsed_rows = registry.list_sec_parsed_data(
+        company_id=company.company_id,
+        fiscal_year=args.year,
+        period=args.period,
+    )
+    parsed_available = bool(packages) and any(
+        str(row["validation_status"]).upper() == "PASS"
+        and str(row["compatibility_status"]).upper() == "COMPATIBLE"
+        and int(row["blocking_issue_count"] or 0) == 0
+        and str(row["artifact_path"] or "").strip()
+        and (paths.root / str(row["artifact_path"])).resolve().is_dir()
+        for row in parsed_rows
+    )
+    plan = plan_sec_slot(
+        parsed_available=parsed_available,
+        package_available=bool(packages),
+        amendment_conflict=amendment_conflict,
+    )
+    package = next(iter(packages.values()), None)
+    return plan, package
 
 
 def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths]:
     root = _project_root()
     paths = _runtime_paths(root)
     company, client = _us_company_and_client(args)
+    registry = SQLiteRegistry(paths.registry)
+    plan, local_package = _us_plan_slot(company, args, paths, registry)
+    if plan.action is SecPlanAction.REVIEW_REQUIRED:
+        raise SecError(plan.reason_code or "P11_AMENDED_VARIANT_PRESENT", "SEC slot has an amended variant conflict")
+    if local_package is not None and plan.action in {SecPlanAction.REUSE_DATA, SecPlanAction.PARSE_LOCAL}:
+        from financial_filing_data_foundation.us_sec.acquisition import SecAcquisitionResult
+
+        result = SecAcquisitionResult(
+            package=local_package,
+            candidate=candidate_from_package(local_package, company),
+            reused=True,
+            plan_action=plan.action.value,
+        )
+        register_sec_package(registry, local_package)
+        register_sec_slot(
+            registry,
+            local_package,
+            fiscal_year=args.year,
+            period=args.period,
+            binding_status="SOURCE_CONFIRMED",
+        )
+        return company, result, paths
     acquirer = SecAcquirer(
-        client,
+        client
+        or SecHttpClient(
+            SecHttpConfig.from_env(),
+            transport=SecSubprocessTransport(SecRuntimeDescriptor.for_project(root)),
+        ),
         SecPackageStore(paths.raw_store),
     )
     result = acquirer.acquire(company, fiscal_year=args.year, period=args.period)
+    result = replace(result, plan_action=plan.action.value)
+    register_sec_package(registry, result.package)
+    register_sec_slot(
+        registry,
+        result.package,
+        fiscal_year=args.year,
+        period=args.period,
+        binding_status="SOURCE_CONFIRMED",
+    )
     return company, result, paths
 
 
@@ -402,6 +574,7 @@ def _us_acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, 
         "company_id": company.company_id,
         "fiscal_year": args.year,
         "period": args.period,
+        "planner_action": result.plan_action,
         "status": "REUSED_LOCAL" if result.reused else "DOWNLOADED",
         "reason_code": None,
         "accession": result.candidate.accession,
@@ -417,12 +590,20 @@ def _us_acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, 
 
 
 def _us_ingest(args: argparse.Namespace) -> int:
-    _, acquire_payload, result, paths, _ = _us_acquire(args, quiet=True)
+    company, result, paths = _us_acquire_result(args)
+    acquire_payload = {
+        "status": "REUSED_LOCAL" if result.reused else "DOWNLOADED",
+        "planner_action": result.plan_action,
+    }
     ingested = ingest_sec_package(
         result.package,
         root=paths.root,
         ticker=result.candidate.ticker,
         period=args.period,
+        company_id=result.candidate.cik and f"US:CIK{result.candidate.cik}",
+        ticker_source_url=getattr(company, "ticker_source_url", None),
+        ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
+        ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
     )
     _print(
         {
@@ -432,6 +613,7 @@ def _us_ingest(args: argparse.Namespace) -> int:
             "cik": result.candidate.cik,
             "fiscal_year": args.year,
             "period": args.period,
+            "planner_action": acquire_payload["planner_action"],
             "accession": result.candidate.accession,
             "package_sha256": result.package.package_sha256,
             "validation_status": ingested.validation.validation_status,
@@ -449,7 +631,7 @@ def _us_ingest(args: argparse.Namespace) -> int:
 def _us_status(args: argparse.Namespace) -> int:
     root = _project_root()
     require_us_development()
-    if args.cik and not args.ticker:
+    if args.cik:
         company = sec_company(cik=normalize_cik(args.cik), ticker=None, allow_development=True)
     else:
         company, _ = _us_company_and_client(args)
@@ -466,7 +648,7 @@ def _us_status(args: argparse.Namespace) -> int:
         for row in payload.get("documents", []):
             if (
                 str(row.get("market", "")).upper() == "US"
-                and str(row.get("ticker", "")).upper() == company.ticker.upper()
+                and str(row.get("company_id") or f"US:CIK{str(row.get('cik') or '').zfill(10)}").upper() == company.company_id.upper()
                 and int(row.get("fiscal_year", 0)) == args.year
                 and str(row.get("raw_fiscal_period", "")).upper() == args.period
             ):
@@ -493,6 +675,7 @@ def _print(payload: dict[str, Any]) -> None:
 
 
 def _acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, dict[str, Any], AcquisitionRequest, RuntimePaths, SQLiteRegistry]:
+    _validate_market_period(args)
     if args.market.upper() == "US":
         return _us_acquire(args, quiet=quiet)  # type: ignore[return-value]
     root = _project_root()
@@ -541,6 +724,7 @@ def _acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, dic
 
 
 def _ingest(args: argparse.Namespace) -> int:
+    _validate_market_period(args)
     if args.market.upper() == "US":
         return _us_ingest(args)
     code, acquire_payload, request, paths, registry = _acquire(args, quiet=True)
@@ -652,6 +836,7 @@ def _ingest(args: argparse.Namespace) -> int:
 
 
 def _status(args: argparse.Namespace) -> int:
+    _validate_market_period(args)
     if args.market.upper() == "US":
         return _us_status(args)
     root = _project_root()

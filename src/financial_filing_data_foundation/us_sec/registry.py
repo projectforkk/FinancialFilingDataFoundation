@@ -45,6 +45,7 @@ def register_sec_parsed_run(
     validation_status: str,
     blocking_issue_count: int,
     artifact_path: str | Path | None,
+    compatibility_status: str | None = None,
 ) -> None:
     registry.register_sec_parsed_data(
         parse_run_id=parse_run_id,
@@ -55,6 +56,7 @@ def register_sec_parsed_run(
         parser_version=parser_version,
         schema_version=schema_version,
         validation_status=validation_status,
+        compatibility_status=compatibility_status,
         blocking_issue_count=blocking_issue_count,
         artifact_path=None if artifact_path is None else str(artifact_path),
     )

@@ -5,11 +5,21 @@ from pathlib import Path
 
 import pytest
 
-from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer
+from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer, _member_role
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig, SecResponse
 from financial_filing_data_foundation.us_sec.identity import sec_company
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
+
+
+def test_generic_xml_is_not_misclassified_as_xbrl_instance() -> None:
+    assert _member_role("attachment.xml", "primary.htm", b"<attachment />").value == "OTHER"
+    assert _member_role(
+        "instance.xml",
+        "primary.htm",
+        b'<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" />',
+    ).value == "XBRL_INSTANCE"
+    assert _member_role("instance.xbrl", "primary.htm", b"<xbrl />").value == "XBRL_INSTANCE"
 
 
 def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path: Path) -> None:
@@ -57,6 +67,7 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
     assert first.package.package_sha256 == second.package.package_sha256
     assert first.reused is False
     assert second.reused is True
+    assert next(member for member in first.package.members if member.relative_name == "example.htm").content_type == "text/html"
     assert calls.count(primary_url) == 1
     assert calls.count(schema_url) == 1
 
@@ -89,4 +100,61 @@ def test_sec_acquirer_does_not_silently_select_amendment(tmp_path: Path) -> None
     with pytest.raises(SecError) as exc_info:
         acquirer.acquire(company, fiscal_year=2025, period="Q2")
     assert exc_info.value.reason_code == P11Reason.P11_AMENDED_VARIANT_PRESENT.value
+
+
+def test_sec_acquirer_fetches_only_history_chunks_covering_requested_year(tmp_path: Path) -> None:
+    submissions_url = "https://data.sec.gov/submissions/CIK0000123456.json"
+    relevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2024.json"
+    irrelevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2018.json"
+    index_url = "https://www.sec.gov/Archives/edgar/data/123456/000012345624000001/index.json"
+    primary_url = "https://www.sec.gov/Archives/edgar/data/123456/000012345624000001/annual.htm"
+    calls: list[str] = []
+    submissions = {
+        "cik": "0000123456",
+        "filings": {
+            "recent": {
+                "accessionNumber": [],
+                "filingDate": [],
+                "reportDate": [],
+                "form": [],
+                "primaryDocument": [],
+            },
+            "files": [
+                {"name": "CIK0000123456-2018.json", "filingFrom": "2018-01-01", "filingTo": "2018-12-31"},
+                {"name": "CIK0000123456-2024.json", "filingFrom": "2024-01-01", "filingTo": "2024-12-31"},
+            ],
+        },
+    }
+    history = {
+        "cik": "0000123456",
+        "accessionNumber": ["0000123456-24-000001"],
+        "filingDate": ["2025-02-01"],
+        "reportDate": ["2024-12-31"],
+        "form": ["10-K"],
+        "primaryDocument": ["annual.htm"],
+    }
+    index = {"directory": {"item": [{"name": "annual.htm"}]}}
+
+    def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
+        calls.append(url)
+        if url == submissions_url:
+            body = json.dumps(submissions).encode()
+            return SecResponse(200, {"Content-Type": "application/json"}, body, url)
+        if url == relevant_history_url:
+            return SecResponse(200, {"Content-Type": "application/json"}, json.dumps(history).encode(), url)
+        if url == irrelevant_history_url:
+            raise AssertionError("irrelevant SEC history chunk was fetched")
+        if url == index_url:
+            return SecResponse(200, {"Content-Type": "application/json"}, json.dumps(index).encode(), url)
+        if url == primary_url:
+            return SecResponse(200, {"Content-Type": "text/html"}, b"<html><body>annual</body></html>", url)
+        raise AssertionError(url)
+
+    client = SecHttpClient(SecHttpConfig(contact_email="ops@example.org"), transport=transport, sleep=lambda _: None)
+    company = sec_company(cik="123456", ticker="EXM", allow_development=True)
+    result = SecAcquirer(client, SecPackageStore(tmp_path / "raw-store")).acquire(company, fiscal_year=2024, period="FY")
+
+    assert result.candidate.accession == "0000123456-24-000001"
+    assert calls.count(relevant_history_url) == 1
+    assert irrelevant_history_url not in calls
 

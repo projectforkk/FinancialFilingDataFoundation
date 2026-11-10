@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from financial_filing_data_foundation.registry import SQLiteRegistry
+from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.package import (
     SecMemberRole,
     SecPackageMember,
@@ -142,4 +143,27 @@ def test_incremental_planner_is_reuse_first_and_conflict_safe() -> None:
     assert plan_sec_slot(parsed_available=False, package_available=False).action is SecPlanAction.DISCOVER_AND_ACQUIRE
     conflict = plan_sec_slot(parsed_available=True, package_available=True, amendment_conflict=True)
     assert conflict.action is SecPlanAction.REVIEW_REQUIRED
+
+
+@pytest.mark.parametrize("name", ["C:/evil.txt", "../evil.txt", "x\\evil.txt", "%2e%2e/evil.txt", "https://evil.example/x"])
+def test_package_member_path_is_canonical_and_windows_safe(name: str) -> None:
+    with pytest.raises(SecError) as exc_info:
+        SecMemberRole.OTHER  # keep enum import exercised for the negative fixture
+        SecPackageMember(
+            relative_name=name,
+            role=SecMemberRole.OTHER,
+            content_type="text/plain",
+            source_url="https://www.sec.gov/Archives/edgar/data/1/member.txt",
+            body=b"x",
+        )
+    assert exc_info.value.reason_code in {P11Reason.P11_PACKAGE_INVALID.value, P11Reason.P11_ARCHIVE_HOST_REJECTED.value}
+
+
+def test_package_store_finds_local_slot_without_network(tmp_path: Path) -> None:
+    package = _package()
+    store = SecPackageStore(tmp_path / "raw-store")
+    store.put(package)
+    found = store.find_by_slot(cik="320193", fiscal_year=2025, period="Q2")
+    assert found is not None
+    assert found.package_sha256 == package.package_sha256
 

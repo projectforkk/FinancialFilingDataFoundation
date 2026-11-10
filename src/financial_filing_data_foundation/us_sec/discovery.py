@@ -7,11 +7,18 @@ from typing import Any, Iterable
 
 from .errors import P11Reason, SecError
 from .models import SecCompanyRef, SecFilingCandidate, SecIssuerKind
+from .path_policy import archive_member_url, normalize_archive_relative_name
 from .policy import SecFormPolicy
 
 
 _ACCESSION_RE = re.compile(r"^\d{10}-\d{2}-\d{6}$")
-_SAFE_MEMBER_RE = re.compile(r"^[^/\\]+$")
+
+
+@dataclass(frozen=True, slots=True)
+class SecHistoryChunk:
+    name: str
+    filing_from: str | None = None
+    filing_to: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +29,13 @@ class SecSubmissions:
     fiscal_year_end: str | None = None
     raw_sha256: str | None = None
     source_url: str | None = None
+    history_ranges: tuple[SecHistoryChunk, ...] = ()
+
+    @property
+    def history_chunks(self) -> tuple[SecHistoryChunk, ...]:
+        if self.history_ranges:
+            return self.history_ranges
+        return tuple(SecHistoryChunk(name) for name in self.history_files)
 
 
 def _array(recent: dict[str, Any], key: str, index: int, *, required: bool = True) -> Any:
@@ -34,10 +48,10 @@ def _array(recent: dict[str, Any], key: str, index: int, *, required: bool = Tru
 
 
 def _candidate_url(cik: str, accession: str, primary_document: str) -> str:
-    if not _SAFE_MEMBER_RE.fullmatch(primary_document) or primary_document in {".", ".."}:
-        raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC primary document path is unsafe")
-    normalized = accession.replace("-", "")
-    return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{normalized}/{primary_document}"
+    try:
+        return archive_member_url(cik, accession, normalize_archive_relative_name(primary_document))
+    except SecError as exc:
+        raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC primary document path is unsafe") from exc
 
 
 def _normalize_fiscal_year_end(value: Any) -> str | None:
@@ -104,6 +118,11 @@ def parse_submissions(
             report_period = _array(recent, "reportDate", index, required=False)
         if not isinstance(form, str) or not isinstance(filing_date, str) or not isinstance(primary_document, str):
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC filing metadata is invalid")
+        # Non-periodic submissions can legitimately carry unrelated nested
+        # documents. They are not candidates for the P11 periodic provider, so
+        # do not construct or validate an archive URL for them.
+        if SecFormPolicy.base_form(form) not in {"10-K", "10-Q", "20-F", "40-F"}:
+            continue
         if report_period is not None and not isinstance(report_period, str):
             report_period = None
         kind = _issuer_kind(form)
@@ -123,10 +142,23 @@ def parse_submissions(
             )
         )
     history_files: list[str] = []
+    history_ranges: list[SecHistoryChunk] = []
     if isinstance(filings, dict) and isinstance(filings.get("files"), list):
         for item in filings["files"]:
-            if isinstance(item, dict) and isinstance(item.get("name"), str):
-                history_files.append(item["name"])
+            if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                continue
+            try:
+                name = normalize_archive_relative_name(item["name"])
+            except SecError as exc:
+                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC history file path is unsafe") from exc
+            history_files.append(name)
+            history_ranges.append(
+                SecHistoryChunk(
+                    name=name,
+                    filing_from=str(item.get("filingFrom") or item.get("filing_from") or "").strip() or None,
+                    filing_to=str(item.get("filingTo") or item.get("filing_to") or "").strip() or None,
+                )
+            )
     return SecSubmissions(
         company=company,
         candidates=tuple(candidates),
@@ -134,6 +166,7 @@ def parse_submissions(
         fiscal_year_end=fiscal_year_end,
         raw_sha256=raw_sha256,
         source_url=source_url,
+        history_ranges=tuple(sorted(history_ranges, key=lambda item: item.name)),
     )
 
 
@@ -338,4 +371,4 @@ def select_filing(candidates: Iterable[SecFilingCandidate]) -> SecFilingCandidat
     return originals[0]
 
 
-__all__ = ["SecSubmissions", "discover_filings", "parse_submissions", "select_filing"]
+__all__ = ["SecHistoryChunk", "SecSubmissions", "discover_filings", "parse_submissions", "select_filing"]

@@ -284,6 +284,7 @@ class McpQueryService:
                 "page_no": int(row["page_no"]),
                 "bbox": copy.deepcopy(row.get("bbox")),
                 "row_count": int(row.get("row_count", 0)),
+                "column_count": int(row.get("column_count", row.get("value_column_count", 0))),
                 "value_column_count": int(
                     row.get("value_column_count", 0)
                 ),
@@ -296,6 +297,12 @@ class McpQueryService:
                 "quality_signals": list(
                     row.get("quality_signals") or ()
                 ),
+                "heading_context": copy.deepcopy(row.get("heading_context")),
+                "caption": row.get("caption"),
+                "nested_table_present": bool(row.get("nested_table_present")),
+                "inline_xbrl_fact_present": bool(row.get("inline_xbrl_fact_present")),
+                "visibility_signals": list(row.get("visibility_signals") or ()),
+                "style_signals": list(row.get("style_signals") or ()),
             }
             for row in rows
         ]
@@ -358,11 +365,11 @@ class McpQueryService:
 
         rows: list[dict[str, Any]] = []
         for fact in bundle.facts:
-            if page_no is not None and int(fact.get("page_no", 0)) != page_no:
+            fact_page = fact.get("virtual_page_no", fact.get("page_no"))
+            if page_no is not None and int(fact_page or 0) != page_no:
                 continue
-            if metric_filter and metric_filter.casefold() not in str(
-                fact.get("raw_metric_name", "")
-            ).casefold():
+            metric_name = fact.get("raw_qname", fact.get("raw_metric_name", ""))
+            if metric_filter and metric_filter.casefold() not in str(metric_name).casefold():
                 continue
             rows.append(fact)
         rows = sorted(rows, key=_fact_sort_key)
@@ -820,11 +827,27 @@ def _verify_sec_source_chain(
     try:
         package = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store").load(document.package_sha256)
         member_hashes = {member.member_sha256 for member in package.members}
+        source_cache: dict[tuple[str, str], object] = {}
+        dom_targets: dict[str, set[str]] = {}
+        for row in evidence:
+            locator_kind = str(row.get("locator_kind") or "DOM_PATH").upper()
+            member_sha = str(row.get("member_sha256") or row.get("source_member_sha256") or "")
+            if locator_kind not in {"DOM_PATH", "DOM_HIDDEN_FACT"} or not member_sha:
+                continue
+            targets = dom_targets.setdefault(member_sha, set())
+            locator = str(row.get("dom_locator") or "")
+            if locator:
+                targets.add(locator)
+            block_locator = str(row.get("block_dom_locator") or "")
+            if block_locator:
+                targets.add(block_locator)
+        for member_sha, targets in dom_targets.items():
+            source_cache[("DOM_TARGETS", member_sha)] = targets
         for row in evidence:
             member_sha = str(row.get("member_sha256") or row.get("source_member_sha256") or "")
             if member_sha not in member_hashes:
                 raise ValueError("SEC evidence member hash is not present in verified raw package")
-            verify_sec_evidence(package, pages, row)
+            verify_sec_evidence(package, pages, row, source_cache=source_cache)
         return package
     except Exception as exc:
         raise McpServiceError(
@@ -1087,9 +1110,9 @@ def _table_sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
 
 def _fact_sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
     return (
-        int(row.get("page_no", 0)),
+        int(row.get("virtual_page_no", row.get("page_no", 0)) or 0),
         str(row.get("table_id", "")),
-        int(row.get("row_index", 0)),
-        int(row.get("column_index", 0)),
+        int(row.get("row_index", 0) or 0),
+        int(row.get("column_index", 0) or 0),
         str(row.get("raw_fact_id", "")),
     )

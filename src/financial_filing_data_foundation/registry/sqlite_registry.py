@@ -151,6 +151,7 @@ _SEC_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
             "parser_version",
             "schema_version",
             "validation_status",
+            "compatibility_status",
             "blocking_issue_count",
             "artifact_path",
             "created_at",
@@ -444,6 +445,7 @@ class SQLiteRegistry:
                 parser_version TEXT NOT NULL,
                 schema_version TEXT NOT NULL,
                 validation_status TEXT NOT NULL,
+                compatibility_status TEXT NOT NULL DEFAULT 'INCOMPATIBLE',
                 blocking_issue_count INTEGER NOT NULL,
                 artifact_path TEXT,
                 created_at TEXT NOT NULL,
@@ -454,6 +456,18 @@ class SQLiteRegistry:
             ON sec_parsed_data(company_id, fiscal_year, raw_fiscal_period);
             """
         )
+        sec_parsed_columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info('sec_parsed_data')").fetchall()
+        }
+        if "compatibility_status" not in sec_parsed_columns:
+            # Existing v2 registries predate the explicit P7 compatibility
+            # field.  Mark those rows incompatible until a new validation run
+            # proves PASS + COMPATIBLE + zero blocking issues.
+            conn.execute(
+                "ALTER TABLE sec_parsed_data ADD COLUMN compatibility_status TEXT NOT NULL DEFAULT 'INCOMPATIBLE'"
+            )
+            conn.commit()
 
     def schema_version(self) -> int:
         with self._connect() as conn:
@@ -602,17 +616,25 @@ class SQLiteRegistry:
         validation_status: str,
         blocking_issue_count: int,
         artifact_path: str | None,
+        compatibility_status: str | None = None,
     ) -> None:
         with self._connect() as conn:
+            normalized_compatibility = compatibility_status or (
+                "COMPATIBLE"
+                if str(validation_status).upper() == "PASS" and int(blocking_issue_count) == 0
+                else "INCOMPATIBLE"
+            )
             conn.execute(
                 """
                 INSERT INTO sec_parsed_data(
                     parse_run_id, package_sha256, company_id, fiscal_year,
                     raw_fiscal_period, parser_version, schema_version,
-                    validation_status, blocking_issue_count, artifact_path, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    validation_status, compatibility_status, blocking_issue_count,
+                    artifact_path, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(parse_run_id) DO UPDATE SET
                     validation_status = excluded.validation_status,
+                    compatibility_status = excluded.compatibility_status,
                     blocking_issue_count = excluded.blocking_issue_count,
                     artifact_path = excluded.artifact_path
                 """,
@@ -625,6 +647,7 @@ class SQLiteRegistry:
                     parser_version,
                     schema_version,
                     validation_status,
+                    normalized_compatibility,
                     int(blocking_issue_count),
                     artifact_path,
                     _utc_now(),
@@ -645,6 +668,24 @@ class SQLiteRegistry:
                 SELECT * FROM sec_filing_bindings
                 WHERE company_id = ? AND fiscal_year = ? AND raw_fiscal_period = ?
                 ORDER BY amended ASC, accession ASC
+                """,
+                (company_id, int(fiscal_year), period.upper()),
+            ).fetchall()
+        return tuple(rows)
+
+    def list_sec_parsed_data(
+        self,
+        *,
+        company_id: str,
+        fiscal_year: int,
+        period: str,
+    ) -> tuple[sqlite3.Row, ...]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM sec_parsed_data
+                WHERE company_id = ? AND fiscal_year = ? AND raw_fiscal_period = ?
+                ORDER BY validation_status ASC, package_sha256 ASC, parse_run_id ASC
                 """,
                 (company_id, int(fiscal_year), period.upper()),
             ).fetchall()

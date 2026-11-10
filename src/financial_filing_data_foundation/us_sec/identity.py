@@ -48,6 +48,9 @@ def sec_company(
     ticker: str | None,
     company_name: str | None = None,
     allow_development: bool = False,
+    ticker_source_url: str | None = None,
+    ticker_source_sha256: str | None = None,
+    ticker_retrieved_at: str | None = None,
 ) -> SecCompanyRef:
     from .feature_gate import require_us_development
 
@@ -59,4 +62,7 @@ def sec_company(
         ticker=alias,
         company_id=f"US:CIK{normalized_cik}",
         company_name=company_name.strip() if company_name else None,
+        ticker_source_url=ticker_source_url,
+        ticker_source_sha256=ticker_source_sha256,
+        ticker_retrieved_at=ticker_retrieved_at,
     )

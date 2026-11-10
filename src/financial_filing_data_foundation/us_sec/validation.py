@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import hashlib
 from dataclasses import dataclass
+from datetime import date
+import re
 from pathlib import Path
 from typing import Any
 
@@ -108,6 +110,32 @@ def validate_sec_artifacts(
             issues.append(_issue(P11Reason.P11_PACKAGE_INVALID.value, "BLOCKING", "source package accession/form is missing"))
         if not any(member.role.value == "PRIMARY_DOCUMENT" for member in package.members):
             issues.append(_issue(P11Reason.P11_PRIMARY_DOCUMENT_MISSING.value, "BLOCKING", "source package primary document is missing"))
+        primary_names = {
+            member.relative_name
+            for member in package.members
+            if member.role.value == "PRIMARY_DOCUMENT"
+        }
+        if package.primary_document and str(package.primary_document) not in primary_names:
+            issues.append(_issue(P11Reason.P11_PACKAGE_INVALID.value, "BLOCKING", "package primary_document does not resolve to the primary member"))
+        if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", str(package.accession)):
+            issues.append(_issue(P11Reason.P11_PACKAGE_INVALID.value, "BLOCKING", "source package accession is invalid"))
+        if package.report_period:
+            try:
+                report_period = date.fromisoformat(str(package.report_period)[:10])
+            except ValueError:
+                issues.append(_issue(P11Reason.P11_PACKAGE_INVALID.value, "REVIEW", "source package report_period is not an ISO date"))
+            else:
+                permitted_years = {int(package.fiscal_year)} if str(package.period).upper() == "FY" else {int(package.fiscal_year) - 1, int(package.fiscal_year)}
+                if report_period.year not in permitted_years:
+                    issues.append(_issue("P11_PERIOD_END_IMPLAUSIBLE", "REVIEW", "report period is not plausible for the requested fiscal slot", report_period=str(package.report_period)))
+                if package.filing_date:
+                    try:
+                        filing_date = date.fromisoformat(str(package.filing_date)[:10])
+                    except ValueError:
+                        issues.append(_issue(P11Reason.P11_PACKAGE_INVALID.value, "REVIEW", "source package filing_date is not an ISO date"))
+                    else:
+                        if filing_date < report_period:
+                            issues.append(_issue("P11_PERIOD_END_IMPLAUSIBLE", "REVIEW", "filing date precedes report period", filing_date=str(package.filing_date), report_period=str(package.report_period)))
         member_hashes = {member.member_sha256 for member in package.members}
         for evidence in parsed.evidence:
             if str(evidence.get("member_sha256") or evidence.get("source_member_sha256") or "") not in member_hashes:
@@ -127,6 +155,24 @@ def validate_sec_artifacts(
         for page in parsed.pages
         for block in (page.get("blocks") or [])
     }
+    table_ids = {str(table.get("table_id", "")) for table in parsed.tables}
+    if len(table_ids) != len(parsed.tables) or "" in table_ids:
+        issues.append(_issue("P11_TABLE_TRACE_INVALID", "BLOCKING", "table identity is missing or duplicated"))
+    cell_ids: set[str] = set()
+    for table in parsed.tables:
+        if str(table.get("document_sha256", "")) != parsed.package_sha256:
+            issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "table document identity does not match package", table_id=table.get("table_id")))
+        source_member = str(table.get("source_member_sha256") or "")
+        if package is not None and source_member not in {member.member_sha256 for member in package.members}:
+            issues.append(_issue(P11Reason.P11_MEMBER_HASH_MISMATCH.value, "BLOCKING", "table source member is not in source package", table_id=table.get("table_id")))
+        for row in table.get("rows") or ():
+            for cell in row.get("cells") or ():
+                cell_id = str(cell.get("cell_id") or "")
+                if not cell_id or cell_id in cell_ids:
+                    issues.append(_issue("P11_TABLE_TRACE_INVALID", "BLOCKING", "table cell identity is missing or duplicated", table_id=table.get("table_id")))
+                cell_ids.add(cell_id)
+                if source_member and not cell.get("source_member_sha256") == source_member:
+                    issues.append(_issue("P11_TABLE_TRACE_INVALID", "BLOCKING", "table cell source member is inconsistent", cell_id=cell_id))
     if not parsed.facts:
         issues.append(
             _issue(
@@ -158,8 +204,30 @@ def validate_sec_artifacts(
         evidence = evidence_by_id.get(fact_evidence_id)
         if evidence is not None and str(evidence.get("raw_fact_id", "")) != str(fact.get("raw_fact_id", "")):
             issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "Evidence does not point back to its Raw Fact", evidence_id=fact_evidence_id))
+        table_cell_id = str(fact.get("table_cell_id") or "")
+        if table_cell_id and table_cell_id not in cell_ids:
+            issues.append(_issue("P11_TABLE_TRACE_INVALID", "BLOCKING", "raw fact table_cell_id does not resolve", raw_fact_id=fact.get("raw_fact_id")))
+        fact_table_id = str(fact.get("table_id") or "")
+        if fact_table_id and fact_table_id not in table_ids:
+            issues.append(_issue("P11_TABLE_TRACE_INVALID", "BLOCKING", "raw fact table_id does not resolve", raw_fact_id=fact.get("raw_fact_id")))
     if len(fact_ids) != len(parsed.facts) or len(evidence_ids) != len(parsed.evidence):
         issues.append(_issue("P11_ARTIFACT_INCOMPLETE_OR_CORRUPT", "BLOCKING", "duplicate raw fact or evidence identity"))
+    evidence_source_cache: dict[tuple[str, str], object] = {}
+    dom_targets: dict[str, set[str]] = {}
+    for evidence in parsed.evidence:
+        locator_kind = str(evidence.get("locator_kind") or "DOM_PATH").upper()
+        member_sha = str(evidence.get("member_sha256") or evidence.get("source_member_sha256") or "")
+        if locator_kind not in {"DOM_PATH", "DOM_HIDDEN_FACT"} or not member_sha:
+            continue
+        targets = dom_targets.setdefault(member_sha, set())
+        locator = str(evidence.get("dom_locator") or "")
+        if locator:
+            targets.add(locator)
+        block_locator = str(evidence.get("block_dom_locator") or "")
+        if block_locator:
+            targets.add(block_locator)
+    for member_sha, targets in dom_targets.items():
+        evidence_source_cache[("DOM_TARGETS", member_sha)] = targets
     for evidence in parsed.evidence:
         locator_kind = str(evidence.get("locator_kind") or "DOM_PATH").upper()
         locator = str(evidence.get("xml_locator" if locator_kind == "XML_PATH" else "dom_locator", ""))
@@ -170,9 +238,12 @@ def validate_sec_artifacts(
                 issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "evidence block_id is not a normalized source block", evidence_id=evidence.get("evidence_id")))
             if not str(evidence.get("block_dom_locator") or "").startswith("/"):
                 issues.append(_issue(P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value, "BLOCKING", "visible evidence block locator is missing", evidence_id=evidence.get("evidence_id")))
+        evidence_table_id = str(evidence.get("table_id") or "")
+        if evidence_table_id and evidence_table_id not in table_ids:
+            issues.append(_issue("P11_TABLE_TRACE_INVALID", "BLOCKING", "evidence table_id does not resolve", evidence_id=evidence.get("evidence_id")))
         if package is not None:
             try:
-                verify_sec_evidence(package, parsed.pages, evidence)
+                verify_sec_evidence(package, parsed.pages, evidence, source_cache=evidence_source_cache)
             except SecError as exc:
                 issues.append(_issue(exc.reason_code, "BLOCKING", str(exc), evidence_id=evidence.get("evidence_id")))
 
@@ -182,8 +253,8 @@ def validate_sec_artifacts(
         artifact_dir=directory,
         package_sha256=parsed.package_sha256,
         validation_status=status,
-        compatibility_status="COMPATIBLE" if blocking == 0 else "UNKNOWN",
-        reuse_eligible=blocking == 0,
+        compatibility_status="COMPATIBLE" if status == "PASS" and blocking == 0 else "INCOMPATIBLE",
+        reuse_eligible=status == "PASS" and blocking == 0,
         blocking_issue_count=blocking,
         failure_issue_count=failures,
         review_issue_count=review,
@@ -228,6 +299,13 @@ def load_sec_validation(artifact_dir: str | Path) -> SecValidationResult:
     )
     if result.issue_count != len(result.issues):
         raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation issue count mismatch")
+    expected_reuse = (
+        result.validation_status == "PASS"
+        and result.compatibility_status == "COMPATIBLE"
+        and result.blocking_issue_count == 0
+    )
+    if result.reuse_eligible != expected_reuse:
+        raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation reuse eligibility is inconsistent")
     return result
 
 

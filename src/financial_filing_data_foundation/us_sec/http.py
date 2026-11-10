@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from urllib.request import (
     HTTPRedirectHandler,
     Request,
@@ -50,7 +50,16 @@ def validate_sec_url(url: str) -> str:
             P11Reason.P11_ARCHIVE_HOST_REJECTED,
             "SEC requests require HTTPS without embedded credentials",
         )
-    if host not in SEC_ALLOWED_HOSTS or not _allowed_path(host, parsed.path):
+    path = parsed.path or "/"
+    if (
+        host not in SEC_ALLOWED_HOSTS
+        or not _allowed_path(host, path)
+        or parsed.query
+        or parsed.fragment
+        or "\\" in path
+        or unquote(path) != path
+        or any(part in {"", ".", ".."} for part in path.split("/") if part in {".", ".."})
+    ):
         raise SecError(
             P11Reason.P11_ARCHIVE_HOST_REJECTED,
             f"SEC URL is not allowlisted: {url}",
@@ -66,6 +75,9 @@ class SecHttpConfig:
     rate_limit_per_second: float = 8.0
     max_attempts: int = 3
     timeout_seconds: float = 30.0
+    connect_timeout_seconds: float | None = None
+    read_timeout_seconds: float | None = None
+    total_timeout_seconds: float | None = None
     max_redirects: int = 3
     submissions_max_bytes: int = SUBMISSIONS_MAX_BYTES
     member_max_bytes: int = MEMBER_MAX_BYTES
@@ -97,6 +109,16 @@ class SecHttpConfig:
             raise ValueError("max_attempts must be between 1 and 5")
         if self.max_redirects < 0 or self.max_redirects > 5:
             raise ValueError("max_redirects must be between 0 and 5")
+        connect = self.timeout_seconds if self.connect_timeout_seconds is None else self.connect_timeout_seconds
+        read = self.timeout_seconds if self.read_timeout_seconds is None else self.read_timeout_seconds
+        total = max(connect, read) if self.total_timeout_seconds is None else self.total_timeout_seconds
+        if connect <= 0 or read <= 0 or total <= 0:
+            raise ValueError("SEC connect/read/total timeouts must be positive")
+        if total < max(connect, read):
+            raise ValueError("SEC total timeout must cover connect and read timeouts")
+        object.__setattr__(self, "connect_timeout_seconds", float(connect))
+        object.__setattr__(self, "read_timeout_seconds", float(read))
+        object.__setattr__(self, "total_timeout_seconds", float(total))
 
 
 class SecRateLimiter:
@@ -158,13 +180,22 @@ def _network_transport(
     *,
     max_bytes: int = PACKAGE_MAX_BYTES,
     max_redirects: int = 3,
+    read_timeout: float | None = None,
+    total_timeout: float | None = None,
 ) -> SecResponse:
     if max_redirects < 0:
         raise ValueError("max_redirects must be non-negative")
     request = Request(url, headers=headers, method="GET")
     opener = build_opener(_AllowlistedRedirectHandler(max_redirects=max_redirects))
+    started = time.monotonic()
+    effective_read_timeout = float(read_timeout if read_timeout is not None else timeout)
+    if effective_read_timeout <= 0 or (total_timeout is not None and total_timeout <= 0):
+        raise ValueError("SEC timeouts must be positive")
     try:
         with opener.open(request, timeout=timeout) as response:
+            raw_socket = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+            if raw_socket is not None and hasattr(raw_socket, "settimeout"):
+                raw_socket.settimeout(effective_read_timeout)
             declared_length = response.headers.get("Content-Length")
             if declared_length:
                 try:
@@ -178,11 +209,15 @@ def _network_transport(
             chunks: list[bytes] = []
             remaining = max_bytes + 1
             while remaining > 0:
+                if total_timeout is not None and time.monotonic() - started >= total_timeout:
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC total timeout exceeded", retryable=True)
                 chunk = response.read(min(1024 * 1024, remaining))
                 if not chunk:
                     break
                 chunks.append(chunk)
                 remaining -= len(chunk)
+                if total_timeout is not None and time.monotonic() - started >= total_timeout:
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC total timeout exceeded", retryable=True)
             body = b"".join(chunks)
             if len(body) > max_bytes:
                 raise SecError(
@@ -291,8 +326,13 @@ class SecHttpClient:
         if limit <= 0:
             raise ValueError("max_bytes must be positive")
         last_status: int | None = None
+        total_deadline = time.monotonic() + float(self.config.total_timeout_seconds or self.config.timeout_seconds)
         for attempt in range(self.config.max_attempts):
+            if time.monotonic() >= total_deadline:
+                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC total timeout exceeded", retryable=True)
             self.limiter.wait()
+            if time.monotonic() >= total_deadline:
+                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC total timeout exceeded", retryable=True)
             try:
                 request_headers = {
                     "User-Agent": self.config.user_agent,
@@ -301,17 +341,21 @@ class SecHttpClient:
                     response = _network_transport(
                         validated_url,
                         request_headers,
-                        self.config.timeout_seconds,
+                        float(self.config.connect_timeout_seconds or self.config.timeout_seconds),
                         max_bytes=limit,
                         max_redirects=self.config.max_redirects,
+                        read_timeout=float(self.config.read_timeout_seconds or self.config.timeout_seconds),
+                        total_timeout=max(0.001, total_deadline - time.monotonic()),
                     )
                 elif hasattr(self.transport, "fetch"):
                     response = self.transport.fetch(  # type: ignore[attr-defined]
                         validated_url,
                         request_headers,
-                        self.config.timeout_seconds,
+                        float(self.config.connect_timeout_seconds or self.config.timeout_seconds),
                         max_bytes=limit,
                         max_redirects=self.config.max_redirects,
+                        read_timeout=float(self.config.read_timeout_seconds or self.config.timeout_seconds),
+                        total_timeout=max(0.001, total_deadline - time.monotonic()),
                     )
                 else:
                     response = self.transport(
@@ -322,7 +366,10 @@ class SecHttpClient:
             except SecError as exc:
                 if not exc.retryable or attempt + 1 >= self.config.max_attempts:
                     raise
-                self.sleep(min(2.0**attempt, 8.0))
+                remaining = total_deadline - time.monotonic()
+                if remaining <= 0:
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC total timeout exceeded", retryable=True) from exc
+                self.sleep(min(2.0**attempt, 8.0, remaining))
                 continue
             validate_sec_url(response.final_url)
             last_status = response.status
@@ -358,11 +405,17 @@ class SecHttpClient:
                 delay = _retry_after(response.headers)
                 if delay is None:
                     delay = min(2.0**attempt, 8.0)
-                self.sleep(delay)
+                remaining = total_deadline - time.monotonic()
+                if remaining <= 0:
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC total timeout exceeded", retryable=True)
+                self.sleep(min(delay, remaining))
                 continue
 
             if 500 <= response.status < 600 and attempt + 1 < self.config.max_attempts:
-                self.sleep(min(2.0**attempt, 8.0))
+                remaining = total_deadline - time.monotonic()
+                if remaining <= 0:
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC total timeout exceeded", retryable=True)
+                self.sleep(min(2.0**attempt, 8.0, remaining))
                 continue
             raise SecError(
                 P11Reason.P11_SEC_DISCOVERY_FAILED,

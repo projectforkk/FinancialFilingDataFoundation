@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import base64
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -16,12 +17,14 @@ class TickerMapSnapshot:
     source_sha256: str
     retrieved_at: str
     mapping: dict[str, tuple[str, ...]]
+    source_bytes_b64: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "source_url": self.source_url,
             "source_sha256": self.source_sha256,
             "retrieved_at": self.retrieved_at,
+            "source_bytes_b64": self.source_bytes_b64,
             "mapping": {
                 key: list(values) for key, values in sorted(self.mapping.items())
             },
@@ -72,6 +75,7 @@ def snapshot_ticker_map(
         source_sha256=hashlib.sha256(bytes(data)).hexdigest(),
         retrieved_at=retrieved_at or datetime.now(timezone.utc).isoformat(),
         mapping=parsed,
+        source_bytes_b64=base64.b64encode(bytes(data)).decode("ascii"),
     )
 
 

@@ -11,6 +11,7 @@ from financial_filing_data_foundation.us_sec.discovery import (
     parse_submissions,
     select_filing,
 )
+from financial_filing_data_foundation.us_sec.acquisition import _history_chunks_for_year
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import (
     _AllowlistedRedirectHandler,
@@ -114,6 +115,18 @@ def test_http_client_declares_user_agent_and_enforces_size_and_content_type() ->
     assert content.value.reason_code == P11Reason.P11_CONTENT_TYPE_INVALID
 
 
+def test_http_config_exposes_connect_read_and_total_timeouts() -> None:
+    config = SecHttpConfig(
+        contact_email="ops@example.org",
+        connect_timeout_seconds=1.0,
+        read_timeout_seconds=2.0,
+        total_timeout_seconds=5.0,
+    )
+    assert (config.connect_timeout_seconds, config.read_timeout_seconds, config.total_timeout_seconds) == (1.0, 2.0, 5.0)
+    with pytest.raises(ValueError):
+        SecHttpConfig(contact_email="ops@example.org", connect_timeout_seconds=2.0, read_timeout_seconds=3.0, total_timeout_seconds=1.0)
+
+
 def test_http_client_rejects_unhandled_content_encoding() -> None:
     def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
         return SecResponse(200, {"Content-Encoding": "gzip"}, b"compressed", url)
@@ -185,6 +198,48 @@ def test_ticker_mapping_and_submission_discovery_are_fail_closed() -> None:
     )
     assert len(candidates) == 2
     assert {item.amended for item in candidates} == {False, True}
+
+
+def test_unrelated_nested_sec_primary_document_does_not_poison_periodic_discovery() -> None:
+    payload = _submissions()
+    filings = payload["filings"]["recent"]  # type: ignore[index]
+    for key, value in {
+        "accessionNumber": "0000123456-25-000006",
+        "filingDate": "2025-12-01",
+        "reportDate": "2025-12-01",
+        "form": "4",
+        "primaryDocument": "xslF345X06/form4.xml",
+    }.items():
+        filings[key].append(value)  # type: ignore[index]
+    company = sec_company(cik="123456789", ticker="EXM", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+    candidates = discover_filings(submissions, fiscal_year=2025, period="Q2")
+    assert len(candidates) == 2
+    assert all(candidate.primary_document != "xslF345X06/form4.xml" for candidate in candidates)
+
+
+@pytest.mark.parametrize("unsafe", ["../filing.htm", "/filing.htm", "C:/filing.htm", "x\\filing.htm", "https://evil.example/filing.htm", "%2e%2e/filing.htm"])
+def test_supported_filing_primary_document_path_traversal_is_rejected(unsafe: str) -> None:
+    payload = _submissions()
+    payload["filings"]["recent"]["primaryDocument"][0] = unsafe  # type: ignore[index]
+    company = sec_company(cik="123456789", ticker="EXM", allow_development=True)
+    with pytest.raises(SecError) as exc_info:
+        parse_submissions(payload, company=company)
+    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
+
+
+def test_history_chunk_ranges_are_preserved_and_unrelated_chunks_are_not_selected() -> None:
+    payload = _submissions()
+    payload["filings"]["files"] = [  # type: ignore[index]
+        {"name": "CIK123456789-2018.json", "filingFrom": "2018-01-01", "filingTo": "2018-12-31"},
+        {"name": "CIK123456789-2024.json", "filingFrom": "2024-01-01", "filingTo": "2024-12-31"},
+        {"name": "CIK123456789-2026.json", "filingFrom": "2026-01-01", "filingTo": "2026-12-31"},
+    ]
+    company = sec_company(cik="123456789", ticker="EXM", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+    assert submissions.history_ranges[1].filing_from == "2024-01-01"
+    selected = _history_chunks_for_year(submissions, 2025)
+    assert [chunk.name for chunk in selected] == ["CIK123456789-2024.json", "CIK123456789-2026.json"]
 
 
 def test_discovery_uses_fiscal_year_end_and_chronology_for_non_calendar_issuers() -> None:

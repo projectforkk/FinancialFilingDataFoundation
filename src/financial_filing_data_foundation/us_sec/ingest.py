@@ -44,6 +44,10 @@ def _upsert_catalog(
     catalog_path: Path,
     period: str,
     publish: bool,
+    company_id: str | None = None,
+    ticker_source_url: str | None = None,
+    ticker_source_sha256: str | None = None,
+    ticker_retrieved_at: str | None = None,
 ) -> str:
     if not publish:
         return "NOT_REGISTERED_REVIEW_CONFLICT"
@@ -59,18 +63,29 @@ def _upsert_catalog(
         "source_kind": "SEC",
         "market": "US",
         "ticker": ticker,
+        "company_id": company_id or f"US:CIK{package.cik}",
+        "provider_company_id": package.cik,
+        "cik": package.cik,
+        "ticker_source_url": ticker_source_url,
+        "ticker_source_sha256": ticker_source_sha256,
+        "ticker_retrieved_at": ticker_retrieved_at,
         "fiscal_year": package.fiscal_year,
         "filing_type": period.upper(),
         "raw_fiscal_period": period.upper(),
         "sec_artifact_dir": _relative(root, parsed.artifact_dir),
     }
-    identity = ("US", ticker.upper(), package.fiscal_year, period.upper())
+    identity = ("US", str(document["company_id"]).upper(), package.fiscal_year, period.upper())
     documents = payload["documents"]
     replacement: int | None = None
     for index, row in enumerate(documents):
+        row_company = str(row.get("company_id") or "").strip()
+        if not row_company and str(row.get("cik") or "").strip().isdigit():
+            row_company = f"US:CIK{str(row.get('cik')).zfill(10)}"
+        if not row_company:
+            row_company = str(row.get("ticker", "")).upper()
         row_identity = (
             str(row.get("market", "")).upper(),
-            str(row.get("ticker", "")).upper(),
+            row_company.upper(),
             int(row.get("fiscal_year", 0)),
             str(row.get("raw_fiscal_period", row.get("filing_type", ""))).upper(),
         )
@@ -87,7 +102,7 @@ def _upsert_catalog(
     else:
         documents[replacement] = document
         action = "ALREADY_REGISTERED"
-    documents.sort(key=lambda row: (str(row.get("market", "")), str(row.get("ticker", "")), int(row.get("fiscal_year", 0)), str(row.get("raw_fiscal_period", "")), str(row.get("document_sha256", ""))))
+    documents.sort(key=lambda row: (str(row.get("market", "")), str(row.get("company_id") or row.get("ticker", "")), int(row.get("fiscal_year", 0)), str(row.get("raw_fiscal_period", "")), str(row.get("document_sha256", ""))))
     candidate = {"schema_version": "p8-mcp-catalog-v1", "documents": documents}
     catalog_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="\n", dir=catalog_path.parent, prefix=".p8-sec.", suffix=".tmp", delete=False) as handle:
@@ -110,6 +125,10 @@ def ingest_sec_package(
     ticker: str,
     period: str,
     amendment_conflict: bool = False,
+    company_id: str | None = None,
+    ticker_source_url: str | None = None,
+    ticker_source_sha256: str | None = None,
+    ticker_retrieved_at: str | None = None,
 ) -> SecIngestResult:
     project_root = Path(root).expanduser().resolve()
     base = project_root / "workspace" / "ingest" / "us"
@@ -133,12 +152,13 @@ def ingest_sec_package(
         parser_version=parsed.parser_version,
         schema_version="p11-sec-artifacts-v1",
         validation_status=validation.validation_status,
+        compatibility_status=validation.compatibility_status,
         blocking_issue_count=validation.blocking_issue_count,
         artifact_path=str(parsed.artifact_dir),
     )
     ready = validation.validation_status == "PASS" and not amendment_conflict
     catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
-    catalog_status = _upsert_catalog(root=project_root, package=package, ticker=ticker, parsed=parsed, validation=validation, catalog_path=catalog_path, period=period, publish=ready)
+    catalog_status = _upsert_catalog(root=project_root, package=package, ticker=ticker, parsed=parsed, validation=validation, catalog_path=catalog_path, period=period, publish=ready, company_id=company_id, ticker_source_url=ticker_source_url, ticker_source_sha256=ticker_source_sha256, ticker_retrieved_at=ticker_retrieved_at)
     return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
 
 

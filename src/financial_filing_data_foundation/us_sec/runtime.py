@@ -91,6 +91,8 @@ class SecSubprocessTransport:
         *,
         max_bytes: int,
         max_redirects: int = 3,
+        read_timeout: float | None = None,
+        total_timeout: float | None = None,
     ) -> SecResponse:
         validate_sec_url(url)
         result = run_sec_runner(
@@ -100,10 +102,12 @@ class SecSubprocessTransport:
                 "url": url,
                 "headers": headers,
                 "timeout": timeout,
+                "read_timeout": read_timeout if read_timeout is not None else timeout,
+                "total_timeout": total_timeout if total_timeout is not None else timeout,
                 "max_bytes": max_bytes,
                 "max_redirects": max_redirects,
             },
-            timeout_seconds=timeout + 30.0,
+            timeout_seconds=float(total_timeout if total_timeout is not None else timeout) + 30.0,
         )
         try:
             body = base64.b64decode(str(result.get("body_b64", "")), validate=True)

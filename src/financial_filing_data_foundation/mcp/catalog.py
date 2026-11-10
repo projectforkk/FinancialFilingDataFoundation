@@ -34,14 +34,21 @@ class CatalogDocument:
     package_sha256: str | None = None
     sec_artifact_dir: Path | None = None
     raw_fiscal_period: str | None = None
+    company_id: str | None = None
+    provider_company_id: str | None = None
+    ticker_source_url: str | None = None
+    ticker_source_sha256: str | None = None
+    ticker_retrieved_at: str | None = None
 
     @property
     def filing_identity(self) -> tuple[str, str, int, str]:
+        stable_company = self.company_id if self.source_kind.upper() == "SEC" and self.company_id else self.ticker
+        stable_period = self.raw_fiscal_period or self.filing_type
         return (
             self.market.upper(),
-            self.ticker.upper(),
+            stable_company.upper(),
             int(self.fiscal_year),
-            self.filing_type.upper(),
+            stable_period.upper(),
         )
 
     def metadata(self) -> dict[str, Any]:
@@ -58,6 +65,11 @@ class CatalogDocument:
                     "source_kind": self.source_kind,
                     "package_sha256": self.package_sha256,
                     "raw_fiscal_period": self.raw_fiscal_period,
+                    "company_id": self.company_id,
+                    "provider_company_id": self.provider_company_id,
+                    "ticker_source_url": self.ticker_source_url,
+                    "ticker_source_sha256": self.ticker_source_sha256,
+                    "ticker_retrieved_at": self.ticker_retrieved_at,
                 }
             )
         return result
@@ -283,6 +295,16 @@ def _parse_document(
                 "P8_CATALOG_INVALID",
                 f"documents[{index}].raw_fiscal_period is invalid",
             )
+        company_id = str(raw.get("company_id") or "").strip()
+        cik = str(raw.get("cik") or "").strip()
+        if not company_id and cik.isdigit():
+            company_id = f"US:CIK{cik.zfill(10)}"
+        if not company_id and ticker.upper().startswith("CIK"):
+            company_id = f"US:{ticker.upper()}"
+        if not company_id:
+            # Accept legacy development fixtures created before the stable
+            # CIK catalog field was introduced. New ingest writes company_id.
+            company_id = f"US:{ticker.upper()}"
         return CatalogDocument(
             document_sha256=document_sha256,
             market=market,
@@ -293,6 +315,11 @@ def _parse_document(
             package_sha256=package_sha256,
             sec_artifact_dir=_artifact_path(root, raw, "sec_artifact_dir", index),
             raw_fiscal_period=raw_period,
+            company_id=company_id,
+            provider_company_id=str(raw.get("provider_company_id") or "").strip() or None,
+            ticker_source_url=str(raw.get("ticker_source_url") or "").strip() or None,
+            ticker_source_sha256=str(raw.get("ticker_source_sha256") or "").strip() or None,
+            ticker_retrieved_at=str(raw.get("ticker_retrieved_at") or "").strip() or None,
         )
 
     return CatalogDocument(

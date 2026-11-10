@@ -17,6 +17,9 @@ class SecCompanyRef:
     company_id: str
     company_name: str | None = None
     issuer_kind: SecIssuerKind = SecIssuerKind.UNKNOWN
+    ticker_source_url: str | None = None
+    ticker_source_sha256: str | None = None
+    ticker_retrieved_at: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
