@@ -160,6 +160,27 @@ _SEC_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
     ),
 }
 
+_SEC_V2_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    "source_packages": _SEC_REQUIRED_SCHEMA_COLUMNS["source_packages"],
+    "package_members": _SEC_REQUIRED_SCHEMA_COLUMNS["package_members"],
+    "sec_filing_bindings": _SEC_REQUIRED_SCHEMA_COLUMNS["sec_filing_bindings"],
+    "sec_parsed_data": frozenset(
+        {
+            "parse_run_id",
+            "package_sha256",
+            "company_id",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "parser_version",
+            "schema_version",
+            "validation_status",
+            "blocking_issue_count",
+            "artifact_path",
+            "created_at",
+        }
+    ),
+}
+
 _SEC_CORE_TABLES = frozenset(
     {"source_packages", "package_members", "sec_filing_bindings", "sec_parsed_data"}
 )
@@ -298,6 +319,53 @@ class SQLiteRegistry:
             )
 
     @staticmethod
+    def _validate_sec_metadata_schema(conn: sqlite3.Connection) -> None:
+        columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info('sec_schema_metadata')").fetchall()
+        }
+        missing_columns = sorted(
+            _SEC_REQUIRED_SCHEMA_COLUMNS["sec_schema_metadata"] - columns
+        )
+        if missing_columns:
+            raise RegistrySchemaUnsupported(
+                "SEC registry metadata is incomplete; missing columns: "
+                + ", ".join(missing_columns)
+            )
+
+    @staticmethod
+    def _validate_sec_v2_schema(conn: sqlite3.Connection) -> None:
+        existing_tables = SQLiteRegistry._sec_table_names(conn)
+        missing_tables = sorted(_SEC_CORE_TABLES - existing_tables)
+        if missing_tables:
+            raise RegistrySchemaUnsupported(
+                "SEC v2 registry extension is incomplete; missing tables: "
+                + ", ".join(missing_tables)
+            )
+
+        shape_errors: list[str] = []
+        for table, expected_columns in _SEC_V2_REQUIRED_SCHEMA_COLUMNS.items():
+            actual_columns = {
+                str(row["name"])
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
+            missing_columns = sorted(expected_columns - actual_columns)
+            extra_columns = sorted(actual_columns - expected_columns)
+            if missing_columns or extra_columns:
+                detail: list[str] = []
+                if missing_columns:
+                    detail.append("missing=" + ",".join(missing_columns))
+                if extra_columns:
+                    detail.append("unexpected=" + ",".join(extra_columns))
+                shape_errors.append(f"{table} ({'; '.join(detail)})")
+
+        if shape_errors:
+            raise RegistrySchemaUnsupported(
+                "SEC registry extension is not a supported historical v2 shape: "
+                + "; ".join(shape_errors)
+            )
+
+    @staticmethod
     def _sec_table_names(conn: sqlite3.Connection) -> set[str]:
         rows = conn.execute(
             """
@@ -346,9 +414,18 @@ class SQLiteRegistry:
 
     @classmethod
     def _migrate_sec_v2_to_v3(cls, conn: sqlite3.Connection) -> None:
+        cls._validate_sec_v2_schema(conn)
         if not conn.in_transaction:
             conn.execute("BEGIN")
         try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sec_schema_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
             columns = {
                 str(row["name"])
                 for row in conn.execute("PRAGMA table_info('sec_parsed_data')").fetchall()
@@ -373,40 +450,56 @@ class SQLiteRegistry:
     def _ensure_sec_schema(cls, conn: sqlite3.Connection) -> None:
         tables_before = cls._sec_table_names(conn)
         core_before = tables_before & _SEC_CORE_TABLES
+        metadata_before = "sec_schema_metadata" in tables_before
+
+        if metadata_before:
+            # Gate versioned SEC registries before running any current-version
+            # DDL.  Unknown future schemas must remain untouched when rejected.
+            cls._validate_sec_metadata_schema(conn)
+            stored_version = cls._read_sec_schema_version(conn)
+            if stored_version is None:
+                raise RegistrySchemaUnsupported(
+                    "SEC registry metadata has no schema_version"
+                )
+            if not core_before:
+                raise RegistrySchemaUnsupported(
+                    "SEC registry metadata exists without a legacy SEC schema"
+                )
+            if core_before != _SEC_CORE_TABLES:
+                missing = sorted(_SEC_CORE_TABLES - core_before)
+                raise RegistrySchemaUnsupported(
+                    "SEC registry extension is incomplete; missing tables: "
+                    + ", ".join(missing)
+                )
+            if stored_version == 2:
+                cls._validate_sec_v2_schema(conn)
+                cls._migrate_sec_v2_to_v3(conn)
+                return
+            if stored_version == SEC_REGISTRY_SCHEMA_VERSION:
+                cls._validate_sec_schema(conn)
+                return
+            raise RegistrySchemaUnsupported(
+                f"unsupported SEC registry schema version: {stored_version}"
+            )
+
         if core_before and core_before != _SEC_CORE_TABLES:
             missing = sorted(_SEC_CORE_TABLES - core_before)
             raise RegistrySchemaUnsupported(
                 "SEC registry extension is incomplete; missing tables: "
                 + ", ".join(missing)
             )
-        if "sec_schema_metadata" in tables_before and not core_before:
-            raise RegistrySchemaUnsupported(
-                "SEC registry extension is incomplete; SEC core tables are missing"
-            )
 
-        cls._create_sec_schema(conn)
-        stored_version = cls._read_sec_schema_version(conn)
         if not core_before:
-            if stored_version is not None:
-                raise RegistrySchemaUnsupported(
-                    "SEC registry metadata exists without a legacy SEC schema"
-                )
+            # No existing SEC extension: create and version the current schema.
+            cls._create_sec_schema(conn)
             cls._write_sec_schema_version(conn, SEC_REGISTRY_SCHEMA_VERSION)
             conn.commit()
             return
-        if stored_version is None:
-            # Existing SEC v2 databases did not persist their extension
-            # version.  The old shape is inferred from the SEC core tables and
-            # migrated without touching package/binding identity fields.
-            cls._migrate_sec_v2_to_v3(conn)
-            return
-        if stored_version == 2:
-            cls._migrate_sec_v2_to_v3(conn)
-            return
-        if stored_version != SEC_REGISTRY_SCHEMA_VERSION:
-            raise RegistrySchemaUnsupported(
-                f"unsupported SEC registry schema version: {stored_version}"
-            )
+
+        # An unversioned SEC extension is supported only when its exact
+        # historical v2 shape is recognized; unknown shapes fail closed.
+        cls._validate_sec_v2_schema(conn)
+        cls._migrate_sec_v2_to_v3(conn)
 
     @staticmethod
     def _create_schema(conn: sqlite3.Connection) -> None:
@@ -579,17 +672,6 @@ class SQLiteRegistry:
             );
             """
         )
-        sec_parsed_columns = {
-            str(row["name"])
-            for row in conn.execute("PRAGMA table_info('sec_parsed_data')").fetchall()
-        }
-        if "compatibility_status" not in sec_parsed_columns:
-            # Existing v2 registries predate the explicit P7 compatibility
-            # field.  Mark those rows incompatible until a new validation run
-            # proves PASS + COMPATIBLE + zero blocking issues.
-            conn.execute(
-                "ALTER TABLE sec_parsed_data ADD COLUMN compatibility_status TEXT NOT NULL DEFAULT 'INCOMPATIBLE'"
-            )
 
     def schema_version(self) -> int:
         with self._connect() as conn:

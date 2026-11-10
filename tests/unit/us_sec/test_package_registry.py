@@ -137,50 +137,468 @@ def test_registry_adds_sec_tables_without_rewriting_legacy_rows(tmp_path: Path) 
     assert package_dir.exists()
 
 
-def _make_v2_registry(db: Path, tmp_path: Path) -> tuple[object, dict[str, tuple[object, ...]]]:
-    registry = SQLiteRegistry(db)
-    package = _package()
-    registry.register_sec_package(package)
-    registry.register_sec_binding(
-        package,
-        company_id="US:CIK0000320193",
-        fiscal_year=2025,
-        period="Q2",
-        artifact_path="old-v3-artifact",
-    )
-    registry.register_sec_parsed_data(
-        parse_run_id="old-run",
-        package_sha256=package.package_sha256,
-        company_id="US:CIK0000320193",
-        fiscal_year=2025,
-        period="Q2",
-        parser_version="VIRTUAL_HTML_V3",
-        schema_version="p11-sec-artifacts-v1",
-        validation_status="PASS",
-        blocking_issue_count=0,
-        compatibility_status="COMPATIBLE",
-        artifact_path="old-v3-artifact",
-    )
+_LEGACY_V1_DDL = """
+CREATE TABLE documents (
+    document_sha256 TEXT PRIMARY KEY,
+    file_size INTEGER NOT NULL,
+    page_count INTEGER,
+    first_seen_at TEXT NOT NULL
+);
+
+CREATE TABLE document_locations (
+    path TEXT PRIMARY KEY,
+    document_sha256 TEXT NOT NULL,
+    mtime_ns INTEGER NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    exists_flag INTEGER NOT NULL CHECK (exists_flag IN (0, 1)),
+    FOREIGN KEY(document_sha256) REFERENCES documents(document_sha256)
+);
+
+CREATE INDEX idx_locations_sha ON document_locations(document_sha256);
+
+CREATE TABLE document_sources (
+    document_sha256 TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    source_title TEXT NOT NULL,
+    filing_date TEXT,
+    report_date TEXT,
+    provider_company_id TEXT,
+    acquired_at TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(document_sha256, provider, source_id),
+    FOREIGN KEY(document_sha256) REFERENCES documents(document_sha256)
+);
+
+CREATE INDEX idx_document_sources_sha ON document_sources(document_sha256);
+
+CREATE TABLE filing_bindings (
+    binding_id TEXT PRIMARY KEY,
+    document_sha256 TEXT NOT NULL,
+    market TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    filing_type TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    raw_fiscal_period TEXT NOT NULL,
+    amended INTEGER,
+    binding_status TEXT NOT NULL,
+    source_provider TEXT,
+    source_id TEXT,
+    source_url TEXT,
+    source_title TEXT,
+    filing_date TEXT,
+    report_date TEXT,
+    provider_company_id TEXT,
+    acquired_at TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(document_sha256) REFERENCES documents(document_sha256)
+);
+
+CREATE INDEX idx_bindings_slot
+    ON filing_bindings(market, company_id, filing_type, fiscal_year, raw_fiscal_period);
+
+CREATE INDEX idx_bindings_sha ON filing_bindings(document_sha256);
+
+CREATE TABLE parsed_data (
+    parse_run_id TEXT PRIMARY KEY,
+    market TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    filing_type TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    raw_fiscal_period TEXT NOT NULL,
+    document_sha256 TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    schema_version TEXT NOT NULL,
+    validation_status TEXT NOT NULL,
+    blocking_issue_count INTEGER NOT NULL,
+    compatibility_status TEXT NOT NULL,
+    artifact_path TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_parsed_slot
+    ON parsed_data(market, company_id, filing_type, fiscal_year, raw_fiscal_period);
+"""
+
+_SEC_V2_DDL = """
+CREATE TABLE source_packages (
+    package_sha256 TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    accession TEXT NOT NULL,
+    cik TEXT NOT NULL,
+    form TEXT NOT NULL,
+    filed_date TEXT,
+    accepted_at TEXT,
+    report_period TEXT,
+    primary_document TEXT NOT NULL,
+    manifest_schema_version TEXT NOT NULL,
+    first_seen_at TEXT NOT NULL
+);
+
+CREATE TABLE package_members (
+    package_sha256 TEXT NOT NULL,
+    member_sha256 TEXT NOT NULL,
+    relative_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    byte_length INTEGER NOT NULL,
+    source_url TEXT NOT NULL,
+    PRIMARY KEY(package_sha256, relative_name),
+    FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+);
+
+CREATE INDEX idx_package_members_sha ON package_members(member_sha256);
+
+CREATE TABLE sec_filing_bindings (
+    binding_id TEXT PRIMARY KEY,
+    package_sha256 TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    raw_fiscal_period TEXT NOT NULL,
+    accession TEXT NOT NULL,
+    form TEXT NOT NULL,
+    amended INTEGER NOT NULL CHECK (amended IN (0, 1)),
+    binding_status TEXT NOT NULL,
+    artifact_path TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+);
+
+CREATE INDEX idx_sec_bindings_slot
+    ON sec_filing_bindings(company_id, fiscal_year, raw_fiscal_period);
+
+CREATE TABLE sec_parsed_data (
+    parse_run_id TEXT PRIMARY KEY,
+    package_sha256 TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    raw_fiscal_period TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    schema_version TEXT NOT NULL,
+    validation_status TEXT NOT NULL,
+    blocking_issue_count INTEGER NOT NULL,
+    artifact_path TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+);
+
+CREATE INDEX idx_sec_parsed_slot
+    ON sec_parsed_data(company_id, fiscal_year, raw_fiscal_period);
+"""
+
+_SEC_V2_PARSED_COLUMNS = (
+    "parse_run_id",
+    "package_sha256",
+    "company_id",
+    "fiscal_year",
+    "raw_fiscal_period",
+    "parser_version",
+    "schema_version",
+    "validation_status",
+    "blocking_issue_count",
+    "artifact_path",
+    "created_at",
+)
+
+
+def _snapshot_registry(db: Path) -> dict[str, object]:
     with sqlite3.connect(db) as conn:
-        conn.execute("ALTER TABLE sec_parsed_data DROP COLUMN compatibility_status")
-        conn.commit()
-        snapshots = {
-            "source_packages": tuple(conn.execute("SELECT * FROM source_packages").fetchone()),
-            "package_members": tuple(conn.execute("SELECT * FROM package_members ORDER BY relative_name").fetchone()),
-            "sec_filing_bindings": tuple(conn.execute("SELECT * FROM sec_filing_bindings").fetchone()),
-            "sec_parsed_data": tuple(conn.execute("SELECT * FROM sec_parsed_data").fetchone()),
+        tables = tuple(
+            row[0]
+            for row in conn.execute(
+                """
+                SELECT name FROM sqlite_master
+                WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+                ORDER BY name
+                """
+            )
+        )
+        table_sql = tuple(
+            conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+                (table,),
+            ).fetchone()
+            for table in tables
+        )
+        columns = {
+            table: tuple(
+                tuple(row)
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            )
+            for table in tables
         }
-    return package, snapshots
+        indexes = tuple(
+            tuple(row)
+            for row in conn.execute(
+                """
+                SELECT name, tbl_name, sql FROM sqlite_master
+                WHERE type = 'index' AND name NOT LIKE 'sqlite_%'
+                ORDER BY name
+                """
+            ).fetchall()
+        )
+        rows = {
+            table: tuple(
+                tuple(row)
+                for row in conn.execute(f'SELECT * FROM "{table}"').fetchall()
+            )
+            for table in tables
+        }
+        user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    return {
+        "user_version": user_version,
+        "tables": tables,
+        "table_sql": table_sql,
+        "columns": columns,
+        "indexes": indexes,
+        "rows": rows,
+    }
 
 
-def test_sec_registry_migrates_v2_to_v3_without_rewriting_legacy_rows(tmp_path: Path) -> None:
+def _snapshot_rows_for_columns(
+    snapshot: dict[str, object], table: str, column_names: tuple[str, ...]
+) -> tuple[tuple[object, ...], ...]:
+    columns = snapshot["columns"]
+    rows = snapshot["rows"]
+    assert isinstance(columns, dict)
+    assert isinstance(rows, dict)
+    positions = {
+        str(column[1]): index
+        for index, column in enumerate(columns[table])
+    }
+    return tuple(
+        tuple(row[positions[column_name]] for column_name in column_names)
+        for row in rows[table]
+    )
+
+
+def _make_v2_registry(db: Path) -> tuple[object, dict[str, object]]:
+    package = _package()
+    with sqlite3.connect(db) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.executescript(_LEGACY_V1_DDL + _SEC_V2_DDL)
+        conn.execute("PRAGMA user_version = 1")
+        legacy_sha = "a" * 64
+        conn.execute(
+            """
+            INSERT INTO documents(
+                document_sha256, file_size, page_count, first_seen_at
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (legacy_sha, 123, 1, "2026-11-11T00:00:00+00:00"),
+        )
+        conn.execute(
+            """
+            INSERT INTO document_locations(
+                path, document_sha256, mtime_ns, last_seen_at, exists_flag
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            ("D:/legacy-cn.pdf", legacy_sha, 1, "2026-11-11T00:00:00+00:00", 1),
+        )
+        conn.execute(
+            """
+            INSERT INTO document_sources(
+                document_sha256, provider, source_id, source_url, source_title,
+                filing_date, report_date, provider_company_id, acquired_at,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                legacy_sha,
+                "cninfo",
+                "legacy-source",
+                "https://example.invalid/legacy-cn.pdf",
+                "legacy CN filing",
+                "2025-03-31",
+                "2024-12-31",
+                "000001",
+                "2026-11-11T00:00:00+00:00",
+                "2026-11-11T00:00:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO filing_bindings(
+                binding_id, document_sha256, market, company_id, filing_type,
+                fiscal_year, raw_fiscal_period, amended, binding_status,
+                source_provider, source_id, source_url, source_title,
+                filing_date, report_date, provider_company_id, acquired_at,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "legacy-binding",
+                legacy_sha,
+                "CN",
+                "CN:000001",
+                "ANNUAL",
+                2024,
+                "FY",
+                0,
+                "SOURCE_CONFIRMED",
+                "cninfo",
+                "legacy-source",
+                "https://example.invalid/legacy-cn.pdf",
+                "legacy CN filing",
+                "2025-03-31",
+                "2024-12-31",
+                "000001",
+                "2026-11-11T00:00:00+00:00",
+                "2026-11-11T00:00:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO parsed_data(
+                parse_run_id, market, company_id, filing_type, fiscal_year,
+                raw_fiscal_period, document_sha256, parser_version,
+                schema_version, validation_status, blocking_issue_count,
+                compatibility_status, artifact_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "legacy-run",
+                "CN",
+                "CN:000001",
+                "ANNUAL",
+                2024,
+                "FY",
+                legacy_sha,
+                "legacy-parser-v1",
+                "legacy-artifacts-v1",
+                "PASS",
+                0,
+                "COMPATIBLE",
+                "legacy-artifact",
+                "2026-11-11T00:00:00+00:00",
+            ),
+        )
+        manifest = package.manifest()
+        conn.execute(
+            """
+            INSERT INTO source_packages(
+                package_sha256, provider, accession, cik, form, filed_date,
+                accepted_at, report_period, primary_document,
+                manifest_schema_version, first_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                manifest["package_sha256"],
+                "sec",
+                manifest["accession"],
+                manifest["cik"],
+                manifest["form"],
+                manifest["filing_date"],
+                manifest["accepted_at"],
+                manifest["report_period"],
+                manifest["primary_document"],
+                manifest["schema_version"],
+                "2026-11-11T00:00:00+00:00",
+            ),
+        )
+        for member in package.canonical_members():
+            conn.execute(
+                """
+                INSERT INTO package_members(
+                    package_sha256, member_sha256, relative_name, role,
+                    content_type, byte_length, source_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    package.package_sha256,
+                    member.member_sha256,
+                    member.relative_name,
+                    member.role.value,
+                    member.content_type,
+                    len(member.body),
+                    member.source_url,
+                ),
+            )
+        binding_id = hashlib.sha256(
+            f"{package.package_sha256}|US:CIK0000320193|2025|Q2|0".encode()
+        ).hexdigest()
+        conn.execute(
+            """
+            INSERT INTO sec_filing_bindings(
+                binding_id, package_sha256, company_id, fiscal_year,
+                raw_fiscal_period, accession, form, amended, binding_status,
+                artifact_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                binding_id,
+                package.package_sha256,
+                "US:CIK0000320193",
+                2025,
+                "Q2",
+                manifest["accession"],
+                manifest["form"],
+                0,
+                "SOURCE_CONFIRMED",
+                "old-v2-artifact",
+                "2026-11-11T00:00:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO sec_parsed_data(
+                parse_run_id, package_sha256, company_id, fiscal_year,
+                raw_fiscal_period, parser_version, schema_version,
+                validation_status, blocking_issue_count, artifact_path,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "old-run",
+                package.package_sha256,
+                "US:CIK0000320193",
+                2025,
+                "Q2",
+                "VIRTUAL_HTML_V2",
+                "p11-sec-artifacts-v1",
+                "PASS",
+                0,
+                "old-v2-artifact",
+                "2026-11-11T00:00:00+00:00",
+            ),
+        )
+        conn.commit()
+    return package, _snapshot_registry(db)
+
+
+def test_sec_registry_migrates_real_v2_to_v3_without_rewriting_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db = tmp_path / "v2.sqlite"
-    _package_obj, before = _make_v2_registry(db, tmp_path)
+    _package_obj, before = _make_v2_registry(db)
+
+    before_columns = before["columns"]
+    assert isinstance(before_columns, dict)
+    assert "sec_schema_metadata" not in before["tables"]
+    assert "compatibility_status" not in {
+        str(column[1]) for column in before_columns["sec_parsed_data"]
+    }
+    assert before["user_version"] == 1
+
+    migration_calls: list[bool] = []
+    original_migration = SQLiteRegistry._migrate_sec_v2_to_v3.__func__
+
+    def wrapped_migration(cls: type[SQLiteRegistry], conn: sqlite3.Connection) -> None:
+        migration_calls.append(True)
+        original_migration(cls, conn)
+
+    monkeypatch.setattr(
+        SQLiteRegistry,
+        "_migrate_sec_v2_to_v3",
+        classmethod(wrapped_migration),
+    )
 
     registry = SQLiteRegistry(db)
 
     assert registry.schema_version() == 1
     assert registry.sec_schema_version() == 3
+    assert migration_calls == [True]
     with sqlite3.connect(db) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
         metadata = conn.execute(
@@ -194,38 +612,85 @@ def test_sec_registry_migrates_v2_to_v3_without_rewriting_legacy_rows(tmp_path: 
         assert conn.execute(
             "SELECT compatibility_status FROM sec_parsed_data WHERE parse_run_id = 'old-run'"
         ).fetchone() == ("INCOMPATIBLE",)
-        for table, expected in before.items():
-            columns_sql = "*"
-            if table == "sec_parsed_data":
-                columns_sql = "parse_run_id, package_sha256, company_id, fiscal_year, raw_fiscal_period, parser_version, schema_version, validation_status, blocking_issue_count, artifact_path, created_at"
-            actual = tuple(conn.execute(f"SELECT {columns_sql} FROM {table}").fetchone())
-            assert actual == expected
+    after = _snapshot_registry(db)
+    assert set(after["tables"]) == set(before["tables"]) | {"sec_schema_metadata"}
+    for table in (
+        "documents",
+        "document_locations",
+        "document_sources",
+        "filing_bindings",
+        "parsed_data",
+    ):
+        assert after["rows"][table] == before["rows"][table]
+        assert after["columns"][table] == before["columns"][table]
+    for table in ("source_packages", "package_members", "sec_filing_bindings"):
+        assert after["rows"][table] == before["rows"][table]
+        assert after["columns"][table] == before["columns"][table]
+    assert _snapshot_rows_for_columns(
+        after, "sec_parsed_data", _SEC_V2_PARSED_COLUMNS
+    ) == before["rows"]["sec_parsed_data"]
+    assert after["indexes"] == before["indexes"]
+    assert after["user_version"] == before["user_version"] == 1
+    assert after["rows"]["sec_schema_metadata"] == (("schema_version", "3"),)
 
 
-def test_sec_registry_v3_reopen_is_idempotent(tmp_path: Path) -> None:
+def test_sec_registry_v3_reopen_after_real_v2_migration_is_idempotent(
+    tmp_path: Path,
+) -> None:
     db = tmp_path / "v2-reopen.sqlite"
-    _make_v2_registry(db, tmp_path)
+    _make_v2_registry(db)
     SQLiteRegistry(db)
-    with sqlite3.connect(db) as conn:
-        before = {
-            "metadata": tuple(conn.execute("SELECT key, value FROM sec_schema_metadata ORDER BY key")),
-            "packages": tuple(conn.execute("SELECT * FROM source_packages")),
-            "members": tuple(conn.execute("SELECT * FROM package_members ORDER BY relative_name")),
-            "bindings": tuple(conn.execute("SELECT * FROM sec_filing_bindings")),
-            "parsed": tuple(conn.execute("SELECT * FROM sec_parsed_data")),
-        }
+    before = _snapshot_registry(db)
 
     reopened = SQLiteRegistry(db)
 
     assert reopened.sec_schema_version() == 3
+    after = _snapshot_registry(db)
+    assert after == before
+
+
+def test_sec_registry_migrates_explicit_v2_metadata_variant(tmp_path: Path) -> None:
+    db = tmp_path / "explicit-v2.sqlite"
+    _make_v2_registry(db)
     with sqlite3.connect(db) as conn:
-        after = {
-            "metadata": tuple(conn.execute("SELECT key, value FROM sec_schema_metadata ORDER BY key")),
-            "packages": tuple(conn.execute("SELECT * FROM source_packages")),
-            "members": tuple(conn.execute("SELECT * FROM package_members ORDER BY relative_name")),
-            "bindings": tuple(conn.execute("SELECT * FROM sec_filing_bindings")),
-            "parsed": tuple(conn.execute("SELECT * FROM sec_parsed_data")),
-        }
+        conn.execute(
+            "CREATE TABLE sec_schema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO sec_schema_metadata(key, value) VALUES ('schema_version', '2')"
+        )
+        conn.commit()
+
+    registry = SQLiteRegistry(db)
+
+    assert registry.sec_schema_version() == 3
+    with sqlite3.connect(db) as conn:
+        assert conn.execute(
+            "SELECT value FROM sec_schema_metadata WHERE key = 'schema_version'"
+        ).fetchone() == ("3",)
+        assert conn.execute(
+            "SELECT compatibility_status FROM sec_parsed_data WHERE parse_run_id = 'old-run'"
+        ).fetchone() == ("INCOMPATIBLE",)
+
+
+def test_future_sec_schema_fails_closed_without_mutation(tmp_path: Path) -> None:
+    db = tmp_path / "future-sec-shape.sqlite"
+    _make_v2_registry(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "CREATE TABLE sec_schema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO sec_schema_metadata(key, value) VALUES ('schema_version', '99')"
+        )
+        conn.commit()
+    before = _snapshot_registry(db)
+
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
+        SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
+    after = _snapshot_registry(db)
     assert after == before
 
 
