@@ -1091,17 +1091,3 @@ Compatibility rules:
 Any implementation that cannot preserve these compatibility rules must stop and
 return to design review.
 
-
-
-P11 is DONE only after:
-
-DESIGN
-→ DEVELOPMENT
-→ DETACHED CODE REVIEW
-→ ACCEPTANCE FREEZE
-→ INDEPENDENT ACCEPTANCE
-→ MAIN INTEGRATION
-→ CLOSEOUT
-
-Until then, current accepted production must continue to report the SEC provider as
-unavailable.
