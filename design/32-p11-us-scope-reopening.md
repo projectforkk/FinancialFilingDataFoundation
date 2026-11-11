@@ -1,69 +1,72 @@
 # 32 — P11 US Scope Reopening Contract
 
-Status: **ACTIVE — P11 REOPENED / P0-P10 BASELINE PRESERVED**
+Status: **ACTIVE — P11 REPAIR REQUIRED / PRIOR ACCEPTANCE SUSPENDED**
 
-Date: 2026-11-09
+Date opened: 2026-11-09
+Design correction: 2026-11-11
+
+Detailed correction authority:
+`design/33-p11-post-acceptance-design-correction.md`
+
+Re-audit:
+`development/178-p11-full-design-code-consistency-reaudit.md`
 
 ## 1. Decision
 
-The previous project closeout limited production to CN/HK and explicitly left the
-US SEC Provider unavailable. The user has now reopened the US initiative.
+The accepted production baseline remains CN + HK.
 
-Current scope is therefore:
+P11 US remains an active feature-branch initiative and is not accepted production
+until the corrected design is implemented, independently reviewed, formally tested
+and merged.
 
-- accepted production baseline: CN + HK;
-- active next phase: P11 US SEC Provider;
-- P11 production status: NOT YET IMPLEMENTED;
-- P0-P10 accepted CN/HK behavior: immutable unless an additive compatibility change
-  is explicitly required by P11 and independently reviewed.
+The previous P11 formal acceptance is retained as historical evidence for the
+scenarios it executed, but it does not authorize main integration after the
+2026-11-11 re-audit.
 
-`design/30-project-final-cn-hk-scope.md` remains historical truth for the closeout
-that occurred on 2026-11-05. This document supersedes it only as the current scope
-decision from 2026-11-09 forward.
+`design/30-project-final-cn-hk-scope.md` remains historical truth for the CN/HK
+closeout.
 
 ## 2. P11 objective
 
-Add official SEC/EDGAR filing acquisition and local parsing for US-listed issuers,
-with a first-class HTML / Inline XBRL / XBRL path.
+Add official SEC/EDGAR filing acquisition and deterministic local parsing for
+US-listed issuers, with a first-class HTML / Inline XBRL / XBRL path.
 
-P11 is not a PDF-provider retrofit.
-
-The source-of-truth chain is:
+Source-of-truth chain:
 
 ```text
-SEC filer identity (CIK)
-→ SEC submissions metadata / accession
+CIK identity
+→ current SEC ticker mapping when ticker is used
+→ current submissions/history discovery observation
+→ accession candidate decision
 → SEC Archives filing package
 → immutable raw members
-→ deterministic HTML/iXBRL/XBRL normalization
-→ page/section/table/raw-fact/evidence compatible research artifacts
-→ P7 validation
-→ P8 read-only access
+→ exactly one logical fact-source mode
+→ deterministic page/section/table/raw-fact/evidence artifacts
+→ P7 validation bound to the discovery observation
+→ P8 read-only snapshot access
 ```
 
-## 3. Supported market declaration during development
+## 3. Accepted main vs merge-ready feature branch
 
-Until P11 acceptance:
+Until corrected P11 acceptance and merge:
 
 ```text
-accepted SUPPORTED_MARKETS = (CN, HK)
-P11 US capability = DEVELOPMENT ONLY
+accepted main SUPPORTED_MARKETS = (CN, HK)
+accepted main P11_SEC_PROVIDER = UNAVAILABLE
 ```
 
-The public market tuple must not be changed merely because design work exists.
+The P11 feature branch may contain the complete merge-ready production behavior,
+including US public market declarations, before acceptance.
 
-Only the final P11 integration gate may add `US` after:
+That does not make US accepted production because the branch is not main.
 
-- identity tests;
-- Registry migration compatibility;
-- live SEC acquisition;
-- parser/validation acceptance;
-- P8 compatibility;
-- full CN/HK regression.
+This rule exists so formal acceptance tests the exact production behavior that will
+be merged. No production-enablement source edit is permitted after ACCEPTANCE_PASS.
+
+The merge-ready candidate must not require `FFDF_P11_US_DEV=1` for normal US
+CLI/P8 behavior.
 
 ## 4. US filing scope
-
-### 4.1 Core periodic filings
 
 Domestic operating companies:
 
@@ -76,30 +79,44 @@ Foreign private issuers:
 
 - FY → Form 20-F or 40-F;
 - Form 6-K may be acquired explicitly;
-- 6-K MUST NOT be assumed to represent a standardized quarterly filing unless a
-  deterministic financial-statement identification rule is proven.
+- 6-K must not be auto-mapped to a standardized quarterly slot without a separately
+  accepted deterministic rule.
 
-### 4.2 Explicitly not part of the required periodic set
+Not required periodic slots:
 
-- 8-K is an event filing, not a required periodic slot;
-- proxy statements are not periodic financial-statement slots;
-- registration statements are not required P11 research filings.
+- 8-K;
+- proxy statements;
+- registration statements.
 
-They may be supported later as explicit event/document acquisition without changing
-periodic-filing semantics.
+## 5. Current discovery requirement
 
-## 5. Source priority
+For online US `acquire` and `ingest`, current SEC submissions metadata is checked
+before local reuse planning.
 
-P11 uses only official SEC public sources for acquisition truth:
+This is required even when a package and compatible parsed artifact already exist.
 
-1. `data.sec.gov/submissions/CIK##########.json`;
-2. SEC Archives filing directory / filing members;
-3. Inline XBRL / XBRL members in the filing package;
-4. SEC XBRL companyfacts/companyconcept APIs only as secondary cross-check data.
+The purpose is to detect:
 
-Companyfacts MUST NOT override the facts in the exact filing being parsed.
+- a later /A amendment;
+- another conflicting filing candidate;
+- current not-found/identity changes.
 
-## 6. Compatibility promise
+Repeat runs may still avoid archive member downloads and parser work.
+
+`status` is local-only and reports state as of the latest discovery observation.
+
+## 6. Fact-source rule
+
+Every package uses exactly one logical fact-source mode:
+
+- `INLINE_XBRL_PRIMARY` when the primary document contains supported Inline XBRL
+  facts;
+- `XBRL_INSTANCE_PRIMARY` only when there is no Inline XBRL fact source and one
+  verified instance is unambiguous.
+
+An extracted instance must not duplicate the primary Inline XBRL logical fact set.
+
+## 7. Compatibility promise
 
 P11 must preserve:
 
@@ -110,20 +127,24 @@ P11 must preserve:
 - MCP_AI_API_CALLS = FORBIDDEN;
 - P8 exact accepted tool names;
 - P9 overlay semantics;
-- P10 dynamic-research responsibilities.
+- P10 dynamic-research responsibilities;
+- accepted CN/HK source/artifact behavior.
 
-Any necessary schema extension must be additive and versioned.
+Incremental-first now explicitly means avoiding redundant archive-byte/parser work
+after current mutable discovery metadata is checked.
 
-## 7. Current truth
+## 8. Current truth
 
-As of this scope reopening:
+As of this correction:
 
-`P11_SEC_PROVIDER = UNAVAILABLE`
+```text
+P11 prior ACCEPTANCE_PASS = SUSPENDED FOR MERGE
+P11 corrected design = FROZEN WHEN DESIGN-CORRECTION COMMIT IS RECORDED
+P11 repair implementation = REQUIRED
+P11 main merge = NOT AUTHORIZED
+P11 accepted production availability = UNAVAILABLE
+```
 
-remains factually correct in accepted production.
+Target state after corrected independent acceptance and exact-candidate merge:
 
-The target state after independent P11 acceptance is:
-
-`P11_SEC_PROVIDER = AVAILABLE`
-
-No current document may claim that state before acceptance.
+`P11_SEC_PROVIDER = AVAILABLE`.

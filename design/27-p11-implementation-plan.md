@@ -1,332 +1,330 @@
 # 27 — P11 US SEC Provider Implementation Plan
 
-Status: **READY FOR SHORT-CYCLE DEVELOPMENT AFTER DESIGN FREEZE**
+Status: **CORRECTED REPAIR CYCLE ACTIVE — PRIOR ACCEPTANCE INVALIDATED FOR MERGE**
 
 Detailed design:
 `design/26-p11-sec-provider-design.md`
 
-Scope reopening:
+Scope contract:
 `design/32-p11-us-scope-reopening.md`
+
+Post-acceptance correction authority:
+`design/33-p11-post-acceptance-design-correction.md`
+
+Re-audit:
+`development/178-p11-full-design-code-consistency-reaudit.md`
 
 ## 1. Execution principle
 
-P11 uses a deliberately short development lifecycle.
+The previous P11 acceptance cycle is historical evidence only. It does not authorize
+main integration after the re-audit/design correction.
 
-The default path is:
+The corrected lifecycle is:
 
 ```text
-DESIGN FREEZE
-→ PC AGENT ONE-PASS DEVELOPMENT
-→ GIT COMMIT / PUSH EXACT CANDIDATE
-→ CHATGPT CODE REVIEW
-→ CHATGPT TEST PLAN
-→ PC AGENT ONE-PASS TEST EXECUTION
-→ GIT COMMIT / PUSH TEST EVIDENCE
+CORRECTED DESIGN FREEZE
+→ PC AGENT ONE-PASS REPAIR DEVELOPMENT
+→ MERGE-READY PRODUCTION CANDIDATE
+→ CHATGPT EXACT-CANDIDATE CODE REVIEW
+→ CHATGPT NEW FORMAL TEST PLAN
+→ PC AGENT ONE-PASS FORMAL TEST EXECUTION
+→ GIT TEST EVIDENCE
 → CHATGPT INDEPENDENT VERIFICATION
 → ACCEPT / FIX
-→ MAIN INTEGRATION
+→ MERGE EXACT ACCEPTED CANDIDATE
+→ CLOSEOUT
 ```
 
-The purpose is to avoid many artificial sub-phases while preserving:
-
-- exact commit traceability;
-- Design-First;
-- independent code review;
-- reproducible test evidence;
-- CN/HK non-regression;
-- no hidden local-only state.
+The merge-ready candidate must already contain production US behavior. No production
+logic is added after acceptance.
 
 ## 2. Roles
 
 ### 2.1 PC Agent
 
-PC Agent is responsible for:
+PC Agent must:
 
-1. reading the frozen P11 design completely;
-2. auditing the actual local environment as part of development;
-3. implementing the full P11 production candidate in one development pass where practical;
-4. writing/adjusting unit and integration tests required by implementation;
-5. running developer-focused smoke checks sufficient to avoid submitting obviously broken code;
-6. committing and pushing the exact production candidate to Git;
-7. after ChatGPT issues the formal test plan, executing that plan on the PC;
-8. committing and pushing all formal test evidence to Git.
+1. read the corrected design baseline completely;
+2. implement P11-ISSUE-123 through P11-ISSUE-130 as one coherent repair;
+3. preserve accepted CN/HK behavior;
+4. add deterministic regression tests for every repaired issue;
+5. produce one exact merge-ready candidate SHA;
+6. stop after candidate/evidence push;
+7. execute formal tests only after ChatGPT reviews that exact candidate and issues a
+   new formal plan.
 
-PC Agent must not declare final acceptance.
+PC Agent must not alter the corrected design contract without a STOP/design issue.
 
 ### 2.2 ChatGPT
 
-ChatGPT is responsible for:
+ChatGPT owns:
 
-1. reviewing the exact Git production candidate;
-2. checking design/code consistency;
-3. identifying correctness, security, compatibility and evidence defects;
-4. deciding `REVIEW_PASS` or `CHANGES_REQUIRED`;
-5. after review PASS, issuing the exact formal test plan;
-6. after PC Agent commits test evidence, independently validating:
-   - candidate identity;
-   - commands actually executed;
-   - outputs/results;
-   - evidence completeness;
-   - CN/HK regression;
-   - live SEC evidence;
-7. deciding final `ACCEPTANCE_PASS` or `ACCEPTANCE_FAILED`.
+- corrected design decisions;
+- exact-candidate code/design review;
+- REVIEW_PASS / CHANGES_REQUIRED;
+- formal test-plan authoring;
+- independent evidence verification;
+- ACCEPTANCE_PASS / ACCEPTANCE_FAILED.
 
 ### 2.3 GitHub
 
-GitHub is the only shared source of truth between PC Agent and ChatGPT.
+GitHub is the shared source of truth.
 
-No local-only claim counts as development or acceptance evidence.
+Local-only claims, screenshots or uncommitted artifacts are not acceptance evidence.
 
-## 3. Gate S0 — Design Freeze
+## 3. Gate S0 — Corrected Design Freeze
 
-Before PC development starts, freeze:
+Before repair code changes, freeze the exact commit containing:
 
 - `design/26-p11-sec-provider-design.md`;
 - `design/27-p11-implementation-plan.md`;
 - `design/32-p11-us-scope-reopening.md`;
-- current accepted main base SHA.
+- `design/33-p11-post-acceptance-design-correction.md`.
 
 Record:
 
 ```text
-design_baseline_sha
-main_base_sha
-development_branch
+corrected_design_baseline_sha
+previous_production_candidate_sha = 9b7fcc9fc37a423eaafd1dde762e9c81d475df9e
+starting_branch
+starting_head
 ```
 
-No production code is written before this gate.
+No old ACCEPTANCE_PASS is carried forward.
 
-## 4. Gate D1 — PC Agent One-Pass Development
+## 4. Gate D1 — One-Pass Repair Development
 
-PC Agent should implement the entire P11 candidate in one development task unless a genuine STOP condition is found.
+The repair wave covers all open issues from the re-audit.
 
-The development task includes the formerly separate activities:
+### 4.1 ISSUE-123 — discovery freshness / late amendment
 
-- environment/runtime audit;
-- US CIK/ticker identity;
-- SEC submissions discovery;
-- Fair Access / User-Agent / rate limiting;
-- accession/form/period policy;
-- immutable SEC filing package acquisition;
-- package/member SHA identity;
-- additive Registry migration;
-- incremental planner integration;
-- HTML / Inline XBRL normalization;
-- virtual HTML pages / DOM locators;
-- HTML tables;
-- XBRL contexts/units/raw facts;
-- evidence;
-- P7 US validation;
-- P8 US read path;
-- user CLI US support;
-- foreign issuer annual support;
-- focused developer tests.
+Implement:
 
-### 4.1 Development constraints
+- current submissions/history discovery before online reuse planning;
+- immutable discovery observation artifact + Registry persistence;
+- delayed-amendment detection after original package/artifact already exists;
+- fail closed when current discovery cannot be established;
+- local-only status with explicit discovery-as-of metadata.
 
-PC Agent must preserve:
+Repeat online ingest may skip archive downloads/parser work, but must not skip
+discovery metadata.
 
-- existing CN/HK behavior;
-- P8 tool names;
-- P9 overlay semantics;
-- P10 responsibilities;
-- raw/source immutability;
-- no AI/API calls inside FFDF/MCP;
-- no guessing;
-- evidence traceability.
+### 4.2 ISSUE-124 — one logical fact source
 
-### 4.2 Historical P11 code
+Implement explicit:
 
-Historical P11 branches/probes may be inspected but must not be merged wholesale.
+- `INLINE_XBRL_PRIMARY`;
+- `XBRL_INSTANCE_PRIMARY`.
 
-Any reused code must be reconciled against the new design and current main.
+Never concatenate both logical fact universes.
 
-### 4.3 Development STOP conditions
+Expose `fact_source_mode` in artifacts/validation/P8.
 
-Stop development and submit a design issue instead of guessing if:
+### 4.3 ISSUE-125 — continuation/exclude semantics
 
-1. accepted P0-P10 behavior cannot be preserved additively;
-2. Registry migration requires destructive rewrite;
-3. SEC filing semantics contradict the frozen identity/period design;
-4. a required SEC source interface no longer behaves as designed;
-5. evidence cannot be traced to immutable source bytes;
-6. a security boundary requires arbitrary URL/filesystem execution;
-7. implementation would require remote AI.
+Implement deterministic Inline XBRL continuation chains, exclusion handling,
+multi-fragment evidence, missing/duplicate/cycle failures and regression fixtures.
 
-If none occurs, complete the full implementation in one pass.
+### 4.4 ISSUE-126 — XBRL member allowlist / semantic isolation
 
-## 5. Development Candidate Commit
+Remove generic XML sweep behavior.
 
-At the end of D1, PC Agent must commit and push one exact candidate.
+Only deterministic XBRL support members may enter XBRL semantic processing.
+`OTHER` XML must never satisfy fact/context/unit resolution.
 
-Required development record:
+### 4.5 ISSUE-127 — ticker provenance
 
-`development/<next>-p11-development-evidence.md`
+Current online ticker resolution must use current official source bytes.
+Cached resolution must reparse verified bytes; serialized derivative mapping cannot
+be trusted independently.
 
-It must include:
+### 4.6 ISSUE-128 — package provenance
 
-- design baseline SHA;
-- starting main SHA;
-- production candidate SHA;
-- branch;
-- changed file list;
-- runtime/dependency changes;
-- Registry migration version;
-- SEC runtime lock/pin;
-- developer smoke commands;
-- developer smoke results;
-- known limitations;
-- explicit statement that no accepted CN/HK raw data was mutated.
+Keep the package SHA formula unchanged.
 
-Developer smoke is not final acceptance.
+Add exact source URL ↔ CIK/accession/relative-name verification and package/member
+Registry provenance comparison in P7/P8.
 
-## 6. Gate R1 — ChatGPT Code Review
+### 4.7 ISSUE-129 — DOM table grid/header correctness
 
-ChatGPT reviews the exact candidate SHA from Git.
+Compute logical width from occupied span grid and build header metadata from real
+header cells/span coverage.
 
-Review scope:
+### 4.8 ISSUE-130 — production enablement
 
-### 6.1 Architecture
+The merge-ready candidate must:
 
-- CIK is stable US company identity;
-- accession is provider filing identity;
-- SEC filing is modeled as a package;
-- HTML/Inline XBRL first;
-- companyfacts is secondary cross-check only;
-- no PDF-only shortcut.
+- not require `FFDF_P11_US_DEV=1` for normal US CLI/P8;
+- contain the intended public supported-market/capability declarations;
+- still be isolated on the feature branch until acceptance.
 
-### 6.2 Acquisition/security
+Formal tests must run with the development flag absent.
 
-- SEC host allowlist;
-- declared User-Agent;
-- rate limiter;
-- retry/backoff;
-- redirect validation;
-- content-size limits;
-- no arbitrary caller URL;
-- no JavaScript execution;
-- no remote subresource loading;
-- staging/atomic commit;
-- source drift detection.
+## 5. Required compatibility/version changes
 
-### 6.3 Registry/incremental behavior
+Target constants:
 
-- migration additive and idempotent;
-- old CN/HK Registry remains readable;
-- same accession/package is reused;
-- package/member hashes are stable;
-- amendment handling fails closed where ambiguous.
+```text
+REGISTRY_SCHEMA_VERSION = 1
+SEC_REGISTRY_SCHEMA_VERSION = 4
+SEC_DISCOVERY_SCHEMA = p11-sec-discovery-v1
+VIRTUAL_HTML_NORMALIZER_VERSION = VIRTUAL_HTML_V5
+SEC_ARTIFACT_SCHEMA = p11-sec-artifacts-v2
+SEC_VALIDATION_SCHEMA = p11-sec-validation-v2
+```
 
-### 6.4 Parser/evidence
+Required behavior:
 
-- virtual pages explicitly marked as virtual;
-- DOM locators deterministic;
-- contextRef/unitRef resolution;
-- custom XBRL QName preserved;
-- raw facts are not canonicalized;
-- evidence resolves to immutable member bytes.
+- SEC Registry v3 → v4 additive migration;
+- v4 migration idempotent;
+- unknown future SEC schema fails closed before mutation;
+- CN/HK `user_version=1` and accepted rows unchanged;
+- V4/v1 US parsed artifacts not reusable as corrected current artifacts;
+- immutable old raw SEC packages may be reparsed to V5/v2 after current discovery;
+- no destructive raw-store migration.
 
-### 6.5 Integration
+## 6. Candidate commit rules
 
-- CN/HK policy unchanged;
-- US domestic Q2 support isolated by market;
-- P8 exact tool names unchanged;
-- P9/P10 semantics unchanged;
-- CLI does not accept arbitrary SEC URLs;
-- public `SUPPORTED_MARKETS` is not prematurely changed before acceptance unless the candidate design explicitly uses a gated development mechanism.
+Production candidate commit contains only implementation + tests required by the
+corrected design.
 
-### 6.6 Review verdict
+Do not mix formal test evidence into the candidate commit.
 
-Exactly one:
+Required development evidence must record:
+
+- corrected design baseline SHA;
+- previous candidate SHA;
+- exact new candidate SHA;
+- changed production/test files;
+- Registry migration;
+- parser/artifact/validation versions;
+- development test commands/results;
+- explicit issue-by-issue closure matrix;
+- explicit CN/HK non-mutation statement.
+
+After the candidate commit, production/test source is frozen pending ChatGPT review.
+
+## 7. Gate R1 — Exact-Candidate Review
+
+ChatGPT re-reviews the exact candidate from Git.
+
+Mandatory review points:
+
+- online discovery occurs before reusable-local return;
+- late amendment cannot bypass discovery;
+- discovery snapshots are immutable/provenanced;
+- ticker mapping is derived from verified bytes;
+- only one logical fact-source mode emits P6 facts;
+- extracted instance does not duplicate Inline XBRL facts;
+- continuation/exclude semantics and source fragments are correct;
+- OTHER XML cannot supply contexts/units/facts;
+- member source URL is bound to CIK/accession/name;
+- P7 consumes discovery observation rather than a free boolean;
+- P8 verifies Registry/package/evidence chain and performs no network;
+- DOM table width/header tree is span-correct;
+- version bumps are complete and old artifacts fail compatibility safely;
+- US works without `FFDF_P11_US_DEV`;
+- CN/HK/P9/P10 behavior remains unchanged.
+
+Verdict is exactly:
 
 ```text
 REVIEW_PASS
 CHANGES_REQUIRED
 ```
 
-If `CHANGES_REQUIRED`, ChatGPT provides a compact issue list.
+No formal acceptance begins before REVIEW_PASS.
 
-PC Agent should fix all review issues in one repair pass and push a new exact candidate SHA.
+## 8. Corrected Formal Test Groups
 
-No formal acceptance testing starts before `REVIEW_PASS`.
-
-## 7. Gate T0 — ChatGPT Formal Test Plan
-
-After `REVIEW_PASS`, ChatGPT creates the exact test plan.
-
-Test plan is committed to Git as:
-
-`development/<next>-p11-formal-test-plan.md`
-
-The plan must identify the exact reviewed candidate SHA and contain executable commands and expected outcomes.
-
-The formal plan covers only tests needed to accept the completed candidate; it does not reopen development design.
-
-## 8. Required Formal Test Groups
-
-The exact commands are written after code review, but acceptance must cover these groups.
-
-### T1 — Compile / static / contract
+### T1 — static/version/contract
 
 - compile;
-- focused P11 unit tests;
-- reason-code/schema tests;
-- runtime lock validation;
-- Git diff/check.
+- diff check;
+- exact version constants;
+- no AI/API boundary regressions.
 
-### T2 — Identity / discovery
+### T2 — ticker/CIK identity
 
-- ticker → CIK;
-- explicit CIK;
-- 10-K;
-- 10-Q Q1/Q2/Q3;
-- amendment case;
+- explicit CIK bypass;
+- current ticker-map lookup;
+- cached snapshot byte/hash verification;
+- derivative mapping tamper;
+- ticker remap/conflicting cache fail closed.
+
+### T3 — discovery freshness and amendment lifecycle
+
+Deterministic two-stage fixture:
+
+```text
+run 1: original filing only → acquire/parse PASS
+run 2: same local package/artifact, submissions now adds /A
+expected: current metadata fetched → REVIEW_REQUIRED
+```
+
+Also test:
+
+- multiple non-amendment candidates;
 - not-found;
-- ambiguous identity;
-- SEC rate/access failure simulation.
+- discovery network failure with cached data;
+- status performs no network and reports last discovery_checked_at.
 
-### T3 — Package acquisition
+### T4 — acquisition/package/provenance
 
-- live official SEC filing discovery;
-- primary document + required XBRL members;
-- member SHA;
-- package SHA;
-- repeat acquisition reuse;
-- source drift negative fixture;
-- host/path/content-type/size negative fixtures.
+- primary + only required XBRL members;
+- unrelated XML exhibit is not downloaded by default;
+- member/package hashes;
+- exact source URL path binding;
+- Registry/manifest provenance tamper;
+- source drift;
+- host/path/content-type/size negatives.
 
-### T4 — Registry / migration
+### T5 — Registry v4
 
-- open old CN/HK Registry;
-- migrate;
-- reopen;
-- migration idempotence;
-- old rows preserved;
-- US package records persisted;
-- planner REUSE/PARSE_LOCAL/DOWNLOAD behavior.
+- true v3 fixture → v4;
+- discovery observation rows preserved/reopened;
+- idempotent reopen;
+- legacy user_version=1 unchanged;
+- future schema no-mutation failure;
+- CN/HK rows untouched.
 
-### T5 — HTML / Inline XBRL parsing
+### T6 — parser/raw facts/evidence
 
-- deterministic virtual pages;
-- sections;
-- DOM table reconstruction;
-- context/unit resolution;
-- custom extension facts;
-- raw fact → evidence locator round trip;
-- malformed/unresolved negative fixtures.
+- INLINE_XBRL_PRIMARY;
+- XBRL_INSTANCE_PRIMARY;
+- primary + extracted instance yields one logical P6 fact set;
+- multiple XBRL instance ambiguity;
+- continuation;
+- chained continuation;
+- ix:exclude;
+- missing continuation;
+- duplicate target;
+- cycle;
+- custom QName;
+- dimensions/nil/context/unit;
+- unrelated OTHER XML context collision cannot resolve a fact;
+- every source fragment round-trips to immutable bytes.
 
-### T6 — P7 / P8
+### T7 — DOM tables
 
-For a live US filing verify:
+- colspan-only width;
+- rowspan occupancy;
+- first-row td is not automatically HEADER;
+- multi-row th span header tree;
+- fact references/cell locators.
 
-- validation result;
-- no blocking issue for the accepted positive fixture;
+### T8 — P7/P8
+
+- discovery observation bound to validation;
+- PASS only for unambiguous current slot;
 - P8 list/get/search/pages/sections/tables/facts/evidence/validation;
-- P8 has no network acquisition.
+- discovery-as-of exposed;
+- P8 no network;
+- source chain/provenance tamper blocked.
 
-### T7 — CLI
+### T9 — production CLI/capability
 
-At least:
+With `FFDF_P11_US_DEV` absent:
 
 ```text
 ffdf acquire --market US ...
@@ -334,104 +332,70 @@ ffdf ingest  --market US ...
 ffdf status  --market US ...
 ```
 
-Repeat command proves incremental reuse.
+P8 US catalog/query must also work.
 
-### T8 — Foreign private issuer
+### T10 — live SEC fixtures
 
-At minimum one official annual:
+Retain at least:
 
-- 20-F or 40-F.
+- Apple FY2025 10-K;
+- Apple FY2025 Q3 10-Q;
+- Kellanova FY2024 original + 10-K/A;
+- Toyota FY2025 20-F.
 
-6-K quarterly auto-mapping is tested only if implemented under deterministic rules.
-Otherwise verify explicit fail-closed behavior.
+For repeat live ingest:
 
-### T9 — CN/HK regression
+- current discovery metadata is re-fetched;
+- unchanged accession causes zero archive member redownload;
+- reusable parsed artifact causes zero parser rerun.
 
-Mandatory:
+For Inline XBRL live fixtures, record logical fact counts by source mode and prove no
+HTML/instance double enumeration.
 
-- existing full unit suite;
-- CN CLI smoke;
-- HK CLI smoke;
-- P8 CN/HK smoke;
-- no accepted CN/HK artifact mutation.
+### T11 — full regression
 
-### T10 — No-AI / security boundary
+- full unit suite;
+- CN CLI;
+- HK CLI;
+- P8 CN/HK;
+- P9/P10 accepted tests;
+- no accepted CN/HK raw/artifact mutation.
 
-Verify production code does not call:
+## 9. Formal evidence
 
-- OpenAI;
-- Anthropic;
-- Gemini;
-- Codex API;
-- MCP sampling;
-- arbitrary shell/network targets from filing content.
-
-## 9. Gate T1 — PC Agent One-Pass Formal Testing
-
-PC Agent executes the complete ChatGPT-authored test plan in one test task.
-
-It may rerun failed tests after correcting only:
-
-- test harness errors;
-- environment setup mistakes explicitly permitted by the plan.
-
-If production code must change, formal testing stops.
-
-The flow returns to:
-
-```text
-code fix
-→ new candidate SHA
-→ ChatGPT review
-→ revised test plan
-```
-
-This prevents testing evidence from silently referring to different code.
-
-## 10. Test Evidence Commit
-
-PC Agent commits and pushes:
-
-`development/<next>-p11-formal-test-evidence.md`
-
-Evidence must include:
+Formal evidence must include:
 
 - exact candidate SHA;
-- exact test-plan SHA/file;
-- environment/runtime identity;
-- every command;
-- exit code;
-- concise result;
-- focused pass counts;
-- full regression pass counts;
-- live SEC CIK/accession/form/period;
-- source URLs;
+- exact formal-plan SHA;
+- corrected design baseline SHA;
+- every command and exit code;
+- focused/full pass counts;
+- live accessions/source URLs;
+- discovery source hashes and observation hashes;
 - package/member hashes;
-- validation status;
-- P8 query results;
-- repeat-run/reuse result;
-- negative-gate results;
-- any skipped test with explicit reason.
+- fact_source_mode and logical fact counts;
+- repeat-run network classification;
+- validation/P8 results;
+- production-mode no-dev-flag proof;
+- CN/HK regression;
+- all skips/failures explicitly recorded.
 
-Large raw logs may be stored as tracked evidence artifacts when practical; summaries must point to them.
+If production code changes during formal testing, stop and return to a new candidate
+review.
 
-No screenshots alone count as test evidence when machine-readable output exists.
+## 10. Gate V1 — Independent Verification
 
-## 11. Gate V1 — ChatGPT Independent Verification
+ChatGPT verifies:
 
-ChatGPT verifies from Git:
-
-1. test evidence references the exact reviewed candidate;
-2. candidate did not change after review;
-3. commands correspond to the formal test plan;
-4. expected positive and negative cases are present;
-5. live SEC evidence is internally consistent;
-6. hashes/identities are coherent;
-7. failures/skips are not hidden;
-8. CN/HK regression passed;
-9. no production-code changes are mixed into the test-evidence commit.
-
-ChatGPT may inspect relevant source/tests/evidence directly from Git.
+- exact candidate identity;
+- no post-review source drift;
+- all corrected test groups executed;
+- no hidden failures/skips;
+- delayed amendment scenario proved;
+- dual-source duplication is absent;
+- continuation evidence is coherent;
+- production path works without dev flag;
+- CN/HK regression passed.
 
 Verdict:
 
@@ -440,53 +404,31 @@ ACCEPTANCE_PASS
 ACCEPTANCE_FAILED
 ```
 
-## 12. Gate I1 — Main Integration
+## 11. Gate I1 — Exact Main Integration
 
-Only after `ACCEPTANCE_PASS`:
+After ACCEPTANCE_PASS:
 
 - merge the exact accepted candidate lineage;
-- update current project status;
-- enable US in public supported-market declarations as required;
-- change P11 capability from unavailable to available;
-- update user documentation;
-- run a final minimal main smoke if merge metadata changed files.
+- do not modify production/test behavior during the merge step;
+- if merge requires source/test changes, acceptance is invalidated and review restarts;
+- update status/user docs after merge;
+- run a minimal post-merge smoke that does not substitute for formal acceptance;
+- record merge SHA.
 
-Record merge SHA.
+## 12. Closeout
 
-## 13. Gate C1 — Closeout
+Closeout records:
 
-Create one final closeout record containing:
-
-- design baseline SHA;
-- reviewed candidate SHA;
-- code review result;
-- formal test plan;
-- formal test evidence commit;
-- ChatGPT verification verdict;
+- corrected design baseline SHA;
+- repaired production candidate SHA;
+- code-review result;
+- formal plan/evidence;
+- acceptance verdict;
 - merge SHA;
-- supported US forms/periods;
-- explicit unsupported cases.
+- supported forms/periods;
+- explicit unsupported cases;
+- migration/version summary.
 
-Final state only after this:
+Only then:
 
-`P11 DONE / PASS`
-
-## 14. Short-path target
-
-Normal successful P11 execution should require only:
-
-```text
-1 design PR
-1 PC development pass
-1 production candidate push
-1 ChatGPT review
-1 ChatGPT test plan
-1 PC formal test pass
-1 test-evidence push
-1 ChatGPT verification
-1 merge/closeout
-```
-
-A repair loop is allowed only when a real defect is found.
-
-The workflow must not create separate development phases merely to mirror architecture components.
+`P11 DONE / PASS`.
