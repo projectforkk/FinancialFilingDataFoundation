@@ -17,7 +17,7 @@
 - Acceptance root: `D:\Codex\FinancialFilingDataFoundation\work\p11-formal-acceptance-9b7fcc9f`
 - Raw logs and acceptance-only harnesses: `work/p11-formal-acceptance-9b7fcc9f/evidence/`
 
-The review and plan objects were fetched from the GitHub development ref into an independent local ref for read-only verification. The active worktree was not reset, merged, or checked out to that ref. No production/test source was modified during this acceptance execution.
+The review and plan objects were initially fetched from the GitHub development ref into an independent local ref for read-only verification; before the evidence commit, the active worktree was not reset or checked out to that ref. After the evidence commit, the plan ref was merged with `--no-ff` solely to synchronize the remote branch. That merge contained documentation only. No production/test source was modified during this acceptance execution.
 
 ## 2. FT-00 candidate freeze
 
@@ -387,6 +387,7 @@ These were operator/environment command corrections, not production/test failure
 - FT-10: `PASS`
 - FT-11: `PASS`
 - Production/test code changed during formal acceptance: `NO`
+- Post-evidence branch synchronization: docs-only `--no-ff` merge `cd3bc21cdfc1e22c240512e2b0e546e3b90e914d`
 - Main merge: `NOT RUN`
 - P11 production availability: `NOT CHANGED`
 - Execution result: `EXECUTION_PASS`
