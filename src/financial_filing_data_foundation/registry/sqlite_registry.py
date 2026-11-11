@@ -181,6 +181,20 @@ _SEC_V2_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
     ),
 }
 
+_SEC_V2_LATE_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    "source_packages": _SEC_REQUIRED_SCHEMA_COLUMNS["source_packages"],
+    "package_members": _SEC_REQUIRED_SCHEMA_COLUMNS["package_members"],
+    "sec_filing_bindings": _SEC_REQUIRED_SCHEMA_COLUMNS["sec_filing_bindings"],
+    "sec_parsed_data": _SEC_REQUIRED_SCHEMA_COLUMNS["sec_parsed_data"],
+}
+
+_SEC_V2_SCHEMA_VARIANTS: tuple[
+    tuple[str, dict[str, frozenset[str]]], ...
+] = (
+    ("V2_EARLY", _SEC_V2_REQUIRED_SCHEMA_COLUMNS),
+    ("V2_LATE", _SEC_V2_LATE_REQUIRED_SCHEMA_COLUMNS),
+)
+
 _SEC_CORE_TABLES = frozenset(
     {"source_packages", "package_members", "sec_filing_bindings", "sec_parsed_data"}
 )
@@ -334,7 +348,7 @@ class SQLiteRegistry:
             )
 
     @staticmethod
-    def _validate_sec_v2_schema(conn: sqlite3.Connection) -> None:
+    def _validate_sec_v2_schema(conn: sqlite3.Connection) -> str:
         existing_tables = SQLiteRegistry._sec_table_names(conn)
         missing_tables = sorted(_SEC_CORE_TABLES - existing_tables)
         if missing_tables:
@@ -343,27 +357,23 @@ class SQLiteRegistry:
                 + ", ".join(missing_tables)
             )
 
-        shape_errors: list[str] = []
-        for table, expected_columns in _SEC_V2_REQUIRED_SCHEMA_COLUMNS.items():
-            actual_columns = {
+        actual_columns_by_table = {
+            table: {
                 str(row["name"])
                 for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
             }
-            missing_columns = sorted(expected_columns - actual_columns)
-            extra_columns = sorted(actual_columns - expected_columns)
-            if missing_columns or extra_columns:
-                detail: list[str] = []
-                if missing_columns:
-                    detail.append("missing=" + ",".join(missing_columns))
-                if extra_columns:
-                    detail.append("unexpected=" + ",".join(extra_columns))
-                shape_errors.append(f"{table} ({'; '.join(detail)})")
+            for table in _SEC_CORE_TABLES
+        }
+        for variant_name, expected_schema in _SEC_V2_SCHEMA_VARIANTS:
+            if all(
+                actual_columns_by_table[table] == expected_columns
+                for table, expected_columns in expected_schema.items()
+            ):
+                return variant_name
 
-        if shape_errors:
-            raise RegistrySchemaUnsupported(
-                "SEC registry extension is not a supported historical v2 shape: "
-                + "; ".join(shape_errors)
-            )
+        raise RegistrySchemaUnsupported(
+            "SEC registry extension is not a supported historical v2 shape"
+        )
 
     @staticmethod
     def _sec_table_names(conn: sqlite3.Connection) -> set[str]:
@@ -414,7 +424,7 @@ class SQLiteRegistry:
 
     @classmethod
     def _migrate_sec_v2_to_v3(cls, conn: sqlite3.Connection) -> None:
-        cls._validate_sec_v2_schema(conn)
+        historical_variant = cls._validate_sec_v2_schema(conn)
         if not conn.in_transaction:
             conn.execute("BEGIN")
         try:
@@ -430,9 +440,18 @@ class SQLiteRegistry:
                 str(row["name"])
                 for row in conn.execute("PRAGMA table_info('sec_parsed_data')").fetchall()
             }
-            if "compatibility_status" not in columns:
+            if historical_variant == "V2_EARLY":
                 conn.execute(
                     "ALTER TABLE sec_parsed_data ADD COLUMN compatibility_status TEXT NOT NULL DEFAULT 'INCOMPATIBLE'"
+                )
+            elif historical_variant == "V2_LATE":
+                if "compatibility_status" not in columns:
+                    raise RegistrySchemaUnsupported(
+                        "SEC late-v2 schema is missing compatibility_status"
+                    )
+            else:
+                raise RegistrySchemaUnsupported(
+                    f"unsupported historical SEC v2 variant: {historical_variant}"
                 )
             # A v2 row has no independently persisted compatibility proof.  It
             # must remain fail-closed even when an older runtime had already

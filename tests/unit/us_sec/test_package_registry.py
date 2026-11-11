@@ -287,6 +287,75 @@ CREATE INDEX idx_sec_parsed_slot
     ON sec_parsed_data(company_id, fiscal_year, raw_fiscal_period);
 """
 
+# Exact late-v2 SEC extension DDL from candidate
+# 362877244aa553ca4d76eb71318b116cde04c6a5.
+_SEC_V2_LATE_DDL = """
+CREATE TABLE source_packages (
+    package_sha256 TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    accession TEXT NOT NULL,
+    cik TEXT NOT NULL,
+    form TEXT NOT NULL,
+    filed_date TEXT,
+    accepted_at TEXT,
+    report_period TEXT,
+    primary_document TEXT NOT NULL,
+    manifest_schema_version TEXT NOT NULL,
+    first_seen_at TEXT NOT NULL
+);
+
+CREATE TABLE package_members (
+    package_sha256 TEXT NOT NULL,
+    member_sha256 TEXT NOT NULL,
+    relative_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    byte_length INTEGER NOT NULL,
+    source_url TEXT NOT NULL,
+    PRIMARY KEY(package_sha256, relative_name),
+    FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+);
+
+CREATE INDEX idx_package_members_sha ON package_members(member_sha256);
+
+CREATE TABLE sec_filing_bindings (
+    binding_id TEXT PRIMARY KEY,
+    package_sha256 TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    raw_fiscal_period TEXT NOT NULL,
+    accession TEXT NOT NULL,
+    form TEXT NOT NULL,
+    amended INTEGER NOT NULL CHECK (amended IN (0, 1)),
+    binding_status TEXT NOT NULL,
+    artifact_path TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+);
+
+CREATE INDEX idx_sec_bindings_slot
+    ON sec_filing_bindings(company_id, fiscal_year, raw_fiscal_period);
+
+CREATE TABLE sec_parsed_data (
+    parse_run_id TEXT PRIMARY KEY,
+    package_sha256 TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    raw_fiscal_period TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    schema_version TEXT NOT NULL,
+    validation_status TEXT NOT NULL,
+    compatibility_status TEXT NOT NULL DEFAULT 'INCOMPATIBLE',
+    blocking_issue_count INTEGER NOT NULL,
+    artifact_path TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256)
+);
+
+CREATE INDEX idx_sec_parsed_slot
+    ON sec_parsed_data(company_id, fiscal_year, raw_fiscal_period);
+"""
+
 _SEC_V2_PARSED_COLUMNS = (
     "parse_run_id",
     "package_sha256",
@@ -296,6 +365,21 @@ _SEC_V2_PARSED_COLUMNS = (
     "parser_version",
     "schema_version",
     "validation_status",
+    "blocking_issue_count",
+    "artifact_path",
+    "created_at",
+)
+
+_SEC_V2_LATE_PARSED_COLUMNS = (
+    "parse_run_id",
+    "package_sha256",
+    "company_id",
+    "fiscal_year",
+    "raw_fiscal_period",
+    "parser_version",
+    "schema_version",
+    "validation_status",
+    "compatibility_status",
     "blocking_issue_count",
     "artifact_path",
     "created_at",
@@ -373,11 +457,14 @@ def _snapshot_rows_for_columns(
     )
 
 
-def _make_v2_registry(db: Path) -> tuple[object, dict[str, object]]:
+def _make_v2_registry(
+    db: Path, *, late: bool = False
+) -> tuple[object, dict[str, object]]:
     package = _package()
     with sqlite3.connect(db) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
-        conn.executescript(_LEGACY_V1_DDL + _SEC_V2_DDL)
+        sec_ddl = _SEC_V2_LATE_DDL if late else _SEC_V2_DDL
+        conn.executescript(_LEGACY_V1_DDL + sec_ddl)
         conn.execute("PRAGMA user_version = 1")
         legacy_sha = "a" * 64
         conn.execute(
@@ -540,29 +627,55 @@ def _make_v2_registry(db: Path) -> tuple[object, dict[str, object]]:
                 "2026-11-11T00:00:00+00:00",
             ),
         )
-        conn.execute(
-            """
-            INSERT INTO sec_parsed_data(
-                parse_run_id, package_sha256, company_id, fiscal_year,
-                raw_fiscal_period, parser_version, schema_version,
-                validation_status, blocking_issue_count, artifact_path,
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "old-run",
-                package.package_sha256,
-                "US:CIK0000320193",
-                2025,
-                "Q2",
-                "VIRTUAL_HTML_V2",
-                "p11-sec-artifacts-v1",
-                "PASS",
-                0,
-                "old-v2-artifact",
-                "2026-11-11T00:00:00+00:00",
-            ),
-        )
+        if late:
+            conn.execute(
+                """
+                INSERT INTO sec_parsed_data(
+                    parse_run_id, package_sha256, company_id, fiscal_year,
+                    raw_fiscal_period, parser_version, schema_version,
+                    validation_status, compatibility_status,
+                    blocking_issue_count, artifact_path, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "old-run",
+                    package.package_sha256,
+                    "US:CIK0000320193",
+                    2025,
+                    "Q2",
+                    "VIRTUAL_HTML_V2",
+                    "p11-sec-artifacts-v1",
+                    "PASS",
+                    "COMPATIBLE",
+                    0,
+                    "old-v2-artifact",
+                    "2026-11-11T00:00:00+00:00",
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO sec_parsed_data(
+                    parse_run_id, package_sha256, company_id, fiscal_year,
+                    raw_fiscal_period, parser_version, schema_version,
+                    validation_status, blocking_issue_count, artifact_path,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "old-run",
+                    package.package_sha256,
+                    "US:CIK0000320193",
+                    2025,
+                    "Q2",
+                    "VIRTUAL_HTML_V2",
+                    "p11-sec-artifacts-v1",
+                    "PASS",
+                    0,
+                    "old-v2-artifact",
+                    "2026-11-11T00:00:00+00:00",
+                ),
+            )
         conn.commit()
     return package, _snapshot_registry(db)
 
@@ -671,6 +784,120 @@ def test_sec_registry_migrates_explicit_v2_metadata_variant(tmp_path: Path) -> N
         assert conn.execute(
             "SELECT compatibility_status FROM sec_parsed_data WHERE parse_run_id = 'old-run'"
         ).fetchone() == ("INCOMPATIBLE",)
+
+
+def test_sec_registry_migrates_late_v2_with_compatibility_column_to_v3(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "late-v2.sqlite"
+    _package_obj, before = _make_v2_registry(db, late=True)
+
+    before_columns = before["columns"]
+    assert isinstance(before_columns, dict)
+    assert "sec_schema_metadata" not in before["tables"]
+    assert "compatibility_status" in {
+        str(column[1]) for column in before_columns["sec_parsed_data"]
+    }
+    assert _snapshot_rows_for_columns(
+        before, "sec_parsed_data", ("compatibility_status",)
+    ) == (("COMPATIBLE",),)
+    assert before["user_version"] == 1
+
+    migration_calls: list[bool] = []
+    original_migration = SQLiteRegistry._migrate_sec_v2_to_v3.__func__
+
+    def wrapped_migration(cls: type[SQLiteRegistry], conn: sqlite3.Connection) -> None:
+        migration_calls.append(True)
+        original_migration(cls, conn)
+
+    monkeypatch.setattr(
+        SQLiteRegistry,
+        "_migrate_sec_v2_to_v3",
+        classmethod(wrapped_migration),
+    )
+
+    registry = SQLiteRegistry(db)
+
+    assert registry.schema_version() == 1
+    assert registry.sec_schema_version() == 3
+    assert migration_calls == [True]
+    after = _snapshot_registry(db)
+    assert set(after["tables"]) == set(before["tables"]) | {"sec_schema_metadata"}
+    for table in (
+        "documents",
+        "document_locations",
+        "document_sources",
+        "filing_bindings",
+        "parsed_data",
+        "source_packages",
+        "package_members",
+        "sec_filing_bindings",
+    ):
+        assert after["rows"][table] == before["rows"][table]
+        assert after["columns"][table] == before["columns"][table]
+    assert _snapshot_rows_for_columns(
+        after,
+        "sec_parsed_data",
+        tuple(column for column in _SEC_V2_LATE_PARSED_COLUMNS if column != "compatibility_status"),
+    ) == _snapshot_rows_for_columns(
+        before,
+        "sec_parsed_data",
+        tuple(column for column in _SEC_V2_LATE_PARSED_COLUMNS if column != "compatibility_status"),
+    )
+    assert _snapshot_rows_for_columns(
+        after, "sec_parsed_data", ("compatibility_status",)
+    ) == (("INCOMPATIBLE",),)
+    assert after["columns"]["sec_parsed_data"] == before["columns"]["sec_parsed_data"]
+    before_table_sql = {item[0]: item for item in before["table_sql"]}
+    after_table_sql = {item[0]: item for item in after["table_sql"]}
+    for table in (
+        "source_packages",
+        "package_members",
+        "sec_filing_bindings",
+        "sec_parsed_data",
+    ):
+        assert after_table_sql[table] == before_table_sql[table]
+    assert after["indexes"] == before["indexes"]
+    assert after["user_version"] == before["user_version"] == 1
+    assert after["rows"]["sec_schema_metadata"] == (("schema_version", "3"),)
+
+    snapshot1 = _snapshot_registry(db)
+    SQLiteRegistry(db)
+    snapshot2 = _snapshot_registry(db)
+    assert snapshot2 == snapshot1
+
+
+def test_unversioned_unknown_sec_shape_is_not_guessed_as_v2(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "unknown-unversioned-sec.sqlite"
+    _make_v2_registry(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "ALTER TABLE sec_parsed_data ADD COLUMN future_unknown_field TEXT"
+        )
+        conn.commit()
+    before = _snapshot_registry(db)
+    migration_calls: list[bool] = []
+    original_migration = SQLiteRegistry._migrate_sec_v2_to_v3.__func__
+
+    def wrapped_migration(cls: type[SQLiteRegistry], conn: sqlite3.Connection) -> None:
+        migration_calls.append(True)
+        original_migration(cls, conn)
+
+    monkeypatch.setattr(
+        SQLiteRegistry,
+        "_migrate_sec_v2_to_v3",
+        classmethod(wrapped_migration),
+    )
+
+    with pytest.raises(RegistrySchemaUnsupported) as exc_info:
+        SQLiteRegistry(db)
+
+    assert exc_info.value.reason_code == "REGISTRY_SCHEMA_UNSUPPORTED"
+    assert migration_calls == []
+    after = _snapshot_registry(db)
+    assert after == before
 
 
 def test_future_sec_schema_fails_closed_without_mutation(tmp_path: Path) -> None:
