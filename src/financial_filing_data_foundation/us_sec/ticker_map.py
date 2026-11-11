@@ -30,6 +30,29 @@ class TickerMapSnapshot:
             },
         }
 
+    def verify(self) -> "TickerMapSnapshot":
+        """Reparse the authenticated source bytes and verify the derivative."""
+
+        if not self.source_bytes_b64:
+            raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, "ticker snapshot source bytes are missing")
+        try:
+            source_bytes = base64.b64decode(self.source_bytes_b64, validate=True)
+        except (ValueError, TypeError) as exc:
+            raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, "ticker snapshot source bytes are invalid") from exc
+        actual_sha = hashlib.sha256(source_bytes).hexdigest()
+        if actual_sha != str(self.source_sha256).lower():
+            raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, "ticker snapshot source bytes hash mismatch")
+        try:
+            reparsed = parse_ticker_map(source_bytes)
+        except SecError as exc:
+            raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, "ticker snapshot source bytes cannot be parsed") from exc
+        if not isinstance(reparsed, dict):
+            raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, "ticker snapshot mapping is invalid")
+        normalized = {key: tuple(value) for key, value in reparsed.items()}
+        if normalized != self.mapping:
+            raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, "ticker snapshot mapping derivative mismatch")
+        return self
+
 
 def parse_ticker_map(data: bytes, ticker: str | None = None) -> dict[str, tuple[str, ...]] | str:
     if not isinstance(data, (bytes, bytearray)):

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 import pymupdf
 
@@ -29,7 +30,7 @@ from financial_filing_data_foundation.registry.models import (
 # additive SEC extension has its own versioned table contract so opening an old
 # registry never rewrites the legacy rows or changes their semantics.
 REGISTRY_SCHEMA_VERSION = 1
-SEC_REGISTRY_SCHEMA_VERSION = 3
+SEC_REGISTRY_SCHEMA_VERSION = 4
 
 _REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
     "documents": frozenset(
@@ -158,6 +159,29 @@ _SEC_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
         }
     ),
+    "sec_discovery_observations": frozenset(
+        {
+            "observation_sha256",
+            "company_id",
+            "cik",
+            "fiscal_year",
+            "raw_fiscal_period",
+            "retrieved_at",
+            "source_documents_json",
+            "candidates_json",
+            "candidate_fingerprint",
+            "selected_accession",
+            "state",
+            "artifact_path",
+            "created_at",
+        }
+    ),
+}
+
+_SEC_V3_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    key: value
+    for key, value in _SEC_REQUIRED_SCHEMA_COLUMNS.items()
+    if key != "sec_discovery_observations"
 }
 
 _SEC_V2_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
@@ -198,6 +222,7 @@ _SEC_V2_SCHEMA_VARIANTS: tuple[
 _SEC_CORE_TABLES = frozenset(
     {"source_packages", "package_members", "sec_filing_bindings", "sec_parsed_data"}
 )
+_SEC_V4_TABLES = _SEC_CORE_TABLES | frozenset({"sec_discovery_observations"})
 _SEC_SCHEMA_VERSION_KEY = "schema_version"
 
 
@@ -333,6 +358,35 @@ class SQLiteRegistry:
             )
 
     @staticmethod
+    def _validate_sec_v3_schema(conn: sqlite3.Connection) -> None:
+        rows = conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            """
+        ).fetchall()
+        existing_tables = {str(row["name"]) for row in rows}
+        missing_tables = sorted(set(_SEC_V3_REQUIRED_SCHEMA_COLUMNS) - existing_tables)
+        if missing_tables:
+            raise RegistrySchemaUnsupported(
+                "SEC v3 registry extension is incomplete; missing tables: "
+                + ", ".join(missing_tables)
+            )
+        missing_columns: list[str] = []
+        for table, required_columns in _SEC_V3_REQUIRED_SCHEMA_COLUMNS.items():
+            columns = {
+                str(row["name"])
+                for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
+            for column in sorted(required_columns - columns):
+                missing_columns.append(f"{table}.{column}")
+        if missing_columns:
+            raise RegistrySchemaUnsupported(
+                "SEC v3 registry extension is incomplete; missing columns: "
+                + ", ".join(missing_columns)
+            )
+
+    @staticmethod
     def _validate_sec_metadata_schema(conn: sqlite3.Connection) -> None:
         columns = {
             str(row["name"])
@@ -459,6 +513,45 @@ class SQLiteRegistry:
             conn.execute(
                 "UPDATE sec_parsed_data SET compatibility_status = 'INCOMPATIBLE'"
             )
+            cls._write_sec_schema_version(conn, 3)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    @classmethod
+    def _migrate_sec_v3_to_v4(cls, conn: sqlite3.Connection) -> None:
+        """Add immutable discovery observations without touching legacy rows."""
+
+        cls._validate_sec_v3_schema(conn)
+        if not conn.in_transaction:
+            conn.execute("BEGIN")
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sec_discovery_observations (
+                    observation_sha256 TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    cik TEXT NOT NULL,
+                    fiscal_year INTEGER NOT NULL,
+                    raw_fiscal_period TEXT NOT NULL,
+                    retrieved_at TEXT NOT NULL,
+                    source_documents_json TEXT NOT NULL,
+                    candidates_json TEXT NOT NULL,
+                    candidate_fingerprint TEXT NOT NULL,
+                    selected_accession TEXT,
+                    state TEXT NOT NULL,
+                    artifact_path TEXT,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_sec_discovery_slot
+                ON sec_discovery_observations(company_id, fiscal_year, raw_fiscal_period, retrieved_at)
+                """
+            )
             cls._write_sec_schema_version(conn, SEC_REGISTRY_SCHEMA_VERSION)
             conn.commit()
         except Exception:
@@ -493,6 +586,11 @@ class SQLiteRegistry:
             if stored_version == 2:
                 cls._validate_sec_v2_schema(conn)
                 cls._migrate_sec_v2_to_v3(conn)
+                cls._migrate_sec_v3_to_v4(conn)
+                return
+            if stored_version == 3:
+                cls._validate_sec_v3_schema(conn)
+                cls._migrate_sec_v3_to_v4(conn)
                 return
             if stored_version == SEC_REGISTRY_SCHEMA_VERSION:
                 cls._validate_sec_schema(conn)
@@ -519,6 +617,7 @@ class SQLiteRegistry:
         # historical v2 shape is recognized; unknown shapes fail closed.
         cls._validate_sec_v2_schema(conn)
         cls._migrate_sec_v2_to_v3(conn)
+        cls._migrate_sec_v3_to_v4(conn)
 
     @staticmethod
     def _create_schema(conn: sqlite3.Connection) -> None:
@@ -689,6 +788,25 @@ class SQLiteRegistry:
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS sec_discovery_observations (
+                observation_sha256 TEXT PRIMARY KEY,
+                company_id TEXT NOT NULL,
+                cik TEXT NOT NULL,
+                fiscal_year INTEGER NOT NULL,
+                raw_fiscal_period TEXT NOT NULL,
+                retrieved_at TEXT NOT NULL,
+                source_documents_json TEXT NOT NULL,
+                candidates_json TEXT NOT NULL,
+                candidate_fingerprint TEXT NOT NULL,
+                selected_accession TEXT,
+                state TEXT NOT NULL,
+                artifact_path TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sec_discovery_slot
+            ON sec_discovery_observations(company_id, fiscal_year, raw_fiscal_period, retrieved_at);
             """
         )
 
@@ -707,6 +825,156 @@ class SQLiteRegistry:
                 f"unsupported SEC registry schema version: {version}"
             )
         return version
+
+    def register_sec_discovery_observation(self, observation: Any) -> None:
+        payload = observation.to_dict()
+        values = (
+            str(payload["observation_sha256"]).lower(),
+            str(payload["company_id"]),
+            str(payload["cik"]),
+            int(payload["fiscal_year"]),
+            str(payload["period"]).upper(),
+            str(payload["retrieved_at"]),
+            json.dumps(payload.get("source_documents", []), ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            json.dumps(payload.get("candidates", []), ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            str(payload["candidate_fingerprint"]),
+            payload.get("selected_accession"),
+            str(payload["state"]).upper(),
+            payload.get("artifact_path"),
+        )
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT * FROM sec_discovery_observations WHERE observation_sha256 = ?",
+                (values[0],),
+            ).fetchone()
+            if existing is not None:
+                existing_values = tuple(
+                    existing[key]
+                    for key in (
+                        "observation_sha256",
+                        "company_id",
+                        "cik",
+                        "fiscal_year",
+                        "raw_fiscal_period",
+                        "retrieved_at",
+                        "source_documents_json",
+                        "candidates_json",
+                        "candidate_fingerprint",
+                        "selected_accession",
+                        "state",
+                        "artifact_path",
+                    )
+                )
+                if existing_values != values:
+                    raise ValueError("P11 discovery observation identity drift")
+                return
+            conn.execute(
+                """
+                INSERT INTO sec_discovery_observations(
+                    observation_sha256, company_id, cik, fiscal_year,
+                    raw_fiscal_period, retrieved_at, source_documents_json,
+                    candidates_json, candidate_fingerprint, selected_accession,
+                    state, artifact_path, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (*values, _utc_now()),
+            )
+            conn.commit()
+
+    def list_sec_discovery_observations(
+        self,
+        *,
+        company_id: str,
+        fiscal_year: int,
+        period: str,
+    ) -> tuple[sqlite3.Row, ...]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM sec_discovery_observations
+                WHERE company_id = ? AND fiscal_year = ? AND raw_fiscal_period = ?
+                ORDER BY retrieved_at DESC, observation_sha256 DESC
+                """,
+                (company_id, int(fiscal_year), str(period).upper()),
+            ).fetchall()
+        return tuple(rows)
+
+    def latest_sec_discovery_observation(
+        self,
+        *,
+        company_id: str,
+        fiscal_year: int,
+        period: str,
+    ) -> sqlite3.Row | None:
+        rows = self.list_sec_discovery_observations(
+            company_id=company_id,
+            fiscal_year=fiscal_year,
+            period=period,
+        )
+        return rows[0] if rows else None
+
+    def verify_sec_package_provenance(self, package: object) -> None:
+        manifest = package.manifest()
+        package_sha = str(manifest["package_sha256"]).lower()
+        with self._connect() as conn:
+            source = conn.execute(
+                "SELECT * FROM source_packages WHERE package_sha256 = ?",
+                (package_sha,),
+            ).fetchone()
+            if source is None:
+                raise ValueError("SEC package is not registered in source_packages")
+            expected_source = (
+                package_sha,
+                "sec",
+                str(manifest["accession"]),
+                str(manifest["cik"]),
+                str(manifest["form"]),
+                manifest.get("filing_date"),
+                manifest.get("accepted_at"),
+                manifest.get("report_period"),
+                str(manifest.get("primary_document") or ""),
+                str(manifest["schema_version"]),
+            )
+            actual_source = tuple(
+                source[key]
+                for key in (
+                    "package_sha256",
+                    "provider",
+                    "accession",
+                    "cik",
+                    "form",
+                    "filed_date",
+                    "accepted_at",
+                    "report_period",
+                    "primary_document",
+                    "manifest_schema_version",
+                )
+            )
+            if actual_source != expected_source:
+                raise ValueError("SEC source_packages provenance mismatch")
+            rows = conn.execute(
+                """
+                SELECT package_sha256, member_sha256, relative_name, role,
+                       content_type, byte_length, source_url
+                FROM package_members WHERE package_sha256 = ?
+                ORDER BY relative_name ASC
+                """,
+                (package_sha,),
+            ).fetchall()
+        expected_members = tuple(
+            (
+                package_sha,
+                member.member_sha256,
+                member.relative_name,
+                member.role.value,
+                member.content_type,
+                len(member.body),
+                member.source_url,
+            )
+            for member in package.canonical_members()
+        )
+        if tuple(tuple(row) for row in rows) != expected_members:
+            raise ValueError("SEC package_members provenance mismatch")
 
     def register_sec_package(self, package: object) -> None:
         manifest = package.manifest()

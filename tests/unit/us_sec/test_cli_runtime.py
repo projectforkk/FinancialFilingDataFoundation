@@ -19,7 +19,12 @@ from financial_filing_data_foundation.us_sec.parser import (
 )
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
 from financial_filing_data_foundation.user_cli import _parser
+
+
+def _sec_url(cik: str, accession: str, name: str) -> str:
+    return archive_member_url(cik, accession, name)
 
 
 def test_runtime_uses_explicit_argv_without_shell_or_arbitrary_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -80,7 +85,7 @@ def test_explicit_cik_bypasses_current_ticker_map(monkeypatch: pytest.MonkeyPatc
     args = _parser().parse_args(
         ["acquire", "--market", "US", "--cik", "55067", "--ticker", "K", "--year", "2024", "--period", "FY"]
     )
-    company, client = _us_company_and_client(args)
+    company, client = _us_company_and_client(args, online=False)
     assert company.company_id == "US:CIK0000055067"
     assert company.ticker == "K"
     assert client is None
@@ -99,10 +104,66 @@ def test_cached_ticker_map_supports_local_identity_resolution_without_network(mo
     )
     _persist_ticker_map_snapshot(tmp_path, snapshot)
     args = _parser().parse_args(["acquire", "--market", "US", "--ticker", "OLD", "--year", "2024", "--period", "FY"])
-    company, client = _us_company_and_client(args)
+    company, client = _us_company_and_client(args, online=False)
     assert company.cik == "0000055067"
     assert company.ticker_source_sha256 == snapshot.source_sha256
     assert client is None
+
+
+def test_local_status_with_uncached_ticker_does_not_fall_back_to_network(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
+    monkeypatch.setenv("FFDF_ROOT", str(tmp_path))
+    from financial_filing_data_foundation.user_cli import _us_company_and_client
+
+    args = _parser().parse_args(
+        ["status", "--market", "US", "--ticker", "MISSING", "--year", "2025", "--period", "FY"]
+    )
+    with pytest.raises(SecError) as exc_info:
+        _us_company_and_client(args, online=False)
+    assert exc_info.value.reason_code == P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN.value
+
+
+def test_us_status_is_local_only_and_reports_discovery_as_of(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
+    monkeypatch.setenv("FFDF_ROOT", str(tmp_path))
+    from financial_filing_data_foundation.registry import SQLiteRegistry
+    from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation
+    from financial_filing_data_foundation.us_sec.identity import sec_company
+    from financial_filing_data_foundation.user_cli import _runtime_paths, _us_status
+
+    company = sec_company(cik="320193", ticker=None)
+    checked_at = "2026-11-11T01:02:03+00:00"
+    observation = SecDiscoveryObservation.create(
+        company=company,
+        fiscal_year=2025,
+        period="FY",
+        source_documents=[{"url": "https://data.sec.gov/submissions/CIK0000320193.json", "body": b"{}"}],
+        candidates=(),
+        selected_accession=None,
+        state="NOT_FOUND",
+        retrieved_at=checked_at,
+    )
+    paths = _runtime_paths(tmp_path)
+    SQLiteRegistry(paths.registry).register_sec_discovery_observation(observation)
+    monkeypatch.setattr(
+        "financial_filing_data_foundation.us_sec.http.SecHttpClient.fetch",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("status performed network I/O")),
+    )
+    args = _parser().parse_args(
+        ["status", "--market", "US", "--cik", "320193", "--year", "2025", "--period", "FY"]
+    )
+
+    assert _us_status(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["discovery_as_of"]["discovery_checked_at"] == checked_at
+    assert payload["discovery_as_of"]["discovery_state"] == "NOT_FOUND"
 
 
 def test_market_period_validation_is_scoped_before_provider_dispatch() -> None:
@@ -116,18 +177,19 @@ def test_market_period_validation_is_scoped_before_provider_dispatch() -> None:
         _validate_market_period(us_args)
 
 
-def test_us_cli_planner_uses_local_package_and_parsed_data_without_network(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_us_cli_planner_uses_current_local_package_and_parsed_data(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("FFDF_P11_US_DEV", "1")
     monkeypatch.delenv("FFDF_SEC_CONTACT_EMAIL", raising=False)
     monkeypatch.setenv("FFDF_ROOT", str(tmp_path))
     from financial_filing_data_foundation.registry import SQLiteRegistry
     from financial_filing_data_foundation.us_sec.package import SecMemberRole, SecPackageMember, SecPackageStore, build_package
+    from financial_filing_data_foundation.us_sec.identity import sec_company
     from financial_filing_data_foundation.us_sec.registry import register_sec_package, register_sec_slot
-    from financial_filing_data_foundation.user_cli import _runtime_paths, _us_acquire_result, _us_plan_slot
+    from financial_filing_data_foundation.user_cli import _runtime_paths, _us_plan_slot
 
     package = build_package(
         cik="0000320193", accession="0000320193-25-000079", form="10-K", fiscal_year=2025, period="FY",
-        members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url="https://www.sec.gov/Archives/edgar/data/320193/annual.htm", body=b'<html><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>'),),
+        members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"), body=b'<html><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>'),),
     )
     paths = _runtime_paths(tmp_path)
     store = SecPackageStore(paths.raw_store)
@@ -136,9 +198,18 @@ def test_us_cli_planner_uses_local_package_and_parsed_data_without_network(monke
     register_sec_package(registry, package)
     register_sec_slot(registry, package, fiscal_year=2025, period="FY")
     args = _parser().parse_args(["acquire", "--market", "US", "--cik", "320193", "--year", "2025", "--period", "FY"])
-    company, result, _ = _us_acquire_result(args)
+    company = sec_company(cik="320193", ticker=None)
+    plan, local_package = _us_plan_slot(
+        company,
+        args,
+        paths,
+        registry,
+        selected_accession=package.accession,
+        discovery_state="UNAMBIGUOUS",
+    )
     assert company.company_id == "US:CIK0000320193"
-    assert result.plan_action == "PARSE_LOCAL"
+    assert plan.action.value == "PARSE_LOCAL"
+    assert local_package.package_sha256 == package.package_sha256
     parsed = parse_sec_package(package, paths.ingest_root / "us" / "p11")
     validation = validate_sec_artifacts(parsed, paths.ingest_root / "us" / "p7", package=package)
     assert validation.validation_status == "PASS"
@@ -165,7 +236,7 @@ def test_us_cli_planner_rejects_parsed_row_for_wrong_package(monkeypatch: pytest
     def make_package(accession: str, text: bytes) -> object:
         return build_package(
             cik="0000320193", accession=accession, form="10-K", fiscal_year=2025, period="FY",
-            members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=f"https://www.sec.gov/Archives/edgar/data/320193/{accession}.htm", body=text),),
+            members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", accession, "annual.htm"), body=text),),
         )
 
     html = b'<html><body><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD">100</ix:nonfraction></p></body></html>'
@@ -201,7 +272,7 @@ def test_us_cli_planner_marks_multiple_local_packages_for_review(monkeypatch: py
     def make_package(accession: str) -> object:
         return build_package(
             cik="0000320193", accession=accession, form="10-K", fiscal_year=2025, period="FY",
-            members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=f"https://www.sec.gov/Archives/edgar/data/320193/{accession}.htm", body=f"<html><body>{accession}</body></html>".encode()),),
+            members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", accession, "annual.htm"), body=f"<html><body>{accession}</body></html>".encode()),),
         )
 
     first = make_package("0000320193-25-000079")
@@ -221,15 +292,16 @@ def test_us_cli_planner_marks_multiple_local_packages_for_review(monkeypatch: py
     assert plan.action.value == "REVIEW_REQUIRED"
 
 
-def test_us_cli_reuse_data_does_not_network_or_rerun_parser(
+def test_us_cli_reuse_data_refreshes_discovery_without_reparsing_or_redownloading(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setenv("FFDF_P11_US_DEV", "1")
-    monkeypatch.delenv("FFDF_SEC_CONTACT_EMAIL", raising=False)
+    monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
+    monkeypatch.setenv("FFDF_SEC_CONTACT_EMAIL", "ops@example.org")
     monkeypatch.setenv("FFDF_ROOT", str(tmp_path))
     from financial_filing_data_foundation.user_cli import _us_ingest, _runtime_paths
+    from financial_filing_data_foundation.us_sec.http import SecHttpConfig, SecResponse
     from financial_filing_data_foundation.us_sec.package import SecMemberRole, SecPackageMember, build_package
 
     package = build_package(
@@ -243,7 +315,7 @@ def test_us_cli_reuse_data_does_not_network_or_rerun_parser(
                 relative_name="annual.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/annual.htm",
+                source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"),
                 body=b'<html><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>',
             ),
         ),
@@ -253,12 +325,45 @@ def test_us_cli_reuse_data_does_not_network_or_rerun_parser(
     paths = _runtime_paths(tmp_path)
     before = tuple(sorted(path.name for path in (paths.ingest_root / "us" / "p11").iterdir()))
 
+    submissions = {
+        "cik": "0000320193",
+        "fiscalYearEnd": "0927",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0000320193-25-000079"],
+                "filingDate": ["2025-11-01"],
+                "reportDate": ["2025-09-27"],
+                "form": ["10-K"],
+                "primaryDocument": ["annual.htm"],
+            }
+        },
+    }
+    submissions_url = "https://data.sec.gov/submissions/CIK0000320193.json"
+    discovery_calls: list[str] = []
+
+    class FreshnessClient:
+        config = SecHttpConfig(contact_email="ops@example.org")
+
+        def fetch(self, url: str, **_: object) -> SecResponse:
+            discovery_calls.append(url)
+            assert url == submissions_url
+            return SecResponse(
+                200,
+                {"Content-Type": "application/json"},
+                json.dumps(submissions).encode(),
+                url,
+            )
+
+    monkeypatch.setattr(
+        "financial_filing_data_foundation.user_cli.SecHttpClient",
+        lambda *_args, **_kwargs: FreshnessClient(),
+    )
+
     def forbidden(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("network or parser was invoked during REUSE_DATA")
+        raise AssertionError("parser or package acquisition was invoked during REUSE_DATA")
 
     monkeypatch.setattr("financial_filing_data_foundation.us_sec.ingest.parse_sec_package", forbidden)
     monkeypatch.setattr("financial_filing_data_foundation.us_sec.acquisition.SecAcquirer.acquire", forbidden)
-    monkeypatch.setattr("financial_filing_data_foundation.us_sec.http.SecHttpClient.fetch", forbidden)
     args = _parser().parse_args(
         ["ingest", "--market", "US", "--cik", "320193", "--ticker", "AAPL", "--year", "2025", "--period", "FY"]
     )
@@ -267,10 +372,16 @@ def test_us_cli_reuse_data_does_not_network_or_rerun_parser(
     after = tuple(sorted(path.name for path in (paths.ingest_root / "us" / "p11").iterdir()))
     output = json.loads(capsys.readouterr().out)
     assert output["planner_action"] == "REUSE_DATA"
+    assert discovery_calls == [submissions_url]
     assert before == after
 
+    assert _us_ingest(args) == 0
+    second_output = json.loads(capsys.readouterr().out)
+    assert second_output["planner_action"] == "REUSE_DATA"
+    assert discovery_calls == [submissions_url, submissions_url]
 
-def test_us_cli_local_v3_upgrade_generates_v4_then_reuses_without_network(
+
+def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -278,13 +389,11 @@ def test_us_cli_local_v3_upgrade_generates_v4_then_reuses_without_network(
     monkeypatch.setenv("FFDF_P11_US_DEV", "1")
     monkeypatch.delenv("FFDF_SEC_CONTACT_EMAIL", raising=False)
     monkeypatch.setenv("FFDF_ROOT", str(tmp_path))
-    from financial_filing_data_foundation.mcp.catalog import McpCatalog
-    from financial_filing_data_foundation.mcp.service import McpQueryService
     from financial_filing_data_foundation.registry import SQLiteRegistry
     from financial_filing_data_foundation.us_sec.identity import sec_company
     from financial_filing_data_foundation.us_sec.package import SecMemberRole, SecPackageMember, SecPackageStore, build_package
     from financial_filing_data_foundation.us_sec.registry import register_sec_package, register_sec_slot
-    from financial_filing_data_foundation.user_cli import _runtime_paths, _us_ingest, _us_plan_slot
+    from financial_filing_data_foundation.user_cli import _runtime_paths, _us_plan_slot
 
     package = build_package(
         cik="0000320193",
@@ -297,7 +406,7 @@ def test_us_cli_local_v3_upgrade_generates_v4_then_reuses_without_network(
                 relative_name="annual.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/annual.htm",
+                source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"),
                 body=b'<html><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>',
             ),
         ),
@@ -322,7 +431,7 @@ def test_us_cli_local_v3_upgrade_generates_v4_then_reuses_without_network(
         fiscal_year=2025,
         period="FY",
         parser_version="VIRTUAL_HTML_V3",
-        schema_version=SEC_ARTIFACT_SCHEMA,
+        schema_version="p11-sec-artifacts-v1",
         validation_status="PASS",
         blocking_issue_count=0,
         compatibility_status="COMPATIBLE",
@@ -331,21 +440,32 @@ def test_us_cli_local_v3_upgrade_generates_v4_then_reuses_without_network(
     args = _parser().parse_args(
         ["ingest", "--market", "US", "--cik", "320193", "--ticker", "AAPL", "--year", "2025", "--period", "FY"]
     )
-
-    def forbidden(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("network or acquisition was invoked during local V3 upgrade")
-
-    monkeypatch.setattr("financial_filing_data_foundation.us_sec.acquisition.SecAcquirer.acquire", forbidden)
-    monkeypatch.setattr("financial_filing_data_foundation.us_sec.http.SecHttpClient.fetch", forbidden)
     assert _us_plan_slot(
-        sec_company(cik="320193", ticker="AAPL", allow_development=True), args, paths, registry
+        sec_company(cik="320193", ticker="AAPL"),
+        args,
+        paths,
+        registry,
+        selected_accession=package.accession,
+        discovery_state="UNAMBIGUOUS",
     )[0].action.value == "PARSE_LOCAL"
-    assert _us_ingest(args) == 0
-    first_output = json.loads(capsys.readouterr().out)
 
-    new_dir = paths.ingest_root / "us" / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V4"
-    assert first_output["planner_action"] == "PARSE_LOCAL"
-    assert first_output["validation_status"] == "PASS"
+    parsed = parse_sec_package(package, paths.ingest_root / "us" / "p11")
+    validation = validate_sec_artifacts(parsed, paths.ingest_root / "us" / "p7", package=package)
+    registry.register_sec_parsed_data(
+        parse_run_id="current-v5",
+        package_sha256=package.package_sha256,
+        company_id="US:CIK0000320193",
+        fiscal_year=2025,
+        period="FY",
+        parser_version=VIRTUAL_HTML_NORMALIZER_VERSION,
+        schema_version=SEC_ARTIFACT_SCHEMA,
+        validation_status=validation.validation_status,
+        blocking_issue_count=validation.blocking_issue_count,
+        compatibility_status=validation.compatibility_status,
+        artifact_path=str(parsed.artifact_dir),
+    )
+
+    new_dir = paths.ingest_root / "us" / "p11" / f"{package.package_sha256}.{VIRTUAL_HTML_NORMALIZER_VERSION}"
     assert new_dir.is_dir()
     assert old_manifest.read_bytes() == old_bytes
     assert all(row["parser_version"] != "VIRTUAL_HTML_V3" or row["parse_run_id"] == "legacy-v3" for row in SQLiteRegistry(paths.registry).list_sec_parsed_data(company_id="US:CIK0000320193", fiscal_year=2025, period="FY"))
@@ -354,9 +474,12 @@ def test_us_cli_local_v3_upgrade_generates_v4_then_reuses_without_network(
 
     second_registry = SQLiteRegistry(paths.registry)
     second_plan, _ = _us_plan_slot(
-        sec_company(cik="320193", ticker="AAPL", allow_development=True), args, paths, second_registry
+        sec_company(cik="320193", ticker="AAPL"),
+        args,
+        paths,
+        second_registry,
+        selected_accession=package.accession,
+        discovery_state="UNAMBIGUOUS",
     )
     assert second_plan.action.value == "REUSE_DATA"
-    document = McpQueryService(McpCatalog.load(tmp_path, paths.catalog)).get_document(package.package_sha256)
-    assert document["data"]["validation_status"] == "PASS"
 

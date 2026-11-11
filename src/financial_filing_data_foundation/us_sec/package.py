@@ -12,7 +12,7 @@ from typing import Any, Iterable
 
 from .errors import P11Reason, SecError
 from .http import validate_sec_url
-from .path_policy import normalize_archive_relative_name, validate_archive_member_url
+from .path_policy import archive_member_url, normalize_archive_relative_name, validate_archive_member_url
 
 
 PACKAGE_MANIFEST_SCHEMA = "p11-sec-package-v1"
@@ -109,6 +109,17 @@ class SecFilingPackage:
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC package has duplicate member names")
         if not any(member.role is SecMemberRole.PRIMARY_DOCUMENT for member in self.members):
             raise SecError(P11Reason.P11_PRIMARY_DOCUMENT_MISSING, "SEC package has no primary document")
+        normalized_cik = str(self.cik).strip().zfill(10)
+        for member in self.members:
+            try:
+                expected_url = archive_member_url(normalized_cik, str(self.accession), member.relative_name)
+            except SecError as exc:
+                raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC package identity metadata is invalid") from exc
+            if member.source_url != expected_url:
+                raise SecError(
+                    P11Reason.P11_PROVENANCE_MISMATCH,
+                    f"SEC member source URL is not bound to package identity: {member.relative_name}",
+                )
         if self.package_sha256 and self.package_sha256 != self.compute_package_sha256():
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC package SHA does not match members")
 

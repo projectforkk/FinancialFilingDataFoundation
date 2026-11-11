@@ -13,7 +13,7 @@ from .compatibility import sec_artifact_compatibility
 from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, verify_sec_evidence
 
 
-SEC_VALIDATION_SCHEMA = "p11-sec-validation-v1"
+SEC_VALIDATION_SCHEMA = "p11-sec-validation-v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +31,11 @@ class SecValidationResult:
     issues: tuple[dict[str, Any], ...]
     report_path: Path
     issues_path: Path
+    fact_source_mode: str = "NO_STRUCTURED_FACTS"
+    discovery_observation_sha256: str | None = None
+    discovery_checked_at: str | None = None
+    selected_accession: str | None = None
+    discovery_state: str | None = None
 
     @property
     def document_sha256(self) -> str:
@@ -49,6 +54,11 @@ class SecValidationResult:
             "review_issue_count": self.review_issue_count,
             "warning_issue_count": self.warning_issue_count,
             "issue_count": self.issue_count,
+            "fact_source_mode": self.fact_source_mode,
+            "discovery_observation_sha256": self.discovery_observation_sha256,
+            "discovery_checked_at": self.discovery_checked_at,
+            "selected_accession": self.selected_accession,
+            "discovery_state": self.discovery_state,
             "report_file": "validation.json",
             "issues_file": "issues.jsonl",
         }
@@ -76,6 +86,9 @@ def _status(issues: list[dict[str, Any]]) -> tuple[str, int, int, int, int]:
         P11Reason.P11_HTML_PARSE_FAILED.value,
         P11Reason.P11_MEMBER_HASH_MISMATCH.value,
         P11Reason.P11_SOURCE_DRIFT.value,
+        P11Reason.P11_PROVENANCE_MISMATCH.value,
+        P11Reason.P11_XBRL_INSTANCE_AMBIGUOUS.value,
+        P11Reason.P11_INLINE_CONTINUATION_INVALID.value,
         P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value,
         "P11_ARTIFACT_INCOMPLETE_OR_CORRUPT",
     }
@@ -100,9 +113,22 @@ def validate_sec_artifacts(
     *,
     amendment_conflict: bool = False,
     package: Any | None = None,
+    discovery_observation: Any | None = None,
+    registry: Any | None = None,
 ) -> SecValidationResult:
     issues = [dict(row) for row in parsed.issues]
     if package is not None:
+        if registry is not None:
+            try:
+                registry.verify_sec_package_provenance(package)
+            except Exception as exc:
+                issues.append(
+                    _issue(
+                        P11Reason.P11_PROVENANCE_MISMATCH.value,
+                        "BLOCKING",
+                        f"SEC package/Registry provenance verification failed: {exc}",
+                    )
+                )
         if str(package.package_sha256) != parsed.package_sha256:
             issues.append(_issue(P11Reason.P11_SOURCE_DRIFT.value, "BLOCKING", "parsed artifact package identity differs from source package"))
         if not str(package.cik).isdigit() or len(str(package.cik)) != 10:
@@ -143,6 +169,31 @@ def validate_sec_artifacts(
                 issues.append(_issue(P11Reason.P11_MEMBER_HASH_MISMATCH.value, "BLOCKING", "evidence member hash is not in source package", evidence_id=evidence.get("evidence_id")))
     if amendment_conflict:
         issues.append(_issue(P11Reason.P11_AMENDED_VARIANT_PRESENT.value, "REVIEW", "original and amended SEC variants are both present"))
+    observation = discovery_observation
+    observation_sha = getattr(observation, "observation_sha256", None) or parsed.discovery_observation_sha256
+    discovery_checked_at = getattr(observation, "retrieved_at", None) or parsed.discovery_checked_at
+    selected_accession = getattr(observation, "selected_accession", None) or parsed.selected_accession
+    discovery_state = getattr(observation, "state", None) or parsed.discovery_state
+    if observation is not None:
+        if str(discovery_state or "").upper() != "UNAMBIGUOUS":
+            issues.append(
+                _issue(
+                    P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN.value,
+                    "REVIEW",
+                    "SEC discovery observation is not an unambiguous active binding",
+                    discovery_state=discovery_state,
+                )
+            )
+        if package is not None and selected_accession and str(selected_accession) != str(package.accession):
+            issues.append(
+                _issue(
+                    P11Reason.P11_PROVENANCE_MISMATCH.value,
+                    "BLOCKING",
+                    "SEC discovery selected accession differs from package accession",
+                    selected_accession=selected_accession,
+                    package_accession=package.accession,
+                )
+            )
 
     expected_pages = list(range(1, len(parsed.pages) + 1))
     actual_pages = [int(row.get("page_no", -1)) for row in parsed.pages]
@@ -275,6 +326,11 @@ def validate_sec_artifacts(
         issues=tuple(issues),
         report_path=directory / "validation.json",
         issues_path=directory / "issues.jsonl",
+        fact_source_mode=parsed.fact_source_mode,
+        discovery_observation_sha256=observation_sha,
+        discovery_checked_at=discovery_checked_at,
+        selected_accession=selected_accession,
+        discovery_state=discovery_state,
     )
     _write(result)
     return result
@@ -308,6 +364,11 @@ def load_sec_validation(artifact_dir: str | Path) -> SecValidationResult:
         issues=issues,
         report_path=report_path,
         issues_path=issues_path,
+        fact_source_mode=str(report.get("fact_source_mode") or "NO_STRUCTURED_FACTS"),
+        discovery_observation_sha256=str(report.get("discovery_observation_sha256") or "") or None,
+        discovery_checked_at=str(report.get("discovery_checked_at") or "") or None,
+        selected_accession=str(report.get("selected_accession") or "") or None,
+        discovery_state=str(report.get("discovery_state") or "") or None,
     )
     if result.issue_count != len(result.issues):
         raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation issue count mismatch")

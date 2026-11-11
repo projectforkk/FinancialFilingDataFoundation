@@ -17,6 +17,11 @@ from financial_filing_data_foundation.us_sec.parser import (
     load_sec_artifacts,
     parse_sec_package,
 )
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+
+
+def _sec_url(cik: str, accession: str, name: str) -> str:
+    return archive_member_url(cik, accession, name)
 
 
 def _package() -> object:
@@ -45,7 +50,7 @@ def _package() -> object:
                 relative_name="example.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/example.htm",
+                source_url=_sec_url("0000320193", "0000320193-25-000001", "example.htm"),
                 body=html,
             ),
         ),
@@ -113,7 +118,7 @@ def _hidden_fact_package() -> object:
                 relative_name="hidden.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/hidden.htm",
+                source_url=_sec_url("0000320193", "0000320193-25-000003", "hidden.htm"),
                 body=html,
             ),
         ),
@@ -193,7 +198,7 @@ def test_parser_does_not_reuse_artifact_from_previous_normalizer_version(tmp_pat
 
     result = parse_sec_package(package, tmp_path / "p11")
 
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V4"
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V5"
     assert result.artifact_dir != legacy_dir
     assert result.artifact_dir.is_dir()
     assert legacy_manifest.read_bytes() == before
@@ -212,8 +217,8 @@ def test_v3_parsed_artifact_is_invalidated_by_v4_normalizer(tmp_path: Path) -> N
 
     result = parse_sec_package(package, tmp_path / "p11")
 
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V4"
-    assert result.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V4"
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V5"
+    assert result.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V5"
     assert result.artifact_dir.is_dir()
     assert legacy_manifest.read_bytes() == before
 
@@ -237,7 +242,7 @@ def test_html5_header_is_visible_but_ix_header_remains_hidden(tmp_path: Path) ->
                 relative_name="header.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/header.htm",
+                source_url=_sec_url("0000320193", "0000320193-25-000005", "header.htm"),
                 body=html,
             ),
         ),
@@ -273,7 +278,7 @@ def test_div_span_narrative_and_inline_fact_parent_are_preserved_without_duplica
         form="10-Q",
         fiscal_year=2025,
         period="Q2",
-        members=(SecPackageMember(relative_name="rich.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url="https://www.sec.gov/Archives/edgar/data/1/rich.htm", body=html),),
+        members=(SecPackageMember(relative_name="rich.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000000001", "0000000001-25-000001", "rich.htm"), body=html),),
     )
     result = parse_sec_package(package, tmp_path / "p11")
     texts = [block["text"] for page in result.pages for block in page["blocks"]]
@@ -308,7 +313,7 @@ def test_visible_fact_in_empty_positioning_wrappers_gets_a_cell_source_block(tmp
                 relative_name="positioned.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/1/positioned.htm",
+                source_url=_sec_url("0000000001", "0000000001-25-000004", "positioned.htm"),
                 body=html,
             ),
         ),
@@ -345,7 +350,7 @@ def test_visible_fact_with_inline_positioning_text_gets_the_outer_narrative_bloc
                 relative_name="inline-positioned.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/1/inline-positioned.htm",
+                source_url=_sec_url("0000000001", "0000000001-25-000005", "inline-positioned.htm"),
                 body=html,
             ),
         ),
@@ -366,8 +371,8 @@ def test_namespaced_nil_and_explicit_typed_dimensions_are_preserved(tmp_path: Pa
       <ex:Amount contextRef="c1" xsi:nil="true"/>
     </xbrli:xbrl>'''
     package = build_package(cik="0000000001", accession="0000000001-25-000002", form="10-Q", fiscal_year=2025, period="Q2", members=(
-        SecPackageMember(relative_name="nil.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url="https://www.sec.gov/Archives/edgar/data/1/nil.htm", body=b"<html><body><p>source</p></body></html>"),
-        SecPackageMember(relative_name="nil.xbrl", role=SecMemberRole.XBRL_INSTANCE, content_type="application/xml", source_url="https://www.sec.gov/Archives/edgar/data/1/nil.xbrl", body=xml),
+        SecPackageMember(relative_name="nil.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000000001", "0000000001-25-000002", "nil.htm"), body=b"<html><body><p>source</p></body></html>"),
+        SecPackageMember(relative_name="nil.xbrl", role=SecMemberRole.XBRL_INSTANCE, content_type="application/xml", source_url=_sec_url("0000000001", "0000000001-25-000002", "nil.xbrl"), body=xml),
     ))
     result = parse_sec_package(package, tmp_path / "p11")
     fact = result.facts[0]
@@ -406,14 +411,14 @@ def _xml_package() -> object:
                 relative_name="example.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/example.htm",
+                source_url=_sec_url("0000320193", "0000320193-25-000002", "example.htm"),
                 body=b"<html><body><p>XML instance source</p></body></html>",
             ),
             SecPackageMember(
                 relative_name="example.xml",
                 role=SecMemberRole.XBRL_INSTANCE,
                 content_type="application/xml",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/example.xml",
+                source_url=_sec_url("0000320193", "0000320193-25-000002", "example.xml"),
                 body=xml,
             ),
         ),

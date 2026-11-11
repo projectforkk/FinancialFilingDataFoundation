@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Iterable
 
 
-SUPPORTED_MARKETS = ("CN", "HK")
+SUPPORTED_MARKETS = ("CN", "HK", "US")
 _ALLOWED_MARKETS = frozenset(SUPPORTED_MARKETS)
 _ALLOWED_PERIODS = frozenset({"Q1", "H1", "Q3", "FY"})
 
@@ -26,9 +26,7 @@ class CompanyRef:
 
     def __post_init__(self) -> None:
         market = self.market.strip().upper()
-        if market not in _ALLOWED_MARKETS and not (
-            market == "US" and self.allow_development_us
-        ):
+        if market not in _ALLOWED_MARKETS:
             raise ValueError(f"unsupported P1 market: {self.market!r}")
         object.__setattr__(self, "market", market)
         object.__setattr__(self, "company_id", _clean_text(self.company_id, "company_id"))
@@ -79,15 +77,13 @@ class FilingSlotKey:
 
     def __post_init__(self) -> None:
         market = self.market.strip().upper()
-        if market not in _ALLOWED_MARKETS and not (
-            market == "US" and self.allow_development_us
-        ):
+        if market not in _ALLOWED_MARKETS:
             raise ValueError(f"unsupported P1 market: {self.market!r}")
         if self.fiscal_year < 1900 or self.fiscal_year > 2200:
             raise ValueError(f"fiscal_year out of supported range: {self.fiscal_year}")
         period = self.raw_fiscal_period.strip().upper()
         allowed_periods = _ALLOWED_PERIODS
-        if market == "US" and self.allow_development_us:
+        if market == "US":
             allowed_periods = allowed_periods | {"Q2"}
         if period not in allowed_periods:
             raise ValueError(f"unsupported P1 fiscal period: {period!r}")

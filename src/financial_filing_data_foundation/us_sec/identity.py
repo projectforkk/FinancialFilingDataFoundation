@@ -52,9 +52,6 @@ def sec_company(
     ticker_source_sha256: str | None = None,
     ticker_retrieved_at: str | None = None,
 ) -> SecCompanyRef:
-    from .feature_gate import require_us_development
-
-    require_us_development(allow_development)
     normalized_cik = normalize_cik(cik)
     alias = normalize_ticker(ticker) if ticker else f"CIK{normalized_cik}"
     return SecCompanyRef(

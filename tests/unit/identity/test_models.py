@@ -13,8 +13,8 @@ from financial_filing_data_foundation.identity import (
 )
 
 
-def test_supported_markets_are_final_cn_hk_scope() -> None:
-    assert SUPPORTED_MARKETS == ("CN", "HK")
+def test_supported_markets_include_sec_us_on_feature_branch() -> None:
+    assert SUPPORTED_MARKETS == ("CN", "HK", "US")
 
 
 def test_filing_slot_key_is_stable_and_normalized() -> None:
@@ -63,6 +63,5 @@ def test_invalid_year_range_is_rejected() -> None:
         build_required_slots(company, 2025, 2024, policy)
 
 
-def test_p1_market_is_limited_to_cn_hk() -> None:
-    with pytest.raises(ValueError, match="unsupported P1 market"):
-        CompanyRef("US", "x", "AAPL")
+def test_p1_market_accepts_us_sec_identity_on_feature_branch() -> None:
+    assert CompanyRef("US", "x", "AAPL").market == "US"

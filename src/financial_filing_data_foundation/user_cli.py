@@ -38,7 +38,6 @@ from financial_filing_data_foundation.validation import (
 )
 from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer, candidate_from_package
 from financial_filing_data_foundation.us_sec.errors import SecError
-from financial_filing_data_foundation.us_sec.feature_gate import require_us_development
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig
 from financial_filing_data_foundation.us_sec.identity import normalize_cik, sec_company
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package, reuse_sec_package
@@ -365,11 +364,16 @@ def _persist_ticker_map_snapshot(root: Path, snapshot: Any) -> Path:
     directory = root / "workspace" / "ingest" / "us" / "ticker-map"
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{snapshot.source_sha256}.json"
-    if not path.exists():
-        path.write_text(
-            json.dumps(snapshot.to_dict(), ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
+    payload = json.dumps(snapshot.to_dict(), ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    if path.exists():
+        try:
+            existing = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise SecError("P11_SOURCE_DRIFT", f"SEC ticker snapshot is unreadable: {path.name}") from exc
+        if existing != payload:
+            raise SecError("P11_SOURCE_DRIFT", f"SEC ticker snapshot is immutable and differs: {path.name}")
+    else:
+        path.write_text(payload, encoding="utf-8")
     return path
 
 
@@ -386,29 +390,41 @@ def _cached_ticker_resolution(root: Path, ticker: str) -> tuple[str, dict[str, s
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             continue
-        mapping = payload.get("mapping") if isinstance(payload, dict) else None
-        values = mapping.get(normalized) if isinstance(mapping, dict) else None
-        if isinstance(values, str):
-            values = [values]
-        if not isinstance(values, list):
-            continue
-        try:
-            ciks = sorted({normalize_cik(str(value)) for value in values})
-        except SecError:
-            continue
-        if len(ciks) > 1:
-            raise SecError("P11_TICKER_CIK_AMBIGUOUS", f"cached ticker maps to multiple CIKs: {normalized}")
-        if not ciks:
-            continue
         source_sha256 = str(payload.get("source_sha256") or "").strip().lower()
         source_bytes_b64 = payload.get("source_bytes_b64")
         if not source_sha256 or not isinstance(source_bytes_b64, str):
-            continue
+            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot metadata is incomplete: {path.name}")
         try:
             source_bytes = base64.b64decode(source_bytes_b64, validate=True)
-        except (ValueError, TypeError):
-            continue
+        except (ValueError, TypeError) as exc:
+            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot source bytes are invalid: {path.name}") from exc
         if hashlib.sha256(source_bytes).hexdigest() != source_sha256:
+            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot source bytes hash mismatch: {path.name}")
+        try:
+            reparsed = parse_ticker_map(source_bytes)
+        except SecError as exc:
+            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot source bytes cannot be parsed: {path.name}") from exc
+        mapping = payload.get("mapping") if isinstance(payload, dict) else None
+        if not isinstance(reparsed, dict) or not isinstance(mapping, dict):
+            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot mapping is invalid: {path.name}")
+        persisted_mapping: dict[str, tuple[str, ...]] = {}
+        try:
+            for key, raw_values in mapping.items():
+                values = [raw_values] if isinstance(raw_values, str) else raw_values
+                if not isinstance(values, list):
+                    raise ValueError(key)
+                persisted_mapping[str(key).upper()] = tuple(sorted({normalize_cik(str(value)) for value in values}))
+        except (SecError, ValueError, TypeError) as exc:
+            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot derivative is invalid: {path.name}") from exc
+        if persisted_mapping != reparsed:
+            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot derivative mismatch: {path.name}")
+        values = reparsed.get(normalized)
+        if values is None:
+            continue
+        ciks = sorted(set(values))
+        if len(ciks) > 1:
+            raise SecError("P11_TICKER_CIK_AMBIGUOUS", f"cached ticker maps to multiple CIKs: {normalized}")
+        if not ciks:
             continue
         matches.append(
             (
@@ -428,28 +444,35 @@ def _cached_ticker_resolution(root: Path, ticker: str) -> tuple[str, dict[str, s
     return max(matches, key=lambda item: (item[1].get("retrieved_at") or "", item[1].get("source_sha256") or ""))
 
 
-def _us_company_and_client(args: argparse.Namespace) -> tuple[Any, SecHttpClient | None]:
-    require_us_development()
+def _us_company_and_client(
+    args: argparse.Namespace,
+    *,
+    online: bool = True,
+) -> tuple[Any, SecHttpClient | None]:
     runtime = SecRuntimeDescriptor.for_project(_project_root())
     client: SecHttpClient | None = None
     ticker = args.ticker.strip().upper() if args.ticker else None
     if args.cik:
         cik = normalize_cik(args.cik)
-        company = sec_company(cik=cik, ticker=ticker, allow_development=True)
+        company = sec_company(cik=cik, ticker=ticker)
         return company, client
     if not ticker:
         raise SecError("P11_INVALID_US_IDENTITY", "US requires --cik or --ticker")
-    cached = _cached_ticker_resolution(_project_root(), ticker)
+    cached = _cached_ticker_resolution(_project_root(), ticker) if not online else None
     if cached is not None:
         cik, provenance = cached
         return sec_company(
             cik=cik,
             ticker=ticker,
-            allow_development=True,
             ticker_source_url=provenance["source_url"],
             ticker_source_sha256=provenance["source_sha256"],
             ticker_retrieved_at=provenance["retrieved_at"],
         ), client
+    if not online:
+        raise SecError(
+            "P11_DISCOVERY_FRESHNESS_UNKNOWN",
+            "verified cached SEC ticker map is unavailable for local-only status",
+        )
     client = SecHttpClient(
         SecHttpConfig.from_env(),
         transport=SecSubprocessTransport(runtime),
@@ -468,7 +491,6 @@ def _us_company_and_client(args: argparse.Namespace) -> tuple[Any, SecHttpClient
     return sec_company(
         cik=cik,
         ticker=ticker,
-        allow_development=True,
         ticker_source_url=snapshot.source_url,
         ticker_source_sha256=snapshot.source_sha256,
         ticker_retrieved_at=snapshot.retrieved_at,
@@ -480,17 +502,24 @@ def _us_plan_slot(
     args: argparse.Namespace,
     paths: RuntimePaths,
     registry: SQLiteRegistry,
+    *,
+    selected_accession: str | None = None,
+    discovery_state: str | None = None,
 ) -> tuple[SecPlan, Any | None]:
     bindings = registry.list_sec_bindings(
         company_id=company.company_id,
         fiscal_year=args.year,
         period=args.period,
     )
+    if selected_accession:
+        bindings = tuple(row for row in bindings if str(row["accession"]) == selected_accession)
     amendment_flags = {bool(int(row["amended"] or 0)) for row in bindings}
     amendment_conflict = bool(bindings) and amendment_flags == {False, True}
     store = SecPackageStore(paths.raw_store)
     packages: dict[str, Any] = {}
     for row in bindings:
+        if selected_accession and str(row["accession"]) != selected_accession:
+            continue
         try:
             package = store.load(str(row["package_sha256"]))
         except Exception:
@@ -498,11 +527,15 @@ def _us_plan_slot(
         packages[package.package_sha256] = package
     if not packages:
         local_packages = store.find_all_by_slot(cik=company.cik, fiscal_year=args.year, period=args.period)
+        if selected_accession:
+            local_packages = tuple(item for item in local_packages if item.accession == selected_accession)
         if len(local_packages) > 1:
             return SecPlan(SecPlanAction.REVIEW_REQUIRED, "P11_LOCAL_PACKAGE_CONFLICT"), None
         if len(local_packages) == 1:
             local = local_packages[0]
             packages[local.package_sha256] = local
+    if discovery_state and discovery_state != "UNAMBIGUOUS":
+        return SecPlan(SecPlanAction.REVIEW_REQUIRED, "P11_DISCOVERY_FRESHNESS_UNKNOWN"), None
     if amendment_conflict:
         return SecPlan(SecPlanAction.REVIEW_REQUIRED, "P11_AMENDED_VARIANT_PRESENT"), None
     if len(packages) > 1:
@@ -582,7 +615,32 @@ def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths
     paths = _runtime_paths(root)
     company, client = _us_company_and_client(args)
     registry = SQLiteRegistry(paths.registry)
-    plan, local_package = _us_plan_slot(company, args, paths, registry)
+    acquirer = SecAcquirer(
+        client
+        or SecHttpClient(
+            SecHttpConfig.from_env(),
+            transport=SecSubprocessTransport(SecRuntimeDescriptor.for_project(root)),
+        ),
+        SecPackageStore(paths.raw_store),
+        registry=registry,
+        discovery_root=paths.ingest_root / "us" / "discovery",
+    )
+    observation = acquirer.discover(company, fiscal_year=args.year, period=args.period)
+    if observation.state != "UNAMBIGUOUS":
+        reason = {
+            "NOT_FOUND": "P11_FILING_NOT_FOUND",
+            "AMENDED_VARIANT_PRESENT": "P11_AMENDED_VARIANT_PRESENT",
+            "SLOT_CANDIDATE_CONFLICT": "P11_SLOT_CANDIDATE_CONFLICT",
+        }.get(observation.state, "P11_DISCOVERY_FRESHNESS_UNKNOWN")
+        raise SecError(reason, f"SEC discovery state is {observation.state}")
+    plan, local_package = _us_plan_slot(
+        company,
+        args,
+        paths,
+        registry,
+        selected_accession=observation.selected_accession,
+        discovery_state=observation.state,
+    )
     if plan.action is SecPlanAction.REVIEW_REQUIRED:
         raise SecError(plan.reason_code or "P11_AMENDED_VARIANT_PRESENT", "SEC slot has an amended variant conflict")
     if local_package is not None and plan.action in {SecPlanAction.REUSE_DATA, SecPlanAction.PARSE_LOCAL}:
@@ -593,8 +651,10 @@ def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths
             candidate=candidate_from_package(local_package, company),
             reused=True,
             plan_action=plan.action.value,
+            observation=observation,
         )
         register_sec_package(registry, local_package)
+        registry.register_sec_discovery_observation(observation)
         register_sec_slot(
             registry,
             local_package,
@@ -603,15 +663,12 @@ def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths
             binding_status="SOURCE_CONFIRMED",
         )
         return company, result, paths
-    acquirer = SecAcquirer(
-        client
-        or SecHttpClient(
-            SecHttpConfig.from_env(),
-            transport=SecSubprocessTransport(SecRuntimeDescriptor.for_project(root)),
-        ),
-        SecPackageStore(paths.raw_store),
+    result = acquirer.acquire(
+        company,
+        fiscal_year=args.year,
+        period=args.period,
+        observation=observation,
     )
-    result = acquirer.acquire(company, fiscal_year=args.year, period=args.period)
     result = replace(result, plan_action=plan.action.value)
     register_sec_package(registry, result.package)
     register_sec_slot(
@@ -644,6 +701,10 @@ def _us_acquire(args: argparse.Namespace, *, quiet: bool = False) -> tuple[int, 
         "raw_path": str(SecPackageStore(paths.raw_store).package_dir(result.package.package_sha256)),
         "provider": "sec",
         "source_id": result.candidate.accession,
+        "discovery_observation_sha256": getattr(result.observation, "observation_sha256", None),
+        "discovery_checked_at": getattr(result.observation, "retrieved_at", None),
+        "selected_accession": getattr(result.observation, "selected_accession", None),
+        "discovery_state": getattr(result.observation, "state", None),
     }
     if not quiet:
         _print(payload)
@@ -680,6 +741,7 @@ def _us_ingest(args: argparse.Namespace) -> int:
             ticker_source_url=getattr(company, "ticker_source_url", None),
             ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
             ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
+            discovery_observation=result.observation,
         )
     else:
         ingested = ingest_sec_package(
@@ -691,6 +753,7 @@ def _us_ingest(args: argparse.Namespace) -> int:
             ticker_source_url=getattr(company, "ticker_source_url", None),
             ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
             ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
+            discovery_observation=result.observation,
         )
     _print(
         {
@@ -717,11 +780,10 @@ def _us_ingest(args: argparse.Namespace) -> int:
 
 def _us_status(args: argparse.Namespace) -> int:
     root = _project_root()
-    require_us_development()
     if args.cik:
-        company = sec_company(cik=normalize_cik(args.cik), ticker=None, allow_development=True)
+        company = sec_company(cik=normalize_cik(args.cik), ticker=None)
     else:
-        company, _ = _us_company_and_client(args)
+        company, _ = _us_company_and_client(args, online=False)
     paths = _runtime_paths(root)
     registry = SQLiteRegistry(paths.registry)
     bindings = registry.list_sec_bindings(
@@ -752,6 +814,16 @@ def _us_status(args: argparse.Namespace) -> int:
             "bindings": [dict(row) for row in bindings],
             "p8_catalog_registered": catalog_document is not None,
             "p8_catalog_document": catalog_document,
+            "discovery_as_of": (
+                None
+                if (observation := registry.latest_sec_discovery_observation(company_id=company.company_id, fiscal_year=args.year, period=args.period)) is None
+                else {
+                    "observation_sha256": observation["observation_sha256"],
+                    "discovery_checked_at": observation["retrieved_at"],
+                    "selected_accession": observation["selected_accession"],
+                    "discovery_state": observation["state"],
+                }
+            ),
         }
     )
     return 0
@@ -998,7 +1070,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ffdf",
         description=(
-            "Financial Filing Data Foundation user CLI for official CN/HK filings and gated US SEC development."
+            "Financial Filing Data Foundation user CLI for official CN/HK filings and US SEC filings."
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)

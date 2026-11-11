@@ -6,9 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from financial_filing_data_foundation.us_sec.feature_gate import is_us_development_enabled
-
-
 CATALOG_SCHEMA_VERSION = "p8-mcp-catalog-v1"
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
@@ -39,6 +36,11 @@ class CatalogDocument:
     ticker_source_url: str | None = None
     ticker_source_sha256: str | None = None
     ticker_retrieved_at: str | None = None
+    discovery_observation_sha256: str | None = None
+    discovery_checked_at: str | None = None
+    selected_accession: str | None = None
+    discovery_state: str | None = None
+    fact_source_mode: str | None = None
 
     @property
     def filing_identity(self) -> tuple[str, str, int, str]:
@@ -70,6 +72,11 @@ class CatalogDocument:
                     "ticker_source_url": self.ticker_source_url,
                     "ticker_source_sha256": self.ticker_source_sha256,
                     "ticker_retrieved_at": self.ticker_retrieved_at,
+                    "discovery_observation_sha256": self.discovery_observation_sha256,
+                    "discovery_checked_at": self.discovery_checked_at,
+                    "selected_accession": self.selected_accession,
+                    "discovery_state": self.discovery_state,
+                    "fact_source_mode": self.fact_source_mode,
                 }
             )
         return result
@@ -276,11 +283,6 @@ def _parse_document(
                 "P8_CATALOG_INVALID",
                 f"documents[{index}] SEC source must use market US",
             )
-        if not is_us_development_enabled():
-            raise CatalogError(
-                "P11_INVALID_US_IDENTITY",
-                "US SEC catalog entries require FFDF_P11_US_DEV=1",
-            )
         package_sha256 = normalize_sha256(
             _required_text(raw, "package_sha256", index)
         )
@@ -320,6 +322,11 @@ def _parse_document(
             ticker_source_url=str(raw.get("ticker_source_url") or "").strip() or None,
             ticker_source_sha256=str(raw.get("ticker_source_sha256") or "").strip() or None,
             ticker_retrieved_at=str(raw.get("ticker_retrieved_at") or "").strip() or None,
+            discovery_observation_sha256=str(raw.get("discovery_observation_sha256") or "").strip() or None,
+            discovery_checked_at=str(raw.get("discovery_checked_at") or "").strip() or None,
+            selected_accession=str(raw.get("selected_accession") or "").strip() or None,
+            discovery_state=str(raw.get("discovery_state") or "").strip() or None,
+            fact_source_mode=str(raw.get("fact_source_mode") or "").strip() or None,
         )
 
     return CatalogDocument(

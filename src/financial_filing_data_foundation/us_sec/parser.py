@@ -18,8 +18,8 @@ from .errors import P11Reason, SecError
 from .package import SecFilingPackage, SecMemberRole
 
 
-SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v1"
-VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V4"
+SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v2"
+VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V5"
 _MAX_BLOCKS_PER_PAGE = 48
 _MAX_CHARS_PER_PAGE = 6000
 
@@ -182,6 +182,72 @@ def _text_cached(node: _Node, cache: dict[int, str]) -> str:
         value = " ".join(" ".join(values).split())
     cache[id(node)] = value
     return value
+
+
+def _logical_text(node: _Node, *, skip_continuations: bool = True) -> str:
+    """Return Inline XBRL logical text, excluding ix:exclude fragments."""
+
+    if _local(node.tag) == "exclude":
+        return ""
+    values: list[str] = []
+    for item in node.content:
+        if isinstance(item, str):
+            values.append(item)
+        else:
+            if skip_continuations and _local(item.tag) == "continuation":
+                continue
+            child_text = _logical_text(item, skip_continuations=skip_continuations)
+            if child_text:
+                values.append(child_text)
+    if not node.content:
+        values.extend(node.data)
+        for child in node.children:
+            if skip_continuations and _local(child.tag) == "continuation":
+                continue
+            child_text = _logical_text(child, skip_continuations=skip_continuations)
+            if child_text:
+                values.append(child_text)
+    return " ".join(" ".join(values).split())
+
+
+def _continuation_index(root: _Node) -> tuple[dict[str, _Node], set[str]]:
+    targets: dict[str, _Node] = {}
+    duplicates: set[str] = set()
+    for node in _descendants(root):
+        if _local(node.tag) != "continuation":
+            continue
+        target_id = _attr(node, "id")
+        if not target_id:
+            continue
+        if target_id in targets:
+            duplicates.add(target_id)
+        else:
+            targets[target_id] = node
+    return targets, duplicates
+
+
+def _resolve_inline_fragments(
+    node: _Node,
+    continuation_targets: dict[str, _Node],
+    duplicate_targets: set[str],
+) -> tuple[tuple[_Node, ...], str | None]:
+    fragments: list[_Node] = [node]
+    visited: set[int] = {id(node)}
+    current = node
+    while True:
+        target_id = _attr(current, "continuedat") or _attr(current, "continued_at")
+        if not target_id:
+            return tuple(fragments), None
+        if target_id in duplicate_targets:
+            return tuple(fragments), f"duplicate continuation target: {target_id}"
+        target = continuation_targets.get(target_id)
+        if target is None:
+            return tuple(fragments), f"missing continuation target: {target_id}"
+        if id(target) in visited:
+            return tuple(fragments), f"cyclic continuation target: {target_id}"
+        visited.add(id(target))
+        fragments.append(target)
+        current = target
 
 
 def _is_hidden(node: _Node) -> bool:
@@ -497,6 +563,11 @@ class SecParseResult:
     facts: tuple[dict[str, Any], ...]
     evidence: tuple[dict[str, Any], ...]
     issues: tuple[dict[str, Any], ...]
+    fact_source_mode: str = "NO_STRUCTURED_FACTS"
+    discovery_observation_sha256: str | None = None
+    discovery_checked_at: str | None = None
+    selected_accession: str | None = None
+    discovery_state: str | None = None
 
     @property
     def document_sha256(self) -> str:
@@ -784,7 +855,7 @@ def _tables(
                     "column_index": col,
                     "row_span": row_span,
                     "col_span": col_span,
-                    "role": "HEADER" if cell.tag == "th" or row_index == 0 else "BODY",
+                    "role": "HEADER" if cell.tag == "th" else "BODY",
                     "text": _visible_text_cached(cell, visible_text_cache, hidden_cache),
                     "source_text": _text_cached(cell, source_text_cache),
                     "dom_locator": cell_locator,
@@ -831,10 +902,39 @@ def _tables(
                 "visibility_signals": visibility_signals,
                 "style_signals": style_signals,
                 "row_count": len(row_records),
-                "column_count": max((len(row["cells"]) for row in row_records), default=0),
-                "value_column_count": max((len(row["cells"]) for row in row_records), default=0),
+                "column_count": max(
+                    (
+                        max(
+                            int(cell["column_index"]) + int(cell["col_span"])
+                            for cell in row["cells"]
+                        )
+                        for row in row_records
+                        if row["cells"]
+                    ),
+                    default=0,
+                ),
+                "value_column_count": max(
+                    (
+                        max(
+                            int(cell["column_index"]) + int(cell["col_span"])
+                            for cell in row["cells"]
+                        )
+                        for row in row_records
+                        if row["cells"]
+                    ),
+                    default=0,
+                ),
                 "header_tree": [
-                    [{"text": cell["text"], "column_index": cell["column_index"], "col_span": cell["col_span"]} for cell in row["cells"]]
+                    [
+                        {
+                            "text": cell["text"],
+                            "column_index": cell["column_index"],
+                            "col_span": cell["col_span"],
+                            "row_span": cell["row_span"],
+                        }
+                        for cell in row["cells"]
+                        if cell["role"] == "HEADER"
+                    ]
                     for row in row_records if any(cell["role"] == "HEADER" for cell in row["cells"])
                 ],
                 "rows": row_records,
@@ -897,10 +997,14 @@ def _ancestors(node: _Node) -> Iterable[_Node]:
 def _contexts_and_units(
     root: _Node,
     package: SecFilingPackage | None = None,
+    *,
+    source_mode: str = "INLINE_XBRL_PRIMARY",
+    instance_member: Any | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     contexts: dict[str, dict[str, Any]] = {}
     units: dict[str, dict[str, Any]] = {}
-    for node in _descendants(root):
+    dom_nodes: Iterable[_Node] = () if source_mode == "XBRL_INSTANCE_PRIMARY" else _descendants(root)
+    for node in dom_nodes:
         local = _local(node.tag)
         if local == "context":
             context_id = _attr(node, "id")
@@ -945,12 +1049,8 @@ def _contexts_and_units(
                 continue
             measures = [_text(child) for child in _descendants(node) if _local(child.tag) == "measure"]
             units[unit_id] = {"id": unit_id, "measures": measures}
-    if package is not None:
-        for member in package.members:
-            if member.role not in {SecMemberRole.XBRL_INSTANCE, SecMemberRole.OTHER}:
-                continue
-            if member.role is SecMemberRole.OTHER and not member.relative_name.casefold().endswith((".xml", ".xbrl")):
-                continue
+    if source_mode == "XBRL_INSTANCE_PRIMARY" and instance_member is not None:
+        for member in (instance_member,):
             try:
                 xml_root = ET.fromstring(member.body)
             except ET.ParseError:
@@ -1015,6 +1115,8 @@ def _facts(
     blocks_by_prefix: dict[str, dict[str, Any]] | None,
     contexts: dict[str, dict[str, Any]],
     units: dict[str, dict[str, Any]],
+    continuation_targets: dict[str, _Node] | None = None,
+    duplicate_continuation_targets: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     primary = next(member for member in package.members if member.role is SecMemberRole.PRIMARY_DOCUMENT)
     primary_sha = primary.member_sha256
@@ -1022,6 +1124,8 @@ def _facts(
     evidence: list[dict[str, Any]] = []
     issues: list[dict[str, Any]] = []
     hidden_cache: dict[int, bool] = {}
+    continuation_targets = continuation_targets or {}
+    duplicate_continuation_targets = duplicate_continuation_targets or set()
     for index, node in enumerate(_descendants(root)):
         if _local(node.tag) not in {"nonfraction", "nonnumeric"}:
             continue
@@ -1046,7 +1150,39 @@ def _facts(
         raw_attrs = dict(node.attrs)
         context_period = dict((resolved_context or {}).get("period") or {})
         table_metadata = cell_metadata.get(str(cell_id), {}) if cell_id else {}
-        raw_value = _text(node)
+        fragments, continuation_error = _resolve_inline_fragments(
+            node,
+            continuation_targets,
+            duplicate_continuation_targets,
+        )
+        if continuation_error is not None:
+            issues.append(
+                {
+                    "code": P11Reason.P11_INLINE_CONTINUATION_INVALID.value,
+                    "severity": "BLOCKING",
+                    "dom_locator": locator,
+                    "message": continuation_error,
+                }
+            )
+            fragments = (node,)
+        fragment_rows = [
+            {
+                "source_member_sha256": primary_sha,
+                "dom_locator": _path(fragment),
+                "source_order_index": fragment_index,
+                "raw_source_text": _logical_text(fragment),
+                "fragment_hash": _sha256(
+                    f"{primary_sha}|fragment|{_path(fragment)}|{_logical_text(fragment)}".encode()
+                ),
+            }
+            for fragment_index, fragment in enumerate(fragments)
+        ]
+        raw_value = " ".join(
+            str(fragment.get("raw_source_text", ""))
+            for fragment in fragment_rows
+            if str(fragment.get("raw_source_text", ""))
+        )
+        raw_value = " ".join(raw_value.split())
         parsed_numeric_candidate = _numeric_candidate(raw_value)
         fragment_hash = _sha256(f"{primary_sha}|fact|{locator}|{raw_value}".encode())
         hidden = _is_hidden_cached(node, hidden_cache)
@@ -1101,6 +1237,7 @@ def _facts(
             "fragment_hash": fragment_hash,
             "source_member_sha256": primary_sha,
             "raw_attributes": raw_attrs,
+            "source_fragments": fragment_rows,
         }
         evidence.append(
             {
@@ -1123,6 +1260,7 @@ def _facts(
                 "table_id": table_metadata.get("table_id"),
                 "row_index": table_metadata.get("row_index"),
                 "column_index": table_metadata.get("column_index"),
+                "source_fragments": fragment_rows,
             }
         )
         facts.append(fact)
@@ -1140,6 +1278,8 @@ def _xml_facts(
     package: SecFilingPackage,
     contexts: dict[str, dict[str, Any]],
     units: dict[str, dict[str, Any]],
+    *,
+    instance_member: Any | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     facts: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
@@ -1153,9 +1293,10 @@ def _xml_facts(
         "roleref",
         "arcroleref",
     }
-    for member in package.members:
-        if member.role is not SecMemberRole.XBRL_INSTANCE:
-            continue
+    members = (instance_member,) if instance_member is not None else tuple(
+        member for member in package.members if member.role is SecMemberRole.XBRL_INSTANCE
+    )
+    for member in members:
         member_sha = member.member_sha256
         try:
             xml_root = ET.fromstring(member.body)
@@ -1237,6 +1378,15 @@ def _xml_facts(
                 "fragment_hash": fragment_hash,
                 "source_member_sha256": member_sha,
                 "raw_attributes": attrs,
+                "source_fragments": [
+                    {
+                        "source_member_sha256": member_sha,
+                        "xml_locator": locator,
+                        "source_order_index": 0,
+                        "raw_source_text": raw_value,
+                        "fragment_hash": fragment_hash,
+                    }
+                ],
             }
             evidence.append(
                 {
@@ -1255,6 +1405,15 @@ def _xml_facts(
                     "table_id": None,
                     "row_index": None,
                     "column_index": None,
+                    "source_fragments": [
+                        {
+                            "source_member_sha256": member_sha,
+                            "xml_locator": locator,
+                            "source_order_index": 0,
+                            "raw_source_text": raw_value,
+                            "fragment_hash": fragment_hash,
+                        }
+                    ],
                 }
             )
             facts.append(fact)
@@ -1320,10 +1479,11 @@ def verify_sec_evidence(
             dom_root = dom_parser.root
             if source_cache is not None:
                 source_cache[cache_key] = dom_root
-                dom_index = dom_parser.locator_index
-                if not dom_index:
-                    dom_index = _index_dom_locators(dom_root)
-                source_cache[("DOM_INDEX", member_sha)] = dom_index
+                # The targeted parser index is sufficient for the primary
+                # fact/block, but continuation fragments may be descendants
+                # that were not explicit targets.  Evidence verification must
+                # retain the complete immutable DOM path index for them.
+                source_cache[("DOM_INDEX", member_sha)] = _index_dom_locators(dom_root)
         index_key = ("DOM_INDEX", member_sha)
         dom_index = source_cache.get(index_key) if source_cache is not None else None
         if dom_index is None and source_cache is not None:
@@ -1341,7 +1501,20 @@ def verify_sec_evidence(
             text_cache = {}
             if source_cache is not None:
                 source_cache[("DOM_TEXT", member_sha)] = text_cache
-        actual_text = _text_cached(node, text_cache)
+        continuation_targets, duplicate_targets = _continuation_index(dom_root)
+        fragments, continuation_error = _resolve_inline_fragments(
+            node,
+            continuation_targets,
+            duplicate_targets,
+        )
+        if continuation_error is not None:
+            raise SecError(P11Reason.P11_INLINE_CONTINUATION_INVALID, continuation_error)
+        actual_text = " ".join(
+            _logical_text(fragment)
+            for fragment in fragments
+            if _logical_text(fragment)
+        )
+        actual_text = " ".join(actual_text.split())
         if locator_kind == "DOM_HIDDEN_FACT":
             if _local(node.tag) not in {"nonfraction", "nonnumeric"} or not _is_hidden(node):
                 raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "hidden evidence locator does not resolve to a hidden Inline XBRL fact")
@@ -1367,6 +1540,67 @@ def verify_sec_evidence(
     else:
         raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "unsupported SEC evidence locator kind")
 
+    source_fragments = evidence.get("source_fragments")
+    if source_fragments is not None:
+        if not isinstance(source_fragments, list) or not source_fragments:
+            raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragments are invalid")
+        if locator_kind in {"DOM_PATH", "DOM_HIDDEN_FACT"}:
+            fragment_index = source_cache.get(("DOM_INDEX", member_sha)) if source_cache is not None else None
+            if not isinstance(fragment_index, dict):
+                fragment_index = _index_dom_locators(dom_root)
+            actual_fragments: list[str] = []
+            expected_fragment_locators = [_path(fragment) for fragment in fragments]
+            actual_fragment_locators: list[str] = []
+            for expected_order, fragment in enumerate(source_fragments):
+                if not isinstance(fragment, dict) or str(fragment.get("source_member_sha256")) != member_sha:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragment identity is invalid")
+                try:
+                    source_order = int(fragment.get("source_order_index", -1))
+                except (TypeError, ValueError) as exc:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragment order is invalid") from exc
+                if source_order != expected_order:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragment order is not contiguous")
+                fragment_locator = str(fragment.get("dom_locator") or "")
+                fragment_node = fragment_index.get(fragment_locator)
+                if fragment_node is None:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragment locator does not resolve")
+                fragment_text = _logical_text(fragment_node)
+                if fragment_text != str(fragment.get("raw_source_text", "")):
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragment text does not match source")
+                expected_fragment_hash = _sha256(
+                    f"{member_sha}|fragment|{fragment_locator}|{fragment_text}".encode()
+                )
+                if str(fragment.get("fragment_hash", "")) != expected_fragment_hash:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragment hash is invalid")
+                actual_fragments.append(fragment_text)
+                actual_fragment_locators.append(fragment_locator)
+            if actual_fragment_locators != expected_fragment_locators:
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragments do not follow the continuation chain")
+            if " ".join(" ".join(actual_fragments).split()) != actual_text:
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence source fragments do not reconstruct logical text")
+        elif locator_kind == "XML_PATH":
+            if len(source_fragments) != 1:
+                raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML evidence must have one source fragment")
+            for fragment in source_fragments:
+                if not isinstance(fragment, dict) or str(fragment.get("source_member_sha256")) != member_sha:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML source fragment identity is invalid")
+                try:
+                    source_order = int(fragment.get("source_order_index", -1))
+                except (TypeError, ValueError) as exc:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML source fragment order is invalid") from exc
+                if source_order != 0:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML source fragment order is invalid")
+                fragment_locator = str(fragment.get("xml_locator") or "")
+                if fragment_locator != locator:
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML source fragment locator differs from fact locator")
+                fragment_root = source_cache.get(("XML", member_sha)) if source_cache is not None else root
+                fragment_node = _resolve_xml_locator(fragment_root, fragment_locator) if isinstance(fragment_root, ET.Element) else None
+                if fragment_node is None or _xml_text(fragment_node) != str(fragment.get("raw_source_text", "")):
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML source fragment does not resolve")
+                if str(fragment.get("fragment_hash", "")) != _sha256(
+                    f"{member_sha}|fact|{fragment_locator}|{fragment.get('raw_source_text', '')}".encode()
+                ):
+                    raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "XML source fragment hash is invalid")
     if actual_text != expected_text:
         raise SecError(P11Reason.P11_EVIDENCE_LOCATOR_INVALID, "evidence raw text does not match source node")
     expected_fragment = _sha256(f"{member_sha}|fact|{locator}|{actual_text}".encode())
@@ -1395,6 +1629,12 @@ def _write_artifacts(
     facts: list[dict[str, Any]],
     evidence: list[dict[str, Any]],
     issues: list[dict[str, Any]],
+    *,
+    fact_source_mode: str,
+    discovery_observation_sha256: str | None = None,
+    discovery_checked_at: str | None = None,
+    selected_accession: str | None = None,
+    discovery_state: str | None = None,
 ) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     _write_jsonl(directory / "pages.jsonl", pages)
@@ -1429,6 +1669,11 @@ def _write_artifacts(
         "fact_count": len(facts),
         "evidence_count": len(evidence),
         "issue_count": len(issues),
+        "fact_source_mode": fact_source_mode,
+        "discovery_observation_sha256": discovery_observation_sha256,
+        "discovery_checked_at": discovery_checked_at,
+        "selected_accession": selected_accession,
+        "discovery_state": discovery_state,
     }
     (directory / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
@@ -1469,10 +1714,25 @@ def load_sec_artifacts(artifact_dir: str | Path) -> SecParseResult:
     for key, manifest_key in counts.items():
         if int(manifest.get(manifest_key, -1)) != len(rows[key]):
             raise SecError(P11Reason.P11_PACKAGE_INVALID, f"SEC artifact count mismatch: {key}")
-    return SecParseResult(directory, package_sha, VIRTUAL_HTML_NORMALIZER_VERSION, **rows)
+    return SecParseResult(
+        directory,
+        package_sha,
+        VIRTUAL_HTML_NORMALIZER_VERSION,
+        **rows,
+        fact_source_mode=str(manifest.get("fact_source_mode") or "NO_STRUCTURED_FACTS"),
+        discovery_observation_sha256=str(manifest.get("discovery_observation_sha256") or "") or None,
+        discovery_checked_at=str(manifest.get("discovery_checked_at") or "") or None,
+        selected_accession=str(manifest.get("selected_accession") or "") or None,
+        discovery_state=str(manifest.get("discovery_state") or "") or None,
+    )
 
 
-def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> SecParseResult:
+def parse_sec_package(
+    package: SecFilingPackage,
+    artifact_root: str | Path,
+    *,
+    discovery_observation: Any | None = None,
+) -> SecParseResult:
     root = Path(artifact_root).expanduser().resolve()
     final_dir = root / f"{package.package_sha256}.{VIRTUAL_HTML_NORMALIZER_VERSION}"
     if final_dir.exists():
@@ -1494,7 +1754,33 @@ def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> S
     pages, page_by_locator = _pages(blocks)
     sections = _sections(root_node, page_by_locator, primary.member_sha256)
     tables, cell_by_locator, cell_metadata = _tables(root_node, page_by_locator, primary.member_sha256, package.package_sha256)
-    contexts, units = _contexts_and_units(root_node, package)
+    inline_fact_present = any(
+        _local(node.tag) in {"nonfraction", "nonnumeric"}
+        for node in _descendants(root_node)
+    )
+    instance_members = [
+        member for member in package.members if member.role is SecMemberRole.XBRL_INSTANCE
+    ]
+    if inline_fact_present:
+        fact_source_mode = "INLINE_XBRL_PRIMARY"
+        instance_member = None
+    elif len(instance_members) == 1:
+        fact_source_mode = "XBRL_INSTANCE_PRIMARY"
+        instance_member = instance_members[0]
+    elif len(instance_members) > 1:
+        raise SecError(
+            P11Reason.P11_XBRL_INSTANCE_AMBIGUOUS,
+            "multiple XBRL instance members are plausible logical fact sources",
+        )
+    else:
+        fact_source_mode = "NO_STRUCTURED_FACTS"
+        instance_member = None
+    contexts, units = _contexts_and_units(
+        root_node,
+        package,
+        source_mode=fact_source_mode,
+        instance_member=instance_member,
+    )
     blocks_by_locator = {str(row["dom_locator"]): row for row in blocks}
     blocks_by_prefix: dict[str, dict[str, Any]] = {}
     for locator, block in blocks_by_locator.items():
@@ -1522,8 +1808,17 @@ def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> S
         blocks_by_prefix,
         contexts,
         units,
+        *_continuation_index(root_node),
     )
-    xml_facts, xml_evidence, xml_issues = _xml_facts(package, contexts, units)
+    if fact_source_mode == "XBRL_INSTANCE_PRIMARY" and instance_member is not None:
+        xml_facts, xml_evidence, xml_issues = _xml_facts(
+            package,
+            contexts,
+            units,
+            instance_member=instance_member,
+        )
+    else:
+        xml_facts, xml_evidence, xml_issues = [], [], []
     facts.extend(xml_facts)
     evidence.extend(xml_evidence)
     issues.extend(xml_issues)
@@ -1532,7 +1827,21 @@ def parse_sec_package(package: SecFilingPackage, artifact_root: str | Path) -> S
     temp_dir = root / f".{package.package_sha256}.{uuid.uuid4().hex}.tmp"
     temp_dir.mkdir(parents=True, exist_ok=False)
     try:
-        _write_artifacts(temp_dir, package, pages, sections, tables, facts, evidence, issues)
+        _write_artifacts(
+            temp_dir,
+            package,
+            pages,
+            sections,
+            tables,
+            facts,
+            evidence,
+            issues,
+            fact_source_mode=fact_source_mode,
+            discovery_observation_sha256=getattr(discovery_observation, "observation_sha256", None),
+            discovery_checked_at=getattr(discovery_observation, "retrieved_at", None),
+            selected_accession=getattr(discovery_observation, "selected_accession", None),
+            discovery_state=getattr(discovery_observation, "state", None),
+        )
         try:
             os.replace(temp_dir, final_dir)
         except FileExistsError:

@@ -7,6 +7,7 @@ import pytest
 
 from financial_filing_data_foundation.mcp.catalog import McpCatalog
 from financial_filing_data_foundation.mcp.service import McpQueryService, McpServiceError
+from financial_filing_data_foundation.registry import SQLiteRegistry
 from financial_filing_data_foundation.us_sec.package import (
     SecMemberRole,
     SecPackageMember,
@@ -16,6 +17,7 @@ from financial_filing_data_foundation.us_sec.package import (
 from financial_filing_data_foundation.us_sec.parser import parse_sec_package
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
 
 
 def _package() -> object:
@@ -30,7 +32,7 @@ def _package() -> object:
                 relative_name="example.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/example.htm",
+                source_url=archive_member_url("0000320193", "0000320193-25-000001", "example.htm"),
                 body=(
                     b'<html><body><ix:header>'
                     b'<xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier>'
@@ -60,7 +62,11 @@ def _empty_periodic_package() -> object:
                 relative_name=member.relative_name,
                 role=member.role,
                 content_type=member.content_type,
-                source_url=member.source_url,
+                source_url=archive_member_url(
+                    package.cik,
+                    "0000320193-25-000099",
+                    member.relative_name,
+                ),
                 body=b"<html><body><h1>Revenue</h1><p>Revenue was 100.</p></body></html>",
             ),
         ),
@@ -78,11 +84,13 @@ def test_sec_p7_validation_is_source_aware_and_writes_report(tmp_path: Path) -> 
 
 
 def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("FFDF_P11_US_DEV", "1")
+    monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
     package = _package()
     parsed = parse_sec_package(package, tmp_path / "p11")
     validation = validate_sec_artifacts(parsed, tmp_path / "p7", package=package)
     SecPackageStore(tmp_path / "workspace" / "ingest" / "raw-store").put(package)
+    registry = SQLiteRegistry(tmp_path / "workspace" / "ingest" / "registry.sqlite")
+    registry.register_sec_package(package)
     catalog_path = tmp_path / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_path.parent.mkdir(parents=True)
     catalog_path.write_text(
@@ -130,7 +138,7 @@ def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPa
 
 
 def test_sec_ingest_publishes_only_nonblocking_package(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("FFDF_P11_US_DEV", "1")
+    monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
     result = ingest_sec_package(_package(), root=tmp_path, ticker="AAPL", period="Q2")
     assert result.research_ready is True
     assert result.catalog_status == "ADDED"
@@ -179,6 +187,8 @@ def test_p8_revalidates_raw_sec_package_before_serving(
     validation = validate_sec_artifacts(parsed, tmp_path / "p7", package=package)
     store = SecPackageStore(tmp_path / "workspace" / "ingest" / "raw-store")
     package_dir = store.put(package)
+    registry = SQLiteRegistry(tmp_path / "workspace" / "ingest" / "registry.sqlite")
+    registry.register_sec_package(package)
     catalog_path = tmp_path / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_path.parent.mkdir(parents=True)
     catalog_path.write_text(

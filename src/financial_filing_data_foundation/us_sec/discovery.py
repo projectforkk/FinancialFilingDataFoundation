@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import date
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from .errors import P11Reason, SecError
@@ -12,6 +16,11 @@ from .policy import SecFormPolicy
 
 
 _ACCESSION_RE = re.compile(r"^\d{10}-\d{2}-\d{6}$")
+SEC_DISCOVERY_SCHEMA = "p11-sec-discovery-v1"
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +28,154 @@ class SecHistoryChunk:
     name: str
     filing_from: str | None = None
     filing_to: str | None = None
+
+
+def candidate_to_record(candidate: SecFilingCandidate) -> dict[str, Any]:
+    return {
+        "accession": candidate.accession,
+        "normalized_accession": candidate.normalized_accession,
+        "form": candidate.form,
+        "filing_date": candidate.filing_date,
+        "report_period": candidate.report_period,
+        "primary_document": candidate.primary_document,
+        "source_url": candidate.source_url,
+        "amended": bool(candidate.amended),
+        "issuer_kind": candidate.issuer_kind.value,
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class SecDiscoveryObservation:
+    observation_sha256: str
+    company_id: str
+    cik: str
+    fiscal_year: int
+    period: str
+    retrieved_at: str
+    source_documents: tuple[dict[str, Any], ...]
+    candidates: tuple[dict[str, Any], ...]
+    candidate_fingerprint: str
+    selected_accession: str | None
+    state: str
+    artifact_path: str | None = None
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        company: SecCompanyRef,
+        fiscal_year: int,
+        period: str,
+        source_documents: Iterable[dict[str, Any]],
+        candidates: Iterable[SecFilingCandidate],
+        selected_accession: str | None,
+        state: str,
+        retrieved_at: str | None = None,
+        artifact_path: str | None = None,
+    ) -> "SecDiscoveryObservation":
+        normalized_sources: list[dict[str, Any]] = []
+        for source in source_documents:
+            url = str(source.get("url") or source.get("source_url") or "").strip()
+            body = source.get("body")
+            body_b64 = source.get("body_b64")
+            if isinstance(body, (bytes, bytearray)):
+                body_bytes = bytes(body)
+                body_b64 = base64.b64encode(body_bytes).decode("ascii")
+            elif isinstance(body_b64, str):
+                try:
+                    body_bytes = base64.b64decode(body_b64, validate=True)
+                except (ValueError, TypeError) as exc:
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "discovery source bytes are invalid") from exc
+            else:
+                body_bytes = b""
+                body_b64 = None
+            source_sha256 = str(source.get("sha256") or source.get("source_sha256") or "").strip().lower()
+            if body_bytes:
+                computed_sha256 = _sha256(body_bytes)
+                if source_sha256 and source_sha256 != computed_sha256:
+                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "discovery source hash mismatch")
+                source_sha256 = computed_sha256
+            if not url or not source_sha256:
+                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "discovery source URL/hash is missing")
+            normalized_sources.append(
+                {
+                    "url": url,
+                    "sha256": source_sha256,
+                    "body_b64": body_b64,
+                }
+            )
+        normalized_candidates = tuple(
+            candidate_to_record(candidate)
+            for candidate in sorted(
+                tuple(candidates),
+                key=lambda item: (item.accession, item.form, item.filing_date, item.primary_document),
+            )
+        )
+        candidate_bytes = json.dumps(
+            list(normalized_candidates), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        candidate_fingerprint = _sha256(candidate_bytes)
+        observed_at = retrieved_at or datetime.now(timezone.utc).isoformat()
+        canonical = {
+            "schema_version": SEC_DISCOVERY_SCHEMA,
+            "company_id": company.company_id,
+            "cik": company.cik,
+            "fiscal_year": int(fiscal_year),
+            "period": str(period).strip().upper(),
+            "sources": [
+                {"url": item["url"], "sha256": item["sha256"]}
+                for item in sorted(normalized_sources, key=lambda item: (item["url"], item["sha256"]))
+            ],
+            "candidates": list(normalized_candidates),
+            "candidate_fingerprint": candidate_fingerprint,
+            "selected_accession": selected_accession,
+            "state": str(state).strip().upper(),
+            "retrieved_at": observed_at,
+        }
+        observation_sha256 = _sha256(
+            json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        )
+        return cls(
+            observation_sha256=observation_sha256,
+            company_id=company.company_id,
+            cik=company.cik,
+            fiscal_year=int(fiscal_year),
+            period=str(period).strip().upper(),
+            retrieved_at=observed_at,
+            source_documents=tuple(normalized_sources),
+            candidates=normalized_candidates,
+            candidate_fingerprint=candidate_fingerprint,
+            selected_accession=selected_accession,
+            state=str(state).strip().upper(),
+            artifact_path=artifact_path,
+        )
+
+    def canonical_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": SEC_DISCOVERY_SCHEMA,
+            "company_id": self.company_id,
+            "cik": self.cik,
+            "fiscal_year": int(self.fiscal_year),
+            "period": self.period,
+            "sources": [
+                {"url": item["url"], "sha256": item["sha256"]}
+                for item in sorted(self.source_documents, key=lambda item: (item["url"], item["sha256"]))
+            ],
+            "candidates": list(self.candidates),
+            "candidate_fingerprint": self.candidate_fingerprint,
+            "selected_accession": self.selected_accession,
+            "state": self.state,
+            "retrieved_at": self.retrieved_at,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **self.canonical_payload(),
+            "observation_sha256": self.observation_sha256,
+            "retrieved_at": self.retrieved_at,
+            "source_documents": [dict(item) for item in self.source_documents],
+            "artifact_path": self.artifact_path,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,4 +528,13 @@ def select_filing(candidates: Iterable[SecFilingCandidate]) -> SecFilingCandidat
     return originals[0]
 
 
-__all__ = ["SecHistoryChunk", "SecSubmissions", "discover_filings", "parse_submissions", "select_filing"]
+__all__ = [
+    "SEC_DISCOVERY_SCHEMA",
+    "SecDiscoveryObservation",
+    "SecHistoryChunk",
+    "SecSubmissions",
+    "candidate_to_record",
+    "discover_filings",
+    "parse_submissions",
+    "select_filing",
+]

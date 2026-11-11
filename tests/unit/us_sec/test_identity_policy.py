@@ -18,8 +18,8 @@ from financial_filing_data_foundation.us_sec.models import SecIssuerKind, SecFil
 from financial_filing_data_foundation.us_sec.policy import SecFormPolicy
 
 
-def test_us_is_not_added_to_accepted_market_tuple() -> None:
-    assert SUPPORTED_MARKETS == ("CN", "HK")
+def test_us_is_public_on_the_feature_branch() -> None:
+    assert SUPPORTED_MARKETS == ("CN", "HK", "US")
 
 
 def test_cik_and_ticker_normalize_without_company_name_guessing() -> None:

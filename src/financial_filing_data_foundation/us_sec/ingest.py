@@ -13,6 +13,7 @@ from financial_filing_data_foundation.mcp.service import McpQueryService
 from financial_filing_data_foundation.registry import SQLiteRegistry
 
 from .identity import sec_company
+from .discovery import SecDiscoveryObservation
 from .package import SecFilingPackage, SecPackageStore
 from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, load_sec_artifacts, parse_sec_package
 from .registry import register_sec_package, register_sec_parsed_run, register_sec_slot
@@ -48,6 +49,7 @@ def _upsert_catalog(
     ticker_source_url: str | None = None,
     ticker_source_sha256: str | None = None,
     ticker_retrieved_at: str | None = None,
+    discovery_observation: SecDiscoveryObservation | None = None,
 ) -> str:
     if not publish:
         return "NOT_REGISTERED_REVIEW_CONFLICT"
@@ -69,6 +71,27 @@ def _upsert_catalog(
         "ticker_source_url": ticker_source_url,
         "ticker_source_sha256": ticker_source_sha256,
         "ticker_retrieved_at": ticker_retrieved_at,
+        "discovery_observation_sha256": (
+            discovery_observation.observation_sha256
+            if discovery_observation is not None
+            else validation.discovery_observation_sha256 or parsed.discovery_observation_sha256
+        ),
+        "discovery_checked_at": (
+            discovery_observation.retrieved_at
+            if discovery_observation is not None
+            else validation.discovery_checked_at or parsed.discovery_checked_at
+        ),
+        "selected_accession": (
+            discovery_observation.selected_accession
+            if discovery_observation is not None
+            else validation.selected_accession or parsed.selected_accession
+        ),
+        "discovery_state": (
+            discovery_observation.state
+            if discovery_observation is not None
+            else validation.discovery_state or parsed.discovery_state
+        ),
+        "fact_source_mode": parsed.fact_source_mode,
         "fiscal_year": package.fiscal_year,
         "filing_type": period.upper(),
         "raw_fiscal_period": period.upper(),
@@ -129,16 +152,26 @@ def ingest_sec_package(
     ticker_source_url: str | None = None,
     ticker_source_sha256: str | None = None,
     ticker_retrieved_at: str | None = None,
+    discovery_observation: SecDiscoveryObservation | None = None,
 ) -> SecIngestResult:
     project_root = Path(root).expanduser().resolve()
     base = project_root / "workspace" / "ingest" / "us"
     store = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store")
     store.put(package)
-    parsed = parse_sec_package(package, base / "p11")
-    validation = validate_sec_artifacts(parsed, base / "p7", amendment_conflict=amendment_conflict, package=package)
     registry_path = project_root / "workspace" / "ingest" / "registry.sqlite"
     registry = SQLiteRegistry(registry_path)
+    if discovery_observation is not None:
+        registry.register_sec_discovery_observation(discovery_observation)
     register_sec_package(registry, package)
+    parsed = parse_sec_package(package, base / "p11", discovery_observation=discovery_observation)
+    validation = validate_sec_artifacts(
+        parsed,
+        base / "p7",
+        amendment_conflict=amendment_conflict,
+        package=package,
+        discovery_observation=discovery_observation,
+        registry=registry,
+    )
     binding_status = "REVIEW_REQUIRED" if amendment_conflict else "SOURCE_CONFIRMED"
     register_sec_slot(registry, package, fiscal_year=package.fiscal_year, period=period, artifact_path=str(parsed.artifact_dir), binding_status=binding_status)
     parse_run_id = hashlib.sha256(f"{package.package_sha256}|{parsed.parser_version}".encode()).hexdigest()
@@ -156,9 +189,13 @@ def ingest_sec_package(
         blocking_issue_count=validation.blocking_issue_count,
         artifact_path=str(parsed.artifact_dir),
     )
-    ready = validation.validation_status == "PASS" and not amendment_conflict
+    ready = (
+        validation.validation_status == "PASS"
+        and not amendment_conflict
+        and (discovery_observation is None or discovery_observation.state == "UNAMBIGUOUS")
+    )
     catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
-    catalog_status = _upsert_catalog(root=project_root, package=package, ticker=ticker, parsed=parsed, validation=validation, catalog_path=catalog_path, period=period, publish=ready, company_id=company_id, ticker_source_url=ticker_source_url, ticker_source_sha256=ticker_source_sha256, ticker_retrieved_at=ticker_retrieved_at)
+    catalog_status = _upsert_catalog(root=project_root, package=package, ticker=ticker, parsed=parsed, validation=validation, catalog_path=catalog_path, period=period, publish=ready, company_id=company_id, ticker_source_url=ticker_source_url, ticker_source_sha256=ticker_source_sha256, ticker_retrieved_at=ticker_retrieved_at, discovery_observation=discovery_observation)
     return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
 
 
@@ -174,6 +211,7 @@ def reuse_sec_package(
     ticker_source_url: str | None = None,
     ticker_source_sha256: str | None = None,
     ticker_retrieved_at: str | None = None,
+    discovery_observation: SecDiscoveryObservation | None = None,
 ) -> SecIngestResult:
     """Reuse a verified current SEC artifact without parsing or downloading."""
 
@@ -186,7 +224,25 @@ def reuse_sec_package(
         raise ValueError("SEC reuse artifact identity differs from source package")
     registry_path = project_root / "workspace" / "ingest" / "registry.sqlite"
     registry = SQLiteRegistry(registry_path)
+    if discovery_observation is not None:
+        registry.register_sec_discovery_observation(discovery_observation)
     register_sec_package(registry, package)
+    if discovery_observation is not None and (
+        validation.discovery_observation_sha256 != discovery_observation.observation_sha256
+        or validation.discovery_checked_at != discovery_observation.retrieved_at
+        or validation.selected_accession != discovery_observation.selected_accession
+        or validation.discovery_state != discovery_observation.state
+    ):
+        # A fresh online discovery is a new P7 binding even when the raw
+        # package and parsed files are reusable.  Refresh only validation
+        # metadata/evidence; never rerun the parser or mutate the raw package.
+        validation = validate_sec_artifacts(
+            parsed,
+            project_root / "workspace" / "ingest" / "us" / "p7",
+            package=package,
+            discovery_observation=discovery_observation,
+            registry=registry,
+        )
     binding_status = "REVIEW_REQUIRED" if amendment_conflict else "SOURCE_CONFIRMED"
     register_sec_slot(
         registry,
@@ -201,6 +257,7 @@ def reuse_sec_package(
         and validation.compatibility_status == "COMPATIBLE"
         and validation.blocking_issue_count == 0
         and not amendment_conflict
+        and (discovery_observation is None or discovery_observation.state == "UNAMBIGUOUS")
     )
     catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_status = _upsert_catalog(
@@ -216,6 +273,7 @@ def reuse_sec_package(
         ticker_source_url=ticker_source_url,
         ticker_source_sha256=ticker_source_sha256,
         ticker_retrieved_at=ticker_retrieved_at,
+        discovery_observation=discovery_observation,
     )
     return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
 

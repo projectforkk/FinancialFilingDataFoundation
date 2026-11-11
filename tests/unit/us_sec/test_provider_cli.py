@@ -10,10 +10,12 @@ from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig, SecResponse
 from financial_filing_data_foundation.us_sec.identity import sec_company
 from financial_filing_data_foundation.us_sec.package import SecMemberRole, SecPackageMember, SecPackageStore, build_package
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
 
 
 def test_generic_xml_is_not_misclassified_as_xbrl_instance() -> None:
     assert _member_role("attachment.xml", "primary.htm", b"<attachment />").value == "OTHER"
+    assert _member_role("attachment.xbrl", "primary.htm", b"<attachment />").value == "OTHER"
     assert _member_role(
         "instance.xml",
         "primary.htm",
@@ -176,7 +178,7 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
             }
         },
     }
-    index = {"directory": {"item": [{"name": "example.htm"}, {"name": "example.xsd"}, {"name": "unrelated.pdf"}]}}
+    index = {"directory": {"item": [{"name": "example.htm"}, {"name": "example.xsd", "type": "EX-101.SCH"}, {"name": "unrelated.xml", "type": "XML"}, {"name": "unrelated.pdf"}]}}
 
     def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
         calls.append(url)
@@ -203,7 +205,7 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
     assert calls.count(schema_url) == 1
 
 
-def test_sec_acquirer_local_package_is_parse_local_not_reuse_data(tmp_path: Path) -> None:
+def test_sec_acquirer_requires_fresh_discovery_before_local_package(tmp_path: Path) -> None:
     package = build_package(
         cik="0000320193",
         accession="0000320193-25-000079",
@@ -215,7 +217,7 @@ def test_sec_acquirer_local_package_is_parse_local_not_reuse_data(tmp_path: Path
                 relative_name="annual.htm",
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
-                source_url="https://www.sec.gov/Archives/edgar/data/320193/annual.htm",
+                source_url=archive_member_url("0000320193", "0000320193-25-000079", "annual.htm"),
                 body=b"<html><body><p>annual</p></body></html>",
             ),
         ),
@@ -224,10 +226,9 @@ def test_sec_acquirer_local_package_is_parse_local_not_reuse_data(tmp_path: Path
     store.put(package)
     company = sec_company(cik="320193", ticker="EXM", allow_development=True)
 
-    result = SecAcquirer(object(), store).acquire(company, fiscal_year=2025, period="FY")
-
-    assert result.reused is True
-    assert result.plan_action == "PARSE_LOCAL"
+    with pytest.raises(SecError) as exc_info:
+        SecAcquirer(object(), store).acquire(company, fiscal_year=2025, period="FY")
+    assert exc_info.value.reason_code == P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN.value
 
 
 def test_sec_acquirer_does_not_silently_select_amendment(tmp_path: Path) -> None:

@@ -17,6 +17,7 @@ from financial_filing_data_foundation.us_sec.parser import load_sec_artifacts
 from financial_filing_data_foundation.us_sec.parser import verify_sec_evidence
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
 from financial_filing_data_foundation.us_sec.validation import load_sec_validation
+from financial_filing_data_foundation.registry import SQLiteRegistry
 
 from .catalog import CatalogDocument, CatalogError, McpCatalog, normalize_sha256
 
@@ -826,6 +827,9 @@ def _verify_sec_source_chain(
         )
     try:
         package = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store").load(document.package_sha256)
+        SQLiteRegistry(project_root / "workspace" / "ingest" / "registry.sqlite").verify_sec_package_provenance(package)
+        if document.selected_accession and str(document.selected_accession) != str(package.accession):
+            raise ValueError("SEC catalog discovery accession differs from raw package")
         member_hashes = {member.member_sha256 for member in package.members}
         source_cache: dict[tuple[str, str], object] = {}
         dom_targets: dict[str, set[str]] = {}
@@ -886,6 +890,35 @@ def _load_sec_bundle(document: CatalogDocument, project_root: Path | None = None
         raise McpServiceError(
             "P8_UPSTREAM_ARTIFACT_INVALID",
             "SEC validation/package identity mismatch",
+        )
+    if document.fact_source_mode and document.fact_source_mode != parsed.fact_source_mode:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog fact-source mode differs from parsed artifact",
+        )
+    if validation.fact_source_mode and validation.fact_source_mode != parsed.fact_source_mode:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC validation fact-source mode differs from parsed artifact",
+        )
+    discovery_fields = (
+        ("discovery_observation_sha256", document.discovery_observation_sha256, validation.discovery_observation_sha256),
+        ("discovery_checked_at", document.discovery_checked_at, validation.discovery_checked_at),
+        ("selected_accession", document.selected_accession, validation.selected_accession),
+        ("discovery_state", document.discovery_state, validation.discovery_state),
+    )
+    for field_name, catalog_value, validation_value in discovery_fields:
+        if (catalog_value is None) != (validation_value is None) or (
+            catalog_value is not None and str(catalog_value) != str(validation_value)
+        ):
+            raise McpServiceError(
+                "P8_UPSTREAM_ARTIFACT_INVALID",
+                f"SEC catalog {field_name} differs from validation artifact",
+            )
+    if validation.discovery_state is not None and validation.discovery_state != "UNAMBIGUOUS":
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog points to a non-unambiguous discovery state",
         )
     tables = tuple(parsed.tables)
     facts = tuple(parsed.facts)
