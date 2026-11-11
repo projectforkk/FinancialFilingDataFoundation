@@ -4,7 +4,7 @@ Status: **READY FOR IMPLEMENTATION — DO NOT START FORMAL ACCEPTANCE**
 
 Corrected design baseline:
 
-`4a99c74714dcbf3d85e5ec57a26369e36ac0d398`
+`09e3174b7e19a60cc5955862670fac8931af67db`
 
 Previous production candidate:
 
@@ -438,7 +438,7 @@ Create:
 It must include:
 
 - corrected design baseline SHA:
-  `4a99c74714dcbf3d85e5ec57a26369e36ac0d398`;
+  `09e3174b7e19a60cc5955862670fac8931af67db`;
 - previous candidate:
   `9b7fcc9fc37a423eaafd1dde762e9c81d475df9e`;
 - new production candidate SHA;
