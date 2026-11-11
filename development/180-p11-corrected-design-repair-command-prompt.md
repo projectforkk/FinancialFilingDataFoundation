@@ -27,7 +27,7 @@ Branch:
 
 Corrected design baseline:
 
-`4a99c74714dcbf3d85e5ec57a26369e36ac0d398`
+`09e3174b7e19a60cc5955862670fac8931af67db`
 
 Previous production candidate:
 
@@ -54,7 +54,7 @@ Before editing:
 git status --short
 git branch --show-current
 git rev-parse HEAD
-git rev-parse 4a99c74714dcbf3d85e5ec57a26369e36ac0d398
+git rev-parse 09e3174b7e19a60cc5955862670fac8931af67db
 git diff --stat 9b7fcc9fc37a423eaafd1dde762e9c81d475df9e..HEAD
 ```
 
@@ -319,7 +319,7 @@ Create:
 Evidence must include:
 
 - corrected design baseline:
-  `4a99c74714dcbf3d85e5ec57a26369e36ac0d398`;
+  `09e3174b7e19a60cc5955862670fac8931af67db`;
 - previous candidate:
   `9b7fcc9fc37a423eaafd1dde762e9c81d475df9e`;
 - NEW_P11_PRODUCTION_CANDIDATE SHA;
@@ -350,7 +350,7 @@ Final response must report:
 
 ```text
 CORRECTED DESIGN BASELINE:
-4a99c74714dcbf3d85e5ec57a26369e36ac0d398
+09e3174b7e19a60cc5955862670fac8931af67db
 
 NEW P11 PRODUCTION CANDIDATE:
 <sha>
