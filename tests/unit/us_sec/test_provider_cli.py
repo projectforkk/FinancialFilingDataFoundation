@@ -22,6 +22,137 @@ def test_generic_xml_is_not_misclassified_as_xbrl_instance() -> None:
     assert _member_role("instance.xbrl", "primary.htm", b"<xbrl />").value == "XBRL_INSTANCE"
 
 
+def _valid_q2_submissions() -> dict[str, object]:
+    return {
+        "cik": "0000320193",
+        "fiscalYearEnd": "1231",
+        "filings": {
+            "recent": {
+                "accessionNumber": [
+                    "0000320193-24-000001",
+                    "0000320193-25-000000",
+                    "0000320193-25-000001",
+                ],
+                "filingDate": ["2024-11-01", "2025-05-01", "2025-08-01"],
+                "reportDate": ["2024-12-31", "2025-03-31", "2025-06-30"],
+                "form": ["10-K", "10-Q", "10-Q"],
+                "primaryDocument": ["fy.htm", "q1.htm", "example.htm"],
+            }
+        },
+    }
+
+
+def _acquirer_for_error_path(
+    tmp_path: Path,
+    *,
+    submissions_body: bytes,
+    archive_body: bytes,
+    history_body: bytes | None = None,
+) -> tuple[SecAcquirer, object]:
+    submissions_url = "https://data.sec.gov/submissions/CIK0000320193.json"
+    history_url = "https://data.sec.gov/submissions/CIK0000320193-2024.json"
+    index_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/index.json"
+
+    def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
+        if url == submissions_url:
+            return SecResponse(200, {"Content-Type": "application/json"}, submissions_body, url)
+        if url == history_url and history_body is not None:
+            return SecResponse(200, {"Content-Type": "application/json"}, history_body, url)
+        if url == index_url:
+            return SecResponse(200, {"Content-Type": "application/json"}, archive_body, url)
+        raise AssertionError(url)
+
+    client = SecHttpClient(
+        SecHttpConfig(contact_email="ops@example.org"),
+        transport=transport,
+        sleep=lambda _: None,
+    )
+    return (
+        SecAcquirer(client, SecPackageStore(tmp_path / "raw-store")),
+        sec_company(cik="320193", ticker="EXM", allow_development=True),
+    )
+
+
+@pytest.mark.parametrize(
+    "archive_body",
+    [
+        pytest.param(json.dumps({}).encode(), id="directory-invalid"),
+        pytest.param(
+            json.dumps({"directory": {"item": {}}}).encode(),
+            id="item-list-invalid",
+        ),
+        pytest.param(
+            json.dumps({"directory": {"item": [{"name": 123}]}}).encode(),
+            id="item-record-invalid",
+        ),
+        pytest.param(b"not-json", id="archive-json-invalid"),
+    ],
+)
+def test_sec_acquirer_malformed_archive_index_raises_discovery_error(
+    tmp_path: Path, archive_body: bytes
+) -> None:
+    acquirer, company = _acquirer_for_error_path(
+        tmp_path,
+        submissions_body=json.dumps(_valid_q2_submissions()).encode(),
+        archive_body=archive_body,
+    )
+
+    with pytest.raises(SecError) as exc_info:
+        acquirer.acquire(company, fiscal_year=2025, period="Q2")
+
+    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
+
+
+def test_sec_acquirer_invalid_main_submissions_json_raises_discovery_error(
+    tmp_path: Path,
+) -> None:
+    acquirer, company = _acquirer_for_error_path(
+        tmp_path,
+        submissions_body=b"not-json",
+        archive_body=b"{}",
+    )
+
+    with pytest.raises(SecError) as exc_info:
+        acquirer.acquire(company, fiscal_year=2025, period="Q2")
+
+    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
+
+
+def test_sec_acquirer_invalid_historical_submissions_json_raises_discovery_error(
+    tmp_path: Path,
+) -> None:
+    submissions = {
+        "cik": "0000320193",
+        "filings": {
+            "recent": {
+                "accessionNumber": [],
+                "filingDate": [],
+                "reportDate": [],
+                "form": [],
+                "primaryDocument": [],
+            },
+            "files": [
+                {
+                    "name": "CIK0000320193-2024.json",
+                    "filingFrom": "2024-01-01",
+                    "filingTo": "2024-12-31",
+                }
+            ],
+        },
+    }
+    acquirer, company = _acquirer_for_error_path(
+        tmp_path,
+        submissions_body=json.dumps(submissions).encode(),
+        archive_body=b"{}",
+        history_body=b"not-json",
+    )
+
+    with pytest.raises(SecError) as exc_info:
+        acquirer.acquire(company, fiscal_year=2024, period="FY")
+
+    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
+
+
 def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path: Path) -> None:
     submissions_url = "https://data.sec.gov/submissions/CIK0000320193.json"
     index_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/index.json"

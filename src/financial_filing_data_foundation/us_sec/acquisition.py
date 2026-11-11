@@ -126,8 +126,6 @@ class SecAcquirer:
         try:
             payload = json.loads(response.body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            from .errors import P11Reason, SecError
-
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC submissions response is invalid JSON") from exc
         submissions = parse_submissions(payload, company=company, source_url=submissions_url)
         candidates = discover_filings(submissions, fiscal_year=fiscal_year, period=period)
@@ -144,8 +142,6 @@ class SecAcquirer:
                 try:
                     history_payload = json.loads(history_response.body.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                    from .errors import P11Reason, SecError
-
                     raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC historical submissions response is invalid JSON") from exc
                 historical = parse_submissions(history_payload, company=company, source_url=history_url)
                 historical_candidates.extend(historical.candidates)
@@ -171,8 +167,6 @@ class SecAcquirer:
         try:
             index_payload = json.loads(index_response.body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            from .errors import P11Reason, SecError
-
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC archive index is invalid JSON") from exc
         if not isinstance(index_payload, dict) or not isinstance(index_payload.get("directory"), dict):
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC archive index directory is invalid")
