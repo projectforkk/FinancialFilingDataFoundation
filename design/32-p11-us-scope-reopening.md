@@ -78,9 +78,10 @@ Domestic operating companies:
 Foreign private issuers:
 
 - FY → Form 20-F or 40-F;
-- Form 6-K may be acquired explicitly;
-- 6-K must not be auto-mapped to a standardized quarterly slot without a separately
-  accepted deterministic rule.
+- explicit Form 6-K acquisition is deferred from P11 v1 under
+  `design/34-p11-explicit-6k-scope-correction.md`;
+- `6-K`/`6-K/A` must not be auto-mapped to a standardized quarterly slot, ignored as
+  an override, or acquired through the periodic-slot path.
 
 Not required periodic slots:
 

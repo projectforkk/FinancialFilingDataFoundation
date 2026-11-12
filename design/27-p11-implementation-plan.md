@@ -160,6 +160,13 @@ The merge-ready candidate must:
 
 Formal tests must run with the development flag absent.
 
+### 4.9 ISSUE-139 — explicit Form 6-K scope
+
+Explicit Form 6-K acquisition is deferred from P11 v1 by
+`design/34-p11-explicit-6k-scope-correction.md`. The implementation must reject
+`--filing-type 6-K`/`6-K/A` deterministically and must not coerce or silently ignore
+that request. A future accession-level 6-K contract requires a new design review.
+
 ## 5. Required compatibility/version changes
 
 Target constants:
