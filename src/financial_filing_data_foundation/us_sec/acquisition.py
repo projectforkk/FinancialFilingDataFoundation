@@ -434,6 +434,26 @@ _XBRL_INDEX_TYPES = frozenset(
     }
 )
 
+_XBRL_REFERENCE_TYPES = frozenset(
+    {
+        "XBRL",
+        "XBRL_INSTANCE",
+        "XBRL_SCHEMA",
+        "XBRL_PRESENTATION",
+        "XBRL_CALCULATION",
+        "XBRL_LABEL",
+        "XBRL_DEFINITION",
+        "XBRL_REFERENCE",
+        "XBRL_LINKBASE",
+        "XBRL_SUPPORT",
+    }
+)
+
+
+def _is_semantic_xbrl_reference(item: dict[str, Any]) -> bool:
+    item_type = str(item.get("type") or item.get("documentType") or "").strip().upper()
+    return item_type in _XBRL_INDEX_TYPES or item_type in _XBRL_REFERENCE_TYPES
+
 
 def _select_archive_members(
     items_by_name: dict[str, dict[str, Any]],
@@ -446,7 +466,7 @@ def _select_archive_members(
     selected: set[str] = {primary_name}
     for name, item in items_by_name.items():
         item_type = str(item.get("type") or item.get("documentType") or "").strip().upper()
-        if item_type in _XBRL_INDEX_TYPES or item_type.startswith("EX-101.") and item_type in _XBRL_INDEX_TYPES:
+        if item_type in _XBRL_INDEX_TYPES:
             selected.add(name)
         if name.casefold() == "filingsummary.xml":
             selected.add(name)
@@ -465,7 +485,8 @@ def _select_archive_members(
                 canonical_reference = normalize_archive_relative_name(clean)
             except SecError:
                 continue
-            if canonical_reference in items_by_name:
+            item = items_by_name.get(canonical_reference)
+            if item is not None and _is_semantic_xbrl_reference(item):
                 selected.add(canonical_reference)
     return sorted(selected, key=str.casefold)
 
