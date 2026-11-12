@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import date
@@ -101,6 +100,104 @@ def _validate_source_bytes(name: str, body: bytes, content_type: str, *, primary
             ET.fromstring(body)
         except ET.ParseError as exc:
             raise SecError(P11Reason.P11_CONTENT_TYPE_INVALID, f"SEC XML member bytes are invalid: {name}") from exc
+
+
+_XBRL_LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
+_SEMANTIC_REFERENCE_TAGS = frozenset({"link:schemaref", "link:linkbaseref"})
+_XBRL_MEMBER_ROLES = frozenset(
+    {
+        SecMemberRole.XBRL_INSTANCE,
+        SecMemberRole.XBRL_SCHEMA,
+        SecMemberRole.XBRL_PRESENTATION,
+        SecMemberRole.XBRL_CALCULATION,
+        SecMemberRole.XBRL_LABEL,
+        SecMemberRole.XBRL_DEFINITION,
+        SecMemberRole.XBRL_REFERENCE,
+    }
+)
+
+
+class _SemanticReferenceHTMLParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.references: list[str] = []
+
+    def _record(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if str(tag).casefold() not in _SEMANTIC_REFERENCE_TAGS:
+            return
+        normalized = {
+            str(key).casefold(): "" if value is None else str(value)
+            for key, value in attrs
+        }
+        reference = normalized.get("xlink:href") or normalized.get("href")
+        if reference:
+            self.references.append(reference)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._record(tag, attrs)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._record(tag, attrs)
+
+
+def _xml_local_name(tag: str) -> str:
+    text = str(tag)
+    if text.startswith("{") and "}" in text:
+        return text.split("}", 1)[1].casefold()
+    return text.rsplit(":", 1)[-1].casefold()
+
+
+def _xml_namespace(tag: str) -> str | None:
+    text = str(tag)
+    if text.startswith("{") and "}" in text:
+        return text[1:].split("}", 1)[0]
+    return None
+
+
+def _xml_attribute_local(element: ET.Element, name: str) -> str | None:
+    wanted = name.casefold()
+    for key, value in element.attrib.items():
+        text = str(key)
+        if text.casefold() == wanted or text.rsplit("}", 1)[-1].rsplit(":", 1)[-1].casefold() == wanted:
+            return str(value)
+    return None
+
+
+def _extract_semantic_xbrl_references(body: bytes, *, primary_html: bool) -> tuple[str, ...]:
+    if primary_html:
+        try:
+            parser = _SemanticReferenceHTMLParser()
+            parser.feed(body.decode("utf-8-sig"))
+            parser.close()
+        except (UnicodeDecodeError, AssertionError, ValueError):
+            return ()
+        return tuple(parser.references)
+
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError:
+        return ()
+    references: list[str] = []
+    for element in root.iter():
+        if (
+            _xml_namespace(str(element.tag)) != _XBRL_LINK_NAMESPACE
+            or _xml_local_name(str(element.tag)) not in {"schemaref", "linkbaseref"}
+        ):
+            continue
+        reference = _xml_attribute_local(element, "href")
+        if reference:
+            references.append(reference)
+    return tuple(references)
+
+
+def _canonical_semantic_reference(reference: str) -> str | None:
+    clean = str(reference).split("#", 1)[0].split("?", 1)[0].strip()
+    if not clean:
+        return None
+    try:
+        return normalize_archive_relative_name(clean)
+    except SecError:
+        return None
 
 
 class SecAcquirer:
@@ -324,11 +421,6 @@ class SecAcquirer:
             name = normalize_archive_relative_name(item["name"])
             items_by_name[name] = item
         primary_name = normalize_archive_relative_name(candidate.primary_document)
-        selected = _select_archive_members(
-            items_by_name,
-            primary_name=primary_name,
-            primary_body=None,
-        )
         primary_url = archive_member_url(company.cik, candidate.accession, primary_name)
         primary_response = self.client.fetch(
             primary_url,
@@ -336,44 +428,68 @@ class SecAcquirer:
             max_bytes=self.client.config.member_max_bytes,
         )
         _validate_source_bytes(primary_name, primary_response.body, "text/html", primary=True)
-        selected = _select_archive_members(
-            items_by_name,
-            primary_name=primary_name,
-            primary_body=primary_response.body,
+        primary_content_type = next(
+            (
+                str(value).split(";", 1)[0].strip().lower()
+                for key, value in primary_response.headers.items()
+                if str(key).casefold() == "content-type"
+            ),
+            _content_types(primary_name)[0],
         )
-        members: list[SecPackageMember] = []
-        for name in selected:
-            member_url = archive_member_url(company.cik, candidate.accession, name)
-            if not archive_url_is_exact(
-                member_url,
-                cik=company.cik,
-                accession=candidate.accession,
-                relative_name=name,
-            ):
-                raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC archive member escaped exact accession root")
-            member_response = primary_response if name == primary_name else self.client.fetch(
-                member_url,
-                expected_content_types=_content_types(name),
-                max_bytes=self.client.config.member_max_bytes,
+        members_by_name: dict[str, SecPackageMember] = {
+            primary_name: SecPackageMember(
+                relative_name=primary_name,
+                role=SecMemberRole.PRIMARY_DOCUMENT,
+                content_type=primary_content_type,
+                source_url=primary_url,
+                body=primary_response.body,
             )
-            content_type = next(
-                (
-                    str(value).split(";", 1)[0].strip().lower()
-                    for key, value in member_response.headers.items()
-                    if str(key).casefold() == "content-type"
-                ),
-                _content_types(name)[0],
+        }
+        accepted_xbrl_bodies: dict[str, tuple[SecMemberRole, bytes]] = {}
+        while True:
+            selected = _select_archive_members(
+                items_by_name,
+                primary_name=primary_name,
+                primary_body=primary_response.body,
+                accepted_member_bodies=accepted_xbrl_bodies,
             )
-            _validate_source_bytes(name, member_response.body, content_type, primary=name == candidate.primary_document)
-            members.append(
-                SecPackageMember(
+            pending = [name for name in selected if name not in members_by_name]
+            if not pending:
+                break
+            for name in pending:
+                member_url = archive_member_url(company.cik, candidate.accession, name)
+                if not archive_url_is_exact(
+                    member_url,
+                    cik=company.cik,
+                    accession=candidate.accession,
                     relative_name=name,
-                    role=_member_role(name, candidate.primary_document, member_response.body),
+                ):
+                    raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC archive member escaped exact accession root")
+                member_response = self.client.fetch(
+                    member_url,
+                    expected_content_types=_content_types(name),
+                    max_bytes=self.client.config.member_max_bytes,
+                )
+                content_type = next(
+                    (
+                        str(value).split(";", 1)[0].strip().lower()
+                        for key, value in member_response.headers.items()
+                        if str(key).casefold() == "content-type"
+                    ),
+                    _content_types(name)[0],
+                )
+                _validate_source_bytes(name, member_response.body, content_type, primary=False)
+                member = SecPackageMember(
+                    relative_name=name,
+                    role=_member_role(name, primary_name, member_response.body),
                     content_type=content_type,
                     source_url=member_url,
                     body=member_response.body,
                 )
-            )
+                members_by_name[name] = member
+                if member.role in _XBRL_MEMBER_ROLES:
+                    accepted_xbrl_bodies[name] = (member.role, member.body)
+        members = [members_by_name[name] for name in selected]
         package = build_package(
             cik=company.cik,
             accession=candidate.accession,
@@ -434,34 +550,14 @@ _XBRL_INDEX_TYPES = frozenset(
     }
 )
 
-_XBRL_REFERENCE_TYPES = frozenset(
-    {
-        "XBRL",
-        "XBRL_INSTANCE",
-        "XBRL_SCHEMA",
-        "XBRL_PRESENTATION",
-        "XBRL_CALCULATION",
-        "XBRL_LABEL",
-        "XBRL_DEFINITION",
-        "XBRL_REFERENCE",
-        "XBRL_LINKBASE",
-        "XBRL_SUPPORT",
-    }
-)
-
-
-def _is_semantic_xbrl_reference(item: dict[str, Any]) -> bool:
-    item_type = str(item.get("type") or item.get("documentType") or "").strip().upper()
-    return item_type in _XBRL_INDEX_TYPES or item_type in _XBRL_REFERENCE_TYPES
-
-
 def _select_archive_members(
     items_by_name: dict[str, dict[str, Any]],
     *,
     primary_name: str,
     primary_body: bytes | None,
+    accepted_member_bodies: dict[str, tuple[SecMemberRole, bytes]] | None = None,
 ) -> list[str]:
-    """Select only filing-local XBRL attachments proven by index/reference metadata."""
+    """Select filing members from independent metadata or semantic references."""
 
     selected: set[str] = {primary_name}
     for name, item in items_by_name.items():
@@ -470,23 +566,19 @@ def _select_archive_members(
             selected.add(name)
         if name.casefold() == "filingsummary.xml":
             selected.add(name)
-    if primary_body:
-        text = primary_body.decode("utf-8-sig", errors="ignore")
-        references = re.findall(
-            r"(?:href|xlink:href|src)\s*=\s*['\"]([^'\"]+)['\"]",
-            text,
-            flags=re.IGNORECASE,
-        )
-        for reference in references:
-            clean = reference.split("#", 1)[0].split("?", 1)[0].strip()
-            if not clean:
-                continue
-            try:
-                canonical_reference = normalize_archive_relative_name(clean)
-            except SecError:
-                continue
-            item = items_by_name.get(canonical_reference)
-            if item is not None and _is_semantic_xbrl_reference(item):
+    semantic_sources: list[tuple[bytes, bool]] = []
+    if primary_body is not None:
+        semantic_sources.append((primary_body, True))
+    for name, (role, body) in sorted(
+        (accepted_member_bodies or {}).items(),
+        key=lambda row: row[0].casefold(),
+    ):
+        if role in _XBRL_MEMBER_ROLES:
+            semantic_sources.append((body, False))
+    for body, primary_html in semantic_sources:
+        for reference in _extract_semantic_xbrl_references(body, primary_html=primary_html):
+            canonical_reference = _canonical_semantic_reference(reference)
+            if canonical_reference is not None and canonical_reference in items_by_name:
                 selected.add(canonical_reference)
     return sorted(selected, key=str.casefold)
 
