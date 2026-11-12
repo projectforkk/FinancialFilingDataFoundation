@@ -10,6 +10,7 @@ from typing import Any
 
 from .errors import P11Reason, SecError
 from .compatibility import sec_artifact_compatibility
+from .discovery import verify_sec_discovery_observation
 from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, verify_sec_evidence
 
 
@@ -174,26 +175,46 @@ def validate_sec_artifacts(
     discovery_checked_at = getattr(observation, "retrieved_at", None) or parsed.discovery_checked_at
     selected_accession = getattr(observation, "selected_accession", None) or parsed.selected_accession
     discovery_state = getattr(observation, "state", None) or parsed.discovery_state
-    if observation is not None:
-        if str(discovery_state or "").upper() != "UNAMBIGUOUS":
-            issues.append(
-                _issue(
-                    P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN.value,
-                    "REVIEW",
-                    "SEC discovery observation is not an unambiguous active binding",
-                    discovery_state=discovery_state,
-                )
+    if observation is None:
+        issues.append(
+            _issue(
+                P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN.value,
+                "BLOCKING",
+                "SEC P7 validation requires an exact discovery observation",
             )
-        if package is not None and selected_accession and str(selected_accession) != str(package.accession):
-            issues.append(
-                _issue(
-                    P11Reason.P11_PROVENANCE_MISMATCH.value,
-                    "BLOCKING",
-                    "SEC discovery selected accession differs from package accession",
-                    selected_accession=selected_accession,
-                    package_accession=package.accession,
+        )
+    else:
+        registry_row = None
+        if registry is not None:
+            try:
+                registry_row = registry.get_sec_discovery_observation(
+                    str(getattr(observation, "observation_sha256", ""))
                 )
+            except Exception as exc:
+                issues.append(
+                    _issue(
+                        P11Reason.P11_PROVENANCE_MISMATCH.value,
+                        "BLOCKING",
+                        f"SEC discovery observation Registry lookup failed: {exc}",
+                    )
+                )
+            if registry_row is None:
+                issues.append(
+                    _issue(
+                        P11Reason.P11_PROVENANCE_MISMATCH.value,
+                        "BLOCKING",
+                        "SEC discovery observation is not present in the Registry",
+                    )
+                )
+        try:
+            verify_sec_discovery_observation(
+                observation,
+                package=package,
+                registry_row=registry_row,
             )
+        except SecError as exc:
+            issues.append(_issue(exc.reason_code, "BLOCKING", str(exc)))
+
 
     expected_pages = list(range(1, len(parsed.pages) + 1))
     actual_pages = [int(row.get("page_no", -1)) for row in parsed.pages]

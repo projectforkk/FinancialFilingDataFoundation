@@ -14,6 +14,8 @@ from financial_filing_data_foundation.us_sec.package import (
     SecPackageStore,
     build_package,
 )
+from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation
+from financial_filing_data_foundation.us_sec.models import SecCompanyRef, SecFilingCandidate, SecIssuerKind
 from financial_filing_data_foundation.us_sec.parser import parse_sec_package
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
@@ -73,10 +75,61 @@ def _empty_periodic_package() -> object:
     )
 
 
+def _observation(package: object) -> SecDiscoveryObservation:
+    candidate = SecFilingCandidate(
+        cik=package.cik,
+        ticker="AAPL",
+        accession=package.accession,
+        normalized_accession=package.accession.replace("-", ""),
+        form=package.form,
+        filing_date="2025-07-30",
+        report_period="2025-06-30",
+        primary_document=package.primary_document,
+        source_url=archive_member_url(package.cik, package.accession, package.primary_document),
+        amended=False,
+        issuer_kind=SecIssuerKind.DOMESTIC,
+    )
+    return SecDiscoveryObservation.create(
+        company=SecCompanyRef(
+            cik=package.cik,
+            ticker="AAPL",
+            company_id=f"US:CIK{package.cik}",
+            issuer_kind=SecIssuerKind.DOMESTIC,
+        ),
+        fiscal_year=package.fiscal_year,
+        period=package.period,
+        source_documents=[
+            {
+                "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+                "body": b'{"cik":"320193"}',
+            }
+        ],
+        candidates=(candidate,),
+        selected_accession=package.accession,
+        state="UNAMBIGUOUS",
+        retrieved_at="2026-11-12T00:00:00+00:00",
+    )
+
+
+def _parse_and_validate(package: object, tmp_path: Path):
+    observation = _observation(package)
+    registry = SQLiteRegistry(tmp_path / "workspace" / "ingest" / "registry.sqlite")
+    registry.register_sec_package(package)
+    registry.register_sec_discovery_observation(observation)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    validation = validate_sec_artifacts(
+        parsed,
+        tmp_path / "p7",
+        package=package,
+        discovery_observation=observation,
+        registry=registry,
+    )
+    return observation, parsed, validation, registry
+
+
 def test_sec_p7_validation_is_source_aware_and_writes_report(tmp_path: Path) -> None:
     package = _package()
-    parsed = parse_sec_package(package, tmp_path / "p11")
-    validation = validate_sec_artifacts(parsed, tmp_path / "p7", package=package)
+    _observation_value, parsed, validation, _registry = _parse_and_validate(package, tmp_path)
     assert validation.validation_status == "PASS"
     assert validation.blocking_issue_count == 0
     assert validation.reuse_eligible is True
@@ -86,11 +139,8 @@ def test_sec_p7_validation_is_source_aware_and_writes_report(tmp_path: Path) -> 
 def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
     package = _package()
-    parsed = parse_sec_package(package, tmp_path / "p11")
-    validation = validate_sec_artifacts(parsed, tmp_path / "p7", package=package)
+    observation, parsed, validation, registry = _parse_and_validate(package, tmp_path)
     SecPackageStore(tmp_path / "workspace" / "ingest" / "raw-store").put(package)
-    registry = SQLiteRegistry(tmp_path / "workspace" / "ingest" / "registry.sqlite")
-    registry.register_sec_package(package)
     catalog_path = tmp_path / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_path.parent.mkdir(parents=True)
     catalog_path.write_text(
@@ -104,6 +154,14 @@ def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPa
                         "source_kind": "SEC",
                         "market": "US",
                         "ticker": "CIK0000320193",
+                        "company_id": f"US:CIK{package.cik}",
+                        "provider_company_id": package.cik,
+                        "cik": package.cik,
+                        "discovery_observation_sha256": observation.observation_sha256,
+                        "discovery_checked_at": observation.retrieved_at,
+                        "selected_accession": observation.selected_accession,
+                        "discovery_state": observation.state,
+                        "fact_source_mode": parsed.fact_source_mode,
                         "fiscal_year": 2025,
                         "filing_type": "Q2",
                         "raw_fiscal_period": "Q2",
@@ -139,7 +197,14 @@ def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPa
 
 def test_sec_ingest_publishes_only_nonblocking_package(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
-    result = ingest_sec_package(_package(), root=tmp_path, ticker="AAPL", period="Q2")
+    package = _package()
+    result = ingest_sec_package(
+        package,
+        root=tmp_path,
+        ticker="AAPL",
+        period="Q2",
+        discovery_observation=_observation(package),
+    )
     assert result.research_ready is True
     assert result.catalog_status == "ADDED"
     assert result.catalog_path.is_file()
@@ -151,13 +216,18 @@ def test_periodic_zero_facts_is_review_required_and_not_research_ready(
 ) -> None:
     monkeypatch.setenv("FFDF_P11_US_DEV", "1")
     package = _empty_periodic_package()
-    parsed = parse_sec_package(package, tmp_path / "p11")
-    validation = validate_sec_artifacts(parsed, tmp_path / "p7", package=package)
+    observation, parsed, validation, _registry = _parse_and_validate(package, tmp_path)
 
     assert not parsed.facts
     assert validation.validation_status == "REVIEW_REQUIRED"
     assert any(issue["code"] == "P11_STRUCTURED_FACTS_MISSING" for issue in validation.issues)
-    result = ingest_sec_package(package, root=tmp_path, ticker="AAPL", period="Q2")
+    result = ingest_sec_package(
+        package,
+        root=tmp_path,
+        ticker="AAPL",
+        period="Q2",
+        discovery_observation=observation,
+    )
     assert result.research_ready is False
     assert result.catalog_status != "ADDED"
     assert validation.compatibility_status == "COMPATIBLE"
@@ -183,12 +253,9 @@ def test_p8_revalidates_raw_sec_package_before_serving(
 ) -> None:
     monkeypatch.setenv("FFDF_P11_US_DEV", "1")
     package = _package()
-    parsed = parse_sec_package(package, tmp_path / "p11")
-    validation = validate_sec_artifacts(parsed, tmp_path / "p7", package=package)
+    observation, parsed, validation, registry = _parse_and_validate(package, tmp_path)
     store = SecPackageStore(tmp_path / "workspace" / "ingest" / "raw-store")
     package_dir = store.put(package)
-    registry = SQLiteRegistry(tmp_path / "workspace" / "ingest" / "registry.sqlite")
-    registry.register_sec_package(package)
     catalog_path = tmp_path / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_path.parent.mkdir(parents=True)
     catalog_path.write_text(
@@ -202,6 +269,14 @@ def test_p8_revalidates_raw_sec_package_before_serving(
                         "source_kind": "SEC",
                         "market": "US",
                         "ticker": "AAPL",
+                        "company_id": f"US:CIK{package.cik}",
+                        "provider_company_id": package.cik,
+                        "cik": package.cik,
+                        "discovery_observation_sha256": observation.observation_sha256,
+                        "discovery_checked_at": observation.retrieved_at,
+                        "selected_accession": observation.selected_accession,
+                        "discovery_state": observation.state,
+                        "fact_source_mode": parsed.fact_source_mode,
                         "fiscal_year": 2025,
                         "filing_type": "Q2",
                         "raw_fiscal_period": "Q2",

@@ -59,6 +59,28 @@ def _package(html: bytes, *, extra: tuple[SecPackageMember, ...] = (), accession
     )
 
 
+def _observation(package) -> SecDiscoveryObservation:
+    return SecDiscoveryObservation.create(
+        company=SecCompanyRef(
+            cik=package.cik,
+            ticker="AAPL",
+            company_id=f"US:CIK{package.cik}",
+        ),
+        fiscal_year=package.fiscal_year,
+        period=package.period,
+        source_documents=[
+            {
+                "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+                "body": b'{"cik":"320193"}',
+            }
+        ],
+        candidates=(),
+        selected_accession=package.accession,
+        state="UNAMBIGUOUS",
+        retrieved_at="2026-11-12T00:00:00+00:00",
+    )
+
+
 def _inline_html(*, continuation: str = "", extra: str = "") -> bytes:
     return (
         "<html><body><ix:header>"
@@ -174,13 +196,19 @@ def test_continuation_chain_exclude_and_fragment_evidence_round_trip(tmp_path: P
         extra="<ix:continuation id='c1' continuedAt='c2'>20</ix:continuation><ix:continuation id='c2'>30<ix:exclude>ignored</ix:exclude></ix:continuation>",
     )
     package = _package(html)
-    parsed = parse_sec_package(package, tmp_path / "p11")
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
     assert parsed.facts[0]["raw_value"] == "10 20 30"
     fragments = parsed.evidence[0]["source_fragments"]
     assert len(fragments) == 3
     assert "ignored" not in parsed.facts[0]["raw_value"]
     verify_sec_evidence(package, parsed.pages, parsed.evidence[0])
-    assert validate_sec_artifacts(parsed, tmp_path / "p7", package=package).validation_status == "PASS"
+    assert validate_sec_artifacts(
+        parsed,
+        tmp_path / "p7",
+        package=package,
+        discovery_observation=observation,
+    ).validation_status == "PASS"
 
 
 @pytest.mark.parametrize(

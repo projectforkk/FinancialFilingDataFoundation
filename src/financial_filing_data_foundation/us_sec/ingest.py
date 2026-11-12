@@ -31,6 +31,27 @@ class SecIngestResult:
     catalog_path: Path
 
 
+def _research_ready(
+    validation: SecValidationResult,
+    package: SecFilingPackage,
+    *,
+    amendment_conflict: bool,
+    discovery_observation: SecDiscoveryObservation | None,
+) -> bool:
+    return bool(
+        discovery_observation is not None
+        and str(discovery_observation.state).upper() == "UNAMBIGUOUS"
+        and str(discovery_observation.selected_accession or "") == str(package.accession)
+        and validation.validation_status == "PASS"
+        and validation.compatibility_status == "COMPATIBLE"
+        and validation.reuse_eligible
+        and validation.blocking_issue_count == 0
+        and not amendment_conflict
+        and validation.discovery_observation_sha256 == discovery_observation.observation_sha256
+        and validation.selected_accession == package.accession
+    )
+
+
 def _relative(root: Path, path: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
 
@@ -172,7 +193,11 @@ def ingest_sec_package(
         discovery_observation=discovery_observation,
         registry=registry,
     )
-    binding_status = "REVIEW_REQUIRED" if amendment_conflict else "SOURCE_CONFIRMED"
+    binding_status = (
+        "SOURCE_CONFIRMED"
+        if not amendment_conflict and discovery_observation is not None and validation.validation_status == "PASS"
+        else "REVIEW_REQUIRED"
+    )
     register_sec_slot(registry, package, fiscal_year=package.fiscal_year, period=period, artifact_path=str(parsed.artifact_dir), binding_status=binding_status)
     parse_run_id = hashlib.sha256(f"{package.package_sha256}|{parsed.parser_version}".encode()).hexdigest()
     register_sec_parsed_run(
@@ -189,10 +214,11 @@ def ingest_sec_package(
         blocking_issue_count=validation.blocking_issue_count,
         artifact_path=str(parsed.artifact_dir),
     )
-    ready = (
-        validation.validation_status == "PASS"
-        and not amendment_conflict
-        and (discovery_observation is None or discovery_observation.state == "UNAMBIGUOUS")
+    ready = _research_ready(
+        validation,
+        package,
+        amendment_conflict=amendment_conflict,
+        discovery_observation=discovery_observation,
     )
     catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_status = _upsert_catalog(root=project_root, package=package, ticker=ticker, parsed=parsed, validation=validation, catalog_path=catalog_path, period=period, publish=ready, company_id=company_id, ticker_source_url=ticker_source_url, ticker_source_sha256=ticker_source_sha256, ticker_retrieved_at=ticker_retrieved_at, discovery_observation=discovery_observation)
@@ -227,12 +253,7 @@ def reuse_sec_package(
     if discovery_observation is not None:
         registry.register_sec_discovery_observation(discovery_observation)
     register_sec_package(registry, package)
-    if discovery_observation is not None and (
-        validation.discovery_observation_sha256 != discovery_observation.observation_sha256
-        or validation.discovery_checked_at != discovery_observation.retrieved_at
-        or validation.selected_accession != discovery_observation.selected_accession
-        or validation.discovery_state != discovery_observation.state
-    ):
+    if discovery_observation is not None:
         # A fresh online discovery is a new P7 binding even when the raw
         # package and parsed files are reusable.  Refresh only validation
         # metadata/evidence; never rerun the parser or mutate the raw package.
@@ -243,7 +264,11 @@ def reuse_sec_package(
             discovery_observation=discovery_observation,
             registry=registry,
         )
-    binding_status = "REVIEW_REQUIRED" if amendment_conflict else "SOURCE_CONFIRMED"
+    binding_status = (
+        "SOURCE_CONFIRMED"
+        if not amendment_conflict and discovery_observation is not None and validation.validation_status == "PASS"
+        else "REVIEW_REQUIRED"
+    )
     register_sec_slot(
         registry,
         package,
@@ -252,12 +277,11 @@ def reuse_sec_package(
         artifact_path=str(parsed.artifact_dir),
         binding_status=binding_status,
     )
-    ready = (
-        validation.validation_status == "PASS"
-        and validation.compatibility_status == "COMPATIBLE"
-        and validation.blocking_issue_count == 0
-        and not amendment_conflict
-        and (discovery_observation is None or discovery_observation.state == "UNAMBIGUOUS")
+    ready = _research_ready(
+        validation,
+        package,
+        amendment_conflict=amendment_conflict,
+        discovery_observation=discovery_observation,
     )
     catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
     catalog_status = _upsert_catalog(

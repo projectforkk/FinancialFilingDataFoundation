@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from datetime import date
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from .errors import P11Reason, SecError
 from .models import SecCompanyRef, SecFilingCandidate, SecIssuerKind
@@ -42,6 +42,31 @@ def candidate_to_record(candidate: SecFilingCandidate) -> dict[str, Any]:
         "amended": bool(candidate.amended),
         "issuer_kind": candidate.issuer_kind.value,
     }
+
+
+def _canonical_candidate_records(
+    candidates: Iterable[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    rows = [dict(candidate) for candidate in candidates]
+    rows.sort(
+        key=lambda item: (
+            str(item.get("accession") or ""),
+            str(item.get("form") or ""),
+            str(item.get("filing_date") or ""),
+            str(item.get("primary_document") or ""),
+        )
+    )
+    return tuple(rows)
+
+
+def _candidate_fingerprint(candidates: Iterable[Mapping[str, Any]]) -> str:
+    payload = json.dumps(
+        list(_canonical_candidate_records(candidates)),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return _sha256(payload)
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,17 +129,10 @@ class SecDiscoveryObservation:
                     "body_b64": body_b64,
                 }
             )
-        normalized_candidates = tuple(
-            candidate_to_record(candidate)
-            for candidate in sorted(
-                tuple(candidates),
-                key=lambda item: (item.accession, item.form, item.filing_date, item.primary_document),
-            )
+        normalized_candidates = _canonical_candidate_records(
+            candidate_to_record(candidate) for candidate in candidates
         )
-        candidate_bytes = json.dumps(
-            list(normalized_candidates), ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
-        candidate_fingerprint = _sha256(candidate_bytes)
+        candidate_fingerprint = _candidate_fingerprint(normalized_candidates)
         observed_at = retrieved_at or datetime.now(timezone.utc).isoformat()
         canonical = {
             "schema_version": SEC_DISCOVERY_SCHEMA,
@@ -161,7 +179,7 @@ class SecDiscoveryObservation:
                 {"url": item["url"], "sha256": item["sha256"]}
                 for item in sorted(self.source_documents, key=lambda item: (item["url"], item["sha256"]))
             ],
-            "candidates": list(self.candidates),
+            "candidates": list(_canonical_candidate_records(self.candidates)),
             "candidate_fingerprint": self.candidate_fingerprint,
             "selected_accession": self.selected_accession,
             "state": self.state,
@@ -176,6 +194,195 @@ class SecDiscoveryObservation:
             "source_documents": [dict(item) for item in self.source_documents],
             "artifact_path": self.artifact_path,
         }
+
+    @classmethod
+    def from_registry_row(cls, row: Mapping[str, Any]) -> "SecDiscoveryObservation":
+        try:
+            source_documents = json.loads(str(row["source_documents_json"]))
+            candidates = json.loads(str(row["candidates_json"]))
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                "SEC Registry discovery observation JSON is invalid",
+            ) from exc
+        if not isinstance(source_documents, list) or not isinstance(candidates, list):
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                "SEC Registry discovery observation payload is invalid",
+            )
+        return cls(
+            observation_sha256=str(row["observation_sha256"]).lower(),
+            company_id=str(row["company_id"]),
+            cik=str(row["cik"]),
+            fiscal_year=int(row["fiscal_year"]),
+            period=str(row["raw_fiscal_period"]).upper(),
+            retrieved_at=str(row["retrieved_at"]),
+            source_documents=tuple(source_documents),
+            candidates=tuple(candidates),
+            candidate_fingerprint=str(row["candidate_fingerprint"]),
+            selected_accession=(
+                str(row["selected_accession"])
+                if row["selected_accession"] is not None
+                else None
+            ),
+            state=str(row["state"]).upper(),
+            artifact_path=(
+                str(row["artifact_path"])
+                if row["artifact_path"] is not None
+                else None
+            ),
+        )
+
+
+def verify_sec_discovery_observation(
+    observation: SecDiscoveryObservation,
+    *,
+    package: Any | None = None,
+    registry_row: Mapping[str, Any] | None = None,
+    expected_company_id: str | None = None,
+    expected_cik: str | None = None,
+    expected_fiscal_year: int | None = None,
+    expected_period: str | None = None,
+    expected_accession: str | None = None,
+    expected_observation_sha256: str | None = None,
+) -> None:
+    """Verify the persisted SEC discovery observation trust boundary.
+
+    This check intentionally re-hashes the observation and its persisted source
+    bytes.  A recorded SHA or Registry row is not accepted as proof by itself.
+    """
+
+    if not isinstance(observation, SecDiscoveryObservation):
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery observation has an unsupported type",
+        )
+
+    if package is not None:
+        expected_cik = expected_cik or str(package.cik)
+        expected_company_id = expected_company_id or f"US:CIK{package.cik}"
+        expected_fiscal_year = expected_fiscal_year or int(package.fiscal_year)
+        expected_period = expected_period or str(package.period)
+        expected_accession = expected_accession or str(package.accession)
+
+    if not re.fullmatch(r"\d{10}", str(observation.cik)):
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation CIK is invalid")
+    if not re.fullmatch(r"US:CIK\d{10}", str(observation.company_id)):
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation company_id is not stable CIK identity")
+    if str(observation.company_id) != f"US:CIK{observation.cik}":
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation company_id/CIK mismatch")
+    if expected_cik is not None and str(observation.cik) != str(expected_cik).zfill(10):
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation CIK differs from expected slot")
+    if expected_company_id is not None and str(observation.company_id) != str(expected_company_id):
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation company_id differs from expected slot")
+    if expected_fiscal_year is not None and int(observation.fiscal_year) != int(expected_fiscal_year):
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation fiscal_year differs from expected slot")
+    if expected_period is not None and str(observation.period).upper() != str(expected_period).upper():
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation period differs from expected slot")
+
+    if str(observation.state).upper() != "UNAMBIGUOUS":
+        raise SecError(
+            P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN,
+            "SEC discovery observation is not UNAMBIGUOUS",
+        )
+    if not observation.selected_accession:
+        raise SecError(
+            P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN,
+            "SEC discovery observation has no selected accession",
+        )
+    if expected_accession is not None and str(observation.selected_accession) != str(expected_accession):
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery selected accession differs from package")
+
+    for source in observation.source_documents:
+        if not isinstance(source, Mapping):
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery source document is invalid")
+        source_sha256 = str(source.get("sha256") or source.get("source_sha256") or "").lower()
+        body_b64 = source.get("body_b64")
+        if not source_sha256 or not isinstance(body_b64, str) or not body_b64:
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                "SEC discovery source bytes are not persisted",
+            )
+        try:
+            body = base64.b64decode(body_b64, validate=True)
+        except (ValueError, TypeError) as exc:
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                "SEC discovery source bytes are invalid base64",
+            ) from exc
+        if _sha256(body) != source_sha256:
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                "SEC discovery source bytes do not match recorded SHA256",
+            )
+
+    computed_fingerprint = _candidate_fingerprint(observation.candidates)
+    if computed_fingerprint != str(observation.candidate_fingerprint).lower():
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery candidate fingerprint mismatch",
+        )
+    computed_observation_sha256 = _sha256(
+        json.dumps(
+            observation.canonical_payload(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    if computed_observation_sha256 != str(observation.observation_sha256).lower():
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery observation canonical SHA256 mismatch",
+        )
+    if expected_observation_sha256 is not None and str(observation.observation_sha256).lower() != str(expected_observation_sha256).lower():
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery observation SHA256 differs from expected binding",
+        )
+
+    if registry_row is not None:
+        try:
+            registry_sources = json.loads(str(registry_row["source_documents_json"]))
+            registry_candidates = json.loads(str(registry_row["candidates_json"]))
+            registry_values = (
+                str(registry_row["observation_sha256"]).lower(),
+                str(registry_row["company_id"]),
+                str(registry_row["cik"]),
+                int(registry_row["fiscal_year"]),
+                str(registry_row["raw_fiscal_period"]).upper(),
+                str(registry_row["retrieved_at"]),
+                json.dumps(registry_sources, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                json.dumps(registry_candidates, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                str(registry_row["candidate_fingerprint"]),
+                registry_row["selected_accession"],
+                str(registry_row["state"]).upper(),
+                registry_row["artifact_path"],
+            )
+            observation_values = (
+                str(observation.observation_sha256).lower(),
+                str(observation.company_id),
+                str(observation.cik),
+                int(observation.fiscal_year),
+                str(observation.period).upper(),
+                str(observation.retrieved_at),
+                json.dumps(list(observation.source_documents), ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                json.dumps(list(observation.candidates), ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                str(observation.candidate_fingerprint),
+                observation.selected_accession,
+                str(observation.state).upper(),
+                observation.artifact_path,
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                "SEC Registry discovery observation is invalid",
+            ) from exc
+        if registry_values != observation_values:
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                "SEC Registry discovery observation differs from supplied observation",
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -537,4 +744,5 @@ __all__ = [
     "discover_filings",
     "parse_submissions",
     "select_filing",
+    "verify_sec_discovery_observation",
 ]

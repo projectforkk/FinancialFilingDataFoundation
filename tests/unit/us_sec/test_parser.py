@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 
 from financial_filing_data_foundation.us_sec.errors import P11Reason
+from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation
+from financial_filing_data_foundation.us_sec.models import SecCompanyRef
 from financial_filing_data_foundation.us_sec.package import (
     SecMemberRole,
     SecPackageMember,
@@ -22,6 +24,28 @@ from financial_filing_data_foundation.us_sec.path_policy import archive_member_u
 
 def _sec_url(cik: str, accession: str, name: str) -> str:
     return archive_member_url(cik, accession, name)
+
+
+def _observation(package: object) -> SecDiscoveryObservation:
+    return SecDiscoveryObservation.create(
+        company=SecCompanyRef(
+            cik=package.cik,
+            ticker="AAPL",
+            company_id=f"US:CIK{package.cik}",
+        ),
+        fiscal_year=package.fiscal_year,
+        period=package.period,
+        source_documents=[
+            {
+                "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+                "body": b'{"cik":"320193"}',
+            }
+        ],
+        candidates=(),
+        selected_accession=package.accession,
+        state="UNAMBIGUOUS",
+        retrieved_at="2026-11-12T00:00:00+00:00",
+    )
 
 
 def _package() -> object:
@@ -127,7 +151,8 @@ def _hidden_fact_package() -> object:
 
 def test_hidden_inline_numeric_and_nonnumeric_facts_are_valid_source_evidence(tmp_path: Path) -> None:
     package = _hidden_fact_package()
-    result = parse_sec_package(package, tmp_path / "p11")
+    observation = _observation(package)
+    result = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
 
     hidden = [fact for fact in result.facts if fact["hidden"]]
     assert {fact["raw_qname"] for fact in hidden} == {"us-gaap:Revenues", "ex:Note"}
@@ -140,7 +165,12 @@ def test_hidden_inline_numeric_and_nonnumeric_facts_are_valid_source_evidence(tm
     assert all(row["block_id"] is None for row in hidden_evidence)
     assert all(row["block_dom_locator"] is None for row in hidden_evidence)
 
-    validation = validate_sec_artifacts(result, tmp_path / "p7", package=package)
+    validation = validate_sec_artifacts(
+        result,
+        tmp_path / "p7",
+        package=package,
+        discovery_observation=observation,
+    )
     assert validation.validation_status == "PASS"
     assert validation.blocking_issue_count == 0
 
@@ -427,7 +457,8 @@ def _xml_package() -> object:
 
 def test_xml_instance_facts_preserve_source_qname_and_locator(tmp_path: Path) -> None:
     package = _xml_package()
-    result = parse_sec_package(package, tmp_path / "p11")
+    observation = _observation(package)
+    result = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
 
     assert {fact["raw_qname"] for fact in result.facts} == {"us-gaap:Revenues", "ex:Comment"}
     numeric = next(fact for fact in result.facts if fact["raw_qname"] == "us-gaap:Revenues")
@@ -437,7 +468,12 @@ def test_xml_instance_facts_preserve_source_qname_and_locator(tmp_path: Path) ->
     assert evidence["xml_locator"].startswith("/")
     assert evidence["member_sha256"] != package.members[0].member_sha256
 
-    validation = validate_sec_artifacts(result, tmp_path / "p7", package=package)
+    validation = validate_sec_artifacts(
+        result,
+        tmp_path / "p7",
+        package=package,
+        discovery_observation=observation,
+    )
     assert validation.validation_status == "PASS"
 
 

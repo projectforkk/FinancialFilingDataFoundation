@@ -8,6 +8,8 @@ from typing import Any, Iterable
 
 CATALOG_SCHEMA_VERSION = "p8-mcp-catalog-v1"
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+_SEC_CIK_RE = re.compile(r"^\d{10}$")
+_SEC_COMPANY_ID_RE = re.compile(r"^US:CIK\d{10}$")
 
 
 class CatalogError(RuntimeError):
@@ -297,16 +299,41 @@ def _parse_document(
                 "P8_CATALOG_INVALID",
                 f"documents[{index}].raw_fiscal_period is invalid",
             )
-        company_id = str(raw.get("company_id") or "").strip()
-        cik = str(raw.get("cik") or "").strip()
-        if not company_id and cik.isdigit():
-            company_id = f"US:CIK{cik.zfill(10)}"
-        if not company_id and ticker.upper().startswith("CIK"):
-            company_id = f"US:{ticker.upper()}"
-        if not company_id:
-            # Accept legacy development fixtures created before the stable
-            # CIK catalog field was introduced. New ingest writes company_id.
-            company_id = f"US:{ticker.upper()}"
+        company_id = _required_text(raw, "company_id", index)
+        cik = _required_text(raw, "cik", index)
+        if not _SEC_CIK_RE.fullmatch(cik):
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}].cik must be a zero-padded 10-digit CIK",
+            )
+        if not _SEC_COMPANY_ID_RE.fullmatch(company_id) or company_id != f"US:CIK{cik}":
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}].company_id must equal US:CIK{cik}",
+            )
+        provider_company_id = _required_text(raw, "provider_company_id", index)
+        if provider_company_id != cik:
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}].provider_company_id must equal cik",
+            )
+        discovery_observation_sha256 = normalize_sha256(
+            _required_text(raw, "discovery_observation_sha256", index)
+        )
+        discovery_checked_at = _required_text(raw, "discovery_checked_at", index)
+        selected_accession = _required_text(raw, "selected_accession", index)
+        discovery_state = _required_text(raw, "discovery_state", index).upper()
+        if discovery_state != "UNAMBIGUOUS":
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}].discovery_state must be UNAMBIGUOUS",
+            )
+        fact_source_mode = _required_text(raw, "fact_source_mode", index)
+        if fact_source_mode not in {"INLINE_XBRL_PRIMARY", "XBRL_INSTANCE_PRIMARY"}:
+            raise CatalogError(
+                "P8_CATALOG_INVALID",
+                f"documents[{index}].fact_source_mode is invalid",
+            )
         return CatalogDocument(
             document_sha256=document_sha256,
             market=market,
@@ -318,15 +345,15 @@ def _parse_document(
             sec_artifact_dir=_artifact_path(root, raw, "sec_artifact_dir", index),
             raw_fiscal_period=raw_period,
             company_id=company_id,
-            provider_company_id=str(raw.get("provider_company_id") or "").strip() or None,
+            provider_company_id=provider_company_id,
             ticker_source_url=str(raw.get("ticker_source_url") or "").strip() or None,
             ticker_source_sha256=str(raw.get("ticker_source_sha256") or "").strip() or None,
             ticker_retrieved_at=str(raw.get("ticker_retrieved_at") or "").strip() or None,
-            discovery_observation_sha256=str(raw.get("discovery_observation_sha256") or "").strip() or None,
-            discovery_checked_at=str(raw.get("discovery_checked_at") or "").strip() or None,
-            selected_accession=str(raw.get("selected_accession") or "").strip() or None,
-            discovery_state=str(raw.get("discovery_state") or "").strip() or None,
-            fact_source_mode=str(raw.get("fact_source_mode") or "").strip() or None,
+            discovery_observation_sha256=discovery_observation_sha256,
+            discovery_checked_at=discovery_checked_at,
+            selected_accession=selected_accession,
+            discovery_state=discovery_state,
+            fact_source_mode=fact_source_mode,
         )
 
     return CatalogDocument(

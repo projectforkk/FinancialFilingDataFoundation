@@ -881,6 +881,19 @@ class SQLiteRegistry:
             )
             conn.commit()
 
+    def get_sec_discovery_observation(
+        self,
+        observation_sha256: str,
+    ) -> sqlite3.Row | None:
+        """Return one immutable SEC discovery observation by its exact SHA."""
+
+        normalized = str(observation_sha256).strip().lower()
+        with self._connect() as conn:
+            return conn.execute(
+                "SELECT * FROM sec_discovery_observations WHERE observation_sha256 = ?",
+                (normalized,),
+            ).fetchone()
+
     def list_sec_discovery_observations(
         self,
         *,

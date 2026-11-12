@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
+from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation
+from financial_filing_data_foundation.us_sec.models import SecCompanyRef
 from financial_filing_data_foundation.us_sec.runtime import (
     SecRuntimeDescriptor,
     SecSubprocessTransport,
@@ -25,6 +27,28 @@ from financial_filing_data_foundation.user_cli import _parser
 
 def _sec_url(cik: str, accession: str, name: str) -> str:
     return archive_member_url(cik, accession, name)
+
+
+def _observation(package: object) -> SecDiscoveryObservation:
+    return SecDiscoveryObservation.create(
+        company=SecCompanyRef(
+            cik=package.cik,
+            ticker="AAPL",
+            company_id=f"US:CIK{package.cik}",
+        ),
+        fiscal_year=package.fiscal_year,
+        period=package.period,
+        source_documents=[
+            {
+                "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+                "body": b'{"cik":"320193"}',
+            }
+        ],
+        candidates=(),
+        selected_accession=package.accession,
+        state="UNAMBIGUOUS",
+        retrieved_at="2026-11-12T00:00:00+00:00",
+    )
 
 
 def test_runtime_uses_explicit_argv_without_shell_or_arbitrary_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -197,6 +221,8 @@ def test_us_cli_planner_uses_current_local_package_and_parsed_data(monkeypatch: 
     registry = SQLiteRegistry(paths.registry)
     register_sec_package(registry, package)
     register_sec_slot(registry, package, fiscal_year=2025, period="FY")
+    observation = _observation(package)
+    registry.register_sec_discovery_observation(observation)
     args = _parser().parse_args(["acquire", "--market", "US", "--cik", "320193", "--year", "2025", "--period", "FY"])
     company = sec_company(cik="320193", ticker=None)
     plan, local_package = _us_plan_slot(
@@ -210,8 +236,14 @@ def test_us_cli_planner_uses_current_local_package_and_parsed_data(monkeypatch: 
     assert company.company_id == "US:CIK0000320193"
     assert plan.action.value == "PARSE_LOCAL"
     assert local_package.package_sha256 == package.package_sha256
-    parsed = parse_sec_package(package, paths.ingest_root / "us" / "p11")
-    validation = validate_sec_artifacts(parsed, paths.ingest_root / "us" / "p7", package=package)
+    parsed = parse_sec_package(package, paths.ingest_root / "us" / "p11", discovery_observation=observation)
+    validation = validate_sec_artifacts(
+        parsed,
+        paths.ingest_root / "us" / "p7",
+        package=package,
+        discovery_observation=observation,
+        registry=registry,
+    )
     assert validation.validation_status == "PASS"
     registry.register_sec_parsed_data(parse_run_id="run1", package_sha256=package.package_sha256, company_id=company.company_id, fiscal_year=2025, period="FY", parser_version="VIRTUAL_HTML_V3", schema_version=SEC_ARTIFACT_SCHEMA, validation_status="PASS", blocking_issue_count=0, compatibility_status="COMPATIBLE", artifact_path=str(parsed.artifact_dir))
     plan, _ = _us_plan_slot(company, args, paths, registry)
@@ -320,7 +352,13 @@ def test_us_cli_reuse_data_refreshes_discovery_without_reparsing_or_redownloadin
             ),
         ),
     )
-    initial = ingest_sec_package(package, root=tmp_path, ticker="AAPL", period="FY")
+    initial = ingest_sec_package(
+        package,
+        root=tmp_path,
+        ticker="AAPL",
+        period="FY",
+        discovery_observation=_observation(package),
+    )
     assert initial.research_ready is True
     paths = _runtime_paths(tmp_path)
     before = tuple(sorted(path.name for path in (paths.ingest_root / "us" / "p11").iterdir()))
@@ -416,6 +454,8 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
     registry = SQLiteRegistry(paths.registry)
     register_sec_package(registry, package)
     register_sec_slot(registry, package, fiscal_year=2025, period="FY")
+    observation = _observation(package)
+    registry.register_sec_discovery_observation(observation)
     old_dir = paths.ingest_root / "us" / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V3"
     old_dir.mkdir(parents=True)
     old_manifest = old_dir / "manifest.json"
@@ -449,8 +489,14 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
         discovery_state="UNAMBIGUOUS",
     )[0].action.value == "PARSE_LOCAL"
 
-    parsed = parse_sec_package(package, paths.ingest_root / "us" / "p11")
-    validation = validate_sec_artifacts(parsed, paths.ingest_root / "us" / "p7", package=package)
+    parsed = parse_sec_package(package, paths.ingest_root / "us" / "p11", discovery_observation=observation)
+    validation = validate_sec_artifacts(
+        parsed,
+        paths.ingest_root / "us" / "p7",
+        package=package,
+        discovery_observation=observation,
+        registry=registry,
+    )
     registry.register_sec_parsed_data(
         parse_run_id="current-v5",
         package_sha256=package.package_sha256,

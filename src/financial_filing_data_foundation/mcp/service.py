@@ -15,6 +15,10 @@ from financial_filing_data_foundation.tables import load_reconstructed_tables
 from financial_filing_data_foundation.validation import load_validation_result
 from financial_filing_data_foundation.us_sec.parser import load_sec_artifacts
 from financial_filing_data_foundation.us_sec.parser import verify_sec_evidence
+from financial_filing_data_foundation.us_sec.discovery import (
+    SecDiscoveryObservation,
+    verify_sec_discovery_observation,
+)
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
 from financial_filing_data_foundation.us_sec.validation import load_sec_validation
 from financial_filing_data_foundation.registry import SQLiteRegistry
@@ -852,11 +856,56 @@ def _verify_sec_source_chain(
             if member_sha not in member_hashes:
                 raise ValueError("SEC evidence member hash is not present in verified raw package")
             verify_sec_evidence(package, pages, row, source_cache=source_cache)
+        _verify_sec_discovery_chain(document, project_root, package)
         return package
     except Exception as exc:
         raise McpServiceError(
             "P8_UPSTREAM_ARTIFACT_INVALID",
             f"SEC raw package/source evidence verification failed for {document.document_sha256}: {exc}",
+        ) from exc
+
+
+def _verify_sec_discovery_chain(
+    document: CatalogDocument,
+    project_root: Path | None,
+    package: Any,
+) -> None:
+    if project_root is None:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog entry has no project root for Registry verification",
+        )
+    try:
+        registry = SQLiteRegistry(project_root / "workspace" / "ingest" / "registry.sqlite")
+        registry_row = registry.get_sec_discovery_observation(
+            str(document.discovery_observation_sha256)
+        )
+        if registry_row is None:
+            raise ValueError("SEC discovery observation is missing from Registry")
+        observation = SecDiscoveryObservation.from_registry_row(registry_row)
+        verify_sec_discovery_observation(
+            observation,
+            package=package,
+            registry_row=registry_row,
+            expected_company_id=document.company_id,
+            expected_fiscal_year=document.fiscal_year,
+            expected_period=document.raw_fiscal_period,
+            expected_observation_sha256=document.discovery_observation_sha256,
+        )
+        if document.discovery_checked_at != observation.retrieved_at:
+            raise ValueError("SEC catalog discovery_checked_at differs from Registry observation")
+        if document.selected_accession != observation.selected_accession:
+            raise ValueError("SEC catalog selected_accession differs from Registry observation")
+        if document.discovery_state != observation.state:
+            raise ValueError("SEC catalog discovery_state differs from Registry observation")
+        if document.company_id != f"US:CIK{package.cik}" or document.provider_company_id != package.cik:
+            raise ValueError("SEC catalog stable CIK identity differs from raw package")
+    except McpServiceError:
+        raise
+    except Exception as exc:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            f"SEC discovery observation verification failed: {exc}",
         ) from exc
 
 
@@ -901,6 +950,30 @@ def _load_sec_bundle(document: CatalogDocument, project_root: Path | None = None
             "P8_UPSTREAM_ARTIFACT_INVALID",
             "SEC validation fact-source mode differs from parsed artifact",
         )
+    required_discovery_fields = (
+        document.discovery_observation_sha256,
+        document.discovery_checked_at,
+        document.selected_accession,
+        document.discovery_state,
+        document.fact_source_mode,
+        document.company_id,
+        document.provider_company_id,
+    )
+    if any(value is None or not str(value).strip() for value in required_discovery_fields):
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog entry is missing required discovery trust fields",
+        )
+    if document.discovery_state != "UNAMBIGUOUS":
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog discovery state is not UNAMBIGUOUS",
+        )
+    if validation.validation_status != "PASS" or validation.compatibility_status != "COMPATIBLE" or not validation.reuse_eligible or validation.blocking_issue_count != 0:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog points to a validation artifact that is not research-ready",
+        )
     discovery_fields = (
         ("discovery_observation_sha256", document.discovery_observation_sha256, validation.discovery_observation_sha256),
         ("discovery_checked_at", document.discovery_checked_at, validation.discovery_checked_at),
@@ -915,11 +988,6 @@ def _load_sec_bundle(document: CatalogDocument, project_root: Path | None = None
                 "P8_UPSTREAM_ARTIFACT_INVALID",
                 f"SEC catalog {field_name} differs from validation artifact",
             )
-    if validation.discovery_state is not None and validation.discovery_state != "UNAMBIGUOUS":
-        raise McpServiceError(
-            "P8_UPSTREAM_ARTIFACT_INVALID",
-            "SEC catalog points to a non-unambiguous discovery state",
-        )
     tables = tuple(parsed.tables)
     facts = tuple(parsed.facts)
     evidence = tuple(parsed.evidence)
