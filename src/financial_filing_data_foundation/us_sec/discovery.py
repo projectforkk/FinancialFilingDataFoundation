@@ -17,7 +17,7 @@ from .policy import SecFormPolicy
 
 
 _ACCESSION_RE = re.compile(r"^\d{10}-\d{2}-\d{6}$")
-SEC_DISCOVERY_SCHEMA = "p11-sec-discovery-v1"
+SEC_DISCOVERY_SCHEMA = "p11-sec-discovery-v2"
 SEC_MAX_HISTORY_CHUNKS = 256
 
 
@@ -392,22 +392,14 @@ def _reconstruct_discovery_candidates(
         source_url=expected_main_url,
         raw_sha256=_sha256(main_body),
     )
-    chunks = main_submissions.history_chunks
-    if len(chunks) > SEC_MAX_HISTORY_CHUNKS:
-        raise SecError(
-            P11Reason.P11_SEC_DISCOVERY_FAILED,
-            f"SEC submissions history file count exceeds bound {SEC_MAX_HISTORY_CHUNKS}",
-        )
-    expected_history_urls: list[str] = []
-    seen_history_names: set[str] = set()
-    for chunk in chunks:
-        if chunk.name in seen_history_names:
-            raise SecError(
-                P11Reason.P11_PROVENANCE_MISMATCH,
-                f"SEC submissions history file is duplicated: {chunk.name}",
-            )
-        seen_history_names.add(chunk.name)
-        expected_history_urls.append(f"https://data.sec.gov/submissions/{chunk.name}")
+    selected_history = select_history_chunks_for_slot(
+        main_submissions,
+        int(observation.fiscal_year),
+    )
+    expected_history_urls = [
+        f"https://data.sec.gov/submissions/{chunk.name}"
+        for chunk in selected_history
+    ]
     expected_urls = {expected_main_url, *expected_history_urls}
     if set(source_rows) != expected_urls:
         raise SecError(
@@ -643,6 +635,65 @@ class SecSubmissions:
         if self.history_ranges:
             return self.history_ranges
         return tuple(SecHistoryChunk(name) for name in self.history_files)
+
+
+def select_history_chunks_for_slot(
+    submissions: SecSubmissions,
+    fiscal_year: int,
+) -> tuple[SecHistoryChunk, ...]:
+    """Return the complete but minimal SEC history source set for one slot.
+
+    A periodic filing for fiscal year Y may have a report period in Y-1, while
+    amendments/conflicts can be filed arbitrarily later.  Therefore only
+    chunks whose filingTo proves they ended before Jan 1 of Y-1 are excluded.
+    Missing range metadata is conservatively included.
+    """
+
+    chunks = submissions.history_chunks
+    if not chunks:
+        return ()
+    if len(chunks) > SEC_MAX_HISTORY_CHUNKS:
+        raise SecError(
+            P11Reason.P11_SEC_DISCOVERY_FAILED,
+            f"SEC submissions history file count exceeds deterministic bound {SEC_MAX_HISTORY_CHUNKS}",
+        )
+    earliest_possible = date(int(fiscal_year) - 1, 1, 1)
+    selected: list[SecHistoryChunk] = []
+    seen_names: set[str] = set()
+    for chunk in chunks:
+        if chunk.name in seen_names:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                f"SEC history chunk is duplicated: {chunk.name}",
+            )
+        seen_names.add(chunk.name)
+        parsed_from: date | None = None
+        parsed_to: date | None = None
+        if chunk.filing_from:
+            try:
+                parsed_from = date.fromisoformat(str(chunk.filing_from)[:10])
+            except ValueError as exc:
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    f"SEC history chunk range is invalid: {chunk.name}",
+                ) from exc
+        if chunk.filing_to:
+            try:
+                parsed_to = date.fromisoformat(str(chunk.filing_to)[:10])
+            except ValueError as exc:
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    f"SEC history chunk range is invalid: {chunk.name}",
+                ) from exc
+        if parsed_from is not None and parsed_to is not None and parsed_from > parsed_to:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                f"SEC history chunk range is reversed: {chunk.name}",
+            )
+        if parsed_to is not None and parsed_to < earliest_possible:
+            continue
+        selected.append(chunk)
+    return tuple(sorted(selected, key=lambda item: item.name))
 
 
 def _array(recent: dict[str, Any], key: str, index: int, *, required: bool = True) -> Any:
@@ -1020,5 +1071,6 @@ __all__ = [
     "merge_filing_candidates",
     "parse_submissions",
     "select_filing",
+    "select_history_chunks_for_slot",
     "verify_sec_discovery_observation",
 ]
