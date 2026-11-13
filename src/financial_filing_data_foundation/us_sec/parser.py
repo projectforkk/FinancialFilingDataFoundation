@@ -1515,6 +1515,89 @@ def _xml_facts(
     return facts, evidence, issues
 
 
+def verify_sec_fact_source_locator(
+    package: SecFilingPackage,
+    fact: dict[str, Any],
+    *,
+    fact_source_mode: str,
+    source_cache: dict[tuple[str, str], object] | None = None,
+) -> None:
+    """Replay one logical fact locator against immutable SEC member bytes."""
+
+    member_sha = str(fact.get("source_member_sha256") or fact.get("member_sha256") or "")
+    member_map = source_cache.get(("MEMBER_MAP", package.package_sha256)) if source_cache is not None else None
+    if not isinstance(member_map, dict):
+        member_map = {item.member_sha256: item for item in package.members}
+        if source_cache is not None:
+            source_cache[("MEMBER_MAP", package.package_sha256)] = member_map
+    member = member_map.get(member_sha)
+    if member is None:
+        raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "logical fact member is not present in SEC package")
+
+    if fact_source_mode == "INLINE_XBRL_PRIMARY":
+        primary_members = [item for item in package.members if item.role is SecMemberRole.PRIMARY_DOCUMENT]
+        if len(primary_members) != 1 or primary_members[0].member_sha256 != member_sha:
+            raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "Inline XBRL fact is not sourced from the primary document")
+        locator = str(fact.get("dom_locator") or "")
+        if not locator.startswith("/") or fact.get("xml_locator"):
+            raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "Inline XBRL fact locator model is invalid")
+        cache_key = ("DOM", member_sha)
+        dom_root = source_cache.get(cache_key) if source_cache is not None else None
+        if dom_root is None:
+            try:
+                html = member.body.decode("utf-8-sig")
+            except UnicodeDecodeError as exc:
+                raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "Inline XBRL source is not UTF-8") from exc
+            parser = _DomParser()
+            try:
+                parser.feed(html)
+                parser.close()
+            except (AssertionError, ValueError) as exc:
+                raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "Inline XBRL source is not parseable") from exc
+            dom_root = parser.root
+            if source_cache is not None:
+                source_cache[cache_key] = dom_root
+                source_cache[("DOM_INDEX", member_sha)] = _index_dom_locators(dom_root)
+        dom_index = source_cache.get(("DOM_INDEX", member_sha)) if source_cache is not None else None
+        if not isinstance(dom_index, dict):
+            dom_index = _index_dom_locators(dom_root)
+            if source_cache is not None:
+                source_cache[("DOM_INDEX", member_sha)] = dom_index
+        node = dom_index.get(locator)
+        if node is None or not _is_inline_fact(node):
+            raise SecError(
+                P11Reason.P11_FACT_SOURCE_MODE_INVALID,
+                "Inline XBRL fact locator does not resolve to an authentic Inline XBRL fact",
+            )
+        return
+
+    if fact_source_mode == "XBRL_INSTANCE_PRIMARY":
+        if member.role is not SecMemberRole.XBRL_INSTANCE:
+            raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "XBRL instance fact is not sourced from an instance member")
+        locator = str(fact.get("xml_locator") or "")
+        if not locator.startswith("/") or fact.get("dom_locator"):
+            raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "XBRL instance fact locator model is invalid")
+        cache_key = ("XML", member_sha)
+        root = source_cache.get(cache_key) if source_cache is not None else None
+        if root is None:
+            root = _parse_xml_root(member.body)
+            if root is None or not _is_valid_xbrl_instance_root(root):
+                raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "XBRL instance source root is not authentic")
+            if source_cache is not None:
+                source_cache[cache_key] = root
+        elif not _is_valid_xbrl_instance_root(root):
+            raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "XBRL instance source root is not authentic")
+        node = _resolve_xml_locator(root, locator)
+        if node is None or not (_xml_attr_local(node, "contextref") or _xml_attr_local(node, "context_ref")):
+            raise SecError(
+                P11Reason.P11_FACT_SOURCE_MODE_INVALID,
+                "XBRL instance fact locator does not resolve to a logical fact element",
+            )
+        return
+
+    raise SecError(P11Reason.P11_FACT_SOURCE_MODE_INVALID, "NO_STRUCTURED_FACTS cannot contain logical fact locators")
+
+
 def verify_sec_evidence(
     package: SecFilingPackage,
     pages: Iterable[dict[str, Any]],
@@ -1976,4 +2059,5 @@ __all__ = [
     "load_sec_artifacts",
     "parse_sec_package",
     "verify_sec_evidence",
+    "verify_sec_fact_source_locator",
 ]
