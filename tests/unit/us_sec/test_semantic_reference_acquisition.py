@@ -206,6 +206,7 @@ def test_namespace_authentic_reference_accepts_alternate_prefixes(tmp_path: Path
 def test_namespace_lookalikes_do_not_authorize_semantic_fetch(tmp_path: Path) -> None:
     wrong_link = "wrong-link.xsd"
     wrong_xlink = "wrong-xlink.xsd"
+    plain_href = "plain-href.xsd"
     unbound = "unbound.xsd"
     primary_body = (
         "<html xmlns:link='https://example.invalid/not-linkbase' "
@@ -214,6 +215,7 @@ def test_namespace_lookalikes_do_not_authorize_semantic_fetch(tmp_path: Path) ->
         "xmlns:x='https://example.invalid/not-xlink'><head>"
         f"<link:schemaRef xlink:href='{wrong_link}'>"
         f"<l:schemaRef x:href='{wrong_xlink}'>"
+        f"<l:schemaRef xmlns='http://www.w3.org/1999/xlink' href='{plain_href}'>"
         f"<fake:schemaRef fake:href='{unbound}'>"
         "</head><body>filing</body></html>"
     ).encode("utf-8")
@@ -223,20 +225,22 @@ def test_namespace_lookalikes_do_not_authorize_semantic_fetch(tmp_path: Path) ->
             {"name": PRIMARY},
             {"name": wrong_link, "type": "text.gif"},
             {"name": wrong_xlink, "type": "text.gif"},
+            {"name": plain_href, "type": "text.gif"},
             {"name": unbound, "type": "text.gif"},
         ],
         bodies={
             PRIMARY: primary_body,
             wrong_link: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
             wrong_xlink: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
+            plain_href: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
             unbound: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
         },
-        forbidden_names={wrong_link, wrong_xlink, unbound},
+        forbidden_names={wrong_link, wrong_xlink, plain_href, unbound},
     )
 
     names = {member.relative_name for member in result.package.members}
     assert names == {PRIMARY}
-    for name in (wrong_link, wrong_xlink, unbound):
+    for name in (wrong_link, wrong_xlink, plain_href, unbound):
         assert calls.count(archive_member_url(CIK, ACCESSION, name)) == 0
 
 
