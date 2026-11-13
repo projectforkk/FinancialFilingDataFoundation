@@ -21,7 +21,7 @@ def test_generic_xml_is_not_misclassified_as_xbrl_instance() -> None:
         "primary.htm",
         b'<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" />',
     ).value == "XBRL_INSTANCE"
-    assert _member_role("instance.xbrl", "primary.htm", b"<xbrl />").value == "XBRL_INSTANCE"
+    assert _member_role("instance.xbrl", "primary.htm", b"<xbrl />").value == "OTHER"
 
 
 def _valid_q2_submissions() -> dict[str, object]:
@@ -261,7 +261,7 @@ def test_sec_acquirer_does_not_silently_select_amendment(tmp_path: Path) -> None
     assert exc_info.value.reason_code == P11Reason.P11_AMENDED_VARIANT_PRESENT.value
 
 
-def test_sec_acquirer_fetches_only_history_chunks_covering_requested_year(tmp_path: Path) -> None:
+def test_sec_acquirer_fetches_all_retained_history_chunks_for_independent_discovery(tmp_path: Path) -> None:
     submissions_url = "https://data.sec.gov/submissions/CIK0000123456.json"
     relevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2024.json"
     irrelevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2018.json"
@@ -302,7 +302,21 @@ def test_sec_acquirer_fetches_only_history_chunks_covering_requested_year(tmp_pa
         if url == relevant_history_url:
             return SecResponse(200, {"Content-Type": "application/json"}, json.dumps(history).encode(), url)
         if url == irrelevant_history_url:
-            raise AssertionError("irrelevant SEC history chunk was fetched")
+            return SecResponse(
+                200,
+                {"Content-Type": "application/json"},
+                json.dumps(
+                    {
+                        "cik": "0000123456",
+                        "accessionNumber": [],
+                        "filingDate": [],
+                        "reportDate": [],
+                        "form": [],
+                        "primaryDocument": [],
+                    }
+                ).encode(),
+                url,
+            )
         if url == index_url:
             return SecResponse(200, {"Content-Type": "application/json"}, json.dumps(index).encode(), url)
         if url == primary_url:
@@ -315,5 +329,5 @@ def test_sec_acquirer_fetches_only_history_chunks_covering_requested_year(tmp_pa
 
     assert result.candidate.accession == "0000123456-24-000001"
     assert calls.count(relevant_history_url) == 1
-    assert irrelevant_history_url not in calls
+    assert calls.count(irrelevant_history_url) == 1
 

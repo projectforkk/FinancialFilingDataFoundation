@@ -15,7 +15,7 @@ from financial_filing_data_foundation.us_sec.discovery import (
 )
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.identity import sec_company
-from financial_filing_data_foundation.us_sec.models import SecCompanyRef
+from financial_filing_data_foundation.us_sec.models import SecCompanyRef, SecFilingCandidate, SecIssuerKind
 from financial_filing_data_foundation.us_sec.package import (
     SecMemberRole,
     SecPackageMember,
@@ -60,21 +60,57 @@ def _package(html: bytes, *, extra: tuple[SecPackageMember, ...] = (), accession
 
 
 def _observation(package) -> SecDiscoveryObservation:
+    body = json.dumps(
+        {
+            "cik": package.cik,
+            "fiscalYearEnd": "1231",
+            "filings": {
+                "recent": {
+                    "accessionNumber": [
+                        "0000320193-24-000100",
+                        "0000320193-25-000100",
+                        package.accession,
+                        "0000320193-25-000101",
+                        "0000320193-25-000102",
+                    ],
+                    "filingDate": ["2025-02-01", "2025-05-01", "2025-07-30", "2025-08-01", "2026-02-01"],
+                    "reportDate": ["2024-12-31", "2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"],
+                    "form": ["10-K", "10-Q", package.form, "10-Q", "10-K"],
+                    "primaryDocument": ["prior.htm", "q1.htm", package.primary_document, "q3.htm", "annual.htm"],
+                }
+            },
+        },
+        sort_keys=True,
+    ).encode()
+    candidate = SecFilingCandidate(
+        cik=package.cik,
+        ticker="AAPL",
+        accession=package.accession,
+        normalized_accession=package.accession.replace("-", ""),
+        form=package.form,
+        filing_date="2025-07-30",
+        report_period="2025-06-30",
+        primary_document=package.primary_document,
+        source_url=archive_member_url(package.cik, package.accession, package.primary_document),
+        amended=False,
+        issuer_kind=SecIssuerKind.DOMESTIC,
+    )
     return SecDiscoveryObservation.create(
         company=SecCompanyRef(
             cik=package.cik,
             ticker="AAPL",
             company_id=f"US:CIK{package.cik}",
+            issuer_kind=SecIssuerKind.DOMESTIC,
         ),
         fiscal_year=package.fiscal_year,
         period=package.period,
         source_documents=[
             {
                 "url": "https://data.sec.gov/submissions/CIK0000320193.json",
-                "body": b'{"cik":"320193"}',
+                "body": body,
             }
         ],
-        candidates=(),
+        candidates=(candidate,),
         selected_accession=package.accession,
         state="UNAMBIGUOUS",
         retrieved_at="2026-11-12T00:00:00+00:00",
@@ -83,7 +119,7 @@ def _observation(package) -> SecDiscoveryObservation:
 
 def _inline_html(*, continuation: str = "", extra: str = "") -> bytes:
     return (
-        "<html><body><ix:header>"
+        "<html xmlns:ix='http://www.xbrl.org/2013/inlineXBRL' xmlns:xbrli='http://www.xbrl.org/2003/instance' xmlns:us-gaap='http://fasb.org/us-gaap/2025'><body><ix:header>"
         "<xbrli:context id='c1'><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier>"
         "</xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant>"
         "</xbrli:period></xbrli:context>"

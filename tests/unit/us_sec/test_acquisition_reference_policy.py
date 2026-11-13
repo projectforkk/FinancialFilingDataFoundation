@@ -114,7 +114,7 @@ def test_primary_browser_assets_are_not_fetched_but_semantic_reference_support_i
         PRIMARY: primary_body,
         schema_name: b"<schema />",
         summary_name: b"<Report />",
-        support_name: b"<xbrl />",
+        support_name: b'<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" />',
         **{name: b"browser asset" for name in static_names},
     }
     acquirer, calls = _build_acquirer(

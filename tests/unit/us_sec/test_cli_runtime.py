@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
-from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation
+from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation, parse_submissions
 from financial_filing_data_foundation.us_sec.models import SecCompanyRef
 from financial_filing_data_foundation.us_sec.runtime import (
     SecRuntimeDescriptor,
@@ -30,21 +30,43 @@ def _sec_url(cik: str, accession: str, name: str) -> str:
 
 
 def _observation(package: object) -> SecDiscoveryObservation:
+    body = json.dumps(
+        {
+            "cik": package.cik,
+            "fiscalYearEnd": "0927",
+            "filings": {
+                "recent": {
+                    "accessionNumber": [package.accession],
+                    "filingDate": ["2025-11-01"],
+                    "reportDate": ["2025-09-27"],
+                    "form": [package.form],
+                    "primaryDocument": [package.primary_document],
+                }
+            },
+        },
+        sort_keys=True,
+    ).encode()
+    company = SecCompanyRef(
+        cik=package.cik,
+        ticker="AAPL",
+        company_id=f"US:CIK{package.cik}",
+    )
+    candidates = parse_submissions(
+        json.loads(body.decode()),
+        company=company,
+        source_url="https://data.sec.gov/submissions/CIK0000320193.json",
+    ).candidates
     return SecDiscoveryObservation.create(
-        company=SecCompanyRef(
-            cik=package.cik,
-            ticker="AAPL",
-            company_id=f"US:CIK{package.cik}",
-        ),
+        company=company,
         fiscal_year=package.fiscal_year,
         period=package.period,
         source_documents=[
             {
                 "url": "https://data.sec.gov/submissions/CIK0000320193.json",
-                "body": b'{"cik":"320193"}',
+                "body": body,
             }
         ],
-        candidates=(),
+        candidates=candidates,
         selected_accession=package.accession,
         state="UNAMBIGUOUS",
         retrieved_at="2026-11-12T00:00:00+00:00",
@@ -213,7 +235,7 @@ def test_us_cli_planner_uses_current_local_package_and_parsed_data(monkeypatch: 
 
     package = build_package(
         cik="0000320193", accession="0000320193-25-000079", form="10-K", fiscal_year=2025, period="FY",
-        members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"), body=b'<html><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>'),),
+        members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"), body=b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>'),),
     )
     paths = _runtime_paths(tmp_path)
     store = SecPackageStore(paths.raw_store)
@@ -271,7 +293,7 @@ def test_us_cli_planner_rejects_parsed_row_for_wrong_package(monkeypatch: pytest
             members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", accession, "annual.htm"), body=text),),
         )
 
-    html = b'<html><body><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD">100</ix:nonfraction></p></body></html>'
+    html = b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD">100</ix:nonfraction></p></body></html>'
     local_package = make_package("0000320193-25-000079", html)
     wrong_package = make_package("0000320193-25-000080", html + b"<p>wrong identity</p>")
     paths = _runtime_paths(tmp_path)
@@ -348,7 +370,7 @@ def test_us_cli_reuse_data_refreshes_discovery_without_reparsing_or_redownloadin
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
                 source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"),
-                body=b'<html><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>',
+                body=b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>',
             ),
         ),
     )
@@ -445,7 +467,7 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
                 source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"),
-                body=b'<html><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>',
+                body=b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>',
             ),
         ),
     )

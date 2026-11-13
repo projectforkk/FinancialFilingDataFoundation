@@ -15,6 +15,9 @@ from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, verify_sec_evidence
 
 
 SEC_VALIDATION_SCHEMA = "p11-sec-validation-v2"
+_VALID_FACT_SOURCE_MODES = frozenset(
+    {"INLINE_XBRL_PRIMARY", "XBRL_INSTANCE_PRIMARY", "NO_STRUCTURED_FACTS"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +173,31 @@ def validate_sec_artifacts(
                 issues.append(_issue(P11Reason.P11_MEMBER_HASH_MISMATCH.value, "BLOCKING", "evidence member hash is not in source package", evidence_id=evidence.get("evidence_id")))
     if amendment_conflict:
         issues.append(_issue(P11Reason.P11_AMENDED_VARIANT_PRESENT.value, "REVIEW", "original and amended SEC variants are both present"))
+    fact_source_mode = str(parsed.fact_source_mode or "").strip().upper()
+    if fact_source_mode not in _VALID_FACT_SOURCE_MODES:
+        issues.append(
+            _issue(
+                P11Reason.P11_FACT_SOURCE_MODE_INVALID.value,
+                "BLOCKING",
+                f"SEC fact_source_mode is unsupported: {fact_source_mode or '<missing>'}",
+            )
+        )
+    elif fact_source_mode == "NO_STRUCTURED_FACTS" and parsed.facts:
+        issues.append(
+            _issue(
+                P11Reason.P11_FACT_SOURCE_MODE_INVALID.value,
+                "BLOCKING",
+                "SEC NO_STRUCTURED_FACTS mode cannot contain persisted Raw Facts",
+            )
+        )
+    elif fact_source_mode in {"INLINE_XBRL_PRIMARY", "XBRL_INSTANCE_PRIMARY"} and not parsed.facts:
+        issues.append(
+            _issue(
+                P11Reason.P11_FACT_SOURCE_MODE_INVALID.value,
+                "BLOCKING",
+                f"SEC {fact_source_mode} mode has no persisted Raw Facts",
+            )
+        )
     observation = discovery_observation
     observation_sha = getattr(observation, "observation_sha256", None) or parsed.discovery_observation_sha256
     discovery_checked_at = getattr(observation, "retrieved_at", None) or parsed.discovery_checked_at

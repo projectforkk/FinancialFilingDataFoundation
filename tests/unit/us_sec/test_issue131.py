@@ -47,7 +47,7 @@ def _package(*, accession: str = ACCESSION):
                 content_type="text/html",
                 source_url=archive_member_url(CIK, accession, "example.htm"),
                 body=(
-                    b"<html><body><ix:header>"
+                    b"<html xmlns:ix='http://www.xbrl.org/2013/inlineXBRL' xmlns:xbrli='http://www.xbrl.org/2003/instance' xmlns:us-gaap='http://fasb.org/us-gaap/2025'><body><ix:header>"
                     b"<xbrli:context id='c1'><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier>"
                     b"</xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant>"
                     b"</xbrli:period></xbrli:context>"
@@ -82,6 +82,28 @@ def _observation(
     state: str = "UNAMBIGUOUS",
     selected_accession: str | None = ACCESSION,
 ) -> SecDiscoveryObservation:
+    body = json.dumps(
+        {
+            "cik": CIK,
+            "fiscalYearEnd": "1231",
+            "filings": {
+                "recent": {
+                    "accessionNumber": [
+                        "0000320193-24-000100",
+                        "0000320193-25-000100",
+                        ACCESSION,
+                        "0000320193-25-000101",
+                        "0000320193-25-000102",
+                    ],
+                    "filingDate": ["2025-02-01", "2025-05-01", "2025-07-30", "2025-08-01", "2026-02-01"],
+                    "reportDate": ["2024-12-31", "2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"],
+                    "form": ["10-K", "10-Q", "10-Q", "10-Q", "10-K"],
+                    "primaryDocument": ["prior.htm", "q1.htm", "example.htm", "q3.htm", "annual.htm"],
+                }
+            },
+        },
+        sort_keys=True,
+    ).encode()
     return SecDiscoveryObservation.create(
         company=SecCompanyRef(
             cik=CIK,
@@ -91,7 +113,7 @@ def _observation(
         ),
         fiscal_year=2025,
         period="Q2",
-        source_documents=[{"url": SOURCE_URL, "body": b'{"cik":"320193"}'}],
+        source_documents=[{"url": SOURCE_URL, "body": body}],
         candidates=(_candidate(),),
         selected_accession=selected_accession,
         state=state,

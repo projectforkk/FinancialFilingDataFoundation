@@ -61,13 +61,14 @@ def _submission_row(
     form: str = "10-K",
     filing_date: str = "2025-11-01",
     report_date: str = "2025-09-27",
+    primary_document: str = "aapl-20250927.htm",
 ) -> dict[str, str]:
     return {
         "accessionNumber": accession,
         "form": form,
         "filingDate": filing_date,
         "reportDate": report_date,
-        "primaryDocument": "aapl-20250927.htm",
+        "primaryDocument": primary_document,
     }
 
 
@@ -264,6 +265,48 @@ def test_t135_10_package_identity_is_checked_against_reconstructed_candidate() -
         verify_sec_discovery_observation(observation, package=package)
 
 
+def test_t135_11_invalid_fact_source_mode_is_blocking_in_p7(tmp_path: Path) -> None:
+    observation = _observation_from_bytes(_q2_submissions_body(), period="Q2")
+    package = _html_package(
+        _inline_html(
+            "<ix:header><xbrli:context id='c1'><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id='USD'><xbrli:measure>USD</xbrli:measure></xbrli:unit></ix:header>"
+            "<h1>Revenue</h1><p><ix:nonfraction name='us-gaap:Revenue' contextRef='c1' unitRef='USD'>100</ix:nonfraction></p>"
+        )
+    )
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+
+    validation = validate_sec_artifacts(
+        replace(parsed, fact_source_mode="INVALID"),
+        tmp_path / "p7",
+        package=package,
+        discovery_observation=observation,
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value for issue in validation.issues)
+
+
+def test_t135_12_no_structured_mode_cannot_claim_persisted_facts(tmp_path: Path) -> None:
+    observation = _observation_from_bytes(_q2_submissions_body(), period="Q2")
+    package = _html_package(
+        _inline_html(
+            "<ix:header><xbrli:context id='c1'><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli></period></xbrli:context><xbrli:unit id='USD'><xbrli:measure>USD</xbrli:measure></xbrli:unit></ix:header>"
+            "<p><ix:nonfraction name='us-gaap:Revenue' contextRef='c1' unitRef='USD'>100</ix:nonfraction></p>"
+        )
+    )
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+
+    validation = validate_sec_artifacts(
+        replace(parsed, fact_source_mode="NO_STRUCTURED_FACTS"),
+        tmp_path / "p7",
+        package=package,
+        discovery_observation=observation,
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value for issue in validation.issues)
+
+
 class _DiscoveryClient:
     def __init__(self, bodies: dict[str, bytes]) -> None:
         self.bodies = bodies
@@ -371,7 +414,7 @@ def _q2_submissions_body() -> bytes:
         [
             _submission_row("0000320193-24-000001", filing_date="2024-11-01", report_date="2024-09-28"),
             _submission_row("0000320193-25-000010", form="10-Q", filing_date="2025-05-01", report_date="2025-03-29"),
-            _submission_row("0000320193-25-000020", form="10-Q", filing_date="2025-08-01", report_date="2025-06-30"),
+            _submission_row(ACCESSION, form="10-Q", filing_date="2025-08-01", report_date="2025-06-30", primary_document="aapl.htm"),
         ]
     )
 

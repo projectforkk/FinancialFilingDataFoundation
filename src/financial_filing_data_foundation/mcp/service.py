@@ -504,38 +504,28 @@ class McpQueryService:
             )
 
         if document.source_kind.upper() == "SEC":
-            if document.sec_artifact_dir is None:
-                raise McpServiceError(
-                    "P8_ARTIFACT_INVALID",
-                    "SEC catalog entry has no artifact directory",
-                )
             try:
-                parsed = load_sec_artifacts(document.sec_artifact_dir)
-                validation = load_sec_validation(
-                    document.sec_artifact_dir.parent.parent
-                    / "p7"
-                    / parsed.package_sha256
-                )
+                bundle = self._bundle(normalized)
             except Exception as exc:
                 raise McpServiceError(
-                    "P8_ARTIFACT_INVALID",
-                    "cannot read SEC artifact summary",
+                    "P8_UPSTREAM_ARTIFACT_INVALID",
+                    "cannot verify SEC artifact summary",
                 ) from exc
             return {
-                **document.metadata(),
-                "page_count": len(parsed.pages),
-                "table_count": len(parsed.tables),
+                **bundle.catalog.metadata(),
+                "page_count": len(bundle.pages),
+                "table_count": len(bundle.tables),
                 "table_group_count": 0,
-                "raw_fact_count": len(parsed.facts),
-                "evidence_count": len(parsed.evidence),
-                "validation_status": validation.validation_status,
-                "compatibility_status": validation.compatibility_status,
-                "reuse_eligible": validation.reuse_eligible,
-                "blocking_issue_count": validation.blocking_issue_count,
-                "failure_issue_count": validation.failure_issue_count,
-                "review_issue_count": validation.review_issue_count,
-                "warning_issue_count": validation.warning_issue_count,
-                "issue_count": validation.issue_count,
+                "raw_fact_count": len(bundle.facts),
+                "evidence_count": len(bundle.evidence),
+                "validation_status": bundle.validation_artifact.validation_status,
+                "compatibility_status": bundle.validation_artifact.compatibility_status,
+                "reuse_eligible": bundle.validation_artifact.reuse_eligible,
+                "blocking_issue_count": bundle.validation_artifact.blocking_issue_count,
+                "failure_issue_count": bundle.validation_artifact.failure_issue_count,
+                "review_issue_count": bundle.validation_artifact.review_issue_count,
+                "warning_issue_count": bundle.validation_artifact.warning_issue_count,
+                "issue_count": bundle.validation_artifact.issue_count,
             }
 
         def load(path: Path, label: str) -> dict[str, Any]:

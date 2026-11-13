@@ -37,7 +37,7 @@ from financial_filing_data_foundation.validation import (
     validate_document_artifacts,
 )
 from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer, candidate_from_package
-from financial_filing_data_foundation.us_sec.errors import SecError
+from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig
 from financial_filing_data_foundation.us_sec.identity import normalize_cik, sec_company
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package, reuse_sec_package
@@ -129,6 +129,12 @@ def _period(value: str) -> str:
 def _validate_market_period(args: argparse.Namespace) -> None:
     market = str(args.market).strip().upper()
     period = str(args.period).strip().upper()
+    filing_type = str(getattr(args, "filing_type", "") or "").strip().upper()
+    if market == "US" and filing_type in {"6-K", "6-K/A"}:
+        raise SecError(
+            P11Reason.P11_UNSUPPORTED_EXPLICIT_6K,
+            "explicit SEC 6-K and 6-K/A acquisition is deferred from P11 v1",
+        )
     allowed = {"Q1", "Q2", "Q3", "FY"} if market == "US" else {"Q1", "H1", "Q3", "FY"}
     if period not in allowed:
         raise ValueError(f"period {period} is not supported for market {market}")

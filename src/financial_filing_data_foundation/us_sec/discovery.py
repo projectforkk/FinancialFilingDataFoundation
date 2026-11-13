@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
+from urllib.parse import urlsplit
 
 from .errors import P11Reason, SecError
 from .models import SecCompanyRef, SecFilingCandidate, SecIssuerKind
@@ -17,6 +18,7 @@ from .policy import SecFormPolicy
 
 _ACCESSION_RE = re.compile(r"^\d{10}-\d{2}-\d{6}$")
 SEC_DISCOVERY_SCHEMA = "p11-sec-discovery-v1"
+SEC_MAX_HISTORY_CHUNKS = 256
 
 
 def _sha256(data: bytes) -> str:
@@ -28,6 +30,12 @@ class SecHistoryChunk:
     name: str
     filing_from: str | None = None
     filing_to: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SecDiscoveryDecision:
+    state: str
+    selected_accession: str | None
 
 
 def candidate_to_record(candidate: SecFilingCandidate) -> dict[str, Any]:
@@ -42,6 +50,54 @@ def candidate_to_record(candidate: SecFilingCandidate) -> dict[str, Any]:
         "amended": bool(candidate.amended),
         "issuer_kind": candidate.issuer_kind.value,
     }
+
+
+def merge_filing_candidates(
+    candidates: Iterable[SecFilingCandidate],
+) -> tuple[SecFilingCandidate, ...]:
+    """Merge official submissions rows without allowing accession drift."""
+
+    by_accession: dict[str, SecFilingCandidate] = {}
+    for candidate in candidates:
+        accession = str(candidate.accession)
+        previous = by_accession.get(accession)
+        if previous is not None:
+            if candidate_to_record(previous) != candidate_to_record(candidate):
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    f"SEC accession has conflicting submissions metadata: {accession}",
+                )
+            continue
+        by_accession[accession] = candidate
+    return tuple(
+        sorted(
+            by_accession.values(),
+            key=lambda item: (
+                str(item.accession),
+                str(item.form),
+                str(item.filing_date),
+                str(item.primary_document),
+            ),
+        )
+    )
+
+
+def derive_discovery_decision(
+    candidates: Iterable[SecFilingCandidate],
+) -> SecDiscoveryDecision:
+    rows = merge_filing_candidates(candidates)
+    originals = tuple(row for row in rows if not row.amended)
+    amendments = tuple(row for row in rows if row.amended)
+    if not rows:
+        return SecDiscoveryDecision("NOT_FOUND", None)
+    if amendments:
+        return SecDiscoveryDecision(
+            "AMENDED_VARIANT_PRESENT",
+            originals[0].accession if len(originals) == 1 else None,
+        )
+    if len(originals) != 1:
+        return SecDiscoveryDecision("SLOT_CANDIDATE_CONFLICT", None)
+    return SecDiscoveryDecision("UNAMBIGUOUS", originals[0].accession)
 
 
 def _canonical_candidate_records(
@@ -234,6 +290,140 @@ class SecDiscoveryObservation:
         )
 
 
+def _decode_observation_source(source: Mapping[str, Any]) -> tuple[str, bytes]:
+    url = str(source.get("url") or source.get("source_url") or "").strip()
+    source_sha256 = str(source.get("sha256") or source.get("source_sha256") or "").strip().lower()
+    body_b64 = source.get("body_b64")
+    if not url or not source_sha256 or not isinstance(body_b64, str) or not body_b64:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery source URL/hash/body is not persisted",
+        )
+    try:
+        body = base64.b64decode(body_b64, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery source bytes are invalid base64",
+        ) from exc
+    if _sha256(body) != source_sha256:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery source bytes do not match recorded SHA256",
+        )
+    return url, body
+
+
+def _decode_submissions_json(body: bytes, *, label: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            f"SEC discovery {label} is not valid JSON",
+        ) from exc
+    if not isinstance(payload, dict):
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            f"SEC discovery {label} JSON root is not an object",
+        )
+    return payload
+
+
+def _reconstruct_discovery_candidates(
+    observation: SecDiscoveryObservation,
+) -> tuple[SecFilingCandidate, ...]:
+    expected_main_url = f"https://data.sec.gov/submissions/CIK{observation.cik}.json"
+    source_rows: dict[str, bytes] = {}
+    for raw_source in observation.source_documents:
+        if not isinstance(raw_source, Mapping):
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery source document is invalid")
+        url, body = _decode_observation_source(raw_source)
+        if url in source_rows:
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery source URL is duplicated")
+        source_rows[url] = body
+    if expected_main_url not in source_rows:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery official current submissions source is missing",
+        )
+    parsed_main = urlsplit(expected_main_url)
+    if (
+        parsed_main.scheme != "https"
+        or parsed_main.netloc != "data.sec.gov"
+        or parsed_main.path != f"/submissions/CIK{observation.cik}.json"
+    ):
+        raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery current submissions URL is invalid")
+    company = SecCompanyRef(
+        cik=observation.cik,
+        ticker="",
+        company_id=observation.company_id,
+    )
+    main_body = source_rows[expected_main_url]
+    main_payload = _decode_submissions_json(main_body, label="current submissions")
+    main_submissions = parse_submissions(
+        main_payload,
+        company=company,
+        source_url=expected_main_url,
+        raw_sha256=_sha256(main_body),
+    )
+    chunks = main_submissions.history_chunks
+    if len(chunks) > SEC_MAX_HISTORY_CHUNKS:
+        raise SecError(
+            P11Reason.P11_SEC_DISCOVERY_FAILED,
+            f"SEC submissions history file count exceeds bound {SEC_MAX_HISTORY_CHUNKS}",
+        )
+    expected_history_urls: list[str] = []
+    seen_history_names: set[str] = set()
+    for chunk in chunks:
+        if chunk.name in seen_history_names:
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                f"SEC submissions history file is duplicated: {chunk.name}",
+            )
+        seen_history_names.add(chunk.name)
+        expected_history_urls.append(f"https://data.sec.gov/submissions/{chunk.name}")
+    expected_urls = {expected_main_url, *expected_history_urls}
+    if set(source_rows) != expected_urls:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery retained source set differs from official submissions files",
+        )
+    candidates: list[SecFilingCandidate] = list(main_submissions.candidates)
+    for history_url in expected_history_urls:
+        parsed_url = urlsplit(history_url)
+        if (
+            parsed_url.scheme != "https"
+            or parsed_url.netloc != "data.sec.gov"
+            or parsed_url.path != f"/submissions/{parsed_url.path.rsplit('/', 1)[-1]}"
+            or parsed_url.query
+            or parsed_url.fragment
+        ):
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery history submissions URL is invalid")
+        body = source_rows[history_url]
+        payload = _decode_submissions_json(body, label=f"history submissions {history_url}")
+        history = parse_submissions(
+            payload,
+            company=company,
+            source_url=history_url,
+            raw_sha256=_sha256(body),
+        )
+        candidates.extend(history.candidates)
+    merged = merge_filing_candidates(candidates)
+    aggregate = SecSubmissions(
+        company=company,
+        candidates=merged,
+        fiscal_year_end=main_submissions.fiscal_year_end,
+    )
+    return merge_filing_candidates(
+        discover_filings(
+            aggregate,
+            fiscal_year=int(observation.fiscal_year),
+            period=str(observation.period),
+        )
+    )
+
+
 def verify_sec_discovery_observation(
     observation: SecDiscoveryObservation,
     *,
@@ -280,6 +470,27 @@ def verify_sec_discovery_observation(
     if expected_period is not None and str(observation.period).upper() != str(expected_period).upper():
         raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery observation period differs from expected slot")
 
+    reconstructed_candidates = _reconstruct_discovery_candidates(observation)
+    reconstructed_records = _canonical_candidate_records(
+        candidate_to_record(candidate) for candidate in reconstructed_candidates
+    )
+    observed_records = _canonical_candidate_records(observation.candidates)
+    if reconstructed_records != observed_records:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery candidates differ from independent submissions reconstruction",
+        )
+    decision = derive_discovery_decision(reconstructed_candidates)
+    if str(observation.state).upper() != decision.state:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery state differs from independent submissions reconstruction",
+        )
+    if observation.selected_accession != decision.selected_accession:
+        raise SecError(
+            P11Reason.P11_PROVENANCE_MISMATCH,
+            "SEC discovery selected accession differs from independent submissions reconstruction",
+        )
     if str(observation.state).upper() != "UNAMBIGUOUS":
         raise SecError(
             P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN,
@@ -293,28 +504,26 @@ def verify_sec_discovery_observation(
     if expected_accession is not None and str(observation.selected_accession) != str(expected_accession):
         raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery selected accession differs from package")
 
-    for source in observation.source_documents:
-        if not isinstance(source, Mapping):
-            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC discovery source document is invalid")
-        source_sha256 = str(source.get("sha256") or source.get("source_sha256") or "").lower()
-        body_b64 = source.get("body_b64")
-        if not source_sha256 or not isinstance(body_b64, str) or not body_b64:
+    if package is not None:
+        selected = next(
+            (
+                candidate
+                for candidate in reconstructed_candidates
+                if candidate.accession == observation.selected_accession
+            ),
+            None,
+        )
+        if selected is None:
             raise SecError(
                 P11Reason.P11_PROVENANCE_MISMATCH,
-                "SEC discovery source bytes are not persisted",
+                "SEC selected accession is not present in reconstructed candidates",
             )
-        try:
-            body = base64.b64decode(body_b64, validate=True)
-        except (ValueError, TypeError) as exc:
-            raise SecError(
-                P11Reason.P11_PROVENANCE_MISMATCH,
-                "SEC discovery source bytes are invalid base64",
-            ) from exc
-        if _sha256(body) != source_sha256:
-            raise SecError(
-                P11Reason.P11_PROVENANCE_MISMATCH,
-                "SEC discovery source bytes do not match recorded SHA256",
-            )
+        if str(package.form).upper() != str(selected.form).upper():
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC package form differs from selected candidate")
+        if package.primary_document and str(package.primary_document) != str(selected.primary_document):
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC package primary document differs from selected candidate")
+        if package.report_period and str(package.report_period) != str(selected.report_period):
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC package report period differs from selected candidate")
 
     computed_fingerprint = _candidate_fingerprint(observation.candidates)
     if computed_fingerprint != str(observation.candidate_fingerprint).lower():
@@ -737,11 +946,15 @@ def select_filing(candidates: Iterable[SecFilingCandidate]) -> SecFilingCandidat
 
 __all__ = [
     "SEC_DISCOVERY_SCHEMA",
+    "SEC_MAX_HISTORY_CHUNKS",
+    "SecDiscoveryDecision",
     "SecDiscoveryObservation",
     "SecHistoryChunk",
     "SecSubmissions",
     "candidate_to_record",
+    "derive_discovery_decision",
     "discover_filings",
+    "merge_filing_candidates",
     "parse_submissions",
     "select_filing",
     "verify_sec_discovery_observation",

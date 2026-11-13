@@ -9,11 +9,14 @@ from pathlib import Path
 from typing import Any
 
 from .discovery import (
+    SEC_MAX_HISTORY_CHUNKS,
     SecDiscoveryObservation,
     SecHistoryChunk,
     SecSubmissions,
     candidate_to_record,
+    derive_discovery_decision,
     discover_filings,
+    merge_filing_candidates,
     parse_submissions,
     select_filing,
 )
@@ -70,7 +73,12 @@ def _member_role(name: str, primary: str, body: bytes | None = None) -> SecMembe
             if root_local == "linkbase":
                 return SecMemberRole.OTHER
             if lower.endswith((".xml", ".xbrl")):
-                return SecMemberRole.XBRL_INSTANCE if root_local == "xbrl" else SecMemberRole.OTHER
+                root_namespace = _xml_namespace(str(root.tag))
+                return (
+                    SecMemberRole.XBRL_INSTANCE
+                    if root_local == "xbrl" and root_namespace == _XBRL_INSTANCE_NAMESPACE
+                    else SecMemberRole.OTHER
+                )
         except ET.ParseError:
             pass
     if lower.endswith(".xml"):
@@ -103,6 +111,7 @@ def _validate_source_bytes(name: str, body: bytes, content_type: str, *, primary
 
 
 _XBRL_LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
+_XBRL_INSTANCE_NAMESPACE = "http://www.xbrl.org/2003/instance"
 _SEMANTIC_REFERENCE_TAGS = frozenset({"link:schemaref", "link:linkbaseref"})
 _XBRL_MEMBER_ROLES = frozenset(
     {
@@ -288,54 +297,40 @@ class SecAcquirer:
             source_url=submissions_url,
             raw_sha256=source_documents[-1].get("sha256"),
         )
-        candidates = discover_filings(submissions, fiscal_year=fiscal_year, period=period)
-        if not candidates and submissions.history_files:
-            historical_candidates = list(submissions.candidates)
-            for chunk in _history_chunks_for_year(submissions, fiscal_year):
-                history_url = f"https://data.sec.gov/submissions/{chunk.name}"
-                try:
-                    history_response = self.client.fetch(
-                        history_url,
-                        expected_content_types=("application/json",),
-                        max_bytes=self.client.config.submissions_max_bytes,
-                    )
-                except Exception as exc:
-                    raise SecError(P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN, "SEC historical discovery could not be completed") from exc
-                source_documents.append({"url": history_url, "body": history_response.body})
-                try:
-                    history_payload = json.loads(history_response.body.decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                    raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC historical submissions response is invalid JSON") from exc
-                historical = parse_submissions(history_payload, company=company, source_url=history_url)
-                historical_candidates.extend(historical.candidates)
-                candidates = discover_filings(
-                    SecSubmissions(
-                        company=company,
-                        candidates=tuple(historical_candidates),
-                        fiscal_year_end=submissions.fiscal_year_end or historical.fiscal_year_end,
-                        history_files=submissions.history_files,
-                        history_ranges=submissions.history_ranges,
-                    ),
-                    fiscal_year=fiscal_year,
-                    period=period,
+        all_candidates = list(submissions.candidates)
+        for chunk in _history_chunks_for_year(submissions, fiscal_year):
+            history_url = f"https://data.sec.gov/submissions/{chunk.name}"
+            try:
+                history_response = self.client.fetch(
+                    history_url,
+                    expected_content_types=("application/json",),
+                    max_bytes=self.client.config.submissions_max_bytes,
                 )
-                if candidates:
-                    break
-        rows = tuple(candidates)
-        originals = tuple(row for row in rows if not row.amended)
-        amendments = tuple(row for row in rows if row.amended)
-        if not rows:
-            state = "NOT_FOUND"
-            selected_accession = None
-        elif amendments:
-            state = "AMENDED_VARIANT_PRESENT"
-            selected_accession = originals[0].accession if len(originals) == 1 else None
-        elif len(originals) != 1:
-            state = "SLOT_CANDIDATE_CONFLICT"
-            selected_accession = None
-        else:
-            state = "UNAMBIGUOUS"
-            selected_accession = originals[0].accession
+            except Exception as exc:
+                raise SecError(P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN, "SEC historical discovery could not be completed") from exc
+            source_documents.append({"url": history_url, "body": history_response.body})
+            try:
+                history_payload = json.loads(history_response.body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC historical submissions response is invalid JSON") from exc
+            historical = parse_submissions(
+                history_payload,
+                company=company,
+                source_url=history_url,
+            )
+            all_candidates.extend(historical.candidates)
+        aggregate = SecSubmissions(
+            company=company,
+            candidates=merge_filing_candidates(all_candidates),
+            fiscal_year_end=submissions.fiscal_year_end,
+            history_files=submissions.history_files,
+            history_ranges=submissions.history_ranges,
+        )
+        candidates = discover_filings(aggregate, fiscal_year=fiscal_year, period=period)
+        rows = merge_filing_candidates(candidates)
+        decision = derive_discovery_decision(rows)
+        state = decision.state
+        selected_accession = decision.selected_accession
         observation = SecDiscoveryObservation.create(
             company=company,
             fiscal_year=fiscal_year,
@@ -515,26 +510,32 @@ def _history_chunks_for_year(submissions: SecSubmissions, fiscal_year: int) -> t
     chunks = submissions.history_chunks
     if not chunks:
         return ()
+    if len(chunks) > SEC_MAX_HISTORY_CHUNKS:
+        raise SecError(
+            P11Reason.P11_SEC_DISCOVERY_FAILED,
+            f"SEC submissions history file count exceeds deterministic bound {SEC_MAX_HISTORY_CHUNKS}",
+        )
     selected: list[SecHistoryChunk] = []
-    lower_bound = fiscal_year - 1
-    upper_bound = fiscal_year + 1
+    seen_names: set[str] = set()
     for chunk in chunks:
-        if not chunk.filing_from or not chunk.filing_to:
-            # Without both official range endpoints we cannot prove that a
-            # chunk can contain the requested filing year.  Do not turn an
-            # incomplete metadata row into an unbounded network fetch.
-            continue
-        try:
-            from_date = date.fromisoformat(str(chunk.filing_from)[:10])
-            to_date = date.fromisoformat(str(chunk.filing_to)[:10])
-        except ValueError as exc:
-            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk range is invalid: {chunk.name}") from exc
-        if from_date > to_date:
+        if chunk.name in seen_names:
+            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk is duplicated: {chunk.name}")
+        seen_names.add(chunk.name)
+        parsed_from = None
+        parsed_to = None
+        if chunk.filing_from:
+            try:
+                parsed_from = date.fromisoformat(str(chunk.filing_from)[:10])
+            except ValueError as exc:
+                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk range is invalid: {chunk.name}") from exc
+        if chunk.filing_to:
+            try:
+                parsed_to = date.fromisoformat(str(chunk.filing_to)[:10])
+            except ValueError as exc:
+                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk range is invalid: {chunk.name}") from exc
+        if parsed_from is not None and parsed_to is not None and parsed_from > parsed_to:
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk range is reversed: {chunk.name}")
-        from_year = from_date.year
-        to_year = to_date.year
-        if from_year <= upper_bound and to_year >= lower_bound:
-            selected.append(chunk)
+        selected.append(chunk)
     return tuple(sorted(selected, key=lambda item: item.name))
 
 

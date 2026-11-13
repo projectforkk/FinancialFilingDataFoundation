@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from financial_filing_data_foundation.us_sec.errors import P11Reason
-from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation
+from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObservation, discover_filings, parse_submissions
 from financial_filing_data_foundation.us_sec.models import SecCompanyRef
 from financial_filing_data_foundation.us_sec.package import (
     SecMemberRole,
@@ -27,21 +28,50 @@ def _sec_url(cik: str, accession: str, name: str) -> str:
 
 
 def _observation(package: object) -> SecDiscoveryObservation:
+    body = json.dumps(
+        {
+            "cik": package.cik,
+            "fiscalYearEnd": "1231",
+            "filings": {
+                "recent": {
+                    "accessionNumber": [
+                        "0000320193-24-000100",
+                        "0000320193-25-000100",
+                        package.accession,
+                        "0000320193-25-000101",
+                        "0000320193-25-000102",
+                    ],
+                    "filingDate": ["2025-02-01", "2025-05-01", "2025-07-30", "2025-08-01", "2026-02-01"],
+                    "reportDate": ["2024-12-31", "2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"],
+                    "form": ["10-K", "10-Q", package.form, "10-Q", "10-K"],
+                    "primaryDocument": ["prior.htm", "q1.htm", package.primary_document, "q3.htm", "annual.htm"],
+                }
+            },
+        },
+        sort_keys=True,
+    ).encode()
+    company = SecCompanyRef(
+        cik=package.cik,
+        ticker="AAPL",
+        company_id=f"US:CIK{package.cik}",
+    )
+    submissions = parse_submissions(
+        json.loads(body.decode()),
+        company=company,
+        source_url="https://data.sec.gov/submissions/CIK0000320193.json",
+    )
+    candidates = discover_filings(submissions, fiscal_year=package.fiscal_year, period=package.period)
     return SecDiscoveryObservation.create(
-        company=SecCompanyRef(
-            cik=package.cik,
-            ticker="AAPL",
-            company_id=f"US:CIK{package.cik}",
-        ),
+        company=company,
         fiscal_year=package.fiscal_year,
         period=package.period,
         source_documents=[
             {
                 "url": "https://data.sec.gov/submissions/CIK0000320193.json",
-                "body": b'{"cik":"320193"}',
+                "body": body,
             }
         ],
-        candidates=(),
+        candidates=candidates,
         selected_accession=package.accession,
         state="UNAMBIGUOUS",
         retrieved_at="2026-11-12T00:00:00+00:00",
@@ -50,7 +80,7 @@ def _observation(package: object) -> SecDiscoveryObservation:
 
 def _package() -> object:
     html = b"""
-    <html><head><title>Example</title></head><body>
+    <html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025" xmlns:ex="http://example.test/ex"><head><title>Example</title></head><body>
       <div><h1>Condensed Statements</h1><p>Amounts in USD.</p></div>
       <ix:header>
         <xbrli:context id="c1"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context>
@@ -118,7 +148,7 @@ def test_html_parser_creates_stable_virtual_pages_dom_tables_and_evidence(tmp_pa
 
 def _hidden_fact_package() -> object:
     html = b"""
-    <html><head><title>Hidden facts</title></head><body>
+    <html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025" xmlns:ex="http://example.test/ex"><head><title>Hidden facts</title></head><body>
       <ix:header>
         <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context>
         <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
@@ -255,7 +285,7 @@ def test_v3_parsed_artifact_is_invalidated_by_v4_normalizer(tmp_path: Path) -> N
 
 def test_html5_header_is_visible_but_ix_header_remains_hidden(tmp_path: Path) -> None:
     html = b"""
-    <html><body>
+    <html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"><body>
       <header><p>Ordinary filing narrative in an HTML5 header.</p></header>
       <ix:header><p>Inline XBRL metadata is not ordinary narrative.</p></ix:header>
       <h1>Visible statement</h1>
@@ -295,7 +325,7 @@ def test_virtual_page_normalization_is_repeatable(tmp_path: Path) -> None:
 
 
 def test_div_span_narrative_and_inline_fact_parent_are_preserved_without_duplicates(tmp_path: Path) -> None:
-    html = b"""<html><body><div class='narrative'><span>Operating performance improved.</span></div>
+    html = b"""<html xmlns:ix='http://www.xbrl.org/2013/inlineXBRL' xmlns:xbrli='http://www.xbrl.org/2003/instance' xmlns:us-gaap='http://fasb.org/us-gaap/2025' xmlns:ex='http://example.test/ex'><body><div class='narrative'><span>Operating performance improved.</span></div>
     <div class='narrative'>Revenue <span>was</span> <span>strong.</span></div>
     <p>Revenue was <ix:nonfraction name='ex:Revenue' contextRef='c1' unitRef='USD'>100</ix:nonfraction> million.</p>
     <ix:nonfraction name='ex:TopLevelFact' contextRef='c1' unitRef='USD'><div>300</div></ix:nonfraction>
@@ -323,7 +353,7 @@ def test_div_span_narrative_and_inline_fact_parent_are_preserved_without_duplica
 
 
 def test_visible_fact_in_empty_positioning_wrappers_gets_a_cell_source_block(tmp_path: Path) -> None:
-    html = b"""<html><body>
+    html = b"""<html xmlns:ix='http://www.xbrl.org/2013/inlineXBRL' xmlns:xbrli='http://www.xbrl.org/2003/instance' xmlns:us-gaap='http://fasb.org/us-gaap/2025'><body>
     <ix:header>
       <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context>
       <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
@@ -358,7 +388,7 @@ def test_visible_fact_in_empty_positioning_wrappers_gets_a_cell_source_block(tmp
 
 
 def test_visible_fact_with_inline_positioning_text_gets_the_outer_narrative_block(tmp_path: Path) -> None:
-    html = b"""<html><body>
+    html = b"""<html xmlns:ix='http://www.xbrl.org/2013/inlineXBRL' xmlns:xbrli='http://www.xbrl.org/2003/instance' xmlns:us-gaap='http://fasb.org/us-gaap/2025'><body>
     <ix:header>
       <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period></xbrli:context>
       <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>

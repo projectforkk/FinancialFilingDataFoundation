@@ -20,6 +20,17 @@ from .package import SecFilingPackage, SecMemberRole
 
 SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v2"
 VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V5"
+XBRL_INSTANCE_NAMESPACE = "http://www.xbrl.org/2003/instance"
+XBRL_DIMENSIONS_NAMESPACE = "http://xbrl.org/2006/xbrldi"
+INLINE_XBRL_NAMESPACES = frozenset(
+    {
+        "http://www.xbrl.org/2011/inlineXBRL",
+        "http://www.xbrl.org/2013/inlineXBRL",
+    }
+)
+SEC_FACT_SOURCE_MODES = frozenset(
+    {"INLINE_XBRL_PRIMARY", "XBRL_INSTANCE_PRIMARY", "NO_STRUCTURED_FACTS"}
+)
 _MAX_BLOCKS_PER_PAGE = 48
 _MAX_CHARS_PER_PAGE = 6000
 
@@ -64,6 +75,7 @@ class _Node:
     children: list["_Node"] = field(default_factory=list)
     data: list[str] = field(default_factory=list)
     content: list[object] = field(default_factory=list)
+    namespace_uri: str | None = None
 
 
 class _DomParser(HTMLParser):
@@ -71,6 +83,7 @@ class _DomParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.root = _Node("#document", {}, None, 0)
         self._stack = [self.root]
+        self._namespace_stack: list[dict[str, str]] = [{}]
         self._order = 0
         self._locator_targets = locator_targets
         self._locator_prefixes: set[str] = set()
@@ -92,6 +105,16 @@ class _DomParser(HTMLParser):
         self._order += 1
         normalized_tag = tag.casefold()
         parent = self._stack[-1]
+        namespace_map = dict(self._namespace_stack[-1])
+        for raw_key, raw_value in attrs:
+            key = str(raw_key).casefold()
+            value = "" if raw_value is None else str(raw_value)
+            if key == "xmlns":
+                namespace_map[""] = value
+            elif key.startswith("xmlns:"):
+                namespace_map[key.split(":", 1)[1]] = value
+        prefix = normalized_tag.split(":", 1)[0] if ":" in normalized_tag else ""
+        namespace_uri = namespace_map.get(prefix)
         indexes = self._child_indexes.setdefault(id(parent), {})
         child_index = indexes.get(normalized_tag, 0) + 1
         indexes[normalized_tag] = child_index
@@ -107,6 +130,7 @@ class _DomParser(HTMLParser):
             self._order,
             locator,
             child_index,
+            namespace_uri=namespace_uri,
         )
         parent.children.append(node)
         parent.content.append(node)
@@ -115,6 +139,7 @@ class _DomParser(HTMLParser):
         if push:
             self._child_indexes.setdefault(id(node), {})
             self._stack.append(node)
+            self._namespace_stack.append(namespace_map)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self._start(tag, attrs, push=tag.casefold() not in {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"})
@@ -126,10 +151,12 @@ class _DomParser(HTMLParser):
         target = tag.casefold()
         if len(self._stack) > 1 and self._stack[-1].tag == target:
             self._stack.pop()
+            self._namespace_stack.pop()
             return
         for index in range(len(self._stack) - 1, 0, -1):
             if self._stack[index].tag == target:
                 del self._stack[index:]
+                del self._namespace_stack[index:]
                 return
 
     def handle_data(self, data: str) -> None:
@@ -139,6 +166,22 @@ class _DomParser(HTMLParser):
 
 def _local(tag: str) -> str:
     return tag.rsplit(":", 1)[-1].casefold()
+
+
+def _is_namespace(node: _Node, namespace: str, local: str | None = None) -> bool:
+    return node.namespace_uri == namespace and (local is None or _local(node.tag) == local.casefold())
+
+
+def _is_inline_construct(node: _Node, local: str) -> bool:
+    return node.namespace_uri in INLINE_XBRL_NAMESPACES and _local(node.tag) == local.casefold()
+
+
+def _is_inline_fact(node: _Node) -> bool:
+    return node.namespace_uri in INLINE_XBRL_NAMESPACES and _local(node.tag) in {"nonfraction", "nonnumeric"}
+
+
+def _is_xbrl_dom(node: _Node, local: str | None = None) -> bool:
+    return _is_namespace(node, XBRL_INSTANCE_NAMESPACE, local)
 
 
 def _attr(node: _Node, name: str) -> str | None:
@@ -187,14 +230,14 @@ def _text_cached(node: _Node, cache: dict[int, str]) -> str:
 def _logical_text(node: _Node, *, skip_continuations: bool = True) -> str:
     """Return Inline XBRL logical text, excluding ix:exclude fragments."""
 
-    if _local(node.tag) == "exclude":
+    if _is_inline_construct(node, "exclude"):
         return ""
     values: list[str] = []
     for item in node.content:
         if isinstance(item, str):
             values.append(item)
         else:
-            if skip_continuations and _local(item.tag) == "continuation":
+            if skip_continuations and _is_inline_construct(item, "continuation"):
                 continue
             child_text = _logical_text(item, skip_continuations=skip_continuations)
             if child_text:
@@ -202,7 +245,7 @@ def _logical_text(node: _Node, *, skip_continuations: bool = True) -> str:
     if not node.content:
         values.extend(node.data)
         for child in node.children:
-            if skip_continuations and _local(child.tag) == "continuation":
+            if skip_continuations and _is_inline_construct(child, "continuation"):
                 continue
             child_text = _logical_text(child, skip_continuations=skip_continuations)
             if child_text:
@@ -214,7 +257,7 @@ def _continuation_index(root: _Node) -> tuple[dict[str, _Node], set[str]]:
     targets: dict[str, _Node] = {}
     duplicates: set[str] = set()
     for node in _descendants(root):
-        if _local(node.tag) != "continuation":
+        if not _is_inline_construct(node, "continuation"):
             continue
         target_id = _attr(node, "id")
         if not target_id:
@@ -253,7 +296,7 @@ def _resolve_inline_fragments(
 def _is_hidden(node: _Node) -> bool:
     current: _Node | None = node
     while current is not None:
-        if _local(current.tag) in {"script", "style", "hidden"} or current.tag in {"ix:header", "ix:hidden"}:
+        if current.tag in {"script", "style", "hidden"} or _is_inline_construct(current, "header") or _is_inline_construct(current, "hidden"):
             return True
         aria_hidden = _attr(current, "aria-hidden")
         if _attr(current, "hidden") is not None or (aria_hidden is not None and aria_hidden.casefold() == "true"):
@@ -280,7 +323,7 @@ def _is_hidden_cached(node: _Node, cache: dict[int, bool]) -> bool:
             result = current_cached
             break
         chain.append(current)
-        if _local(current.tag) in {"script", "style", "hidden"} or current.tag in {"ix:header", "ix:hidden"}:
+        if current.tag in {"script", "style", "hidden"} or _is_inline_construct(current, "header") or _is_inline_construct(current, "hidden"):
             result = True
             break
         aria_hidden = _attr(current, "aria-hidden")
@@ -632,19 +675,19 @@ def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
         "span",
     }
     structural_block_tags = block_tags - {"span"}
-    fact_tags = {"ix:nonfraction", "ix:nonnumeric"}
     candidates: list[_Node] = []
     visible_text_cache: dict[int, str] = {}
     hidden_cache: dict[int, bool] = {}
     for node in _descendants(root):
-        if node.tag not in block_tags and node.tag not in fact_tags or _is_hidden_cached(node, hidden_cache):
+        is_fact = _is_inline_fact(node)
+        if (node.tag not in block_tags and not is_fact) or _is_hidden_cached(node, hidden_cache):
             continue
         value = _visible_text_cached(node, visible_text_cache, hidden_cache)
         if not value:
             continue
         if _under_nested_inline_wrapper(node, structural_block_tags):
             continue
-        if node.tag in fact_tags and any(ancestor.tag in structural_block_tags for ancestor in _ancestors(node)):
+        if is_fact and any(ancestor.tag in structural_block_tags for ancestor in _ancestors(node)):
             # A fact inside a paragraph/cell/table block is anchored by that
             # surrounding source block; promoting the fact separately would
             # duplicate the narrative and destabilize evidence selection.
@@ -657,7 +700,7 @@ def _blocks(root: _Node, member_sha: str) -> list[dict[str, Any]]:
             continue
         if any(
             child.tag in structural_block_tags
-            and child.tag not in fact_tags
+            and not _is_inline_fact(child)
             and not _is_inline_wrapper(child)
             and _visible_text_cached(child, visible_text_cache, hidden_cache)
             for child in node.children
@@ -817,7 +860,7 @@ def _tables(
             hidden_cache=hidden_cache,
         )
         nested_table_present = any(node.tag == "table" for node in _descendants(table_node))
-        inline_xbrl_fact_present = any(_local(node.tag) in {"nonfraction", "nonnumeric"} for node in _descendants(table_node))
+        inline_xbrl_fact_present = any(_is_inline_fact(node) for node in _descendants(table_node))
         visibility_signals = _visibility_signals(table_node, hidden_cache=hidden_cache)
         style_signals = _style_signals(table_node)
         candidate_signals: list[str] = []
@@ -862,7 +905,7 @@ def _tables(
                     "source_member_sha256": member_sha,
                     "visibility_signals": _visibility_signals(cell, hidden_cache=hidden_cache),
                     "style_signals": _style_signals(cell),
-                    "inline_xbrl_fact_present": any(_local(child.tag) in {"nonfraction", "nonnumeric"} for child in _descendants(cell)),
+                    "inline_xbrl_fact_present": any(_is_inline_fact(child) for child in _descendants(cell)),
                     "raw_fact_ids": [],
                 }
                 origin_cells.append(row_record)
@@ -1005,6 +1048,8 @@ def _contexts_and_units(
     units: dict[str, dict[str, Any]] = {}
     dom_nodes: Iterable[_Node] = () if source_mode == "XBRL_INSTANCE_PRIMARY" else _descendants(root)
     for node in dom_nodes:
+        if not _is_xbrl_dom(node):
+            continue
         local = _local(node.tag)
         if local == "context":
             context_id = _attr(node, "id")
@@ -1012,12 +1057,23 @@ def _contexts_and_units(
                 continue
             period: dict[str, Any] = {}
             for child in _descendants(node):
+                if not _is_xbrl_dom(child):
+                    continue
                 child_local = _local(child.tag)
                 if child_local in {"instant", "startdate", "enddate"}:
                     period[child_local] = _text(child)
-            identifier = next((_text(child) for child in _descendants(node) if _local(child.tag) == "identifier"), None)
+            identifier = next(
+                (
+                    _text(child)
+                    for child in _descendants(node)
+                    if _is_xbrl_dom(child, "identifier")
+                ),
+                None,
+            )
             dimensions: list[dict[str, Any]] = []
             for child in _descendants(node):
+                if child.namespace_uri != XBRL_DIMENSIONS_NAMESPACE:
+                    continue
                 child_local = _local(child.tag)
                 if child_local == "explicitmember":
                     member_qname = _text(child)
@@ -1047,7 +1103,11 @@ def _contexts_and_units(
             unit_id = _attr(node, "id")
             if not unit_id:
                 continue
-            measures = [_text(child) for child in _descendants(node) if _local(child.tag) == "measure"]
+            measures = [
+                _text(child)
+                for child in _descendants(node)
+                if _is_xbrl_dom(child, "measure")
+            ]
             units[unit_id] = {"id": unit_id, "measures": measures}
     if source_mode == "XBRL_INSTANCE_PRIMARY" and instance_member is not None:
         for member in (instance_member,):
@@ -1055,7 +1115,11 @@ def _contexts_and_units(
                 xml_root = ET.fromstring(member.body)
             except ET.ParseError:
                 continue
+            if not _is_valid_xbrl_instance_root(xml_root):
+                continue
             for element in xml_root.iter():
+                if _xml_namespace(str(element.tag)) != XBRL_INSTANCE_NAMESPACE:
+                    continue
                 local = _xml_local(str(element.tag))
                 if local == "context":
                     context_id = element.attrib.get("id")
@@ -1065,13 +1129,14 @@ def _contexts_and_units(
                     identifier: str | None = None
                     dimensions: list[dict[str, Any]] = []
                     for child in element.iter():
+                        child_namespace = _xml_namespace(str(child.tag))
                         child_local = _xml_local(str(child.tag))
                         text = _xml_text(child)
-                        if child_local in {"instant", "startdate", "enddate"}:
+                        if child_namespace == XBRL_INSTANCE_NAMESPACE and child_local in {"instant", "startdate", "enddate"}:
                             period[child_local] = text
-                        elif child_local == "identifier":
+                        elif child_namespace == XBRL_INSTANCE_NAMESPACE and child_local == "identifier":
                             identifier = text
-                        elif child_local in {"explicitmember", "typedmember"}:
+                        elif child_namespace == XBRL_DIMENSIONS_NAMESPACE and child_local in {"explicitmember", "typedmember"}:
                             dimensions.append(
                                 {
                                     "dimension_kind": "EXPLICIT" if child_local == "explicitmember" else "TYPED",
@@ -1098,7 +1163,8 @@ def _contexts_and_units(
                         "measures": [
                             "" if child.text is None else " ".join(child.text.split())
                             for child in element.iter()
-                            if _xml_local(str(child.tag)) == "measure"
+                                if _xml_namespace(str(child.tag)) == XBRL_INSTANCE_NAMESPACE
+                                and _xml_local(str(child.tag)) == "measure"
                         ],
                         "source_member_sha256": member.member_sha256,
                     }
@@ -1127,7 +1193,7 @@ def _facts(
     continuation_targets = continuation_targets or {}
     duplicate_continuation_targets = duplicate_continuation_targets or set()
     for index, node in enumerate(_descendants(root)):
-        if _local(node.tag) not in {"nonfraction", "nonnumeric"}:
+        if not _is_inline_fact(node):
             continue
         locator = _path(node)
         context_ref = _attr(node, "contextref") or _attr(node, "context_ref")
@@ -1274,6 +1340,29 @@ def _xml_local(tag: str) -> str:
     return _local(text)
 
 
+def _xml_namespace(tag: str) -> str | None:
+    text = str(tag)
+    if text.startswith("{") and "}" in text:
+        return text[1:].split("}", 1)[0]
+    return None
+
+
+def _is_valid_xbrl_instance_root(root: ET.Element | None) -> bool:
+    return (
+        root is not None
+        and
+        _xml_namespace(str(root.tag)) == XBRL_INSTANCE_NAMESPACE
+        and _xml_local(str(root.tag)) == "xbrl"
+    )
+
+
+def _parse_xml_root(body: bytes) -> ET.Element | None:
+    try:
+        return ET.fromstring(body)
+    except ET.ParseError:
+        return None
+
+
 def _xml_facts(
     package: SecFilingPackage,
     contexts: dict[str, dict[str, Any]],
@@ -1302,11 +1391,17 @@ def _xml_facts(
             xml_root = ET.fromstring(member.body)
         except ET.ParseError:
             continue
+        if not _is_valid_xbrl_instance_root(xml_root):
+            continue
         namespaces = _xml_namespace_map(member.body)
         for index, (element, locator) in enumerate(_xml_walk(xml_root)):
             attrs = {str(key).casefold(): str(value) for key, value in element.attrib.items()}
             context_ref = _xml_attr_local(element, "contextref") or _xml_attr_local(element, "context_ref")
-            if not context_ref or _xml_local(str(element.tag)) in ignored_elements:
+            if (
+                not context_ref
+                or _xml_namespace(str(element.tag)) == XBRL_INSTANCE_NAMESPACE
+                and _xml_local(str(element.tag)) in ignored_elements
+            ):
                 continue
             unit_ref = _xml_attr_local(element, "unitref") or _xml_attr_local(element, "unit_ref")
             raw_qname = _xml_qname(str(element.tag), namespaces)
@@ -1755,11 +1850,20 @@ def parse_sec_package(
     sections = _sections(root_node, page_by_locator, primary.member_sha256)
     tables, cell_by_locator, cell_metadata = _tables(root_node, page_by_locator, primary.member_sha256, package.package_sha256)
     inline_fact_present = any(
-        _local(node.tag) in {"nonfraction", "nonnumeric"}
+        _is_inline_fact(node)
         for node in _descendants(root_node)
     )
+    invalid_instance_members = [
+        member
+        for member in package.members
+        if member.role is SecMemberRole.XBRL_INSTANCE
+        and not _is_valid_xbrl_instance_root(_parse_xml_root(member.body))
+    ]
     instance_members = [
-        member for member in package.members if member.role is SecMemberRole.XBRL_INSTANCE
+        member
+        for member in package.members
+        if member.role is SecMemberRole.XBRL_INSTANCE
+        and _is_valid_xbrl_instance_root(_parse_xml_root(member.body))
     ]
     if inline_fact_present:
         fact_source_mode = "INLINE_XBRL_PRIMARY"
@@ -1822,6 +1926,14 @@ def parse_sec_package(
     facts.extend(xml_facts)
     evidence.extend(xml_evidence)
     issues.extend(xml_issues)
+    for member in invalid_instance_members:
+        issues.append(
+            {
+                "code": P11Reason.P11_PACKAGE_INVALID.value,
+                "severity": "BLOCKING",
+                "message": f"SEC XBRL instance member has an unauthentic root namespace: {member.relative_name}",
+            }
+        )
     _attach_facts_to_tables(tables, facts)
     root.mkdir(parents=True, exist_ok=True)
     temp_dir = root / f".{package.package_sha256}.{uuid.uuid4().hex}.tmp"
@@ -1855,7 +1967,11 @@ def parse_sec_package(
 
 __all__ = [
     "SEC_ARTIFACT_SCHEMA",
+    "SEC_FACT_SOURCE_MODES",
+    "INLINE_XBRL_NAMESPACES",
     "SecParseResult",
+    "XBRL_DIMENSIONS_NAMESPACE",
+    "XBRL_INSTANCE_NAMESPACE",
     "VIRTUAL_HTML_NORMALIZER_VERSION",
     "load_sec_artifacts",
     "parse_sec_package",
