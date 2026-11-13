@@ -11,11 +11,17 @@ Scope contract:
 Post-acceptance correction authority:
 `design/33-p11-post-acceptance-design-correction.md`
 
+Explicit 6-K scope correction:
+`design/34-p11-explicit-6k-scope-correction.md`
+
 Review 4 repair correction:
 `design/35-p11-repair-140-143-design-correction.md`
 
 Review 5 trust-boundary correction:
 `design/36-p11-review5-trust-boundary-correction.md`
+
+Review 5 freeze consistency and Raw Fact binding correction:
+`design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md`
 
 Review 5 exact-candidate result:
 `development/192-p11-fresh-full-exact-candidate-review-5.md = CHANGES_REQUIRED`
@@ -50,7 +56,7 @@ logic is added after acceptance. Design and implementation must not first appear
 together in one production candidate commit.
 
 Development is currently blocked pending ChatGPT review and authorization of
-Design 36.
+Design 37.
 
 ## 2. Roles
 
@@ -59,7 +65,7 @@ Design 36.
 PC Agent must:
 
 1. read the corrected design baseline completely;
-2. implement P11-ISSUE-123 through P11-ISSUE-130 as one coherent repair;
+2. implement the explicitly authorized current-cycle issue scope as one coherent repair;
 3. preserve accepted CN/HK behavior;
 4. add deterministic regression tests for every repaired issue;
 5. produce one exact merge-ready candidate SHA;
@@ -68,6 +74,19 @@ PC Agent must:
    new formal plan.
 
 PC Agent must not alter the corrected design contract without a STOP/design issue.
+
+The current Review 5 development cycle is limited to:
+
+```text
+ISSUE-142 residual implementation
+ISSUE-143 residual implementation
+ISSUE-145 implementation
+```
+
+`ISSUE-140` and `ISSUE-141` are already fixed and require regression
+preservation only. `ISSUE-144` is a governance correction and has no production
+implementation scope. Historical ISSUE-123..139 records remain historical and
+must not be erased or silently reopened as the current scope.
 
 ### 2.2 ChatGPT
 
@@ -201,7 +220,13 @@ Required behavior:
 - unknown future SEC schema fails closed before mutation;
 - CN/HK `user_version=1` and accepted rows unchanged;
 - V4/v1 US parsed artifacts not reusable as corrected current artifacts;
-- immutable old raw SEC packages may be reparsed to V5/v2 after current discovery;
+- pre-V6 parsed artifacts are incompatible with the current parser contract;
+- the current parser is VIRTUAL_HTML_V6 and current parsed artifacts use
+  p11-sec-artifacts-v2;
+- immutable raw SEC packages remain reusable as local parse input;
+- existing V6/v2 parsed artifacts may be loaded locally, but validation-v2
+  results cannot qualify for REUSE_DATA under the stronger contract;
+- validation-v3 must execute before REUSE_DATA becomes eligible;
 - no destructive raw-store migration.
 
 ## 4.10 Review 5 — Design 36 trust-boundary freeze
@@ -229,6 +254,9 @@ Design 36 requires the next implementation to:
 - replay every logical fact's context/unit references from immutable source
   nodes, including actual source-node reference equality and same-member
   context/unit resolution;
+- independently replay the Raw Fact semantic payload and compare its raw value,
+  QName, metric identity, source attributes, locator, fragment/continuation
+  chain, and deterministic numeric candidate against the authoritative source;
 - reject authentic XBRL instance bytes whose package role is inconsistent;
 - preserve the `NO_STRUCTURED_FACTS` zero-fact/evidence invariant.
 
@@ -242,11 +270,11 @@ SEC_VALIDATION_SCHEMA = p11-sec-validation-v3
 SEC_REGISTRY_SCHEMA_VERSION = 4
 ```
 
-The validation schema changes because stronger source-node replay changes
-validation acceptance semantics. V6 parsed artifacts remain usable as local
-parse input, old validation-v2 results cannot qualify for `REUSE_DATA`, and
-immutable raw SEC packages remain reusable. No development implementation is
-authorized until ChatGPT reviews this section and Design 36.
+The validation schema changes because stronger source-node replay and Raw Fact
+binding change validation acceptance semantics. V6 parsed artifacts remain
+usable as local parse input, old validation-v2 results cannot qualify for
+`REUSE_DATA`, and immutable raw SEC packages remain reusable. No development
+implementation is authorized until ChatGPT reviews Design 37.
 
 Formal Test Plan remains:
 
@@ -254,6 +282,89 @@ Formal Test Plan remains:
 NOT CREATED
 NOT AUTHORIZED
 ```
+
+## 4.11 Review 5 development verification matrix
+
+These are development tests, not Formal Acceptance. They may be implemented only
+after ChatGPT authorizes Design 37.
+
+### ISSUE-142 residual history validation
+
+The focused suite must cover:
+
+```text
+filings.files absent → valid empty inventory
+filings.files non-list → BLOCK
+descriptor non-object → BLOCK
+name missing → BLOCK
+name non-string → BLOCK
+name empty → BLOCK
+unsafe name → BLOCK
+duplicate normalized name → BLOCK
+filingFrom non-string → BLOCK
+filingTo non-string → BLOCK
+trailing date garbage → BLOCK
+invalid calendar date → BLOCK
+reversed range → BLOCK
+missing ranges → conservatively selected
+ancient provably irrelevant → excluded
+late amendment range → selected
+all descriptors validated before first history fetch
+online source set == P7 reconstruction source set
+```
+
+The validated-before-fetch fixture must include one apparently selectable valid
+descriptor and one malformed descriptor, and must prove history fetch count is
+zero before the blocking error.
+
+### ISSUE-143 source-node replay
+
+The focused suite must cover:
+
+```text
+valid Inline source chain → PASS
+valid instance source chain → PASS
+fact context_ref tamper → BLOCK
+fact unit_ref tamper → BLOCK
+persisted context semantic payload tamper → BLOCK
+persisted unit semantic payload tamper → BLOCK
+context/unit present only in another member → BLOCK
+authentic XBRL instance bytes with OTHER/wrong role → BLOCK
+two authentic instance roots across package members → BLOCK
+DOM fact in instance mode → BLOCK
+XML fact in Inline mode → BLOCK
+```
+
+### ISSUE-145 Raw Fact semantic binding
+
+The focused suite must cover both source modes where applicable:
+
+```text
+fact raw_value tamper while evidence remains valid → BLOCK
+fact raw_qname tamper while evidence remains valid → BLOCK
+raw_metric_name tamper → BLOCK
+parsed_numeric_candidate tamper → BLOCK
+decimals/precision/scale/sign/nil source-attribute tamper → BLOCK as applicable
+fact fragment_hash differs from evidence/source → BLOCK
+fact source_fragments differ from evidence/source continuation chain → BLOCK
+fact/evidence locator divergence → BLOCK
+```
+
+### Validation migration
+
+The suite must prove:
+
+```text
+existing V6 / artifacts-v2 + validation-v2
+→ REUSE_DATA denied
+
+same raw package + same V6 parsed artifact
+→ no parsed artifact mutation required
+→ P7 validation-v3 executes
+→ valid result becomes reusable only after v3 PASS
+```
+
+Old validation-v2 artifact bytes remain immutable.
 
 ## 6. Candidate commit rules
 
