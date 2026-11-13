@@ -265,6 +265,43 @@ def test_unbound_literal_link_prefix_does_not_authorize_fetch(tmp_path: Path) ->
     assert calls.count(archive_member_url(CIK, ACCESSION, schema_name)) == 0
 
 
+def test_selected_generic_linkbase_xml_recurses_namespace_auth_dependencies(tmp_path: Path) -> None:
+    support_name = "generic-support.xml"
+    dependency_name = "generic-next.xsd"
+    primary_body = (
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' "
+        "xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
+        f"<link:schemaRef xlink:href='{support_name}'>"
+        "</head><body>filing</body></html>"
+    ).encode("utf-8")
+    support_body = (
+        b"<link:linkbase xmlns:link='http://www.xbrl.org/2003/linkbase' "
+        b"xmlns:xlink='http://www.w3.org/1999/xlink'>"
+        b"<link:schemaRef xlink:href='generic-next.xsd'/>"
+        b"</link:linkbase>"
+    )
+    result, calls = _acquire(
+        tmp_path,
+        items=[
+            {"name": PRIMARY},
+            {"name": support_name, "type": "text.gif"},
+            {"name": dependency_name, "type": "text.gif"},
+        ],
+        bodies={
+            PRIMARY: primary_body,
+            support_name: support_body,
+            dependency_name: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
+        },
+    )
+
+    names = {member.relative_name for member in result.package.members}
+    assert names == {PRIMARY, support_name, dependency_name}
+    support = next(member for member in result.package.members if member.relative_name == support_name)
+    assert support.role is SecMemberRole.OTHER
+    assert calls.count(archive_member_url(CIK, ACCESSION, support_name)) == 1
+    assert calls.count(archive_member_url(CIK, ACCESSION, dependency_name)) == 1
+
+
 def test_xml_support_member_generic_or_wrong_namespace_links_do_not_expand_fetch(tmp_path: Path) -> None:
     support_name = "support.xml"
     forbidden_name = "generic-next.xml"
