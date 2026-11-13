@@ -590,3 +590,39 @@ def test_p7_blocks_instance_fact_whose_logical_source_member_is_tampered(tmp_pat
         for issue in validation.issues
     )
 
+def test_p7_blocks_inline_fact_locator_that_resolves_to_non_ixbrl_dom_node(tmp_path: Path) -> None:
+    package = _hidden_fact_package()
+    parsed = parse_sec_package(package, tmp_path / "p11")
+    facts = [dict(row) for row in parsed.facts]
+    fact = facts[0]
+    assert str(fact.get("block_dom_locator") or "").startswith("/")
+    fact["dom_locator"] = fact["block_dom_locator"]
+    tampered = replace(parsed, facts=tuple(facts))
+
+    validation = validate_sec_artifacts(tampered, tmp_path / "p7", package=package)
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(
+        issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value
+        for issue in validation.issues
+    )
+
+
+def test_p7_blocks_instance_fact_locator_that_resolves_to_non_fact_xml_node(tmp_path: Path) -> None:
+    package = _xml_package()
+    parsed = parse_sec_package(package, tmp_path / "p11")
+    facts = [dict(row) for row in parsed.facts]
+    locator = str(facts[0]["xml_locator"])
+    parent_locator = locator.rsplit("/", 1)[0]
+    assert parent_locator.startswith("/")
+    facts[0]["xml_locator"] = parent_locator
+    tampered = replace(parsed, facts=tuple(facts))
+
+    validation = validate_sec_artifacts(tampered, tmp_path / "p7", package=package)
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(
+        issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value
+        for issue in validation.issues
+    )
+
