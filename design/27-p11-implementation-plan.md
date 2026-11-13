@@ -1,6 +1,6 @@
 # 27 — P11 US SEC Provider Implementation Plan
 
-Status: **CORRECTED REPAIR CYCLE ACTIVE — PRIOR ACCEPTANCE INVALIDATED FOR MERGE**
+Status: **DESIGN 36 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
 
 Detailed design:
 `design/26-p11-sec-provider-design.md`
@@ -11,6 +11,15 @@ Scope contract:
 Post-acceptance correction authority:
 `design/33-p11-post-acceptance-design-correction.md`
 
+Review 4 repair correction:
+`design/35-p11-repair-140-143-design-correction.md`
+
+Review 5 trust-boundary correction:
+`design/36-p11-review5-trust-boundary-correction.md`
+
+Review 5 exact-candidate result:
+`development/192-p11-fresh-full-exact-candidate-review-5.md = CHANGES_REQUIRED`
+
 Re-audit:
 `development/178-p11-full-design-code-consistency-reaudit.md`
 
@@ -19,24 +28,29 @@ Re-audit:
 The previous P11 acceptance cycle is historical evidence only. It does not authorize
 main integration after the re-audit/design correction.
 
-The corrected lifecycle is:
+The current lifecycle is:
 
 ```text
-CORRECTED DESIGN FREEZE
-→ PC AGENT ONE-PASS REPAIR DEVELOPMENT
-→ MERGE-READY PRODUCTION CANDIDATE
-→ CHATGPT EXACT-CANDIDATE CODE REVIEW
-→ CHATGPT NEW FORMAL TEST PLAN
-→ PC AGENT ONE-PASS FORMAL TEST EXECUTION
-→ GIT TEST EVIDENCE
-→ CHATGPT INDEPENDENT VERIFICATION
-→ ACCEPT / FIX
-→ MERGE EXACT ACCEPTED CANDIDATE
-→ CLOSEOUT
+DESIGN-ONLY COMMIT/FREEZE
+→ CHATGPT DESIGN REVIEW
+→ DEVELOPMENT INSTRUCTION
+→ PC AGENT IMPLEMENTATION
+→ DEVELOPMENT TESTS
+→ EXACT PRODUCTION CANDIDATE FREEZE
+→ DEVELOPMENT EVIDENCE
+→ CHATGPT FRESH FULL EXACT-CANDIDATE REVIEW
+→ only after REVIEW_PASS:
+   FORMAL TEST PLAN
+→ FORMAL ACCEPTANCE
+→ MAIN MERGE / CLOSEOUT
 ```
 
 The merge-ready candidate must already contain production US behavior. No production
-logic is added after acceptance.
+logic is added after acceptance. Design and implementation must not first appear
+together in one production candidate commit.
+
+Development is currently blocked pending ChatGPT review and authorization of
+Design 36.
 
 ## 2. Roles
 
@@ -175,9 +189,9 @@ Target constants:
 REGISTRY_SCHEMA_VERSION = 1
 SEC_REGISTRY_SCHEMA_VERSION = 4
 SEC_DISCOVERY_SCHEMA = p11-sec-discovery-v1
-VIRTUAL_HTML_NORMALIZER_VERSION = VIRTUAL_HTML_V5
+VIRTUAL_HTML_NORMALIZER_VERSION = VIRTUAL_HTML_V6
 SEC_ARTIFACT_SCHEMA = p11-sec-artifacts-v2
-SEC_VALIDATION_SCHEMA = p11-sec-validation-v2
+SEC_VALIDATION_SCHEMA = p11-sec-validation-v3
 ```
 
 Required behavior:
@@ -189,6 +203,57 @@ Required behavior:
 - V4/v1 US parsed artifacts not reusable as corrected current artifacts;
 - immutable old raw SEC packages may be reparsed to V5/v2 after current discovery;
 - no destructive raw-store migration.
+
+## 4.10 Review 5 — Design 36 trust-boundary freeze
+
+The latest design authority is `design/36-p11-review5-trust-boundary-correction.md`.
+The exact-candidate Review 5 result is `CHANGES_REQUIRED`.
+
+Current issue disposition:
+
+```text
+ISSUE-140 = FIXED
+ISSUE-141 = FIXED
+ISSUE-142 = repair still required
+ISSUE-143 = repair still required
+ISSUE-144 = design/governance corrected by Design 36
+```
+
+Design 36 requires the next implementation to:
+
+- fail closed for every malformed or unsafe `filings.files` descriptor;
+- require strict `YYYY-MM-DD` history range syntax without coercion,
+  truncation, or trailing-garbage acceptance;
+- retain the shared complete-but-minimal history selector and conservative
+  handling of missing ranges;
+- replay every logical fact's context/unit references from immutable source
+  nodes, including actual source-node reference equality and same-member
+  context/unit resolution;
+- reject authentic XBRL instance bytes whose package role is inconsistent;
+- preserve the `NO_STRUCTURED_FACTS` zero-fact/evidence invariant.
+
+Next-cycle version contract:
+
+```text
+SEC_DISCOVERY_SCHEMA = p11-sec-discovery-v1
+VIRTUAL_HTML_NORMALIZER_VERSION = VIRTUAL_HTML_V6
+SEC_ARTIFACT_SCHEMA = p11-sec-artifacts-v2
+SEC_VALIDATION_SCHEMA = p11-sec-validation-v3
+SEC_REGISTRY_SCHEMA_VERSION = 4
+```
+
+The validation schema changes because stronger source-node replay changes
+validation acceptance semantics. V6 parsed artifacts remain usable as local
+parse input, old validation-v2 results cannot qualify for `REUSE_DATA`, and
+immutable raw SEC packages remain reusable. No development implementation is
+authorized until ChatGPT reviews this section and Design 36.
+
+Formal Test Plan remains:
+
+```text
+NOT CREATED
+NOT AUTHORIZED
+```
 
 ## 6. Candidate commit rules
 

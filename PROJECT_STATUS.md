@@ -6,19 +6,22 @@
 
 ## Current state
 
-**P11_REOPENED / DESIGN_READY / P0_P10_ACCEPTED_BASELINE_PRESERVED**
+**P11_REVIEW_5_CHANGES_REQUIRED / DESIGN_FROZEN / DEVELOPMENT_AWAITING_AUTHORIZATION / P0_P10_ACCEPTED_BASELINE_PRESERVED**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = REOPENED / DESIGN READY / PRODUCTION NOT YET IMPLEMENTED`
+`P11 = REVIEW 5 CHANGES_REQUIRED / DESIGN FROZEN / DEVELOPMENT NOT AUTHORIZED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
-- detailed design: `design/26-p11-sec-provider-design.md`;
+- detailed design authority chain: `design/26-p11-sec-provider-design.md` + `design/32-p11-us-scope-reopening.md` + `design/33-p11-post-acceptance-design-correction.md` + `design/34-p11-explicit-6k-scope-correction.md` + `design/35-p11-repair-140-143-design-correction.md` + `design/36-p11-review5-trust-boundary-correction.md`;
 - implementation plan: `design/27-p11-implementation-plan.md`;
 - authorization: `development/147-p11-us-scope-reopening-authorization.md`.
+- Review 5: `development/192-p11-fresh-full-exact-candidate-review-5.md = CHANGES_REQUIRED`;
+- ISSUE-140/141: `FIXED`; ISSUE-142/143: `OPEN / PARTIAL`; ISSUE-144: `DESIGN GOVERNANCE CORRECTION`;
+- development authorization for Design 36: `NOT YET ISSUED`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -713,23 +716,23 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`
+- P11 — US SEC Provider: `REVIEW 5 CHANGES_REQUIRED / DESIGN FROZEN / DEVELOPMENT AWAITING AUTHORIZATION`
 
 
 ## P11 short execution workflow
 
-Current execution model:
+Current P11 execution model:
 
 ```text
-Design Freeze
-→ PC Agent one-pass development
-→ exact Git production candidate
-→ ChatGPT code review
-→ ChatGPT formal test plan
-→ PC Agent one-pass formal test
-→ Git test evidence
-→ ChatGPT independent verification
-→ merge / closeout
+DESIGN-ONLY COMMIT/FREEZE
+→ CHATGPT DESIGN REVIEW
+→ DEVELOPMENT INSTRUCTION
+→ PC AGENT IMPLEMENTATION
+→ DEVELOPMENT TESTS
+→ EXACT PRODUCTION CANDIDATE FREEZE
+→ DEVELOPMENT EVIDENCE
+→ CHATGPT FRESH FULL EXACT-CANDIDATE REVIEW
+→ only after REVIEW_PASS: FORMAL TEST PLAN / ACCEPTANCE / MERGE
 ```
 
 No artificial component-by-component development phases are required. A repair loop is used only when an actual design/code/test defect is found.
