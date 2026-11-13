@@ -244,6 +244,65 @@ def test_namespace_lookalikes_do_not_authorize_semantic_fetch(tmp_path: Path) ->
         assert calls.count(archive_member_url(CIK, ACCESSION, name)) == 0
 
 
+def test_unbound_literal_link_prefix_does_not_authorize_fetch(tmp_path: Path) -> None:
+    schema_name = "unbound-link.xsd"
+    primary_body = (
+        "<html xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
+        f"<link:schemaRef xlink:href='{schema_name}'>"
+        "</head><body>filing</body></html>"
+    ).encode("utf-8")
+    result, calls = _acquire(
+        tmp_path,
+        items=[{"name": PRIMARY}, {"name": schema_name, "type": "text.gif"}],
+        bodies={
+            PRIMARY: primary_body,
+            schema_name: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
+        },
+        forbidden_names={schema_name},
+    )
+
+    assert schema_name not in {member.relative_name for member in result.package.members}
+    assert calls.count(archive_member_url(CIK, ACCESSION, schema_name)) == 0
+
+
+def test_xml_support_member_generic_or_wrong_namespace_links_do_not_expand_fetch(tmp_path: Path) -> None:
+    support_name = "support.xml"
+    forbidden_name = "generic-next.xml"
+    primary_body = (
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' "
+        "xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
+        f"<link:schemaRef xlink:href='{support_name}'>"
+        "</head><body>filing</body></html>"
+    ).encode("utf-8")
+    support_body = (
+        b"<xbrli:xbrl xmlns:xbrli='http://www.xbrl.org/2003/instance' "
+        b"xmlns:fake='https://example.invalid/not-linkbase' "
+        b"xmlns:xlink='http://www.w3.org/1999/xlink'>"
+        b"<fake:schemaRef xlink:href='generic-next.xml'/>"
+        b"<attachment href='generic-next.xml'/>"
+        b"</xbrli:xbrl>"
+    )
+    result, calls = _acquire(
+        tmp_path,
+        items=[
+            {"name": PRIMARY},
+            {"name": support_name, "type": "text.gif"},
+            {"name": forbidden_name, "type": "text.gif"},
+        ],
+        bodies={
+            PRIMARY: primary_body,
+            support_name: support_body,
+            forbidden_name: b"<attachment />",
+        },
+        forbidden_names={forbidden_name},
+    )
+
+    names = {member.relative_name for member in result.package.members}
+    assert names == {PRIMARY, support_name}
+    assert calls.count(archive_member_url(CIK, ACCESSION, support_name)) == 1
+    assert calls.count(archive_member_url(CIK, ACCESSION, forbidden_name)) == 0
+
+
 def test_t134_03_generic_xml_hyperlink_is_rejected(tmp_path: Path) -> None:
     generic_name = "unrelated.xml"
     primary_body = (
