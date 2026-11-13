@@ -1,735 +1,478 @@
 # Project Status
 
-## Repository
+Updated: 2026-11-13
+
+Repository:
 
 `projectforkk/FinancialFilingDataFoundation`
 
-## Current state
+Current development branch:
 
-**P11_REOPENED / DESIGN_READY / P0_P10_ACCEPTED_BASELINE_PRESERVED**
+`task/p11-sec-rebuild-development`
 
-Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
+This file is the concise current-state index. Historical development/review/acceptance documents remain the audit trail and must not be rewritten to match the latest state.
 
-P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
+---
 
-`P11 = REOPENED / DESIGN READY / PRODUCTION NOT YET IMPLEMENTED`
-
-Current P11 design:
-- scope reopening: `design/32-p11-us-scope-reopening.md`;
-- detailed design: `design/26-p11-sec-provider-design.md`;
-- implementation plan: `design/27-p11-implementation-plan.md`;
-- authorization: `development/147-p11-us-scope-reopening-authorization.md`.
-
-Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
-
-Post-closeout operational user CLI (2026-11-05): `ffdf acquire`, `ffdf ingest`, and `ffdf status` are available for CN/HK self-service operation. This is an orchestration surface over the accepted P0-P10 components and does not reopen market/provider scope. CLI focused tests: `5 passed`; current full unit regression: `450 passed / 0 failed`; design: `design/31-user-cli-design.md`; implementation record: `development/146-user-cli-implementation.md`.
-
-## Accepted baseline
-
-- phase: `P10_DONE`
-- frozen acceptance candidate: `183ca5dc89a606715a3e352bf92a235f7aa31fad`
-- reviewed production candidate: `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
-- final formal production review: `development/119-p10-l-formal-code-review-result.md = PASS`
-- final acceptance-package review: `development/134-p10-acceptance-package-formal-review-result.md = PASS`
-- acceptance verdict: `PASS`
-- acceptance evidence: `acceptance/40-p10-independent-acceptance-result.md`
-- accepted merge commit: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`
-- accepted_baseline_sha: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`
-- main integration evidence commit: `230968937a8ebdcbde56982a22b37125e4aefff4`
-- acceptance focused P10: `136 passed`
-- acceptance full unit: `444 passed`
-- final main focused P10: `136 passed in 22.66s`
-- final main full unit: `444 passed in 45.79s`
-- live CN 600519 FY2024: `COMPLETE / PASS`
-- negative capability K1-K5: `PASS`
-- accepted base immutability: `47 / 47 files unchanged`
-- blocker: `NONE`
-
-## Phase history
-
-### P0 — Native PDF Parsing Feasibility Probe
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/05-p0-acceptance-result.md`
-- closeout: `edff06b2b1138b50d742e92ce8b8df628c6d2c61`
-
-### P1 — Identity / Registry / Incremental Planner
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/08-p1-acceptance-result.md`
-- frozen candidate: `3b382f4091a96a2dff40144253da42bf8de1fcc2`
-- accepted merge: `1cb6e88be318c0a1424d74ee601c336075361cd6`
-
-### P2 — Acquisition Provider
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/11-p2-acceptance-result.md`
-- frozen candidate: `803fe3d09bb69a6b378c4e619de00fde95aa9456`
-- reviewed production candidate: `881c80be1938a128448ea3ed0b4e2cb962f46018`
-- accepted merge: `4add9fff36b61e2521e9c8d749cee829adb4ab6f`
-- deterministic suite: `87 passed`
-- live CN / HK: `PASS`
-- Dayu pin: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
-
-### P3 — Native Page / Section / FTS
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/14-p3-acceptance-result.md`
-- frozen candidate: `7b81c97e73448389e38cf9936a8af7dfe074d1e1`
-- reviewed production candidate: `3c3536db0bdfdfbc5300004731b04d992930904f`
-- full suite: `104 passed in 2.65s`
-- CN fresh dual-root: `PASS`
-- HK fresh dual-root: `PASS`
-- accepted merge: `24cb4571a9d9f97b4b963d6339970c931d979c4d`
-
-### P4 — Table Candidate Detection
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/17-p4-acceptance-result.md`
-- frozen candidate: `647d6179bdde9e370185fea1d389f0087370faae`
-- reviewed production candidate: `ea78b2f9adbf0ad6564146ba166da85d1085bf81`
-- full suite: `133 passed`
-- live CN / HK: `PASS`
-- accepted merge: `97f2de24861347c97bf875e7b72899eb11ab56c2`
-
-### P5 — Table Reconstruction / Cross-page
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/20-p5-acceptance-result.md`
-- frozen candidate: `44ddd73d736f1da64bab38641091a8c6d55c9990`
-- reviewed production candidate: `2c4bafd36b59defd4ff47eeb16713cbee64e739e`
-- full suite: `156 passed`
-- live CN / HK: `PASS`
-- accepted merge: `8ff01cd3feed41c4b81aff88bce6502d50e8f32e`
-
-### P6 — Raw Facts / Evidence
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/23-p6-acceptance-result.md`
-- frozen candidate: `07cb4258e1f2083b7c930686b637acdd89b03d0a`
-- reviewed candidate: `bb31515b4fc6ac09aea0aed0cf14262555a7398e`
-- full suite: `189 passed`
-- live CN/HK: `PASS`
-- accepted merge: `d13b62778d123ba109c5f8ab2329d121d81b186b`
-
-### P7 — Quality Gate / Validation
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/26-p7-acceptance-result.md`
-- frozen candidate: `8edb68a885ebcd80a0bdc31567e7adcd0aea19fd`
-- reviewed candidate: `0b1ffcec4fa4416724a6c505a9706eb41999bead`
-- full suite: `213 passed`
-- live CN/HK deterministic validation: `PASS`
-- accepted merge: `5f314bab9d88fb16b4b46c662e0a9f1b8f1a9b13`
-
-### P8 — Local MCP
-
-- status: `DONE / PASS`
-- acceptance evidence: `acceptance/33-p8-issue006-acceptance-result.md`
-- frozen candidate: `31525235a44c8576d22fba542438b491e15e653b`
-- reviewed candidate: `537ebbd17454f80c8838f58abbbd02d5994f8716`
-- full suite: `235 passed`
-- official MCP protocol: `2026-07-28`
-- exact tools: `11 / 11 PASS`
-- live CN/HK MCP queries: `PASS`
-- runtime package lock: `30 / 30 MATCH`
-- runtime lock byte reproducibility: `PASS`
-- P8-ISSUE-006 dual-runtime test boundary: `PASS`
-- accepted merge: `ee934ad05812c69b79f76db43e62cfd4050efb8e`
-
-### P9 — Codex Review Overlay
-
-- status: `DONE / PASS`
-- final production candidate: `66308627d1dd1f0af2f02ff3f18d3e91f33dcc8d`
-- final reviewed/evidence candidate: `e7822438c80964f29960c3dafa278a5ede8cdc44`
-- final formal review: `development/74-p9-jr3-formal-rereview-result.md` = `PASS`
-- frozen acceptance candidate: `926c665f5dd667765781630638c62239b267ceb7`
-- acceptance evidence: `acceptance/37-p9-acceptance-result.md`
-- acceptance focused: `73 passed`
-- acceptance synthetic: `2 passed, 71 deselected`
-- acceptance full unit: `308 passed`
-- CN 600519 FY2024 live acceptance: `PASS`
-- HK 00700 FY2024 live acceptance: `PASS`
-- base immutability: `23 / 23 files unchanged`
-- post-merge full regression: `308 passed in 23.74s`
-- accepted merge: `58a1d2236b68a56fc66ddf8b97603e7232c87265`
-
-### P10 — Codex Dynamic Research Integration
-
-- status: `DONE / PASS`
-- starting main: `e9b30626f2b88ac5527d42bd76d0b682efbeef0e`
-- production candidate: `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
-- accepted candidate: `183ca5dc89a606715a3e352bf92a235f7aa31fad`
-- acceptance evidence: `acceptance/40-p10-independent-acceptance-result.md = PASS`
-- accepted merge: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`
-- main integration evidence: `230968937a8ebdcbde56982a22b37125e4aefff4`
-- closeout: `development/142-p10-closeout.md`
-- final main research: `136 passed in 22.66s`
-- final main full unit: `444 passed in 45.79s`
-- detailed design: `design/24-p10-codex-dynamic-research-integration-design.md`
-- implementation plan: `design/25-p10-implementation-plan.md`
-- design/28: future semantic reference / implementation not authorized
-- design/29: future Research MCP reference / production not authorized
-
-## Current project scope
-
-**CN/HK ACCEPTED PRODUCTION + P11 US SEC REOPENED FOR NEW LIFECYCLE**
-
-Historical closeout scope contract:
-
-`design/30-project-final-cn-hk-scope.md`
-
-Historical closeout decision:
-
-`development/144-final-cn-hk-project-scope-closeout.md`
-
-Both remain valid historical records for the 2026-11-05 closeout, but are superseded for current P11 execution by:
-
-`design/32-p11-us-scope-reopening.md`
-
-Current authorization:
-
-`development/147-p11-us-scope-reopening-authorization.md`
-
-The older `development/143-p11-design-authorization.md` is retained as audit history and is not the new development baseline.
-
-P10-C is closed:
-
-- production candidate `35553df23f58a7f539b7390f98c7f154e42c817e`;
-- detached review `development/86-p10-c-detached-code-review-result.md = PASS`.
-
-P10-D is closed:
-
-- amended design baseline `ba962aef818d7a31731637a5cfef1f57020a7d1d`;
-- final production/test candidate `c8b4041c2d06e1d601707ca765ddd9e817f0dfc9`;
-- development evidence `development/89-p10-d-context-evidence.md = PASS`;
-- detached review result `development/91-p10-d-detached-code-review-result.md = PASS`;
-- review result commit `109af3057942db62d80e8a39d0f18f68d0321fd8`.
-
-P10-E is closed:
-
-- amended design baseline `d6b34d84d1eeae6b0f2009895a14c5956217a18f`;
-- production candidate `802a395247e490a83acaef744c1641188fbf704e`;
-- development evidence `development/94-p10-e-provenance-evidence.md = PASS`;
-- detached review instruction `development/95-p10-e-code-review-instruction.md`;
-- detached review result `development/96-p10-e-detached-code-review-result.md = PASS`;
-- review result commit `af7295d740ecadeb9c17705c1e1048f3f742a8e6`.
-
-P10-F pre-implementation review found `P10-ISSUE-005` before any CLI production code existed.
-
-Stop record:
-
-`development/97-p10-f-preimplementation-design-stop.md`
-
-Current P10-F design baseline:
-
-`860e628ecf9f804734c9d343b3f2a9894928c9e9`
-
-Development authorization:
-
-`development/98-p10-f-cli-reauthorization.md`
-
-P10-F production candidate:
-
-`d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
-
-Development evidence:
-
-`development/99-p10-f-cli-evidence.md = PASS`
-
-Evidence commit:
-
-`fad7f84`
-
-Detached review instruction:
-
-`development/100-p10-f-code-review-instruction.md`
-
-Detached review result:
-
-`development/101-p10-f-detached-code-review-result.md = PASS`
-
-Review result commit:
-
-`5b54748`
-
-P10-F is closed.
-
-P10-G authorization:
-
-`development/102-p10-g-integration-instruction-authorization.md`
-
-P10-G candidate:
-
-`3a805a8f333ac20770d6aec1c8285d93993d18fc`
-
-Integration artifact:
-
-`integration/p10/FFDF_RESEARCH_INTEGRATION.md`
-
-Artifact SHA256:
-
-`ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`
-
-Development evidence:
-
-`development/103-p10-g-integration-instruction-evidence.md = PASS`
-
-Evidence commit:
-
-`241055f`
-
-Detached documentation review instruction:
-
-`development/104-p10-g-documentation-review-instruction.md`
-
-Detached review stop:
-
-`development/105-p10-g-detached-review-stop.md`
-
-P10-ISSUE-006:
-
-- same exact Git candidate produced LF active-worktree bytes and CRLF fresh-detached bytes under `core.autocrlf=true`;
-- candidate Git blob itself is LF and has SHA256 `ef10406c9957f7a68a9af001c913deef0a057e166100a2d852c0c8fcd2c46296`;
-- worktree-byte SHA is therefore not the cross-worktree identity;
-- amended contract uses exact candidate Git blob bytes as P10-G artifact identity.
-
-Current P10-G amended design baseline:
-
-`d896173`
-
-Review rerun authorization:
-
-`development/106-p10-g-review-reauthorization.md`
-
-The amended P10-F baseline freezes:
-
-- exact four CLI argv contracts;
-- stdin-only JSON request transport;
-- 16 MiB request limit;
-- exact request schemas;
-- project-relative catalog/review-root inputs;
-- exact canonical success/error envelopes;
-- exact CLI reason codes and exit codes;
-- spec-first error precedence;
-- deterministic context rebuild for validate-ledger;
-- no request-file browse, implicit writes, network/AI/subprocess/SQL, P8 business proxy, or P9 mutation.
-
-P10-G detached review rerun is PASS and the gate is closed.
-
-Detached review result:
-
-`development/107-p10-g-detached-review-result.md = PASS`
-
-P10-H validation authorization:
-
-`development/108-p10-h-full-regression-authorization.md`
-
-P10-H evidence:
-
-`development/109-p10-h-full-regression-scope-evidence.md = PASS`
-
-P10-H is closed.
-
-P10-I authorization:
-
-`development/110-p10-i-dynamic-spec-authorization.md`
-
-P10-I evidence:
-
-`development/111-p10-i-dynamic-spec-evidence.md = PASS`
-
-P10-I is closed.
-
-P10-J live-run authorization:
-
-`development/112-p10-j-live-run-authorization.md`
-
-P10-J stopped after accepted P9 rejected a relocated/copy of existing review state:
-
-`development/113-p10-j-live-run-stop.md`
-
-P10-ISSUE-007:
-
-- accepted P9 review manifest binds the project-relative `review_dir`；
-- a byte-for-byte copied review store at another path is intentionally invalid；
-- isolated P10 review roots must be constructed at their final path with accepted P9 `prepare`；
-- only supported/evidence-grounded actions required by the frozen spec may be replayed；
-- the isolated root must use its newly generated resolution/snapshot identity；
-- source/live P9 state and P8 raw values remain immutable.
-
-P10-J amended design baseline:
-
-`668269e`
-
-P10-J rerun authorization:
-
-`development/114-p10-j-live-run-reauthorization.md`
-
-P10-J live-run evidence:
-
-`development/115-p10-j-live-research-evidence.md = PASS / COMPLETE`
-
-P10-J is closed.
-
-P10-K authorization:
-
-`development/116-p10-k-negative-gates-authorization.md`
-
-P10-K evidence:
-
-`development/117-p10-k-negative-gates-evidence.md = PASS`
-
-P10-K is closed.
-
-P10-L formal review authorization:
-
-`development/118-p10-l-formal-review-authorization.md`
-
-P10-L formal review result:
-
-`development/119-p10-l-formal-code-review-result.md = PASS`
-
-P10-L is closed.
-
-P10-M acceptance-freeze authorization:
-
-`development/120-p10-m-acceptance-freeze-authorization.md`
-
-P10-M freeze evidence:
-
-`development/121-p10-m-acceptance-freeze-evidence.md = PASS`
-
-Frozen package:
-
-- `acceptance/39-p10-final-acceptance-freeze.md`
-- `acceptance/p10_independent_acceptance_harness.py`
-- `acceptance/p10-base-immutability-manifest.json`
-- `acceptance/p10-fixtures/**`
-
-Core design and production remain frozen.
-
-Historical invalid freeze attempt:
-
-`42e39c971a360ca4e0ee09761221cc8da7ddbaa9`
-
-Stop record:
-
-`development/122-p10-m-freeze-stop.md`
-
-Reason: staged `git diff --cached --check` found trailing whitespace in `acceptance/39`, but PowerShell continued to commit/push. This commit is ineligible for P10-N and remains historical evidence.
-
-Corrected re-freeze evidence:
-
-`development/123-p10-m-refreeze-evidence.md = PASS`
-
-Corrected `acceptance/39` SHA256:
-
-`92889cc508c8d62e3fa8f36044fdde8dd81131970df54e615b1967b936603b94`
-
-Corrected P10-M re-freeze evidence:
-
-`development/123-p10-m-refreeze-evidence.md = PASS`
-
-Actual eligible corrected P10-M re-freeze commit:
-
-`4d1ab46f11d1d7b88934309ce32319e2200f0d8f`
-
-The historical SHA recorded later as `56cbe185e97e6e07dd354e03b98942d87f8e5787` does not exist in Git and is invalid.
-
-P10-M remains closed on the actual corrected candidate above.
-
-Historical invalid P10-N authorization:
-
-`development/124-p10-n-independent-acceptance-authorization.md`
-
-Historical invalid closeout authorization:
-
-`development/125-p10-closeout-authorization.md`
-
-Closeout stop:
-
-`development/126-p10-closeout-stop.md`
-
-Facts:
-
-- no `acceptance/40-p10-independent-acceptance-result.md` existed;
-- no `workspace/p10-n` execution root existed;
-- no P10-N detached acceptance worktree existed;
-- therefore P10-N had not actually executed;
-- historical integration merge `b560f49a78316fa59a4183de326d2dee0a80ebb6` is ineligible for main integration;
-- `origin/main` remains the accepted P9 baseline `e9b30626f2b88ac5527d42bd76d0b682efbeef0e`.
-
-Corrected P10-N authorization:
-
-`development/127-p10-n-corrected-reauthorization.md`
-
-Exact acceptance candidate:
-
-`4d1ab46f11d1d7b88934309ce32319e2200f0d8f`
-
-Corrected P10-N execution reached frozen harness precheck and STOPPED before any research acceptance run.
-
-Stop record:
-
-`development/128-p10-n-precheck-stop.md`
-
-P10-ISSUE-008 facts:
-
-- fixture manifest size/SHA matches exact candidate Git blob bytes;
-- all 8 frozen Markdown fixture Git blobs are LF;
-- detached Windows checkout under `core.autocrlf=true` materializes CRLF;
-- frozen harness incorrectly used checkout `Path.read_bytes()` as fixture identity;
-- no P10 production/test change or fixture semantic drift occurred.
-
-The prior P10-M freeze and corrected P10-N authorization are invalidated by the acceptance-package identity defect.
-
-Current ISSUE-008 design baseline:
-
-`f8bffca`
-
-Acceptance harness amendment authorization:
-
-`development/129-p10-acceptance-harness-amendment-authorization.md`
-
-Partial harness candidate:
-
-`9621f20d33c1d1b650bcdf1a7686b5f0b9c7c817`
-
-Detached precheck preview:
-
-- fixture identity source = `GIT_BLOB`;
-- all 8 frozen fixture hashes = PASS;
-- precheck status = PASS;
-- preview then exposed P10-ISSUE-009: base immutability manifest still used checkout bytes.
-
-Preview stop:
-
-`development/130-p10-acceptance-harness-preview-stop.md`
-
-The partial harness candidate is not eligible for formal review/freeze.
-
-P10-ISSUE-009 design baseline:
-
-`ad78cbe`
-
-Harness v2 authorization:
-
-`development/131-p10-acceptance-harness-v2-authorization.md`
-
-Harness v2 candidate:
-
-`db06b7a890e25908d224b6a63d8695be2f414b25`
-
-Harness v2 evidence:
-
-`development/132-p10-acceptance-harness-v2-evidence.md = PASS`
-
-Detached precheck preview = PASS with both base manifest and fixture manifest identity source `GIT_BLOB`.
-
-Targeted formal review authorization:
-
-`development/133-p10-acceptance-package-formal-review-authorization.md`
-
-Targeted formal review result:
-
-`development/134-p10-acceptance-package-formal-review-result.md = PASS`
-
-P10-M re-freeze authorization:
-
-`development/135-p10-m-issue008009-refreeze-authorization.md`
-
-Re-freeze evidence:
-
-`development/136-p10-m-issue008009-refreeze-evidence.md = PASS / PACKAGE READY`
-
-Fresh precheck preview = PASS; base and fixture manifest identities are both `GIT_BLOB`.
-
-Actual P10-M re-freeze commit:
-
-`183ca5dc89a606715a3e352bf92a235f7aa31fad`
-
-P10-M is closed on this exact candidate.
-
-P10-N authorization:
-
-`development/137-p10-n-independent-acceptance-authorization.md`
-
-Only exact candidate `183ca5dc89a606715a3e352bf92a235f7aa31fad` was eligible. The first execution attempt stopped because the mutable live P9 submission metadata did not match the frozen acceptance/39 metadata. Stop record: `development/138-p10-n-execution-stop.md`. Fresh rerun authorization: `development/139-p10-n-rerun-authorization.md`. Candidate/package/design remained unchanged.
-
-Fresh Independent Acceptance result:
-
-`acceptance/40-p10-independent-acceptance-result.md = PASS`
-
-Verified in the fresh rerun:
-
-- precheck PASS with Git-blob fixture/base identity;
-- research unit `136 passed`;
-- full unit `444 passed`;
-- dynamic Spec A/B hashes/toolsets differ and both ledgers PASS;
-- live CN 600519 run = COMPLETE;
-- fresh isolated P9 resolution/overlay validated;
-- K1–K5 exact negative capability gates PASS;
-- immutable 47-file base postcheck PASS;
-- detached candidate remained clean at `183ca5dc89a606715a3e352bf92a235f7aa31fad`.
-
-P10-N is CLOSED / PASS.
-
-P10-O closeout authorization:
-
-`development/140-p10-o-closeout-authorization-v2.md`
-
-Fresh v2 integration gate evidence:
-
-`development/141-p10-o-v2-integration-evidence.md = PASS`
-
-Fresh v2 integration merge: `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`.
-
-Main integration evidence commit:
-
-`230968937a8ebdcbde56982a22b37125e4aefff4`
-
-Final closeout:
-
-`development/142-p10-closeout.md = DONE / PASS`
-
-Final main verification:
-
-- P10 research: `136 passed in 22.66s`;
-- full unit: `444 passed in 45.79s`;
-- P8/P9/runtime/security/base immutability: `PASS`.
-
-Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and historical only.
-
-P10 is DONE / PASS. US SEC Provider is outside the final project scope; Research MCP production and Semantic Resolver production remain unauthorized.
-
-Still not authorized:
-
-- Research MCP production;
-- Semantic Resolver production;
-- US SEC Provider production (final project scope: out of scope);
-- any weakening of P8 read-only or P9 durable-review boundaries.
-
-## Project directory consolidation
-
-- verdict: `PASS`
-- design: `design/15-project-directory-management.md`
-- evidence: `development/34-directory-consolidation-evidence.md`
-- canonical root: `D:\Codex\FinancialFilingDataFoundation`
-- all linked worktrees inside project root: `PASS`
-- Dayu source inside project root: `PASS`
-- Dayu runtime inside project root: `PASS`
-- runtime lock: `runtime-locks/dayu-2115c86-py312-win-amd64.lock.txt`
-- old/new accepted package snapshot: `MATCH`
-- full regression after migration: `156 passed`
-
-## Current runtime boundaries
-
-### FFDF main runtime
-
-`D:\Codex\FinancialFilingDataFoundation\.venv`
-
-- Python 3.14.9 ARM64
-- PyMuPDF 1.28.2
-- Dayu absent
-- Docling absent
-- Torch absent
-
-### Dayu acquisition runtime
-
-`D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-dayu-2115c86\.venv`
-
-- Python 3.12.14 AMD64
-- dayu-agent 0.1.4
-- pinned source commit: `2115c86d5a9027bb51cbbc8a4d0175080732e4e6`
-
-The P2 Dayu runtime is isolated from the FFDF main runtime.
-
-### P8 MCP runtime
-
-`D:\Codex\FinancialFilingDataFoundation\runtimes\ffdf-mcp-2.3.0\.venv`
-
-- Python 3.12.14 AMD64
-- mcp 2.3.0
-- mcp-types 2.3.0
-- PyMuPDF 1.28.2
-- tracked lock: `runtime-locks/mcp-2.3.0-py312-win-amd64.lock.txt`
-- lock SHA256: `8e958b8abcfD9b2de829451ffc253932fa26bb473f73837484b75b1019f092ec`
-- `.gitattributes`: `runtime-locks/*.txt text eol=lf`
-- official protocol acceptance: `2026-07-28`
-- transport: `stdio only`
-
-The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls remain forbidden.
-
-## Accepted live source identities
-
-### CN sample
-
-- market: `CN`
-- ticker: `600519`
-- period: `FY2024`
-- provider: `cninfo`
-- source id: `1222993920`
-- SHA256: `5299f4940e2ce4e91084b73dc457d558b9d335fa76fbfee6227e4254eb7f4a30`
-- size: `3,626,217`
-
-### HK sample
-
-- market: `HK`
-- ticker: `00700`
-- period: `FY2024`
-- provider: `hkexnews`
-- source id: `11618398`
-- SHA256: `70f529984a87ef7f46d9e1db26bb9ef27eef9c01d29c59aabf69e557b479a6a0`
-- size: `5,241,364`
-
-## Governance rules
-
-1. GitHub is the truth source.
-2. Every phase follows:
-   `DESIGN → DEVELOPMENT → CODE REVIEW → INDEPENDENT ACCEPTANCE → DONE`.
-3. If a problem is found and a solution is identified:
-   `STOP → update design → commit design baseline → rerun affected gates → continue`.
-4. Do not use destructive reset / clean / force push to hide state.
-5. Original source documents are immutable.
-6. MCP AI API calls are forbidden.
-7. Tracked Markdown / JSON governance artifacts use `UTF-8 without BOM`.
-8. Phase code enters the accepted baseline only after Independent Acceptance PASS.
-9. P8 may expose only deterministic local MCP tools; MCP AI API calls remain FORBIDDEN and P9 Review Overlay remains separate.
-10. Design index: `design/00-design-management-index.md`.
-11. Directory governance: `design/15-project-directory-management.md`.
-12. All FFDF-owned dependencies/runtimes/worktrees/workspace/data are managed under `D:\Codex\FinancialFilingDataFoundation`.
-
-## Roadmap
-
-- P0 — Native PDF Parsing Feasibility Probe: `DONE`
-- P1 — Identity / Registry / Incremental Planner: `DONE`
-- P2 — Acquisition Provider: `DONE`
-- P3 — Native Page / Section / FTS: `DONE`
-- P4 — Table Candidate Detection: `DONE`
-- P5 — Table Reconstruction / Cross-page: `DONE`
-- P6 — Raw Facts / Evidence: `DONE`
-- P7 — Quality Gate / Validation: `DONE`
-- P8 — Local MCP: `DONE`
-- P9 — Codex Review Overlay: `DONE`
-- P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`
-
-
-## P11 short execution workflow
-
-Current execution model:
+# 1. Executive state
 
 ```text
-Design Freeze
-→ PC Agent one-pass development
-→ exact Git production candidate
-→ ChatGPT code review
-→ ChatGPT formal test plan
-→ PC Agent one-pass formal test
-→ Git test evidence
-→ ChatGPT independent verification
-→ merge / closeout
+P0-P10:
+DONE / ACCEPTED / PRODUCTION BASELINE PRESERVED
+
+P11 US SEC PROVIDER:
+REOPENED
+IMPLEMENTED THROUGH MULTIPLE REPAIR CYCLES
+NOT ACCEPTED
+CURRENT FULL REVIEW = CHANGES_REQUIRED
+
+FORMAL TEST PLAN FOR CURRENT CANDIDATE:
+NOT AUTHORIZED
+
+FORMAL ACCEPTANCE:
+NOT RUN FOR CURRENT CANDIDATE
+
+MAIN MERGE:
+NOT AUTHORIZED
+
+P11 DONE:
+NO
 ```
 
-No artificial component-by-component development phases are required. A repair loop is used only when an actual design/code/test defect is found.
+Accepted production markets on main remain:
+
+`CN`, `HK`
+
+US SEC is still under the reopened P11 lifecycle and is not yet accepted into production main.
+
+---
+
+# 2. Accepted production baseline — completed
+
+P0 through P10 are complete and accepted.
+
+Final accepted P10 production baseline:
+
+- frozen acceptance candidate:
+  `183ca5dc89a606715a3e352bf92a235f7aa31fad`
+- accepted integration merge:
+  `a539500ef1fd0036eaa8d79a9bf7cfe78db57185`
+- main integration evidence:
+  `230968937a8ebdcbde56982a22b37125e4aefff4`
+- independent acceptance:
+  `acceptance/40-p10-independent-acceptance-result.md = PASS`
+- final closeout:
+  `development/142-p10-closeout.md = DONE / PASS`
+- final accepted P10 research regression:
+  `136 passed`
+- final accepted full unit regression:
+  `444 passed`
+- CN 600519 FY2024 live acceptance:
+  `PASS`
+- P10 K1-K5 negative capability gates:
+  `PASS`
+
+P0-P10 accepted behavior is a compatibility boundary for P11.
+
+P11 must not weaken accepted:
+
+- CN/HK acquisition/ingest/status;
+- Registry behavior;
+- P3-P7 artifact/evidence semantics;
+- P8 read-only contract;
+- P9 review overlay;
+- P10 research integration;
+- runtime/security/immutability guarantees.
+
+---
+
+# 3. P11 scope / design authority
+
+P11 was historically closed as out of scope, then explicitly reopened.
+
+Historical CN/HK closeout remains accepted history, but no longer represents current P11 scope.
+
+P11 active design lineage includes:
+
+- `design/26-p11-sec-provider-design.md`
+- `design/27-p11-implementation-plan.md`
+- `design/32-p11-us-scope-reopening.md`
+- `design/33-p11-post-acceptance-design-correction.md`
+- `design/34-p11-explicit-6k-scope-correction.md`
+
+Original corrected P11 design baseline:
+
+`09e3174b7e19a60cc5955862670fac8931af67db`
+
+Current design freeze including Design 34:
+
+`4bf644374af3a0585453379fcc185d6464105776`
+
+After Design 34, `09e3174...` is still the corrected-design ancestry but must not be treated as the complete current design freeze by itself.
+
+Design 34 resolves explicit Form 6-K scope for P11 v1:
+
+- no 6-K → standardized quarter coercion;
+- explicit 6-K/6-K/A acquisition is deferred;
+- explicit requests are deterministically rejected.
+
+---
+
+# 4. P11 lifecycle completed so far
+
+## 4.1 Reopening / architecture / implementation
+
+Completed:
+
+- P11 scope reopening;
+- dedicated SEC package/provider architecture;
+- current ticker→CIK and explicit CIK identity model;
+- SEC current submissions/history discovery;
+- SEC package store and package/member provenance;
+- dedicated HTML/iXBRL/XBRL parser;
+- P7 SEC validation;
+- P8 SEC catalog/query integration;
+- production CLI US paths;
+- runtime/Fair Access/security implementation;
+- developer live SEC testing.
+
+## 4.2 Historical formal execution
+
+A prior Formal Test Plan existed for an older candidate:
+
+- plan:
+  `development/183-p11-formal-test-plan-3.md`
+- execution prompt:
+  `development/184-p11-formal-test-execution-prompt-3.md`
+- execution evidence:
+  `development/185-p11-formal-test-evidence-3.md`
+- exact old candidate:
+  `9389d59d68c84762b55b29bedb973db4ea45256a`
+
+That formal execution failed at live Apple FT-10 because static JPEG assets were incorrectly selected into the SEC package.
+
+That old Formal Plan is historical only.
+
+It must never be resumed for a later candidate.
+
+---
+
+# 5. P11 repaired issue history — completed or materially closed
+
+Fresh review history currently considers the following repaired/closed or materially corrected:
+
+```text
+P11-ISSUE-123  current discovery before reuse
+P11-ISSUE-124  exactly one logical fact source
+P11-ISSUE-125  Inline continuation / exclude correctness
+P11-ISSUE-126  OTHER XML semantic isolation
+P11-ISSUE-127  ticker source provenance / current refresh
+P11-ISSUE-128  package/member provenance
+P11-ISSUE-129  logical DOM table grid / header semantics
+P11-ISSUE-130  production enablement without dev flag
+P11-ISSUE-131  exact discovery observation trust boundary
+P11-ISSUE-133  browser/static asset over-selection
+P11-ISSUE-134  semantic XBRL references independent of SEC index type
+P11-ISSUE-135  persisted observation semantics independently reconstructed
+P11-ISSUE-136  early history termination / split-candidate correctness fixed
+P11-ISSUE-137  report-safe P8 summary now uses verified SEC trust chain
+P11-ISSUE-138  parser namespace authenticity implemented
+P11-ISSUE-139  explicit 6-K scope design-corrected and rejected deterministically
+```
+
+Important nuance:
+
+- ISSUE-136 core correctness is fixed, but the current “fetch all history” implementation created ISSUE-142.
+- ISSUE-138 parser authenticity is implemented, but compatibility/acquisition cross-boundary gaps created ISSUE-140 and ISSUE-141.
+
+---
+
+# 6. Latest reviewed production candidate
+
+Latest production candidate reviewed by ChatGPT:
+
+`55fc575cdaaeebd8b686ce76120978c714ca1a28`
+
+Developer evidence:
+
+`development/189-p11-full-design-repair-135-139-evidence.md`
+
+Evidence commit:
+
+`21962b8e4748cb8f800ad75be904624508d84ae8`
+
+Candidate → evidence:
+
+`DOCUMENTATION ONLY — PASS`
+
+Latest fresh full exact-candidate review:
+
+`development/190-p11-fresh-full-exact-candidate-review-4.md`
+
+Review commit:
+
+`adac1075a71881dc5aec41049ead3b03d1933d4c`
+
+Review verdict:
+
+```text
+CHANGES_REQUIRED
+REVIEW_PASS = NO
+FORMAL TEST PLAN = NOT AUTHORIZED
+```
+
+---
+
+# 7. Latest developer verification on 55fc575...
+
+Developer evidence for the latest reviewed candidate recorded:
+
+- focused ISSUE-135..139:
+  `33 passed`
+- US SEC + MCP related:
+  `193 passed`
+- full unit:
+  `703 passed`
+- compileall:
+  `PASS`
+- git diff --check:
+  `PASS`
+
+Apple FY2025 developer smoke:
+
+- CIK:
+  `0000320193`
+- accession:
+  `0000320193-25-000079`
+- structured facts:
+  `1,131`
+- XSD:
+  `1`
+- linkbases:
+  `4`
+- static/browser asset requests:
+  `0`
+- P7:
+  `PASS`
+- research_ready:
+  `true`
+- `FFDF_P11_US_DEV`:
+  `ABSENT`
+
+These are developer verification results only.
+
+They are not Formal Acceptance.
+
+---
+
+# 8. Current work — in progress
+
+Current authorized work is a coherent repair cycle for:
+
+```text
+P11-ISSUE-140
+P11-ISSUE-141
+P11-ISSUE-142
+P11-ISSUE-143
+```
+
+No current repair candidate exists yet after Review 190.
+
+## P11-ISSUE-140 — parser/artifact compatibility invalidation
+
+Status:
+
+`OPEN / BLOCKING`
+
+Problem:
+
+ISSUE-138 changed parser semantics to namespace-authentic behavior, but the reviewed candidate still uses the previous V5/v2 compatibility identity.
+
+Therefore a pre-ISSUE-138 V5/v2 artifact can still qualify for reuse and bypass the corrected parser.
+
+Required:
+
+- design-corrected compatibility/version freeze;
+- previous affected parsed artifacts become incompatible;
+- immutable raw package remains reusable;
+- parser must actually re-run;
+- new artifact written separately;
+- old artifact remains immutable;
+- current artifact reusable after reparse.
+
+## P11-ISSUE-141 — namespace-authentic semantic-reference acquisition
+
+Status:
+
+`OPEN / BLOCKING`
+
+Problem:
+
+Primary HTML semantic-reference acquisition still recognizes literal `link:schemaRef` / `link:linkbaseRef` prefix strings instead of authentic XBRL linkbase/XLink namespace semantics.
+
+Required:
+
+- namespace URI based linkbase reference recognition;
+- prefix independence;
+- authentic XLink reference handling;
+- wrong/unbound lookalikes rejected;
+- ISSUE-133 static-asset zero-fetch preserved;
+- ISSUE-134 generic-index-type semantic XBRL support preserved.
+
+## P11-ISSUE-142 — complete but minimal history source selection
+
+Status:
+
+`OPEN / BLOCKING`
+
+Problem:
+
+The previous repair removed early history termination but now fetches every listed SEC history chunk.
+
+This preserves completeness but conflicts with the design requirement to fetch only history required for the requested slot.
+
+Required:
+
+- complete candidate coverage;
+- late amendments remain discoverable;
+- provably irrelevant history not fetched;
+- incomplete metadata handled conservatively;
+- deterministic bound/fail-closed behavior;
+- online discovery and P7 reconstruction use exactly the same selection rule.
+
+If a safe minimal rule cannot be established from official metadata, return to design rather than guess.
+
+## P11-ISSUE-143 — P7 fact-source semantic invariants
+
+Status:
+
+`OPEN / BLOCKING`
+
+Problem:
+
+P7 validates the fact_source_mode enum and basic fact counts but does not fully prove that logical facts/evidence come from the source mandated by the mode.
+
+Required:
+
+- INLINE_XBRL_PRIMARY → logical facts only from authentic primary iXBRL;
+- XBRL_INSTANCE_PRIMARY → logical facts only from exactly one verified XBRL instance;
+- NO_STRUCTURED_FACTS → zero logical facts;
+- internally self-consistent mode/source tampering fails closed.
+
+---
+
+# 9. Not completed / not authorized
+
+The following are not complete:
+
+- ISSUE-140 repair;
+- ISSUE-141 repair;
+- ISSUE-142 repair;
+- ISSUE-143 repair;
+- new post-140..143 production candidate;
+- developer evidence for that new candidate;
+- fresh full exact-candidate review of that new candidate;
+- new Formal Test Plan;
+- new formal execution;
+- independent final acceptance review;
+- P11 acceptance;
+- exact main integration;
+- P11 closeout.
+
+The following are explicitly not authorized now:
+
+```text
+NEW FORMAL TEST PLAN
+FORMAL ACCEPTANCE
+MAIN MERGE
+P11 DONE
+```
+
+A Formal Test Plan can be created only after a fresh full exact-candidate design/code review returns:
+
+`REVIEW_PASS`
+
+---
+
+# 10. Required next lifecycle
+
+```text
+READ CURRENT DESIGN / REVIEW 190
+→ DESIGN CORRECTION FOR ISSUE-140 IF REQUIRED
+→ REPAIR ISSUE-140..143
+→ FOCUSED REGRESSION
+→ FULL US SEC REGRESSION
+→ FULL UNIT REGRESSION
+→ P0-P10 COMPATIBILITY REGRESSION
+→ LIVE APPLE DEVELOPER SMOKE
+→ FREEZE NEW EXACT PRODUCTION CANDIDATE
+→ DOCUMENTATION-ONLY DEVELOPER EVIDENCE
+→ STOP
+→ CHATGPT FRESH FULL EXACT-CANDIDATE DESIGN/CODE REVIEW
+→ only if REVIEW_PASS:
+   NEW FORMAL TEST PLAN
+→ separate Formal Execution
+→ ChatGPT independent final acceptance review
+→ acceptance
+→ explicit main integration authorization
+→ closeout
+```
+
+Any production/test/design change after candidate freeze creates a new candidate and invalidates the previous review boundary.
+
+---
+
+# 11. Current compatibility / governance constraints
+
+Current known pre-repair values on the reviewed candidate:
+
+```text
+REGISTRY_SCHEMA_VERSION = 1
+SEC_REGISTRY_SCHEMA_VERSION = 4
+SEC_DISCOVERY_SCHEMA = p11-sec-discovery-v1
+VIRTUAL_HTML_NORMALIZER_VERSION = VIRTUAL_HTML_V5
+SEC_ARTIFACT_SCHEMA = p11-sec-artifacts-v2
+SEC_VALIDATION_SCHEMA = p11-sec-validation-v2
+```
+
+ISSUE-140 is expected to require a new parser compatibility identity.
+
+Do not change version numbers merely because code changed.
+
+A version change must be design-grounded and preserve old artifacts immutably.
+
+---
+
+# 12. Project-wide unauthorized future scope
+
+Unless separately authorized, the following remain outside the current production task:
+
+- Research MCP production expansion beyond accepted P8/P9/P10 contracts;
+- Semantic Resolver production;
+- remote AI/LLM APIs inside FFDF extraction;
+- weakening P8 read-only behavior;
+- weakening P9 durable-review boundaries;
+- automatic 6-K quarterly mapping.
+
+---
+
+# 13. Session handoff
+
+A full-project new-session handoff prompt is tracked at:
+
+`docs/P11_SESSION_HANDOFF_PROMPT.md`
+
+The new session must not jump straight into ISSUE-140..143.
+
+It must first:
+
+1. read governance/status;
+2. read every tracked design document;
+3. read the complete production source tree;
+4. read tests as executable contracts;
+5. understand P0-P10 accepted history;
+6. understand current P11 trust boundaries and lifecycle;
+7. summarize the project as a whole;
+8. only then continue the current repair.
+
+Git is the source of truth if this status file and later commits ever differ.
