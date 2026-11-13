@@ -83,6 +83,11 @@ ISSUE-143 residual implementation
 ISSUE-145 implementation
 ```
 
+The same current cycle also includes the validation-v3 persistence/migration
+implementation frozen by Design 37. This is part of the ISSUE-143/145
+validation hardening and does not create a new parser, artifact, discovery, or
+Registry schema version.
+
 `ISSUE-140` and `ISSUE-141` are already fixed and require regression
 preservation only. `ISSUE-144` is a governance correction and has no production
 implementation scope. Historical ISSUE-123..139 records remain historical and
@@ -235,6 +240,12 @@ Required behavior:
 - existing V6/v2 parsed artifacts may be loaded locally, but validation-v2
   results cannot qualify for REUSE_DATA under the stronger contract;
 - validation-v3 must execute before REUSE_DATA becomes eligible;
+- current validation-v3 artifacts live under the schema-versioned directory
+  `p7/<package_sha256>/p11-sec-validation-v3/`;
+- legacy flat validation-v2 files remain read-only and cannot be used as a
+  current-runtime fallback;
+- US ingest, reuse, CLI and P8 resolve the current validation artifact through
+  one shared deterministic versioned-path rule;
 - no destructive raw-store migration.
 
 ## 4.10 Review 5 — Design 37 final design freeze
@@ -384,6 +395,52 @@ same raw package + same V6 parsed artifact
 ```
 
 Old validation-v2 artifact bytes remain immutable.
+
+### Validation-v3 persistence and migration
+
+The development suite must also prove:
+
+```text
+legacy flat validation-v2 exists
+→ hash validation.json and issues.jsonl before migration
+
+current validation-v3 absent
+→ REUSE_DATA denied
+
+same V6/v2 parsed artifact reused as local input
+→ parser does not rerun solely because validation is old
+
+P7 v3 executes
+→ current result path =
+   p7/<package_sha256>/p11-sec-validation-v3/
+
+after v3:
+legacy validation-v2 validation.json hash unchanged
+legacy validation-v2 issues.jsonl hash unchanged
+
+v3 validation.json schema_version =
+p11-sec-validation-v3
+
+v3 PASS
+→ current reuse eligibility restored
+
+v3 missing + valid v2 present
+→ CLI/reuse/P8 must not accept v2 as current
+
+v3 corrupt + valid v2 present
+→ fail closed
+→ no fallback to v2
+
+v3 present + valid
+→ CLI / ingest / P8 resolve the same current validation artifact
+
+fresh discovery refresh
+→ current v3 replacement is atomic
+→ no partial current artifact is visible
+```
+
+The implementation must include a regression proving that current production
+call sites do not independently hard-code the legacy flat validation path.
 
 ## 6. Candidate commit rules
 

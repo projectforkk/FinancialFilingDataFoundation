@@ -436,10 +436,206 @@ same raw package + same V6 parsed artifact
 
 Old validation-v2 artifact bytes remain immutable.
 
-## 7. Governance state
+## 7. Validation-v3 Artifact Persistence and Migration
+
+### 7.1 Validation artifact identity
+
+The current SEC validation artifact identity is:
 
 ```text
-P11 REVIEW 5 FINAL DESIGN FREEZE READY
+package_sha256
++
+SEC_VALIDATION_SCHEMA
+```
+
+The current schema is:
+
+```text
+p11-sec-validation-v3
+```
+
+A result written under another validation schema is not the current validation
+artifact and cannot establish current reuse eligibility.
+
+### 7.2 Current v3 storage path
+
+The current validation artifact path is schema-versioned:
+
+```text
+workspace/ingest/us/p7/
+  <package_sha256>/
+    <SEC_VALIDATION_SCHEMA>/
+      validation.json
+      issues.jsonl
+```
+
+For the current contract:
+
+```text
+workspace/ingest/us/p7/
+  <package_sha256>/
+    p11-sec-validation-v3/
+      validation.json
+      issues.jsonl
+```
+
+A newly generated `SecValidationResult.artifact_dir` for v3 is therefore the
+schema-versioned directory
+`.../p7/<package_sha256>/p11-sec-validation-v3`.
+
+Current v3 validation files must not be written directly into
+`.../p7/<package_sha256>/`.
+
+### 7.3 Historical flat validation-v2 artifact
+
+Historical validation-v2 artifacts may exist at the legacy flat path:
+
+```text
+workspace/ingest/us/p7/
+  <package_sha256>/
+    validation.json
+    issues.jsonl
+```
+
+Those legacy files are:
+
+```text
+HISTORICAL
+READ-ONLY
+INCOMPATIBLE FOR CURRENT REUSE
+```
+
+They must not be overwritten, deleted, renamed, moved, rewritten, or converted
+in place. Adding the child directory `p11-sec-validation-v3/` is allowed
+because the legacy files themselves remain byte-for-byte unchanged.
+
+### 7.4 Shared current-validation path resolver
+
+Production code must use one shared deterministic resolver for the current SEC
+validation artifact directory. Conceptually:
+
+```text
+current_validation_dir(
+    validation_root,
+    package_sha256,
+    SEC_VALIDATION_SCHEMA
+)
+=
+validation_root
+/ package_sha256
+/ SEC_VALIDATION_SCHEMA
+```
+
+The exact Python function name is an implementation detail.
+
+US ingest, US reuse, US CLI reusable-artifact planning, P8 US loading, and
+migration tests must use this same rule. No current production call site may
+independently reconstruct the legacy flat path
+`p7/<package_sha256>/validation.json`.
+
+### 7.5 Loader and reuse semantics
+
+Current runtime reuse logic loads only the current expected validation schema:
+
+```text
+expected schema = p11-sec-validation-v3
+```
+
+If current v3 is absent while a legacy flat validation-v2 artifact exists:
+
+```text
+current reusable validation = unavailable
+REUSE_DATA = denied
+revalidation = required
+```
+
+This condition is not corruption. The immutable raw package and compatible
+V6/v2 parsed artifact remain eligible as local inputs for revalidation.
+
+A current runtime must not silently upgrade, reinterpret, or fall back to a
+legacy v2 artifact.
+
+### 7.6 V2-to-v3 revalidation transition
+
+The required transition is:
+
+```text
+raw package exists
++
+VIRTUAL_HTML_V6 / p11-sec-artifacts-v2 parsed artifact exists
++
+only validation-v2 exists
+
+→ fresh current discovery
+→ do not rerun the parser solely because validation is old
+→ load the existing V6/v2 parsed artifact
+→ execute P7 validation-v3
+→ write the new versioned validation-v3 artifact
+→ leave validation-v2 bytes unchanged
+→ update current Registry/runtime validation state from the v3 result
+→ REUSE_DATA becomes eligible only after v3 PASS
+```
+
+No parsed artifact mutation is permitted solely because the validation schema
+changed.
+
+### 7.7 Repeated v3 validation and atomicity
+
+If a current v3 validation directory already exists, a refreshed validation
+must not expose partial state. The project must use atomic artifact replacement
+semantics so the visible current v3 result is internally consistent:
+
+```text
+validation.json
+issues.jsonl
+schema_version = p11-sec-validation-v3
+artifact_hashes
+issue_count
+reuse_eligible
+```
+
+Fresh discovery may require a refreshed current v3 result because the discovery
+observation identity changed. A missing or invalid v3 result must never cause
+fallback to validation-v2.
+
+### 7.8 Registry contract
+
+No Registry schema bump is required:
+
+```text
+SEC_REGISTRY_SCHEMA_VERSION = 4
+```
+
+The current Registry validation fields represent the current v3 result.
+Historical v2 files remain audit artifacts only and do not become current
+Registry validation truth.
+
+### 7.9 P8 contract
+
+P8 US must resolve and verify current validation through the same deterministic
+versioned path rule. P8 must not:
+
+```text
+load legacy flat validation-v2 as current
+search arbitrary validation directories
+choose a validation directory by timestamp
+fall back from v3 to v2
+```
+
+Current validation identity is determined by:
+
+```text
+package_sha256
++
+SEC_VALIDATION_SCHEMA
+```
+
+P8 remains read-only and does not execute revalidation.
+
+## 8. Governance state
+
+```text
+P11 REVIEW 5 VALIDATION-V3 PERSISTENCE DESIGN FREEZE
 ISSUE-140 = FIXED
 ISSUE-141 = FIXED
 ISSUE-142 = DESIGN FROZEN / IMPLEMENTATION REQUIRED
