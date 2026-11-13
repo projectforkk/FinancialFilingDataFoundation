@@ -1,0 +1,85 @@
+name: P11 C8D8EA73 Apple FY2025 Live Developer Smoke
+
+on:
+  push:
+    branches:
+      - ci/p11-live-c8d8ea73
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: src
+      FFDF_ROOT: ${{ runner.temp }}\ffdf-p11-live-c8d8ea73
+      FFDF_SEC_CONTACT_EMAIL: ${{ secrets.FFDF_SEC_CONTACT_EMAIL }}
+    steps:
+      - name: Checkout exact repair head
+        uses: actions/checkout@v4
+        with:
+          ref: c8d8ea73840e3231625ad304c6d0032637b0b666
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install runtime dependency
+        run: python -m pip install pymupdf==1.28.2
+      - name: Require configured SEC Fair Access contact
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:FFDF_SEC_CONTACT_EMAIL)) {
+            throw "FFDF_SEC_CONTACT_EMAIL repository secret is not configured"
+          }
+      - name: First Apple FY2025 ingest
+        shell: pwsh
+        run: |
+          python -m financial_filing_data_foundation.user_cli ingest --market US --cik 320193 --ticker AAPL --year 2025 --period FY | Tee-Object -FilePath first-ingest.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Validate first live receipt
+        shell: pwsh
+        run: |
+          $r = Get-Content first-ingest.json -Raw | ConvertFrom-Json
+          if ($r.accession -ne "0000320193-25-000079") { throw "unexpected accession: $($r.accession)" }
+          if ($r.validation_status -ne "PASS") { throw "P7 not PASS" }
+          if ([int]$r.blocking_issue_count -ne 0) { throw "blocking issues present" }
+          if ($r.research_ready -ne $true) { throw "research_ready is not true" }
+          if ($r.p8_catalog -notin @("ADDED","UPDATED","UNCHANGED")) { throw "P8 catalog not registered" }
+          $m = Get-Content (Join-Path $r.artifact_dir "manifest.json") -Raw | ConvertFrom-Json
+          if ($m.schema_version -ne "p11-sec-artifacts-v3") { throw "unexpected artifact schema" }
+          if ($m.parser_version -ne "VIRTUAL_HTML_V6") { throw "unexpected parser version" }
+          if ($m.fact_source_mode -ne "INLINE_XBRL_PRIMARY") { throw "unexpected fact source mode: $($m.fact_source_mode)" }
+          if ([int]$m.fact_count -le 0) { throw "no structured facts" }
+          Write-Host "FIRST_FACT_COUNT=$($m.fact_count)"
+          Write-Host "FIRST_PACKAGE_SHA=$($r.package_sha256)"
+          $rawRoot = Join-Path $env:FFDF_ROOT "workspace\ingest\raw-store\packages\sha256"
+          $pkg = Get-ChildItem $rawRoot -Filter manifest.json -Recurse | Where-Object {
+            (Get-Content $_.FullName -Raw | ConvertFrom-Json).package_sha256 -eq $r.package_sha256
+          } | Select-Object -First 1
+          if ($null -eq $pkg) { throw "raw package manifest not found" }
+          $p = Get-Content $pkg.FullName -Raw | ConvertFrom-Json
+          $static = @($p.members | Where-Object { $_.relative_name -match '\.(jpg|jpeg|png|gif|svg)$' })
+          if ($static.Count -ne 0) { throw "static image members unexpectedly acquired" }
+          Write-Host "PACKAGE_MEMBER_COUNT=$(@($p.members).Count)"
+          Write-Host "XSD_COUNT=$(@($p.members | Where-Object { $_.role -eq 'XBRL_SCHEMA' }).Count)"
+          Write-Host "LINKBASE_COUNT=$(@($p.members | Where-Object { $_.role -in @('XBRL_PRESENTATION','XBRL_CALCULATION','XBRL_LABEL','XBRL_DEFINITION','XBRL_REFERENCE') }).Count)"
+      - name: Second Apple FY2025 ingest must reuse current V6 data
+        shell: pwsh
+        run: |
+          python -m financial_filing_data_foundation.user_cli ingest --market US --cik 320193 --ticker AAPL --year 2025 --period FY | Tee-Object -FilePath second-ingest.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content second-ingest.json -Raw | ConvertFrom-Json
+          if ($r.planner_action -ne "REUSE_DATA") { throw "second ingest did not REUSE_DATA: $($r.planner_action)" }
+          if ($r.validation_status -ne "PASS" -or $r.research_ready -ne $true) { throw "second ingest not research ready" }
+          Write-Host "SECOND_PLANNER_ACTION=$($r.planner_action)"
+      - name: Local-only status
+        shell: pwsh
+        run: |
+          python -m financial_filing_data_foundation.user_cli status --market US --cik 320193 --year 2025 --period FY | Tee-Object -FilePath status.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $r = Get-Content status.json -Raw | ConvertFrom-Json
+          if ($r.p8_catalog_registered -ne $true) { throw "P8 catalog missing in local status" }
+          if ($null -eq $r.discovery_as_of) { throw "discovery observation missing" }
