@@ -595,8 +595,10 @@ def test_p7_blocks_inline_fact_locator_that_resolves_to_non_ixbrl_dom_node(tmp_p
     parsed = parse_sec_package(package, tmp_path / "p11")
     facts = [dict(row) for row in parsed.facts]
     fact = facts[0]
-    assert str(fact.get("block_dom_locator") or "").startswith("/")
-    fact["dom_locator"] = fact["block_dom_locator"]
+    locator = str(fact["dom_locator"])
+    parent_locator = locator.rsplit("/", 1)[0]
+    assert parent_locator.startswith("/")
+    fact["dom_locator"] = parent_locator
     tampered = replace(parsed, facts=tuple(facts))
 
     validation = validate_sec_artifacts(tampered, tmp_path / "p7", package=package)
