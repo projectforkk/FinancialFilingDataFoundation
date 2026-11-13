@@ -541,3 +541,52 @@ def test_validation_blocks_corrupt_html_evidence_round_trip(
         for issue in validation.issues
     )
 
+def test_p7_blocks_inline_facts_relabelled_as_instance_mode(tmp_path: Path) -> None:
+    package = _hidden_fact_package()
+    parsed = parse_sec_package(package, tmp_path / "p11")
+    tampered = replace(parsed, fact_source_mode="XBRL_INSTANCE_PRIMARY")
+
+    validation = validate_sec_artifacts(tampered, tmp_path / "p7", package=package)
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(
+        issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value
+        for issue in validation.issues
+    )
+
+
+def test_p7_blocks_instance_facts_relabelled_as_inline_mode(tmp_path: Path) -> None:
+    package = _xml_package()
+    parsed = parse_sec_package(package, tmp_path / "p11")
+    tampered = replace(parsed, fact_source_mode="INLINE_XBRL_PRIMARY")
+
+    validation = validate_sec_artifacts(tampered, tmp_path / "p7", package=package)
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(
+        issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value
+        for issue in validation.issues
+    )
+
+
+def test_p7_blocks_instance_fact_whose_logical_source_member_is_tampered(tmp_path: Path) -> None:
+    package = _xml_package()
+    parsed = parse_sec_package(package, tmp_path / "p11")
+    primary_sha = next(
+        member.member_sha256
+        for member in package.members
+        if member.role is SecMemberRole.PRIMARY_DOCUMENT
+    )
+    facts = [dict(row) for row in parsed.facts]
+    facts[0]["member_sha256"] = primary_sha
+    facts[0]["source_member_sha256"] = primary_sha
+    tampered = replace(parsed, facts=tuple(facts))
+
+    validation = validate_sec_artifacts(tampered, tmp_path / "p7", package=package)
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(
+        issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value
+        for issue in validation.issues
+    )
+
