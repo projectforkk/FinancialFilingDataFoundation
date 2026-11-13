@@ -151,12 +151,20 @@ class _SemanticReferenceHTMLParser(HTMLParser):
         return scope
 
     @staticmethod
-    def _qname(name: str, scope: dict[str, str]) -> tuple[str | None, str]:
+    def _qname(
+        name: str,
+        scope: dict[str, str],
+        *,
+        attribute: bool = False,
+    ) -> tuple[str | None, str]:
         normalized = str(name).casefold()
         if ":" in normalized:
             prefix, local = normalized.split(":", 1)
             return scope.get(prefix), local
-        return scope.get(""), normalized
+        # XML Namespaces: the default namespace applies to elements, never to
+        # unprefixed attributes.  A plain href must therefore never become an
+        # XLink href merely because an ancestor declares a default namespace.
+        return (None if attribute else scope.get("")), normalized
 
     def _record(
         self,
@@ -171,7 +179,7 @@ class _SemanticReferenceHTMLParser(HTMLParser):
         ):
             return
         for key, value in attrs:
-            attr_namespace, attr_local = self._qname(key, scope)
+            attr_namespace, attr_local = self._qname(key, scope, attribute=True)
             if attr_namespace == _XLINK_NAMESPACE and attr_local == "href" and value:
                 self.references.append(str(value))
                 return
