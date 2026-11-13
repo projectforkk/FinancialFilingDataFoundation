@@ -18,8 +18,8 @@ from .errors import P11Reason, SecError
 from .package import SecFilingPackage, SecMemberRole
 
 
-SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v2"
-VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V5"
+SEC_ARTIFACT_SCHEMA = "p11-sec-artifacts-v3"
+VIRTUAL_HTML_NORMALIZER_VERSION = "VIRTUAL_HTML_V6"
 XBRL_INSTANCE_NAMESPACE = "http://www.xbrl.org/2003/instance"
 XBRL_DIMENSIONS_NAMESPACE = "http://xbrl.org/2006/xbrldi"
 INLINE_XBRL_NAMESPACES = frozenset(
