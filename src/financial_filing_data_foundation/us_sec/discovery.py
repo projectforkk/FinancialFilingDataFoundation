@@ -330,6 +330,31 @@ def _decode_submissions_json(body: bytes, *, label: str) -> dict[str, Any]:
     return payload
 
 
+def _reject_incomplete_rows_near_slot(
+    submissions: SecSubmissions,
+    fiscal_year: int,
+) -> None:
+    for row in submissions.incomplete_periodic_rows:
+        report_period = row.get("report_period")
+        if not report_period:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                "SEC history contains an incomplete periodic row without report period",
+            )
+        try:
+            report_year = date.fromisoformat(str(report_period)[:10]).year
+        except ValueError as exc:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                "SEC history contains an incomplete periodic row with invalid report period",
+            ) from exc
+        if fiscal_year - 1 <= report_year <= fiscal_year + 1:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                "SEC history contains an incomplete periodic row near the requested fiscal slot",
+            )
+
+
 def _reconstruct_discovery_candidates(
     observation: SecDiscoveryObservation,
 ) -> tuple[SecFilingCandidate, ...]:
@@ -390,6 +415,9 @@ def _reconstruct_discovery_candidates(
             "SEC discovery retained source set differs from official submissions files",
         )
     candidates: list[SecFilingCandidate] = list(main_submissions.candidates)
+    incomplete_periodic_rows: list[dict[str, str | None]] = list(
+        main_submissions.incomplete_periodic_rows
+    )
     for history_url in expected_history_urls:
         parsed_url = urlsplit(history_url)
         if (
@@ -407,14 +435,19 @@ def _reconstruct_discovery_candidates(
             company=company,
             source_url=history_url,
             raw_sha256=_sha256(body),
+            allow_incomplete_periodic_rows=True,
         )
         candidates.extend(history.candidates)
+        if history.incomplete_periodic_rows:
+            incomplete_periodic_rows.extend(history.incomplete_periodic_rows)
     merged = merge_filing_candidates(candidates)
     aggregate = SecSubmissions(
         company=company,
         candidates=merged,
         fiscal_year_end=main_submissions.fiscal_year_end,
+        incomplete_periodic_rows=tuple(incomplete_periodic_rows),
     )
+    _reject_incomplete_rows_near_slot(aggregate, int(observation.fiscal_year))
     return merge_filing_candidates(
         discover_filings(
             aggregate,
@@ -603,6 +636,7 @@ class SecSubmissions:
     raw_sha256: str | None = None
     source_url: str | None = None
     history_ranges: tuple[SecHistoryChunk, ...] = ()
+    incomplete_periodic_rows: tuple[dict[str, str | None], ...] = ()
 
     @property
     def history_chunks(self) -> tuple[SecHistoryChunk, ...]:
@@ -657,6 +691,7 @@ def parse_submissions(
     company: SecCompanyRef,
     source_url: str | None = None,
     raw_sha256: str | None = None,
+    allow_incomplete_periodic_rows: bool = False,
 ) -> SecSubmissions:
     if not isinstance(payload, dict):
         raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC submissions must be an object")
@@ -680,22 +715,49 @@ def parse_submissions(
     if not all(isinstance(value, list) for value in (accessions, forms, dates, primary_documents)):
         raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC submissions arrays are missing")
     candidates: list[SecFilingCandidate] = []
+    incomplete_periodic_rows: list[dict[str, str | None]] = []
     for index, raw_accession in enumerate(accessions):
         if not isinstance(raw_accession, str) or not _ACCESSION_RE.fullmatch(raw_accession):
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC accession is invalid")
         form = _array(recent, "form", index)
         filing_date = _array(recent, "filingDate", index)
-        primary_document = _array(recent, "primaryDocument", index)
+        primary_document = _array(
+            recent,
+            "primaryDocument",
+            index,
+            required=not allow_incomplete_periodic_rows,
+        )
         report_period = _array(recent, "reportPeriod", index, required=False)
         if report_period is None:
             report_period = _array(recent, "reportDate", index, required=False)
-        if not isinstance(form, str) or not isinstance(filing_date, str) or not isinstance(primary_document, str):
+        if not isinstance(form, str) or not isinstance(filing_date, str):
             raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC filing metadata is invalid")
         # Non-periodic submissions can legitimately carry unrelated nested
         # documents. They are not candidates for the P11 periodic provider, so
         # do not construct or validate an archive URL for them.
         if SecFormPolicy.base_form(form) not in {"10-K", "10-Q", "20-F", "40-F"}:
             continue
+        if not isinstance(primary_document, str) or not primary_document.strip():
+            if allow_incomplete_periodic_rows:
+                incomplete_periodic_rows.append(
+                    {
+                        "accession": raw_accession,
+                        "form": form.strip().upper(),
+                        "filing_date": filing_date.strip(),
+                        "report_period": (
+                            report_period.strip()
+                            if isinstance(report_period, str) and report_period.strip()
+                            else None
+                        ),
+                        "primary_document": (
+                            primary_document.strip()
+                            if isinstance(primary_document, str)
+                            else None
+                        ),
+                    }
+                )
+                continue
+            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC filing metadata is invalid")
         if report_period is not None and not isinstance(report_period, str):
             report_period = None
         kind = _issuer_kind(form)
@@ -740,6 +802,7 @@ def parse_submissions(
         raw_sha256=raw_sha256,
         source_url=source_url,
         history_ranges=tuple(sorted(history_ranges, key=lambda item: item.name)),
+        incomplete_periodic_rows=tuple(incomplete_periodic_rows),
     )
 
 

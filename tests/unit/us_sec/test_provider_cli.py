@@ -308,11 +308,11 @@ def test_sec_acquirer_fetches_all_retained_history_chunks_for_independent_discov
                 json.dumps(
                     {
                         "cik": "0000123456",
-                        "accessionNumber": [],
-                        "filingDate": [],
-                        "reportDate": [],
-                        "form": [],
-                        "primaryDocument": [],
+                        "accessionNumber": ["0000123456-18-000001"],
+                        "filingDate": ["2019-02-01"],
+                        "reportDate": ["2018-12-31"],
+                        "form": ["10-Q"],
+                        "primaryDocument": [""],
                     }
                 ).encode(),
                 url,

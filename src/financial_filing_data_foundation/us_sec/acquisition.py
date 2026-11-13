@@ -13,6 +13,7 @@ from .discovery import (
     SecDiscoveryObservation,
     SecHistoryChunk,
     SecSubmissions,
+    _reject_incomplete_rows_near_slot,
     candidate_to_record,
     derive_discovery_decision,
     discover_filings,
@@ -298,6 +299,7 @@ class SecAcquirer:
             raw_sha256=source_documents[-1].get("sha256"),
         )
         all_candidates = list(submissions.candidates)
+        incomplete_periodic_rows = list(submissions.incomplete_periodic_rows)
         for chunk in _history_chunks_for_year(submissions, fiscal_year):
             history_url = f"https://data.sec.gov/submissions/{chunk.name}"
             try:
@@ -317,15 +319,19 @@ class SecAcquirer:
                 history_payload,
                 company=company,
                 source_url=history_url,
+                allow_incomplete_periodic_rows=True,
             )
             all_candidates.extend(historical.candidates)
+            incomplete_periodic_rows.extend(historical.incomplete_periodic_rows)
         aggregate = SecSubmissions(
             company=company,
             candidates=merge_filing_candidates(all_candidates),
             fiscal_year_end=submissions.fiscal_year_end,
             history_files=submissions.history_files,
             history_ranges=submissions.history_ranges,
+            incomplete_periodic_rows=tuple(incomplete_periodic_rows),
         )
+        _reject_incomplete_rows_near_slot(aggregate, fiscal_year)
         candidates = discover_filings(aggregate, fiscal_year=fiscal_year, period=period)
         rows = merge_filing_candidates(candidates)
         decision = derive_discovery_decision(rows)
