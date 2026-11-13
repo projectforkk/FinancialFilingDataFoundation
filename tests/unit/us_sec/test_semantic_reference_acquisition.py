@@ -111,7 +111,7 @@ def test_t134_01_schema_ref_selects_generic_index_type_and_excludes_static_asset
         "decorative.svg",
     }
     primary_body = (
-        "<html><head>"
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
         "<link:schemaRef xlink:href='aapl-20250927.xsd'>"
         "<img src='aapl-20250927_g1.jpg'><link href='style.css'>"
         "<script src='script.js'></script><img src='graphic.png'>"
@@ -155,7 +155,7 @@ def test_t134_02_linkbase_ref_selects_generic_index_type_once(tmp_path: Path) ->
     linkbase_name = "aapl-20250927_pre.xml"
     static_name = "style.css"
     primary_body = (
-        "<html><head>"
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
         "<link:linkbaseRef xlink:href='aapl-20250927_pre.xml'>"
         "<link href='style.css'>"
         "</head><body>filing</body></html>"
@@ -182,6 +182,64 @@ def test_t134_02_linkbase_ref_selects_generic_index_type_once(tmp_path: Path) ->
     assert calls.count(archive_member_url(CIK, ACCESSION, static_name)) == 0
 
 
+def test_namespace_authentic_reference_accepts_alternate_prefixes(tmp_path: Path) -> None:
+    schema_name = "aapl-alt.xsd"
+    primary_body = (
+        "<html xmlns:l='http://www.xbrl.org/2003/linkbase' "
+        "xmlns:x='http://www.w3.org/1999/xlink'><head>"
+        "<l:schemaRef x:href='aapl-alt.xsd'>"
+        "</head><body>filing</body></html>"
+    ).encode("utf-8")
+    result, calls = _acquire(
+        tmp_path,
+        items=[{"name": PRIMARY}, {"name": schema_name, "type": "text.gif"}],
+        bodies={
+            PRIMARY: primary_body,
+            schema_name: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
+        },
+    )
+
+    assert schema_name in {member.relative_name for member in result.package.members}
+    assert calls.count(archive_member_url(CIK, ACCESSION, schema_name)) == 1
+
+
+def test_namespace_lookalikes_do_not_authorize_semantic_fetch(tmp_path: Path) -> None:
+    wrong_link = "wrong-link.xsd"
+    wrong_xlink = "wrong-xlink.xsd"
+    unbound = "unbound.xsd"
+    primary_body = (
+        "<html xmlns:link='https://example.invalid/not-linkbase' "
+        "xmlns:xlink='http://www.w3.org/1999/xlink' "
+        "xmlns:l='http://www.xbrl.org/2003/linkbase' "
+        "xmlns:x='https://example.invalid/not-xlink'><head>"
+        f"<link:schemaRef xlink:href='{wrong_link}'>"
+        f"<l:schemaRef x:href='{wrong_xlink}'>"
+        f"<fake:schemaRef fake:href='{unbound}'>"
+        "</head><body>filing</body></html>"
+    ).encode("utf-8")
+    result, calls = _acquire(
+        tmp_path,
+        items=[
+            {"name": PRIMARY},
+            {"name": wrong_link, "type": "text.gif"},
+            {"name": wrong_xlink, "type": "text.gif"},
+            {"name": unbound, "type": "text.gif"},
+        ],
+        bodies={
+            PRIMARY: primary_body,
+            wrong_link: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
+            wrong_xlink: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
+            unbound: b"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' />",
+        },
+        forbidden_names={wrong_link, wrong_xlink, unbound},
+    )
+
+    names = {member.relative_name for member in result.package.members}
+    assert names == {PRIMARY}
+    for name in (wrong_link, wrong_xlink, unbound):
+        assert calls.count(archive_member_url(CIK, ACCESSION, name)) == 0
+
+
 def test_t134_03_generic_xml_hyperlink_is_rejected(tmp_path: Path) -> None:
     generic_name = "unrelated.xml"
     primary_body = (
@@ -200,7 +258,7 @@ def test_t134_03_generic_xml_hyperlink_is_rejected(tmp_path: Path) -> None:
 
 def test_semantic_references_keep_archive_path_security_boundaries() -> None:
     body = (
-        "<html><head>"
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
         "<link:schemaRef xlink:href='../escape.xsd'>"
         "<link:linkbaseRef xlink:href='/absolute.xml'>"
         "<link:schemaRef xlink:href='C:/drive.xsd'>"
@@ -229,7 +287,7 @@ def test_semantic_references_keep_archive_path_security_boundaries() -> None:
 def test_t134_05_generic_index_instance_reference_drives_xbrl_instance_primary(tmp_path: Path) -> None:
     instance_name = "aapl-20250927-instance.xml"
     primary_body = (
-        "<html><head>"
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
         "<link:schemaRef xlink:href='aapl-20250927-instance.xml'>"
         "</head><body><p>narrative only</p></body></html>"
     ).encode("utf-8")
@@ -284,7 +342,7 @@ def test_t134_07_semantic_dependency_cycle_is_bounded_and_deduplicated(tmp_path:
     a_name = "a.xml"
     b_name = "b.xml"
     primary_body = (
-        "<html><head>"
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
         "<link:schemaRef xlink:href='a.xml'><link:schemaRef xlink:href='a.xml'>"
         "</head><body>filing</body></html>"
     ).encode("utf-8")
