@@ -12,7 +12,13 @@ from typing import Any
 from .errors import P11Reason, SecError
 from .compatibility import sec_artifact_compatibility
 from .discovery import verify_sec_discovery_observation
-from .parser import SEC_ARTIFACT_SCHEMA, XBRL_INSTANCE_NAMESPACE, SecParseResult, verify_sec_evidence
+from .parser import (
+    SEC_ARTIFACT_SCHEMA,
+    XBRL_INSTANCE_NAMESPACE,
+    SecParseResult,
+    verify_sec_evidence,
+    verify_sec_fact_source_locator,
+)
 
 
 SEC_VALIDATION_SCHEMA = "p11-sec-validation-v3"
@@ -91,6 +97,8 @@ def _fact_source_semantic_issues(
     parsed: SecParseResult,
     package: Any,
     fact_source_mode: str,
+    *,
+    source_cache: dict[tuple[str, str], object] | None = None,
 ) -> list[dict[str, Any]]:
     """Prove the persisted logical-fact universe matches fact_source_mode."""
 
@@ -121,8 +129,6 @@ def _fact_source_semantic_issues(
         )
 
     if fact_source_mode == "NO_STRUCTURED_FACTS":
-        if parsed.facts:
-            block("SEC NO_STRUCTURED_FACTS mode contains logical Raw Facts")
         return issues
 
     if fact_source_mode == "INLINE_XBRL_PRIMARY":
@@ -206,6 +212,15 @@ def _fact_source_semantic_issues(
                     raw_fact_id=fact_id or None,
                 )
                 break
+        try:
+            verify_sec_fact_source_locator(
+                package,
+                fact,
+                fact_source_mode=fact_source_mode,
+                source_cache=source_cache,
+            )
+        except SecError as exc:
+            block(str(exc), raw_fact_id=fact_id or None)
     return issues
 
 
@@ -310,6 +325,7 @@ def validate_sec_artifacts(
                 issues.append(_issue(P11Reason.P11_MEMBER_HASH_MISMATCH.value, "BLOCKING", "evidence member hash is not in source package", evidence_id=evidence.get("evidence_id")))
     if amendment_conflict:
         issues.append(_issue(P11Reason.P11_AMENDED_VARIANT_PRESENT.value, "REVIEW", "original and amended SEC variants are both present"))
+    source_replay_cache: dict[tuple[str, str], object] = {}
     fact_source_mode = str(parsed.fact_source_mode or "").strip().upper()
     if fact_source_mode not in _VALID_FACT_SOURCE_MODES:
         issues.append(
@@ -336,7 +352,14 @@ def validate_sec_artifacts(
             )
         )
     if package is not None and fact_source_mode in _VALID_FACT_SOURCE_MODES:
-        issues.extend(_fact_source_semantic_issues(parsed, package, fact_source_mode))
+        issues.extend(
+            _fact_source_semantic_issues(
+                parsed,
+                package,
+                fact_source_mode,
+                source_cache=source_replay_cache,
+            )
+        )
     observation = discovery_observation
     observation_sha = getattr(observation, "observation_sha256", None) or parsed.discovery_observation_sha256
     discovery_checked_at = getattr(observation, "retrieved_at", None) or parsed.discovery_checked_at
@@ -452,7 +475,7 @@ def validate_sec_artifacts(
             issues.append(_issue("P11_TABLE_TRACE_INVALID", "BLOCKING", "raw fact table_id does not resolve", raw_fact_id=fact.get("raw_fact_id")))
     if len(fact_ids) != len(parsed.facts) or len(evidence_ids) != len(parsed.evidence):
         issues.append(_issue("P11_ARTIFACT_INCOMPLETE_OR_CORRUPT", "BLOCKING", "duplicate raw fact or evidence identity"))
-    evidence_source_cache: dict[tuple[str, str], object] = {}
+    evidence_source_cache = source_replay_cache
     dom_targets: dict[str, set[str]] = {}
     for evidence in parsed.evidence:
         locator_kind = str(evidence.get("locator_kind") or "DOM_PATH").upper()
