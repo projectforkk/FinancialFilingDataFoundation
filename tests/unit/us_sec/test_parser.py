@@ -247,7 +247,7 @@ def test_visible_inline_fact_still_requires_a_block_anchor(tmp_path: Path) -> No
 
 def test_pre_issue138_v5_v2_artifact_is_not_reused_by_v6_parser(tmp_path: Path) -> None:
     package = _hidden_fact_package()
-    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V6"
+    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V5"
     legacy_dir.mkdir(parents=True)
     legacy_manifest = legacy_dir / "manifest.json"
     legacy_manifest.write_text(
