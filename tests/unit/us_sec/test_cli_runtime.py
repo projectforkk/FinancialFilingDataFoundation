@@ -267,7 +267,7 @@ def test_us_cli_planner_uses_current_local_package_and_parsed_data(monkeypatch: 
         registry=registry,
     )
     assert validation.validation_status == "PASS"
-    registry.register_sec_parsed_data(parse_run_id="run1", package_sha256=package.package_sha256, company_id=company.company_id, fiscal_year=2025, period="FY", parser_version="VIRTUAL_HTML_V3", schema_version=SEC_ARTIFACT_SCHEMA, validation_status="PASS", blocking_issue_count=0, compatibility_status="COMPATIBLE", artifact_path=str(parsed.artifact_dir))
+    registry.register_sec_parsed_data(parse_run_id="run1", package_sha256=package.package_sha256, company_id=company.company_id, fiscal_year=2025, period="FY", parser_version="VIRTUAL_HTML_V5", schema_version="p11-sec-artifacts-v2", validation_status="PASS", blocking_issue_count=0, compatibility_status="COMPATIBLE", artifact_path=str(parsed.artifact_dir))
     plan, _ = _us_plan_slot(company, args, paths, registry)
     assert plan.action.value == "PARSE_LOCAL"
     registry.register_sec_parsed_data(parse_run_id="stale-schema", package_sha256=package.package_sha256, company_id=company.company_id, fiscal_year=2025, period="FY", parser_version=VIRTUAL_HTML_NORMALIZER_VERSION, schema_version="p11-sec-artifacts-v0", validation_status="PASS", blocking_issue_count=0, compatibility_status="COMPATIBLE", artifact_path=str(parsed.artifact_dir))
@@ -478,22 +478,22 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
     register_sec_slot(registry, package, fiscal_year=2025, period="FY")
     observation = _observation(package)
     registry.register_sec_discovery_observation(observation)
-    old_dir = paths.ingest_root / "us" / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V3"
+    old_dir = paths.ingest_root / "us" / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V5"
     old_dir.mkdir(parents=True)
     old_manifest = old_dir / "manifest.json"
     old_manifest.write_text(
-        '{"schema_version":"p11-sec-artifacts-v1","parser_version":"VIRTUAL_HTML_V3","package_sha256":"%s"}\n' % package.package_sha256,
+        '{"schema_version":"p11-sec-artifacts-v2","parser_version":"VIRTUAL_HTML_V5","package_sha256":"%s"}\n' % package.package_sha256,
         encoding="utf-8",
     )
     old_bytes = old_manifest.read_bytes()
     registry.register_sec_parsed_data(
-        parse_run_id="legacy-v3",
+        parse_run_id="legacy-v5-v2",
         package_sha256=package.package_sha256,
         company_id="US:CIK0000320193",
         fiscal_year=2025,
         period="FY",
-        parser_version="VIRTUAL_HTML_V3",
-        schema_version="p11-sec-artifacts-v1",
+        parser_version="VIRTUAL_HTML_V5",
+        schema_version="p11-sec-artifacts-v2",
         validation_status="PASS",
         blocking_issue_count=0,
         compatibility_status="COMPATIBLE",
@@ -520,7 +520,7 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
         registry=registry,
     )
     registry.register_sec_parsed_data(
-        parse_run_id="current-v5",
+        parse_run_id="current-v6",
         package_sha256=package.package_sha256,
         company_id="US:CIK0000320193",
         fiscal_year=2025,
@@ -536,7 +536,7 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
     new_dir = paths.ingest_root / "us" / "p11" / f"{package.package_sha256}.{VIRTUAL_HTML_NORMALIZER_VERSION}"
     assert new_dir.is_dir()
     assert old_manifest.read_bytes() == old_bytes
-    assert all(row["parser_version"] != "VIRTUAL_HTML_V3" or row["parse_run_id"] == "legacy-v3" for row in SQLiteRegistry(paths.registry).list_sec_parsed_data(company_id="US:CIK0000320193", fiscal_year=2025, period="FY"))
+    assert all(row["parser_version"] != "VIRTUAL_HTML_V5" or row["parse_run_id"] == "legacy-v5-v2" for row in SQLiteRegistry(paths.registry).list_sec_parsed_data(company_id="US:CIK0000320193", fiscal_year=2025, period="FY"))
     rows = SQLiteRegistry(paths.registry).list_sec_parsed_data(company_id="US:CIK0000320193", fiscal_year=2025, period="FY")
     assert any(row["parser_version"] == VIRTUAL_HTML_NORMALIZER_VERSION and row["schema_version"] == SEC_ARTIFACT_SCHEMA for row in rows)
 
