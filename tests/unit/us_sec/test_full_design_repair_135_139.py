@@ -334,7 +334,7 @@ def test_t136_01_all_listed_history_chunks_are_processed_after_current_match(tmp
     assert observation.state == "AMENDED_VARIANT_PRESENT"
 
 
-def test_t136_02_history_enumeration_is_deterministic_and_includes_missing_ranges(tmp_path: Path) -> None:
+def test_t136_02_history_enumeration_includes_missing_ranges_and_excludes_provably_ancient_chunks(tmp_path: Path) -> None:
     names = [
         "CIK0000320193-submissions-002.json",
         "CIK0000320193-submissions-001.json",
@@ -352,7 +352,6 @@ def test_t136_02_history_enumeration_is_deterministic_and_includes_missing_range
     acquirer._discover_with_candidates(_company(), fiscal_year=2025, period="FY")
 
     assert client.calls[1:] == [
-        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
         "https://data.sec.gov/submissions/CIK0000320193-submissions-002.json",
     ]
 
