@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_REVIEW_5_VALIDATION_V3_PERSISTENCE_DESIGN_FREEZE / DEVELOPMENT_AWAITING_AUTHORIZATION**
+**P11_REVIEW_5_DEVELOPMENT_AUTHORIZED / DESIGN_BASELINE_70353788**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = REVIEW 5 VALIDATION-V3 PERSISTENCE DESIGN FREEZE / DEVELOPMENT NOT AUTHORIZED`
+`P11 = REVIEW 5 DESIGN_FREEZE_PASS / DEVELOPMENT AUTHORIZED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -23,9 +23,10 @@ Current P11 design:
 - Design 36 review: `development/193-p11-design-freeze-review-result.md = DESIGN_FREEZE_CHANGES_REQUIRED`;
 - Design 37 final-freeze review: `development/194-p11-design37-final-freeze-review-result.md = CHANGES_REQUIRED`;
 - validation-v3 persistence review: `development/195-p11-validation-v3-persistence-design-review.md = CHANGES_REQUIRED`;
-- ISSUE-140 = `FIXED`; ISSUE-141 = `FIXED`; ISSUE-142 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`; ISSUE-143 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`; ISSUE-144 = `GOVERNANCE CORRECTED`; ISSUE-145 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
-- validation-v3 persistence = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
-- development authorization: `NOT YET ISSUED`.
+- final exact design freeze: `70353788d0b6188e757e24b10b0883b0a9a057dd = DESIGN_FREEZE_PASS`;
+- development authorization: `development/196-p11-review5-development-authorization.md`;
+- ISSUE-140 = `FIXED`; ISSUE-141 = `FIXED`; ISSUE-142 = `DEVELOPMENT AUTHORIZED`; ISSUE-143 = `DEVELOPMENT AUTHORIZED`; ISSUE-144 = `GOVERNANCE CORRECTED`; ISSUE-145 = `DEVELOPMENT AUTHORIZED`;
+- validation-v3 persistence = `DEVELOPMENT AUTHORIZED`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -720,7 +721,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `REVIEW 5 VALIDATION-V3 PERSISTENCE DESIGN FREEZE / DEVELOPMENT AWAITING AUTHORIZATION`
+- P11 — US SEC Provider: `REVIEW 5 DEVELOPMENT AUTHORIZED / DESIGN BASELINE 70353788`
 
 
 ## P11 short execution workflow
