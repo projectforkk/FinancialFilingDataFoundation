@@ -908,18 +908,11 @@ def _load_sec_bundle(document: CatalogDocument, project_root: Path | None = None
     try:
         parsed = load_sec_artifacts(document.sec_artifact_dir)
         validation = load_sec_validation(document.sec_artifact_dir.parent.parent / "p7" / parsed.package_sha256)
-    except Exception:
-        # The catalog normally points at the P11 artifact directory and keeps P7
-        # beside it.  A direct validation artifact is also accepted for small
-        # local fixtures.
-        try:
-            parsed = load_sec_artifacts(document.sec_artifact_dir)
-            validation = load_sec_validation(document.sec_artifact_dir)
-        except Exception as exc:
-            raise McpServiceError(
-                "P8_UPSTREAM_ARTIFACT_INVALID",
-                f"SEC upstream artifact validation failed for {document.document_sha256}: {exc}",
-            ) from exc
+    except Exception as exc:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            f"SEC upstream artifact validation failed for {document.document_sha256}: {exc}",
+        ) from exc
     if parsed.package_sha256 != document.document_sha256:
         raise McpServiceError(
             "P8_UPSTREAM_ARTIFACT_INVALID",

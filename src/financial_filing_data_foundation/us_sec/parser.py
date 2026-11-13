@@ -1249,7 +1249,7 @@ def _facts(
             if str(fragment.get("raw_source_text", ""))
         )
         raw_value = " ".join(raw_value.split())
-        parsed_numeric_candidate = _numeric_candidate(raw_value)
+        parsed_numeric_candidate = None if ((_attr_local(node, "nil") or "").casefold() in {"true", "1"}) else _numeric_candidate(raw_value)
         fragment_hash = _sha256(f"{primary_sha}|fact|{locator}|{raw_value}".encode())
         hidden = _is_hidden_cached(node, hidden_cache)
         source_block = None if hidden else _source_block_for_node(node, blocks_by_locator, blocks_by_prefix)

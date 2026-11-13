@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
+import shutil
+import uuid
 from dataclasses import dataclass
 from datetime import date
 import re
@@ -15,21 +18,33 @@ from .parser import (
     SEC_ARTIFACT_SCHEMA,
     XBRL_INSTANCE_NAMESPACE,
     SecParseResult,
+    _attr,
+    _attr_local,
+    _continuation_index,
     _DomParser,
+    _contexts_and_units,
     _descendants,
+    _is_hidden,
     _is_inline_fact,
     _is_valid_xbrl_instance_root,
+    _logical_text,
+    _numeric_candidate,
+    _path,
     _parse_xml_root,
+    _resolve_inline_fragments,
     _resolve_dom_locator,
     _resolve_xml_locator,
     _xml_attr_local,
     _xml_local,
+    _xml_namespace_map,
     _xml_namespace,
+    _xml_qname,
+    _xml_text,
     verify_sec_evidence,
 )
 
 
-SEC_VALIDATION_SCHEMA = "p11-sec-validation-v2"
+SEC_VALIDATION_SCHEMA = "p11-sec-validation-v3"
 _VALID_FACT_SOURCE_MODES = frozenset(
     {"INLINE_XBRL_PRIMARY", "XBRL_INSTANCE_PRIMARY", "NO_STRUCTURED_FACTS"}
 )
@@ -87,16 +102,51 @@ def _issue(code: str, severity: str, message: str, **extra: Any) -> dict[str, An
     return {"code": code, "severity": severity, "message": message, **extra}
 
 
+def sec_validation_artifact_dir(validation_root: str | Path, package_sha256: str) -> Path:
+    """Resolve the only current SEC validation location for a package."""
+
+    package_sha = str(package_sha256).strip().lower()
+    if len(package_sha) != 64 or any(char not in "0123456789abcdef" for char in package_sha):
+        raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation package SHA is invalid")
+    return (
+        Path(validation_root).expanduser().resolve()
+        / package_sha
+        / SEC_VALIDATION_SCHEMA
+    )
+
+
 def _write(result: SecValidationResult) -> None:
-    result.artifact_dir.mkdir(parents=True, exist_ok=True)
-    with result.issues_path.open("w", encoding="utf-8", newline="\n") as handle:
-        for row in result.issues:
-            handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
-    payload = result.to_dict()
-    payload["artifact_hashes"] = {
-        "issues_file": hashlib.sha256(result.issues_path.read_bytes()).hexdigest(),
-    }
-    result.report_path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    directory = result.artifact_dir
+    directory.parent.mkdir(parents=True, exist_ok=True)
+    temp_dir = directory.parent / f".{directory.name}.{uuid.uuid4().hex}.tmp"
+    backup_dir = directory.parent / f".{directory.name}.{uuid.uuid4().hex}.bak"
+    temp_dir.mkdir(parents=False, exist_ok=False)
+    try:
+        issues_path = temp_dir / "issues.jsonl"
+        with issues_path.open("w", encoding="utf-8", newline="\n") as handle:
+            for row in result.issues:
+                handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
+        payload = result.to_dict()
+        payload["artifact_hashes"] = {
+            "issues_file": hashlib.sha256(issues_path.read_bytes()).hexdigest(),
+        }
+        (temp_dir / "validation.json").write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        if directory.exists():
+            os.replace(directory, backup_dir)
+        os.replace(temp_dir, directory)
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
+    except Exception:
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        if not directory.exists() and backup_dir.exists():
+            os.replace(backup_dir, directory)
+        elif backup_dir.exists():
+            shutil.rmtree(backup_dir, ignore_errors=True)
+        raise
 
 
 def _status(issues: list[dict[str, Any]]) -> tuple[str, int, int, int, int]:
@@ -109,6 +159,7 @@ def _status(issues: list[dict[str, Any]]) -> tuple[str, int, int, int, int]:
         P11Reason.P11_XBRL_INSTANCE_AMBIGUOUS.value,
         P11Reason.P11_INLINE_CONTINUATION_INVALID.value,
         P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value,
+        P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value,
         "P11_ARTIFACT_INCOMPLETE_OR_CORRUPT",
     }
     blocking = sum(1 for row in issues if str(row.get("code")) in blocking_codes or str(row.get("severity", "")).upper() == "BLOCKING")
@@ -126,12 +177,91 @@ def _status(issues: list[dict[str, Any]]) -> tuple[str, int, int, int, int]:
     return status, blocking, failures, review, warning
 
 
+def _canonical_context(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or not isinstance(value.get("period"), dict):
+        return None
+    raw_dimensions = value.get("dimensions")
+    if not isinstance(raw_dimensions, list):
+        return None
+    dimensions: list[dict[str, Any]] = []
+    dimension_fields = (
+        "dimension_kind",
+        "dimension",
+        "member",
+        "member_qname",
+        "typed_value",
+        "typed_member_text",
+    )
+    for dimension in raw_dimensions:
+        if not isinstance(dimension, dict):
+            return None
+        dimensions.append({field: dimension.get(field) for field in dimension_fields})
+    period_fields = ("instant", "startdate", "enddate")
+    return {
+        "id": value.get("id"),
+        "entity_identifier": value.get("entity_identifier"),
+        "period": {field: value["period"].get(field) for field in period_fields if field in value["period"]},
+        "dimensions": dimensions,
+    }
+
+
+def _canonical_unit(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or not isinstance(value.get("measures"), list):
+        return None
+    return {"id": value.get("id"), "measures": list(value["measures"])}
+
+
+def _fact_fragments(
+    fragments: tuple[Any, ...],
+    member_sha: str,
+    *,
+    xml: bool = False,
+) -> tuple[list[dict[str, Any]], str, str]:
+    rows: list[dict[str, Any]] = []
+    for index, fragment in enumerate(fragments):
+        if xml:
+            locator = str(fragment[1])
+            raw_source_text = _xml_text(fragment[0])
+            row = {
+                "source_member_sha256": member_sha,
+                "xml_locator": locator,
+                "source_order_index": index,
+                "raw_source_text": raw_source_text,
+                "fragment_hash": hashlib.sha256(
+                    f"{member_sha}|fact|{locator}|{raw_source_text}".encode()
+                ).hexdigest(),
+            }
+        else:
+            node = fragment
+            locator = _path(node)
+            raw_source_text = _logical_text(node)
+            row = {
+                "source_member_sha256": member_sha,
+                "dom_locator": locator,
+                "source_order_index": index,
+                "raw_source_text": raw_source_text,
+                "fragment_hash": hashlib.sha256(
+                    f"{member_sha}|fragment|{locator}|{raw_source_text}".encode()
+                ).hexdigest(),
+            }
+        rows.append(row)
+    raw_value = " ".join(
+        str(row.get("raw_source_text", ""))
+        for row in rows
+        if str(row.get("raw_source_text", ""))
+    )
+    raw_value = " ".join(raw_value.split())
+    locator = str(rows[0].get("xml_locator") or rows[0].get("dom_locator") or "")
+    fragment_hash = hashlib.sha256(f"{member_sha}|fact|{locator}|{raw_value}".encode()).hexdigest()
+    return rows, raw_value, fragment_hash
+
+
 def _fact_source_semantic_issues(
     parsed: SecParseResult,
     package: Any | None,
     fact_source_mode: str,
 ) -> list[dict[str, Any]]:
-    """Independently verify that logical facts match their declared source mode."""
+    """Replay immutable SEC source nodes and compare every persisted assertion."""
 
     if fact_source_mode == "NO_STRUCTURED_FACTS":
         if parsed.facts or parsed.evidence:
@@ -149,14 +279,10 @@ def _fact_source_semantic_issues(
     issues: list[dict[str, Any]] = []
 
     def invalid(message: str, **extra: Any) -> None:
-        issues.append(
-            _issue(
-                P11Reason.P11_FACT_SOURCE_MODE_INVALID.value,
-                "BLOCKING",
-                message,
-                **extra,
-            )
-        )
+        issues.append(_issue(P11Reason.P11_FACT_SOURCE_MODE_INVALID.value, "BLOCKING", message, **extra))
+
+    def mismatch(message: str, **extra: Any) -> None:
+        issues.append(_issue(P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value, "BLOCKING", message, **extra))
 
     primary_members = [member for member in package.members if member.role.value == "PRIMARY_DOCUMENT"]
     evidence_by_fact = {
@@ -164,20 +290,92 @@ def _fact_source_semantic_issues(
         for evidence in parsed.evidence
         if str(evidence.get("raw_fact_id") or "")
     }
+    evidence_by_id = {
+        str(evidence.get("evidence_id") or ""): evidence
+        for evidence in parsed.evidence
+        if str(evidence.get("evidence_id") or "")
+    }
 
-    def row_member_mismatch(row: dict[str, Any], expected_sha: str) -> bool:
-        return (
-            str(row.get("member_sha256") or "") != expected_sha
-            or str(row.get("source_member_sha256") or "") != expected_sha
-        )
+    def compare_fragment_members(row: dict[str, Any], expected_sha: str, *, raw_fact_id: str) -> None:
+        fragments = row.get("source_fragments")
+        if not isinstance(fragments, list):
+            mismatch("SEC source fragments are not a list", raw_fact_id=raw_fact_id)
+            return
+        if any(fragment.get("source_member_sha256") != expected_sha for fragment in fragments if isinstance(fragment, dict)):
+            mismatch("SEC source fragment member differs from immutable source", raw_fact_id=raw_fact_id)
 
-    def fragment_member_mismatch(row: dict[str, Any], expected_sha: str) -> bool:
-        fragments = row.get("source_fragments") or ()
-        return any(
-            not isinstance(fragment, dict)
-            or str(fragment.get("source_member_sha256") or "") != expected_sha
-            for fragment in fragments
-        )
+    def compare_common_fact(
+        fact: dict[str, Any],
+        evidence: dict[str, Any] | None,
+        expected: dict[str, Any],
+        *,
+        raw_fact_id: str,
+        source_locator_field: str,
+        evidence_locator_field: str,
+        expected_locator_kind: str,
+    ) -> None:
+        if fact.get("member_sha256") != expected["source_member_sha256"] or fact.get("source_member_sha256") != expected["source_member_sha256"]:
+            invalid("SEC logical fact is not sourced from the authoritative member", raw_fact_id=raw_fact_id)
+        for field in (
+            "member_sha256",
+            "source_member_sha256",
+            "raw_qname",
+            "raw_metric_name",
+            "raw_value",
+            "fact_kind",
+            "context_ref",
+            "unit_ref",
+            "decimals",
+            "precision",
+            "scale",
+            "sign",
+            "format",
+            "nil",
+            "continued_at",
+            "hidden",
+            "parsed_numeric_candidate",
+            "fragment_hash",
+            "raw_attributes",
+            "source_fragments",
+        ):
+            if fact.get(field) != expected.get(field):
+                mismatch(f"SEC Raw Fact field differs from immutable source: {field}", raw_fact_id=raw_fact_id, field=field)
+        if fact.get(source_locator_field) != expected.get(source_locator_field):
+            mismatch("SEC Raw Fact locator differs from immutable source", raw_fact_id=raw_fact_id)
+        if source_locator_field == "dom_locator" and fact.get("xml_locator"):
+            mismatch("SEC Inline Raw Fact carries an XML locator", raw_fact_id=raw_fact_id)
+        if source_locator_field == "xml_locator" and fact.get("dom_locator"):
+            mismatch("SEC XML Raw Fact carries a DOM locator", raw_fact_id=raw_fact_id)
+        compare_fragment_members(fact, str(expected["source_member_sha256"]), raw_fact_id=raw_fact_id)
+
+        if evidence is None:
+            return
+        evidence_fields = {
+            "evidence_id": fact.get("evidence_id"),
+            "raw_fact_id": raw_fact_id,
+            "member_sha256": expected["source_member_sha256"],
+            "source_member_sha256": expected["source_member_sha256"],
+            "fragment_hash": expected["fragment_hash"],
+            "raw_text": expected["raw_value"],
+            "text": expected["raw_value"],
+            "source_fragments": expected["source_fragments"],
+            evidence_locator_field: expected[source_locator_field],
+            "locator_kind": expected_locator_kind,
+        }
+        if "hidden" in evidence:
+            evidence_fields["hidden"] = expected["hidden"]
+        if "fact_dom_locator" in evidence:
+            evidence_fields["fact_dom_locator"] = expected.get("dom_locator")
+        if evidence.get("member_sha256") != expected["source_member_sha256"] or evidence.get("source_member_sha256") != expected["source_member_sha256"]:
+            invalid("SEC evidence is not sourced from the authoritative member", raw_fact_id=raw_fact_id)
+        for field, value in evidence_fields.items():
+            if evidence.get(field) != value:
+                mismatch(f"SEC Raw Fact evidence field differs from immutable source: {field}", raw_fact_id=raw_fact_id, field=field)
+        compare_fragment_members(evidence, str(expected["source_member_sha256"]), raw_fact_id=raw_fact_id)
+        if source_locator_field == "dom_locator" and evidence.get("xml_locator"):
+            mismatch("SEC Inline evidence carries an XML locator", raw_fact_id=raw_fact_id)
+        if source_locator_field == "xml_locator" and evidence.get("dom_locator"):
+            mismatch("SEC XML evidence carries a DOM locator", raw_fact_id=raw_fact_id)
 
     if fact_source_mode == "INLINE_XBRL_PRIMARY":
         if len(primary_members) != 1:
@@ -186,9 +384,8 @@ def _fact_source_semantic_issues(
         primary = primary_members[0]
         primary_sha = str(primary.member_sha256)
         try:
-            html = primary.body.decode("utf-8-sig")
             dom_parser = _DomParser()
-            dom_parser.feed(html)
+            dom_parser.feed(primary.body.decode("utf-8-sig"))
             dom_parser.close()
         except (UnicodeDecodeError, AssertionError, ValueError) as exc:
             invalid("SEC INLINE_XBRL_PRIMARY primary member cannot be independently parsed", error=str(exc))
@@ -196,40 +393,81 @@ def _fact_source_semantic_issues(
         dom_root = dom_parser.root
         if not any(_is_inline_fact(node) for node in _descendants(dom_root)):
             invalid("SEC INLINE_XBRL_PRIMARY mode has no authentic Inline XBRL fact in the primary member")
+        contexts, units = _contexts_and_units(dom_root, package, source_mode="INLINE_XBRL_PRIMARY")
+        continuation_targets, duplicate_targets = _continuation_index(dom_root)
         for fact in parsed.facts:
             raw_fact_id = str(fact.get("raw_fact_id") or "")
-            if row_member_mismatch(fact, primary_sha) or fragment_member_mismatch(fact, primary_sha):
-                invalid("SEC Inline logical fact is not sourced from the primary member", raw_fact_id=raw_fact_id)
-            if fact.get("xml_locator"):
-                invalid("SEC Inline logical fact carries an XML locator", raw_fact_id=raw_fact_id)
-            locator = str(fact.get("dom_locator") or "")
-            node = _resolve_dom_locator(dom_root, locator) if locator else None
+            locator = fact.get("dom_locator")
+            node = _resolve_dom_locator(dom_root, locator) if isinstance(locator, str) and locator else None
             if node is None or not _is_inline_fact(node):
                 invalid("SEC Inline logical fact locator does not resolve to an authentic primary Inline fact", raw_fact_id=raw_fact_id)
-            for field_name in ("context", "unit"):
-                value = fact.get(field_name)
-                if isinstance(value, dict) and value.get("source_member_sha256") not in {None, "", primary_sha}:
+                continue
+            context_ref = _attr_local(node, "contextref")
+            unit_ref = _attr_local(node, "unitref")
+            if context_ref and context_ref not in contexts:
+                invalid("SEC Inline fact contextRef does not resolve in the primary member", raw_fact_id=raw_fact_id)
+            if unit_ref and unit_ref not in units:
+                invalid("SEC Inline fact unitRef does not resolve in the primary member", raw_fact_id=raw_fact_id)
+            fragments, continuation_error = _resolve_inline_fragments(node, continuation_targets, duplicate_targets)
+            if continuation_error is not None:
+                invalid("SEC Inline fact continuation chain is invalid", raw_fact_id=raw_fact_id, error=continuation_error)
+                continue
+            fragment_rows, raw_value, fragment_hash = _fact_fragments(fragments, primary_sha)
+            raw_qname = _attr(node, "name") or ""
+            nil = (_attr_local(node, "nil") or "").casefold() in {"true", "1"}
+            expected = {
+                "member_sha256": primary_sha,
+                "source_member_sha256": primary_sha,
+                "dom_locator": str(locator),
+                "raw_qname": raw_qname,
+                "raw_metric_name": raw_qname,
+                "raw_value": raw_value,
+                "fact_kind": "NUMERIC" if str(node.tag).rsplit(":", 1)[-1].casefold() == "nonfraction" else "NONNUMERIC",
+                "context_ref": context_ref,
+                "unit_ref": unit_ref,
+                "decimals": _attr_local(node, "decimals"),
+                "precision": _attr_local(node, "precision"),
+                "scale": _attr_local(node, "scale"),
+                "sign": _attr_local(node, "sign"),
+                "format": _attr_local(node, "format"),
+                "nil": nil,
+                "continued_at": _attr_local(node, "continuedat") or _attr_local(node, "continued_at"),
+                "hidden": _is_hidden(node),
+                "parsed_numeric_candidate": None if nil else _numeric_candidate(raw_value),
+                "fragment_hash": fragment_hash,
+                "raw_attributes": dict(node.attrs),
+                "source_fragments": fragment_rows,
+            }
+            for field_name, payload, canonicalizer in (
+                ("context", fact.get("context"), _canonical_context),
+                ("unit", fact.get("unit"), _canonical_unit),
+            ):
+                source_payload = contexts.get(context_ref) if field_name == "context" and context_ref else units.get(unit_ref) if field_name == "unit" and unit_ref else None
+                if source_payload is not None and canonicalizer(payload) != canonicalizer(source_payload):
+                    mismatch(f"SEC Inline {field_name} payload differs from immutable source", raw_fact_id=raw_fact_id, field=field_name)
+                if isinstance(payload, dict) and payload.get("source_member_sha256") not in {None, "", primary_sha}:
                     invalid("SEC Inline fact context/unit was sourced from a non-primary member", raw_fact_id=raw_fact_id, field=field_name)
-            evidence = evidence_by_fact.get(raw_fact_id)
-            if evidence is not None:
-                if row_member_mismatch(evidence, primary_sha) or fragment_member_mismatch(evidence, primary_sha):
-                    invalid("SEC Inline evidence is not sourced from the primary member", raw_fact_id=raw_fact_id)
-                if str(evidence.get("locator_kind") or "").upper() not in {"DOM_PATH", "DOM_HIDDEN_FACT"}:
-                    invalid("SEC Inline evidence does not use the DOM locator model", raw_fact_id=raw_fact_id)
-                if evidence.get("xml_locator"):
-                    invalid("SEC Inline evidence carries an XML locator", raw_fact_id=raw_fact_id)
+            compare_common_fact(
+                fact,
+                evidence_by_fact.get(raw_fact_id) or evidence_by_id.get(str(fact.get("evidence_id") or "")),
+                expected,
+                raw_fact_id=raw_fact_id,
+                source_locator_field="dom_locator",
+                evidence_locator_field="dom_locator",
+                expected_locator_kind="DOM_HIDDEN_FACT" if expected["hidden"] else "DOM_PATH",
+            )
         for evidence in parsed.evidence:
-            if row_member_mismatch(evidence, primary_sha) or fragment_member_mismatch(evidence, primary_sha):
-                invalid("SEC Inline evidence row is not sourced from the primary member", evidence_id=evidence.get("evidence_id"))
+            raw_fact_id = str(evidence.get("raw_fact_id") or "")
+            if raw_fact_id not in evidence_by_fact or not any(str(fact.get("raw_fact_id") or "") == raw_fact_id for fact in parsed.facts):
+                invalid("SEC Inline evidence does not resolve to a persisted Raw Fact", evidence_id=evidence.get("evidence_id"))
         return issues
 
     if fact_source_mode != "XBRL_INSTANCE_PRIMARY":
         return issues
 
-    instance_members = [member for member in package.members if member.role.value == "XBRL_INSTANCE"]
-    authentic_instances = []
+    authentic_instances: list[Any] = []
     parsed_roots: dict[str, Any] = {}
-    for member in instance_members:
+    for member in package.members:
         root = _parse_xml_root(member.body)
         if _is_valid_xbrl_instance_root(root):
             authentic_instances.append(member)
@@ -238,49 +476,94 @@ def _fact_source_semantic_issues(
         invalid("SEC XBRL_INSTANCE_PRIMARY mode requires exactly one authentic XBRL instance member")
         return issues
     instance = authentic_instances[0]
+    if instance.role.value != "XBRL_INSTANCE":
+        invalid("SEC authentic XBRL instance has a conflicting package role", member_sha256=instance.member_sha256)
+        return issues
     instance_sha = str(instance.member_sha256)
     instance_root = parsed_roots[instance_sha]
     if len(primary_members) == 1:
         try:
-            html = primary_members[0].body.decode("utf-8-sig")
             dom_parser = _DomParser()
-            dom_parser.feed(html)
+            dom_parser.feed(primary_members[0].body.decode("utf-8-sig"))
             dom_parser.close()
             if any(_is_inline_fact(node) for node in _descendants(dom_parser.root)):
                 invalid("SEC XBRL_INSTANCE_PRIMARY mode contains primary Inline XBRL facts")
         except (UnicodeDecodeError, AssertionError, ValueError) as exc:
             invalid("SEC XBRL_INSTANCE_PRIMARY primary member cannot be independently parsed", error=str(exc))
+    contexts, units = _contexts_and_units(_DomParser().root, package, source_mode="XBRL_INSTANCE_PRIMARY", instance_member=instance)
+    ignored_elements = {"context", "unit", "schemaref", "linkbaseref", "footnotelink", "roleref", "arcroleref"}
+    namespaces = _xml_namespace_map(instance.body)
     for fact in parsed.facts:
         raw_fact_id = str(fact.get("raw_fact_id") or "")
-        if row_member_mismatch(fact, instance_sha) or fragment_member_mismatch(fact, instance_sha):
-            invalid("SEC XML logical fact is not sourced from the selected XBRL instance", raw_fact_id=raw_fact_id)
-        if str(fact.get("locator_kind") or "").upper() != "XML_PATH":
-            invalid("SEC XML logical fact does not use the XML locator model", raw_fact_id=raw_fact_id)
-        locator = str(fact.get("xml_locator") or "")
-        node = _resolve_xml_locator(instance_root, locator) if locator else None
-        if node is None or _xml_namespace(str(node.tag)) == XBRL_INSTANCE_NAMESPACE or not _xml_attr_local(node, "contextref"):
+        locator = fact.get("xml_locator")
+        node = _resolve_xml_locator(instance_root, locator) if isinstance(locator, str) and locator else None
+        if node is None or _xml_namespace(str(node.tag)) == XBRL_INSTANCE_NAMESPACE or _xml_attr_local(node, "contextref") is None:
             invalid("SEC XML logical fact locator does not resolve to an instance fact", raw_fact_id=raw_fact_id)
-        if fact.get("dom_locator"):
-            invalid("SEC XML logical fact carries a DOM locator", raw_fact_id=raw_fact_id)
-        for field_name in ("context", "unit"):
-            if field_name == "context" and not fact.get("context_ref"):
-                continue
-            if field_name == "unit" and not fact.get("unit_ref"):
-                continue
-            value = fact.get(field_name)
-            if not isinstance(value, dict) or str(value.get("source_member_sha256") or "") != instance_sha:
-                invalid("SEC XML fact context/unit is not bound to the selected XBRL instance", raw_fact_id=raw_fact_id, field=field_name)
-        evidence = evidence_by_fact.get(raw_fact_id)
-        if evidence is not None:
-            if row_member_mismatch(evidence, instance_sha) or fragment_member_mismatch(evidence, instance_sha):
-                invalid("SEC XML evidence is not sourced from the selected XBRL instance", raw_fact_id=raw_fact_id)
-            if str(evidence.get("locator_kind") or "").upper() != "XML_PATH":
-                invalid("SEC XML evidence does not use the XML locator model", raw_fact_id=raw_fact_id)
-            if evidence.get("dom_locator"):
-                invalid("SEC XML evidence carries a DOM locator", raw_fact_id=raw_fact_id)
+            continue
+        context_ref = _xml_attr_local(node, "contextref")
+        unit_ref = _xml_attr_local(node, "unitref")
+        if _xml_local(str(node.tag)) in ignored_elements:
+            invalid("SEC XML logical fact locator resolves to a reserved instance element", raw_fact_id=raw_fact_id)
+            continue
+        if context_ref and context_ref not in contexts:
+            invalid("SEC XML fact contextRef does not resolve in the selected instance", raw_fact_id=raw_fact_id)
+        if unit_ref and unit_ref not in units:
+            invalid("SEC XML fact unitRef does not resolve in the selected instance", raw_fact_id=raw_fact_id)
+        raw_value = _xml_text(node)
+        nil = (_xml_attr_local(node, "nil") or "").casefold() in {"true", "1"}
+        numeric = None if nil else _numeric_candidate(raw_value)
+        fact_kind = "NUMERIC" if unit_ref or numeric is not None else "NONNUMERIC"
+        fragment_rows, raw_value, fragment_hash = _fact_fragments(((node, str(locator)),), instance_sha, xml=True)
+        raw_qname = _xml_qname(str(node.tag), namespaces)
+        expected = {
+            "member_sha256": instance_sha,
+            "source_member_sha256": instance_sha,
+            "xml_locator": str(locator),
+            "raw_qname": raw_qname,
+            "raw_metric_name": raw_qname,
+            "raw_value": raw_value,
+            "fact_kind": fact_kind,
+            "context_ref": context_ref,
+            "unit_ref": unit_ref,
+            "decimals": _xml_attr_local(node, "decimals"),
+            "precision": _xml_attr_local(node, "precision"),
+            "scale": _xml_attr_local(node, "scale"),
+            "sign": _xml_attr_local(node, "sign"),
+            "format": _xml_attr_local(node, "format"),
+            "nil": nil,
+            "continued_at": _xml_attr_local(node, "continuedat") or _xml_attr_local(node, "continued_at"),
+            "hidden": False,
+            "parsed_numeric_candidate": numeric,
+            "fragment_hash": fragment_hash,
+            "raw_attributes": {str(key).casefold(): str(value) for key, value in node.attrib.items()},
+            "source_fragments": fragment_rows,
+        }
+        for field_name, payload, canonicalizer in (
+            ("context", fact.get("context"), _canonical_context),
+            ("unit", fact.get("unit"), _canonical_unit),
+        ):
+            source_payload = contexts.get(context_ref) if field_name == "context" and context_ref else units.get(unit_ref) if field_name == "unit" and unit_ref else None
+            if source_payload is not None and canonicalizer(payload) != canonicalizer(source_payload):
+                mismatch(f"SEC XML {field_name} payload differs from immutable source", raw_fact_id=raw_fact_id, field=field_name)
+            if field_name == "context" and context_ref:
+                if not isinstance(payload, dict) or payload.get("source_member_sha256") != instance_sha:
+                    invalid("SEC XML fact context is not bound to the selected XBRL instance", raw_fact_id=raw_fact_id)
+            if field_name == "unit" and unit_ref:
+                if not isinstance(payload, dict) or payload.get("source_member_sha256") != instance_sha:
+                    invalid("SEC XML fact unit is not bound to the selected XBRL instance", raw_fact_id=raw_fact_id)
+        compare_common_fact(
+            fact,
+            evidence_by_fact.get(raw_fact_id) or evidence_by_id.get(str(fact.get("evidence_id") or "")),
+            expected,
+            raw_fact_id=raw_fact_id,
+            source_locator_field="xml_locator",
+            evidence_locator_field="xml_locator",
+            expected_locator_kind="XML_PATH",
+        )
     for evidence in parsed.evidence:
-        if row_member_mismatch(evidence, instance_sha) or fragment_member_mismatch(evidence, instance_sha):
-            invalid("SEC XML evidence row is not sourced from the selected XBRL instance", evidence_id=evidence.get("evidence_id"))
+        raw_fact_id = str(evidence.get("raw_fact_id") or "")
+        if raw_fact_id not in evidence_by_fact or not any(str(fact.get("raw_fact_id") or "") == raw_fact_id for fact in parsed.facts):
+            invalid("SEC XML evidence does not resolve to a persisted Raw Fact", evidence_id=evidence.get("evidence_id"))
     return issues
 
 
@@ -524,7 +807,7 @@ def validate_sec_artifacts(
                 issues.append(_issue(exc.reason_code, "BLOCKING", str(exc), evidence_id=evidence.get("evidence_id")))
 
     status, blocking, failures, review, warning = _status(issues)
-    directory = Path(validation_root).expanduser().resolve() / parsed.package_sha256
+    directory = sec_validation_artifact_dir(validation_root, parsed.package_sha256)
     result = SecValidationResult(
         artifact_dir=directory,
         package_sha256=parsed.package_sha256,
@@ -560,8 +843,39 @@ def validate_sec_artifacts(
     return result
 
 
-def load_sec_validation(artifact_dir: str | Path) -> SecValidationResult:
+def _resolve_sec_validation_dir(
+    artifact_dir: str | Path,
+    package_sha256: str | None = None,
+) -> Path:
     directory = Path(artifact_dir).expanduser().resolve()
+    if package_sha256 is not None:
+        return sec_validation_artifact_dir(directory, package_sha256)
+    if directory.name == SEC_VALIDATION_SCHEMA:
+        return directory
+    if re.fullmatch(r"[0-9a-fA-F]{64}", directory.name):
+        return sec_validation_artifact_dir(directory.parent, directory.name)
+    return directory
+
+
+def load_sec_validation(
+    artifact_dir: str | Path,
+    *,
+    package_sha256: str | None = None,
+) -> SecValidationResult:
+    """Load only the current schema-versioned SEC validation artifact.
+
+    A legacy flat ``<package_sha>/validation.json`` directory is deliberately
+    not considered a fallback.  Callers may pass either the current directory
+    itself or the P7 root/package directory and this resolver will map it to
+    ``<package_sha>/p11-sec-validation-v3``.
+    """
+
+    directory = _resolve_sec_validation_dir(artifact_dir, package_sha256)
+    if (
+        directory.name != SEC_VALIDATION_SCHEMA
+        or not re.fullmatch(r"[0-9a-fA-F]{64}", directory.parent.name)
+    ):
+        raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation artifact path is not versioned")
     report_path = directory / "validation.json"
     issues_path = directory / "issues.jsonl"
     try:
@@ -594,6 +908,8 @@ def load_sec_validation(artifact_dir: str | Path) -> SecValidationResult:
         selected_accession=str(report.get("selected_accession") or "") or None,
         discovery_state=str(report.get("discovery_state") or "") or None,
     )
+    if result.package_sha256.lower() != directory.parent.name.lower():
+        raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation package/path identity mismatch")
     if result.issue_count != len(result.issues):
         raise SecError(P11Reason.P11_PACKAGE_INVALID, "SEC validation issue count mismatch")
     expected_reuse = (
@@ -606,4 +922,10 @@ def load_sec_validation(artifact_dir: str | Path) -> SecValidationResult:
     return result
 
 
-__all__ = ["SEC_VALIDATION_SCHEMA", "SecValidationResult", "load_sec_validation", "validate_sec_artifacts"]
+__all__ = [
+    "SEC_VALIDATION_SCHEMA",
+    "SecValidationResult",
+    "load_sec_validation",
+    "sec_validation_artifact_dir",
+    "validate_sec_artifacts",
+]

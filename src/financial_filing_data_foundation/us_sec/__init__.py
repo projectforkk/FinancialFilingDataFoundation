@@ -6,7 +6,7 @@ from .policy import SecFormPolicy
 from .acquisition import SecAcquirer, SecAcquisitionResult
 from .package import SecFilingPackage, SecMemberRole, SecPackageMember, SecPackageStore, build_package
 from .parser import SecParseResult, VIRTUAL_HTML_NORMALIZER_VERSION, load_sec_artifacts, parse_sec_package
-from .validation import SecValidationResult, load_sec_validation, validate_sec_artifacts
+from .validation import SEC_VALIDATION_SCHEMA, SecValidationResult, load_sec_validation, sec_validation_artifact_dir, validate_sec_artifacts
 from .runtime import SEC_RUNTIME_VERSION, SecRuntimeDescriptor, SecSubprocessTransport, run_sec_runner
 
 __all__ = [
@@ -31,6 +31,7 @@ __all__ = [
     "SecPackageStore",
     "SecParseResult",
     "SecValidationResult",
+    "SEC_VALIDATION_SCHEMA",
     "VIRTUAL_HTML_NORMALIZER_VERSION",
     "build_package",
     "SEC_RUNTIME_VERSION",
@@ -38,6 +39,7 @@ __all__ = [
     "SecSubprocessTransport",
     "load_sec_artifacts",
     "load_sec_validation",
+    "sec_validation_artifact_dir",
     "parse_sec_package",
     "run_sec_runner",
     "validate_sec_artifacts",

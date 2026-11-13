@@ -18,7 +18,11 @@ from financial_filing_data_foundation.us_sec.discovery import SecDiscoveryObserv
 from financial_filing_data_foundation.us_sec.models import SecCompanyRef, SecFilingCandidate, SecIssuerKind
 from financial_filing_data_foundation.us_sec.parser import parse_sec_package
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
-from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
+from financial_filing_data_foundation.us_sec.validation import (
+    SEC_VALIDATION_SCHEMA,
+    load_sec_validation,
+    validate_sec_artifacts,
+)
 from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
 
 
@@ -155,7 +159,37 @@ def test_sec_p7_validation_is_source_aware_and_writes_report(tmp_path: Path) -> 
     assert validation.validation_status == "PASS"
     assert validation.blocking_issue_count == 0
     assert validation.reuse_eligible is True
+    assert validation.artifact_dir == tmp_path / "p7" / package.package_sha256 / SEC_VALIDATION_SCHEMA
     assert (validation.artifact_dir / "validation.json").is_file()
+    loaded = load_sec_validation(tmp_path / "p7" / package.package_sha256)
+    assert loaded.artifact_dir == validation.artifact_dir
+
+
+def test_sec_validation_v2_flat_files_are_not_a_v3_fallback(tmp_path: Path) -> None:
+    package = _package()
+    _observation_value, _parsed, validation, _registry = _parse_and_validate(package, tmp_path)
+    legacy_dir = tmp_path / "legacy" / package.package_sha256
+    legacy_dir.mkdir(parents=True)
+    legacy_report = json.loads((validation.artifact_dir / "validation.json").read_text(encoding="utf-8"))
+    legacy_report["schema_version"] = "p11-sec-validation-v2"
+    (legacy_dir / "validation.json").write_text(json.dumps(legacy_report) + "\n", encoding="utf-8")
+    (legacy_dir / "issues.jsonl").write_bytes((validation.artifact_dir / "issues.jsonl").read_bytes())
+
+    with pytest.raises(Exception):
+        load_sec_validation(legacy_dir)
+
+
+def test_sec_validation_corrupt_v3_does_not_fall_back_to_valid_flat_v2(tmp_path: Path) -> None:
+    package = _package()
+    _observation_value, _parsed, validation, _registry = _parse_and_validate(package, tmp_path)
+    legacy_dir = tmp_path / "legacy" / package.package_sha256
+    legacy_dir.mkdir(parents=True)
+    (legacy_dir / "validation.json").write_bytes((validation.artifact_dir / "validation.json").read_bytes())
+    (legacy_dir / "issues.jsonl").write_bytes((validation.artifact_dir / "issues.jsonl").read_bytes())
+    (validation.artifact_dir / "issues.jsonl").write_text("corrupt\n", encoding="utf-8")
+
+    with pytest.raises(Exception):
+        load_sec_validation(validation.artifact_dir)
 
 
 def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

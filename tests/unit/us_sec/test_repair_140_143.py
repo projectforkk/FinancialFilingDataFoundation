@@ -414,6 +414,70 @@ def test_t142_09_excessive_relevant_history_count_fails_closed() -> None:
         _history_chunks_for_year(submissions, 2025, period="FY")
 
 
+@pytest.mark.parametrize(
+    "files",
+    [
+        [None],
+        [{"name": None}],
+        [{"name": 123}],
+        [{"name": ""}],
+        [{"name": "../unsafe.json"}],
+        [{"name": "ok.json", "filingFrom": 20250101}],
+        [{"name": "ok.json", "filingTo": "2025-01-01T00:00:00"}],
+        [{"name": "ok.json", "filingTo": "2025-02-30"}],
+        [{"name": "ok.json", "filingFrom": "2025-02-01", "filingTo": "2025-01-31"}],
+        [{"name": "same.json"}, {"name": "same.json"}],
+    ],
+)
+def test_t142_13_to_22_current_history_inventory_is_strict(files: object) -> None:
+    payload = _payload([])
+    payload_json = json.loads(payload)
+    payload_json["filings"]["files"] = files
+
+    with pytest.raises(SecError) as exc_info:
+        parse_submissions(payload_json, company=_company())
+
+    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
+
+
+def test_t142_23_absent_history_inventory_is_valid_empty() -> None:
+    payload_json = json.loads(_payload([]))
+    del payload_json["filings"]["files"]
+
+    submissions = parse_submissions(payload_json, company=_company())
+
+    assert submissions.history_ranges == ()
+    assert submissions.history_files == ()
+
+
+def test_t142_24_present_history_inventory_must_be_a_list() -> None:
+    payload_json = json.loads(_payload([]))
+    payload_json["filings"]["files"] = {"name": "not-a-list.json"}
+
+    with pytest.raises(SecError) as exc_info:
+        parse_submissions(payload_json, company=_company())
+
+    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
+
+
+def test_t142_25_malformed_inventory_aborts_before_history_fetch(tmp_path: Path) -> None:
+    history_name = f"CIK{CIK}-submissions-valid.json"
+    main_body = _payload(
+        [],
+        files=[
+            {"name": history_name, "filingFrom": "2025-01-01", "filingTo": "2025-12-31"},
+            {"name": "bad.json", "filingTo": "2025-01-01T00:00:00"},
+        ],
+    )
+    client = _DiscoveryClient({MAIN_URL: main_body})
+    acquirer = SecAcquirer(client, SecPackageStore(tmp_path / "raw"), discovery_root=tmp_path / "discovery")
+
+    with pytest.raises(SecError):
+        acquirer._discover_with_candidates(_company(), fiscal_year=2025, period="FY")
+
+    assert client.calls == [MAIN_URL]
+
+
 class _DiscoveryClient:
     def __init__(self, bodies: dict[str, bytes]) -> None:
         self.bodies = bodies
@@ -642,3 +706,282 @@ def test_t143_07_no_structured_facts_with_facts_is_blocked(tmp_path: Path) -> No
 
     assert validation.validation_status == "BLOCKED"
     assert any(issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value for issue in validation.issues)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("context_ref", "wrong-context"),
+        ("unit_ref", "wrong-unit"),
+        ("fact_kind", "NONNUMERIC"),
+        ("raw_metric_name", "us-gaap:Other"),
+        ("parsed_numeric_candidate", "999"),
+        ("decimals", "9"),
+        ("precision", "9"),
+        ("scale", "9"),
+        ("sign", "-"),
+        ("format", "ixt:num-dot-decimal"),
+        ("nil", True),
+        ("continued_at", "continuation-1"),
+        ("hidden", True),
+        ("fragment_hash", "0" * 64),
+        ("source_fragments", []),
+    ],
+)
+def test_t145_05_to_19_inline_source_projection_fields_are_bound(
+    field: str,
+    value: object,
+    tmp_path: Path,
+) -> None:
+    package = _package(primary_body=_inline_html())
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    facts = [dict(row) for row in parsed.facts]
+    facts[0][field] = value
+
+    validation = _validate(
+        replace(parsed, facts=tuple(facts)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+def test_t143_10_inline_fact_cannot_resolve_context_or_unit_from_another_member(tmp_path: Path) -> None:
+    primary = (
+        '<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" '
+        'xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body>'
+        '<ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD">100</ix:nonfraction>'
+        "</body></html>"
+    ).encode()
+    instance = SecPackageMember(
+        relative_name="other.xml",
+        role=SecMemberRole.OTHER,
+        content_type="application/xml",
+        source_url=archive_member_url(CIK, ACCESSION, "other.xml"),
+        body=_instance_xml(),
+    )
+    package = _package(primary_body=primary, extra_members=(instance,))
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+
+    validation = _validate(parsed, package, observation, tmp_path / "p7")
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value for issue in validation.issues)
+
+
+def test_t143_11_authentic_instance_under_wrong_role_is_blocked(tmp_path: Path) -> None:
+    instance = SecPackageMember(
+        relative_name="instance.xml",
+        role=SecMemberRole.OTHER,
+        content_type="application/xml",
+        source_url=archive_member_url(CIK, ACCESSION, "instance.xml"),
+        body=_instance_xml(),
+    )
+    package = _package(primary_body=b"<html><body>Annual</body></html>", extra_members=(instance,))
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+
+    validation = _validate(
+        replace(parsed, fact_source_mode="XBRL_INSTANCE_PRIMARY"),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_FACT_SOURCE_MODE_INVALID.value for issue in validation.issues)
+
+
+def test_t145_20_evidence_locator_divergence_is_a_source_mismatch(tmp_path: Path) -> None:
+    package = _package(primary_body=_inline_html())
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    evidence = [dict(row) for row in parsed.evidence]
+    evidence[0]["dom_locator"] = "/html[1]/body[1]"
+
+    validation = _validate(
+        replace(parsed, evidence=tuple(evidence)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+def test_t145_21_inline_unit_payload_must_match_immutable_source(tmp_path: Path) -> None:
+    package = _package(primary_body=_inline_html())
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    facts = [dict(row) for row in parsed.facts]
+    facts[0]["unit"] = {**facts[0]["unit"], "measures": ["iso4217:EUR"]}
+
+    validation = _validate(
+        replace(parsed, facts=tuple(facts)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+def test_t145_22_inline_continuation_chain_is_replayed_for_fact_and_evidence(tmp_path: Path) -> None:
+    primary = (
+        '<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" '
+        'xmlns:xbrli="http://www.xbrl.org/2003/instance" '
+        'xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body><ix:header>'
+        '<xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier>'
+        "</xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant>"
+        "</xbrli:period></xbrli:context>"
+        '<xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>'
+        '</ix:header><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" '
+        'unitRef="USD" continuedAt="c2">100</ix:nonfraction></p>'
+        '<ix:continuation id="c2">200</ix:continuation></body></html>'
+    ).encode()
+    package = _package(primary_body=primary)
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    assert parsed.facts[0]["raw_value"] == "100 200"
+    assert _validate(parsed, package, observation, tmp_path / "p7").validation_status == "PASS"
+
+    facts = [dict(row) for row in parsed.facts]
+    facts[0]["source_fragments"][1]["raw_source_text"] = "tampered"
+    validation = _validate(
+        replace(parsed, facts=tuple(facts)),
+        package,
+        observation,
+        tmp_path / "p7-tampered",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("raw_metric_name", "ex:Other"),
+        ("parsed_numeric_candidate", "999"),
+        ("decimals", "9"),
+        ("precision", "9"),
+        ("scale", "9"),
+        ("sign", "-"),
+        ("nil", True),
+        ("fragment_hash", "0" * 64),
+        ("source_fragments", []),
+    ],
+)
+def test_t145_23_to_31_instance_source_projection_fields_are_bound(
+    field: str,
+    value: object,
+    tmp_path: Path,
+) -> None:
+    instance = SecPackageMember(
+        relative_name="instance.xml",
+        role=SecMemberRole.XBRL_INSTANCE,
+        content_type="application/xml",
+        source_url=archive_member_url(CIK, ACCESSION, "instance.xml"),
+        body=_instance_xml(),
+    )
+    package = _package(primary_body=b"<html><body><h1>Annual</h1></body></html>", extra_members=(instance,))
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    facts = [dict(row) for row in parsed.facts]
+    facts[0][field] = value
+
+    validation = _validate(
+        replace(parsed, facts=tuple(facts)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+def test_t145_01_inline_raw_fact_value_must_match_immutable_source(tmp_path: Path) -> None:
+    package = _package(primary_body=_inline_html(value="100"))
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    facts = [dict(row) for row in parsed.facts]
+    facts[0]["raw_value"] = "101"
+
+    validation = _validate(
+        replace(parsed, facts=tuple(facts)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+def test_t145_02_inline_context_payload_must_match_immutable_source(tmp_path: Path) -> None:
+    package = _package(primary_body=_inline_html())
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    facts = [dict(row) for row in parsed.facts]
+    facts[0]["context"] = {**facts[0]["context"], "entity_identifier": "tampered"}
+
+    validation = _validate(
+        replace(parsed, facts=tuple(facts)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+def test_t145_03_inline_evidence_payload_must_match_raw_fact(tmp_path: Path) -> None:
+    package = _package(primary_body=_inline_html())
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    evidence = [dict(row) for row in parsed.evidence]
+    evidence[0]["raw_text"] = "tampered"
+
+    validation = _validate(
+        replace(parsed, evidence=tuple(evidence)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)
+
+
+def test_t145_04_instance_raw_fact_qname_must_match_immutable_source(tmp_path: Path) -> None:
+    instance = SecPackageMember(
+        relative_name="instance.xml",
+        role=SecMemberRole.XBRL_INSTANCE,
+        content_type="application/xml",
+        source_url=archive_member_url(CIK, ACCESSION, "instance.xml"),
+        body=_instance_xml(),
+    )
+    package = _package(primary_body=b"<html><body><h1>Annual</h1></body></html>", extra_members=(instance,))
+    observation = _observation(package)
+    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    facts = [dict(row) for row in parsed.facts]
+    facts[0]["raw_qname"] = "ex:Tampered"
+
+    validation = _validate(
+        replace(parsed, facts=tuple(facts)),
+        package,
+        observation,
+        tmp_path / "p7",
+    )
+
+    assert validation.validation_status == "BLOCKED"
+    assert any(issue["code"] == P11Reason.P11_RAW_FACT_SOURCE_MISMATCH.value for issue in validation.issues)

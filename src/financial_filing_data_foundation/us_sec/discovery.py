@@ -703,7 +703,23 @@ def select_history_chunks(
     selected: list[SecHistoryChunk] = []
     seen_names: set[str] = set()
     for chunk in chunks:
-        name = str(chunk.name)
+        if not isinstance(chunk, SecHistoryChunk):
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                "SEC history chunk descriptor is not an object",
+            )
+        if not isinstance(chunk.name, str) or not chunk.name:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                "SEC history chunk name is missing or not a string",
+            )
+        try:
+            name = normalize_archive_relative_name(chunk.name)
+        except SecError as exc:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                f"SEC history chunk path is unsafe: {chunk.name!r}",
+            ) from exc
         if name in seen_names:
             raise SecError(
                 P11Reason.P11_SEC_DISCOVERY_FAILED,
@@ -712,29 +728,41 @@ def select_history_chunks(
         seen_names.add(name)
         parsed_from: date | None = None
         parsed_to: date | None = None
-        if chunk.filing_from:
+        for field_name, value in (("filingFrom", chunk.filing_from), ("filingTo", chunk.filing_to)):
+            if value is None or value == "":
+                continue
+            if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    f"SEC history chunk {field_name} is not an exact date: {name}",
+                )
             try:
-                parsed_from = date.fromisoformat(str(chunk.filing_from)[:10])
+                parsed = date.fromisoformat(value)
             except ValueError as exc:
                 raise SecError(
                     P11Reason.P11_SEC_DISCOVERY_FAILED,
-                    f"SEC history chunk range is invalid: {name}",
+                    f"SEC history chunk {field_name} is not a calendar date: {name}",
                 ) from exc
-        if chunk.filing_to:
-            try:
-                parsed_to = date.fromisoformat(str(chunk.filing_to)[:10])
-            except ValueError as exc:
-                raise SecError(
-                    P11Reason.P11_SEC_DISCOVERY_FAILED,
-                    f"SEC history chunk range is invalid: {name}",
-                ) from exc
+            if field_name == "filingFrom":
+                parsed_from = parsed
+            else:
+                parsed_to = parsed
         if parsed_from is not None and parsed_to is not None and parsed_from > parsed_to:
             raise SecError(
                 P11Reason.P11_SEC_DISCOVERY_FAILED,
                 f"SEC history chunk range is reversed: {name}",
             )
         if parsed_to is None or parsed_to >= cutoff:
-            selected.append(chunk)
+            if chunk.name == name:
+                selected.append(chunk)
+            else:
+                selected.append(
+                    SecHistoryChunk(
+                        name=name,
+                        filing_from=chunk.filing_from,
+                        filing_to=chunk.filing_to,
+                    )
+                )
     if len(selected) > SEC_MAX_HISTORY_CHUNKS:
         raise SecError(
             P11Reason.P11_SEC_DISCOVERY_FAILED,
@@ -876,20 +904,73 @@ def parse_submissions(
         )
     history_files: list[str] = []
     history_ranges: list[SecHistoryChunk] = []
-    if isinstance(filings, dict) and isinstance(filings.get("files"), list):
-        for item in filings["files"]:
-            if not isinstance(item, dict) or not isinstance(item.get("name"), str):
-                continue
+    if isinstance(filings, dict) and "files" in filings:
+        raw_files = filings.get("files")
+        if not isinstance(raw_files, list):
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                "SEC submissions filings.files must be a list",
+            )
+        seen_names: set[str] = set()
+        for item in raw_files:
+            if not isinstance(item, dict):
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    "SEC history file descriptor is not an object",
+                )
+            raw_name = item.get("name")
+            if not isinstance(raw_name, str) or not raw_name:
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    "SEC history file descriptor name is missing or not a string",
+                )
             try:
-                name = normalize_archive_relative_name(item["name"])
+                name = normalize_archive_relative_name(raw_name)
             except SecError as exc:
                 raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC history file path is unsafe") from exc
+            if name in seen_names:
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    f"SEC history file descriptor is duplicated: {name}",
+                )
+            seen_names.add(name)
+
+            def _history_range_value(camel: str, snake: str) -> Any:
+                if camel in item:
+                    return item[camel]
+                if snake in item:
+                    return item[snake]
+                return None
+
+            filing_from = _history_range_value("filingFrom", "filing_from")
+            filing_to = _history_range_value("filingTo", "filing_to")
+            for field_name, value in (("filingFrom", filing_from), ("filingTo", filing_to)):
+                if value is None or value == "":
+                    continue
+                if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+                    raise SecError(
+                        P11Reason.P11_SEC_DISCOVERY_FAILED,
+                        f"SEC history file descriptor {field_name} is invalid",
+                    )
+                try:
+                    date.fromisoformat(value)
+                except ValueError as exc:
+                    raise SecError(
+                        P11Reason.P11_SEC_DISCOVERY_FAILED,
+                        f"SEC history file descriptor {field_name} is not a calendar date",
+                    ) from exc
+            if filing_from not in (None, "") and filing_to not in (None, ""):
+                if date.fromisoformat(filing_from) > date.fromisoformat(filing_to):
+                    raise SecError(
+                        P11Reason.P11_SEC_DISCOVERY_FAILED,
+                        f"SEC history file descriptor range is reversed: {name}",
+                    )
             history_files.append(name)
             history_ranges.append(
                 SecHistoryChunk(
                     name=name,
-                    filing_from=str(item.get("filingFrom") or item.get("filing_from") or "").strip() or None,
-                    filing_to=str(item.get("filingTo") or item.get("filing_to") or "").strip() or None,
+                    filing_from=filing_from if filing_from not in (None, "") else None,
+                    filing_to=filing_to if filing_to not in (None, "") else None,
                 )
             )
     return SecSubmissions(
