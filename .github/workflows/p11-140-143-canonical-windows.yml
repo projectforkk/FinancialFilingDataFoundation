@@ -1,0 +1,47 @@
+name: P11 140-143 Canonical Windows Development Verification
+
+on:
+  push:
+    branches:
+      - ci/p11-140-143-c8d8ea73-windows
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact work candidate
+        uses: actions/checkout@v4
+        with:
+          ref: c8d8ea73840e3231625ad304c6d0032637b0b666
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install deterministic test runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pymupdf==1.28.2
+      - name: Static compile
+        env:
+          PYTHONPATH: src
+        run: python -m compileall -q src
+      - name: Focused US SEC suite
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q tests/unit/us_sec
+      - name: US SEC plus MCP catalog regression
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q tests/unit/us_sec tests/unit/mcp/test_catalog_service.py
+      - name: Full unit regression
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q tests/unit
+      - name: Diff whitespace check
+        shell: bash
+        run: git diff --check b1082f8a2110ddaaa238ca2a627903fb5b2ef283 c8d8ea73840e3231625ad304c6d0032637b0b666
