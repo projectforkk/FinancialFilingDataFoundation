@@ -123,6 +123,9 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 30-project-final-cn-hk-scope.md | 2026-11-05 closeout scope | ACCEPTED HISTORICAL SCOPE |
 | 31-user-cli-design.md | CN/HK operational CLI | ACCEPTED POST-CLOSEOUT |
 | 32-p11-us-scope-reopening.md | 2026-11-09 P11 scope reopening | ACTIVE CURRENT SCOPE |
+| 33-p11-post-acceptance-design-correction.md | P11 corrected parser/discovery trust contracts | ACTIVE P11 AUTHORITY |
+| 34-p11-explicit-6k-scope-correction.md | P11 v1 explicit 6-K defer | ACTIVE P11 AUTHORITY |
+| 35-p11-issue-140-143-coherent-correction.md | P11 compatibility / namespace / history / P7 correction | ACTIVE CURRENT CORRECTION |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -166,7 +169,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 + 32 | 27 | TBD | REOPENED / DESIGN READY |
+| P11 | 26 + 32 + 33 + 34 + 35 | 27 + 35 | TBD | REOPENED / DEVELOPMENT / CHANGES_REQUIRED |
 
 ---
 
@@ -299,12 +302,15 @@ Implementation plan 至少覆盖：
 当前：
 `P11_REOPENED / DESIGN_READY / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
-P11 current design:
-- scope reopening = `design/32-p11-us-scope-reopening.md`;
+P11 current design authority:
 - detailed design = `design/26-p11-sec-provider-design.md`;
 - implementation plan = `design/27-p11-implementation-plan.md`;
-- authorization = `development/147-p11-us-scope-reopening-authorization.md`;
-- next action = P11-A environment/interface audit; production code must follow the ordered plan.
+- scope reopening = `design/32-p11-us-scope-reopening.md`;
+- corrected trust/parser baseline = `design/33-p11-post-acceptance-design-correction.md`;
+- explicit 6-K correction = `design/34-p11-explicit-6k-scope-correction.md`;
+- ISSUE-140..143 coherent correction = `design/35-p11-issue-140-143-coherent-correction.md`;
+- latest full review = `development/190-p11-fresh-full-exact-candidate-review-4.md` = CHANGES_REQUIRED;
+- current authorized action = implement P11-ISSUE-140..143 coherently; Formal Test Plan remains NOT AUTHORIZED.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
@@ -455,6 +461,6 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 ## 14. P11 Reopening Note — 2026-11-09
 
 The 2026-11-05 CN/HK project closeout remains accepted history. User authority on
-2026-11-09 reopened P11. For current P11 work, design/32 + design/26 + design/27 are
+2026-11-09 reopened P11. For current P11 work, design/26 + design/27 + design/32 + design/33 + design/34 + design/35 are
 the active design truth. Historical unaccepted P11 branches are not implementation
 baselines.
