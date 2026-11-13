@@ -3,15 +3,12 @@ from __future__ import annotations
 import json
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
 from .discovery import (
-    SEC_MAX_HISTORY_CHUNKS,
     SecDiscoveryObservation,
-    SecHistoryChunk,
     SecSubmissions,
     _reject_incomplete_rows_near_slot,
     candidate_to_record,
@@ -20,6 +17,7 @@ from .discovery import (
     merge_filing_candidates,
     parse_submissions,
     select_filing,
+    select_history_chunks_for_slot,
 )
 from .errors import P11Reason, SecError
 from .http import SecHttpClient
@@ -113,7 +111,14 @@ def _validate_source_bytes(name: str, body: bytes, content_type: str, *, primary
 
 _XBRL_LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
 _XBRL_INSTANCE_NAMESPACE = "http://www.xbrl.org/2003/instance"
-_SEMANTIC_REFERENCE_TAGS = frozenset({"link:schemaref", "link:linkbaseref"})
+_XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
+_SEMANTIC_REFERENCE_LOCAL_NAMES = frozenset({"schemaref", "linkbaseref"})
+_HTML_VOID_ELEMENTS = frozenset(
+    {
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
+    }
+)
 _XBRL_MEMBER_ROLES = frozenset(
     {
         SecMemberRole.XBRL_INSTANCE,
@@ -128,26 +133,62 @@ _XBRL_MEMBER_ROLES = frozenset(
 
 
 class _SemanticReferenceHTMLParser(HTMLParser):
+    """Extract only namespace-authentic XBRL linkbase references."""
+
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.references: list[str] = []
+        self._namespace_stack: list[dict[str, str]] = [{}]
 
-    def _record(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if str(tag).casefold() not in _SEMANTIC_REFERENCE_TAGS:
+    def _scope(self, attrs: list[tuple[str, str | None]]) -> dict[str, str]:
+        scope = dict(self._namespace_stack[-1])
+        for key, value in attrs:
+            normalized = str(key).casefold()
+            if normalized == "xmlns":
+                scope[""] = "" if value is None else str(value)
+            elif normalized.startswith("xmlns:"):
+                scope[normalized.split(":", 1)[1]] = "" if value is None else str(value)
+        return scope
+
+    @staticmethod
+    def _qname(name: str, scope: dict[str, str]) -> tuple[str | None, str]:
+        normalized = str(name).casefold()
+        if ":" in normalized:
+            prefix, local = normalized.split(":", 1)
+            return scope.get(prefix), local
+        return scope.get(""), normalized
+
+    def _record(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+        scope: dict[str, str],
+    ) -> None:
+        namespace_uri, local_name = self._qname(tag, scope)
+        if (
+            namespace_uri != _XBRL_LINK_NAMESPACE
+            or local_name not in _SEMANTIC_REFERENCE_LOCAL_NAMES
+        ):
             return
-        normalized = {
-            str(key).casefold(): "" if value is None else str(value)
-            for key, value in attrs
-        }
-        reference = normalized.get("xlink:href") or normalized.get("href")
-        if reference:
-            self.references.append(reference)
+        for key, value in attrs:
+            attr_namespace, attr_local = self._qname(key, scope)
+            if attr_namespace == _XLINK_NAMESPACE and attr_local == "href" and value:
+                self.references.append(str(value))
+                return
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self._record(tag, attrs)
+        scope = self._scope(attrs)
+        self._record(tag, attrs, scope)
+        if str(tag).casefold() not in _HTML_VOID_ELEMENTS:
+            self._namespace_stack.append(scope)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self._record(tag, attrs)
+        scope = self._scope(attrs)
+        self._record(tag, attrs, scope)
+
+    def handle_endtag(self, tag: str) -> None:
+        if len(self._namespace_stack) > 1:
+            self._namespace_stack.pop()
 
 
 def _xml_local_name(tag: str) -> str:
@@ -164,13 +205,14 @@ def _xml_namespace(tag: str) -> str | None:
     return None
 
 
-def _xml_attribute_local(element: ET.Element, name: str) -> str | None:
-    wanted = name.casefold()
-    for key, value in element.attrib.items():
-        text = str(key)
-        if text.casefold() == wanted or text.rsplit("}", 1)[-1].rsplit(":", 1)[-1].casefold() == wanted:
-            return str(value)
-    return None
+def _xml_namespaced_attribute(
+    element: ET.Element,
+    *,
+    namespace: str,
+    local_name: str,
+) -> str | None:
+    value = element.attrib.get(f"{{{namespace}}}{local_name}")
+    return str(value) if value else None
 
 
 def _extract_semantic_xbrl_references(body: bytes, *, primary_html: bool) -> tuple[str, ...]:
@@ -191,10 +233,14 @@ def _extract_semantic_xbrl_references(body: bytes, *, primary_html: bool) -> tup
     for element in root.iter():
         if (
             _xml_namespace(str(element.tag)) != _XBRL_LINK_NAMESPACE
-            or _xml_local_name(str(element.tag)) not in {"schemaref", "linkbaseref"}
+            or _xml_local_name(str(element.tag)) not in _SEMANTIC_REFERENCE_LOCAL_NAMES
         ):
             continue
-        reference = _xml_attribute_local(element, "href")
+        reference = _xml_namespaced_attribute(
+            element,
+            namespace=_XLINK_NAMESPACE,
+            local_name="href",
+        )
         if reference:
             references.append(reference)
     return tuple(references)
@@ -300,7 +346,7 @@ class SecAcquirer:
         )
         all_candidates = list(submissions.candidates)
         incomplete_periodic_rows = list(submissions.incomplete_periodic_rows)
-        for chunk in _history_chunks_for_year(submissions, fiscal_year):
+        for chunk in select_history_chunks_for_slot(submissions, fiscal_year):
             history_url = f"https://data.sec.gov/submissions/{chunk.name}"
             try:
                 history_response = self.client.fetch(
@@ -511,38 +557,6 @@ class SecAcquirer:
             observation=observation,
         )
 
-
-def _history_chunks_for_year(submissions: SecSubmissions, fiscal_year: int) -> tuple[SecHistoryChunk, ...]:
-    chunks = submissions.history_chunks
-    if not chunks:
-        return ()
-    if len(chunks) > SEC_MAX_HISTORY_CHUNKS:
-        raise SecError(
-            P11Reason.P11_SEC_DISCOVERY_FAILED,
-            f"SEC submissions history file count exceeds deterministic bound {SEC_MAX_HISTORY_CHUNKS}",
-        )
-    selected: list[SecHistoryChunk] = []
-    seen_names: set[str] = set()
-    for chunk in chunks:
-        if chunk.name in seen_names:
-            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk is duplicated: {chunk.name}")
-        seen_names.add(chunk.name)
-        parsed_from = None
-        parsed_to = None
-        if chunk.filing_from:
-            try:
-                parsed_from = date.fromisoformat(str(chunk.filing_from)[:10])
-            except ValueError as exc:
-                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk range is invalid: {chunk.name}") from exc
-        if chunk.filing_to:
-            try:
-                parsed_to = date.fromisoformat(str(chunk.filing_to)[:10])
-            except ValueError as exc:
-                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk range is invalid: {chunk.name}") from exc
-        if parsed_from is not None and parsed_to is not None and parsed_from > parsed_to:
-            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, f"SEC history chunk range is reversed: {chunk.name}")
-        selected.append(chunk)
-    return tuple(sorted(selected, key=lambda item: item.name))
 
 
 _XBRL_INDEX_TYPES = frozenset(
