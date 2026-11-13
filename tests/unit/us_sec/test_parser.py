@@ -245,41 +245,44 @@ def test_visible_inline_fact_still_requires_a_block_anchor(tmp_path: Path) -> No
     assert any(issue["code"] == P11Reason.P11_EVIDENCE_LOCATOR_INVALID.value for issue in validation.issues)
 
 
-def test_parser_does_not_reuse_artifact_from_previous_normalizer_version(tmp_path: Path) -> None:
+def test_pre_issue138_v5_v2_artifact_is_not_reused_by_v6_parser(tmp_path: Path) -> None:
     package = _hidden_fact_package()
-    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V3"
+    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V6"
     legacy_dir.mkdir(parents=True)
     legacy_manifest = legacy_dir / "manifest.json"
     legacy_manifest.write_text(
-        '{"schema_version":"p11-sec-artifacts-v1","parser_version":"VIRTUAL_HTML_V3"}\n',
+        '{"schema_version":"p11-sec-artifacts-v2","parser_version":"VIRTUAL_HTML_V5","package_sha256":"legacy"}\n',
         encoding="utf-8",
     )
     before = legacy_manifest.read_bytes()
 
     result = parse_sec_package(package, tmp_path / "p11")
 
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V5"
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V6"
     assert result.artifact_dir != legacy_dir
+    assert result.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V6"
     assert result.artifact_dir.is_dir()
     assert legacy_manifest.read_bytes() == before
 
 
-def test_v3_parsed_artifact_is_invalidated_by_v4_normalizer(tmp_path: Path) -> None:
+def test_current_v6_parser_reuses_only_its_distinct_v6_artifact_directory(tmp_path: Path) -> None:
     package = _hidden_fact_package()
-    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V3"
+    legacy_dir = tmp_path / "p11" / f"{package.package_sha256}.VIRTUAL_HTML_V5"
     legacy_dir.mkdir(parents=True)
     legacy_manifest = legacy_dir / "manifest.json"
     legacy_manifest.write_text(
-        '{"schema_version":"p11-sec-artifacts-v1","parser_version":"VIRTUAL_HTML_V3","package_sha256":"legacy"}\n',
+        '{"schema_version":"p11-sec-artifacts-v2","parser_version":"VIRTUAL_HTML_V5","package_sha256":"legacy"}\n',
         encoding="utf-8",
     )
     before = legacy_manifest.read_bytes()
 
-    result = parse_sec_package(package, tmp_path / "p11")
+    first = parse_sec_package(package, tmp_path / "p11")
+    second = parse_sec_package(package, tmp_path / "p11")
 
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V5"
-    assert result.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V5"
-    assert result.artifact_dir.is_dir()
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V6"
+    assert first.artifact_dir == second.artifact_dir
+    assert first.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V6"
+    assert first.facts == second.facts
     assert legacy_manifest.read_bytes() == before
 
 
