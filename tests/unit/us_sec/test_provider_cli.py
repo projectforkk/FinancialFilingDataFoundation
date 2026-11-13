@@ -261,7 +261,7 @@ def test_sec_acquirer_does_not_silently_select_amendment(tmp_path: Path) -> None
     assert exc_info.value.reason_code == P11Reason.P11_AMENDED_VARIANT_PRESENT.value
 
 
-def test_sec_acquirer_fetches_all_retained_history_chunks_for_independent_discovery(tmp_path: Path) -> None:
+def test_sec_acquirer_skips_provably_ancient_history_but_fetches_required_history(tmp_path: Path) -> None:
     submissions_url = "https://data.sec.gov/submissions/CIK0000123456.json"
     relevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2024.json"
     irrelevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2018.json"
@@ -329,5 +329,5 @@ def test_sec_acquirer_fetches_all_retained_history_chunks_for_independent_discov
 
     assert result.candidate.accession == "0000123456-24-000001"
     assert calls.count(relevant_history_url) == 1
-    assert calls.count(irrelevant_history_url) == 1
+    assert calls.count(irrelevant_history_url) == 0
 
