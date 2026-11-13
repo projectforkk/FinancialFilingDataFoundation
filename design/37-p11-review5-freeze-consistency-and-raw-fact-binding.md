@@ -275,11 +275,66 @@ member establishes origin.
 
 ### 4.6 Fail-closed reason
 
-Any mismatch between persisted Raw Fact semantics and replayed source semantics
-is blocking. Use the most-specific existing P11 reason where accurate. If no
-existing reason accurately expresses Raw Fact/source semantic drift, the
-implementation may add one explicit reason code as part of the authorized
-development design, before code is written. No silent repair is allowed.
+Freeze this exact reason code for Raw Fact/source replay inequality:
+
+```text
+P11_RAW_FACT_SOURCE_MISMATCH
+```
+
+Meaning:
+
+```text
+A persisted logical Raw Fact does not semantically equal the authoritative
+fact reconstructed from its immutable package member and exact source locator.
+```
+
+Severity:
+
+```text
+BLOCKING
+```
+
+Use this reason for ISSUE-145 semantic mismatches including, where applicable:
+
+```text
+raw_value mismatch
+raw_qname mismatch
+raw_metric_name mismatch
+parsed_numeric_candidate mismatch
+fact_kind mismatch
+context_ref mismatch
+unit_ref mismatch
+source-derived attribute mismatch
+source member mismatch
+fact locator mismatch
+fact/evidence semantic mismatch
+fragment_hash mismatch
+source_fragments mismatch
+persisted context semantic payload mismatch
+persisted unit semantic payload mismatch
+```
+
+More specific existing errors remain authoritative for their existing domains.
+For example, use `P11_EVIDENCE_LOCATOR_INVALID` when an evidence locator itself
+does not resolve, and `P11_FACT_SOURCE_MODE_INVALID` when the declared logical
+source mode itself is invalid.
+
+Raw Fact/source replay inequality is always:
+
+```text
+P11_RAW_FACT_SOURCE_MISMATCH
+```
+
+The PC Agent must not invent or rename reason codes during implementation. Any
+future need for another reason code requires:
+
+```text
+STOP
+→ design amendment
+→ Git design freeze
+→ ChatGPT review
+→ development reauthorization
+```
 
 ## 5. Compatibility contract
 
@@ -384,13 +439,13 @@ Old validation-v2 artifact bytes remain immutable.
 ## 7. Governance state
 
 ```text
-P11 REVIEW 5 DESIGN FREEZE CORRECTION IN PROGRESS
+P11 REVIEW 5 FINAL DESIGN FREEZE READY
 ISSUE-140 = FIXED
 ISSUE-141 = FIXED
-ISSUE-142 = OPEN / IMPLEMENTATION REQUIRED
-ISSUE-143 = OPEN / IMPLEMENTATION REQUIRED
-ISSUE-144 = GOVERNANCE CORRECTION
-ISSUE-145 = OPEN / DESIGN CORRECTED BY DESIGN 37
+ISSUE-142 = DESIGN FROZEN / IMPLEMENTATION REQUIRED
+ISSUE-143 = DESIGN FROZEN / IMPLEMENTATION REQUIRED
+ISSUE-144 = GOVERNANCE CORRECTED
+ISSUE-145 = DESIGN FROZEN / IMPLEMENTATION REQUIRED
 DEVELOPMENT AUTHORIZED = NO
 FORMAL TEST PLAN = NOT CREATED / NOT AUTHORIZED
 FORMAL ACCEPTANCE = NOT RUN

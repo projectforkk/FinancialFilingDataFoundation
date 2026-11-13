@@ -1,6 +1,6 @@
 # 27 — P11 US SEC Provider Implementation Plan
 
-Status: **DESIGN 36 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
+Status: **DESIGN 37 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
 
 Detailed design:
 `design/26-p11-sec-provider-design.md`
@@ -112,16 +112,24 @@ Before repair code changes, freeze the exact commit containing:
 - `design/26-p11-sec-provider-design.md`;
 - `design/27-p11-implementation-plan.md`;
 - `design/32-p11-us-scope-reopening.md`;
-- `design/33-p11-post-acceptance-design-correction.md`.
+- `design/33-p11-post-acceptance-design-correction.md`;
+- `design/34-p11-explicit-6k-scope-correction.md`;
+- `design/35-p11-repair-140-143-design-correction.md`;
+- `design/36-p11-review5-trust-boundary-correction.md`;
+- `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md`.
 
 Record:
 
 ```text
-corrected_design_baseline_sha
-previous_production_candidate_sha = 9b7fcc9fc37a423eaafd1dde762e9c81d475df9e
+corrected_design_baseline_sha = exact final design-freeze commit returned by this task
+previous_production_candidate_sha = a65723c3cf17bbccf10748e2c671671a2c7dfb1b
 starting_branch
 starting_head
 ```
+
+The exact new `corrected_design_baseline_sha` is recorded in the PC Agent
+result and later development evidence; it must not be guessed or inserted
+before the final design-freeze commit exists.
 
 No old ACCEPTANCE_PASS is carried forward.
 
@@ -229,22 +237,29 @@ Required behavior:
 - validation-v3 must execute before REUSE_DATA becomes eligible;
 - no destructive raw-store migration.
 
-## 4.10 Review 5 — Design 36 trust-boundary freeze
+## 4.10 Review 5 — Design 37 final design freeze
 
-The latest design authority is `design/36-p11-review5-trust-boundary-correction.md`.
-The exact-candidate Review 5 result is `CHANGES_REQUIRED`.
+Design 36 is the Review 5 trust-boundary correction that established the
+ISSUE-142/143 residual contract. Design 37 is the latest/current design
+authority and supersedes Design 36 where Design 37 adds or corrects Review 5
+freeze semantics. The current implementation must follow Design 37.
+
+The exact-candidate Review 5 result is `CHANGES_REQUIRED`. The Design 37
+final-freeze review is recorded in
+`development/194-p11-design37-final-freeze-review-result.md`.
 
 Current issue disposition:
 
 ```text
 ISSUE-140 = FIXED
 ISSUE-141 = FIXED
-ISSUE-142 = repair still required
-ISSUE-143 = repair still required
-ISSUE-144 = design/governance corrected by Design 36
+ISSUE-142 = DESIGN FROZEN / IMPLEMENTATION REQUIRED
+ISSUE-143 = DESIGN FROZEN / IMPLEMENTATION REQUIRED
+ISSUE-144 = GOVERNANCE CORRECTED
+ISSUE-145 = DESIGN FROZEN / IMPLEMENTATION REQUIRED
 ```
 
-Design 36 requires the next implementation to:
+The current Review 5 design freeze requires the next implementation to:
 
 - fail closed for every malformed or unsafe `filings.files` descriptor;
 - require strict `YYYY-MM-DD` history range syntax without coercion,
@@ -259,6 +274,10 @@ Design 36 requires the next implementation to:
   chain, and deterministic numeric candidate against the authoritative source;
 - reject authentic XBRL instance bytes whose package role is inconsistent;
 - preserve the `NO_STRUCTURED_FACTS` zero-fact/evidence invariant.
+
+The Raw Fact semantic mismatch reason is frozen by Design 37 §4.6 as
+`P11_RAW_FACT_SOURCE_MISMATCH` with `BLOCKING` severity. The implementation
+must not invent or rename reason codes.
 
 Next-cycle version contract:
 

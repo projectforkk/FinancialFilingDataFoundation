@@ -117,7 +117,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
 | 26-p11-sec-provider-design.md | P11 US SEC Provider | ACTIVE / DESIGN READY |
-| 27-p11-implementation-plan.md | P11 implementation plan | ACTIVE / DESIGN 36 DEVELOPMENT GATE |
+| 27-p11-implementation-plan.md | P11 implementation plan | ACTIVE / DESIGN 37 DEVELOPMENT GATE |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-project-final-cn-hk-scope.md | 2026-11-05 closeout scope | ACCEPTED HISTORICAL SCOPE |
@@ -126,8 +126,8 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 33-p11-post-acceptance-design-correction.md | P11 post-acceptance correction | ACTIVE CURRENT CORRECTION |
 | 34-p11-explicit-6k-scope-correction.md | P11 explicit 6-K scope correction | ACTIVE CURRENT CORRECTION |
 | 35-p11-repair-140-143-design-correction.md | P11 Review 4 repair correction | ACTIVE CURRENT CORRECTION |
-| 36-p11-review5-trust-boundary-correction.md | P11 Review 5 trust-boundary correction | ACTIVE DESIGN FREEZE / DEVELOPMENT AWAITING AUTHORIZATION |
-| 37-p11-review5-freeze-consistency-and-raw-fact-binding.md | P11 Review 5 freeze consistency and Raw Fact binding correction | ACTIVE DESIGN FREEZE CORRECTION / DEVELOPMENT AWAITING AUTHORIZATION |
+| 36-p11-review5-trust-boundary-correction.md | P11 Review 5 trust-boundary correction | HISTORICAL DESIGN FREEZE ATTEMPT / SUPERSEDED BY DESIGN 37 |
+| 37-p11-review5-freeze-consistency-and-raw-fact-binding.md | P11 Review 5 freeze consistency and Raw Fact binding correction | ACTIVE DESIGN FREEZE / DEVELOPMENT AWAITING AUTHORIZATION |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -177,7 +177,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 + 32 + 33 + 34 + 35 + 36 + 37 | 27 | TBD | REPAIR / DESIGN FREEZE CORRECTION / DEVELOPMENT AWAITING AUTHORIZATION |
+| P11 | 26 + 32 + 33 + 34 + 35 + 36 + 37 | 27 | TBD | REPAIR / DESIGN 37 FROZEN / DEVELOPMENT AWAITING AUTHORIZATION |
 
 ---
 
@@ -308,7 +308,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_REVIEW_5_DESIGN_FREEZE_CORRECTION_IN_PROGRESS / DEVELOPMENT_AWAITING_AUTHORIZATION / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_REVIEW_5_FINAL_DESIGN_FREEZE_READY / DEVELOPMENT_AWAITING_AUTHORIZATION / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -317,8 +317,9 @@ P11 current design:
 - authorization = `development/147-p11-us-scope-reopening-authorization.md`;
 - Review 5 = `development/192-p11-fresh-full-exact-candidate-review-5.md` / `CHANGES_REQUIRED`;
 - Design 36 review = `development/193-p11-design-freeze-review-result.md` / `DESIGN_FREEZE_CHANGES_REQUIRED`;
-- ISSUE-140 = `FIXED`; ISSUE-141 = `FIXED`; ISSUE-142 = `OPEN / IMPLEMENTATION REQUIRED`; ISSUE-143 = `OPEN / IMPLEMENTATION REQUIRED`; ISSUE-144 = `GOVERNANCE CORRECTION`; ISSUE-145 = `OPEN / DESIGN CORRECTED BY DESIGN 37`;
-- next action = ChatGPT design review of Design 37; development is not authorized until that review explicitly authorizes it.
+- Design 37 final-freeze review = `development/194-p11-design37-final-freeze-review-result.md` / `CHANGES_REQUIRED`;
+- ISSUE-140 = `FIXED`; ISSUE-141 = `FIXED`; ISSUE-142 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`; ISSUE-143 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`; ISSUE-144 = `GOVERNANCE CORRECTED`; ISSUE-145 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
+- next action = ChatGPT final review of the exact Design 37 freeze; development is not authorized until that review explicitly authorizes it.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
