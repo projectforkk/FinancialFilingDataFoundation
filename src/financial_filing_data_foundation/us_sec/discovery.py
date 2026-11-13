@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit
@@ -392,12 +392,11 @@ def _reconstruct_discovery_candidates(
         source_url=expected_main_url,
         raw_sha256=_sha256(main_body),
     )
-    chunks = main_submissions.history_chunks
-    if len(chunks) > SEC_MAX_HISTORY_CHUNKS:
-        raise SecError(
-            P11Reason.P11_SEC_DISCOVERY_FAILED,
-            f"SEC submissions history file count exceeds bound {SEC_MAX_HISTORY_CHUNKS}",
-        )
+    chunks = select_history_chunks(
+        main_submissions,
+        int(observation.fiscal_year),
+        period=str(observation.period),
+    )
     expected_history_urls: list[str] = []
     seen_history_names: set[str] = set()
     for chunk in chunks:
@@ -643,6 +642,105 @@ class SecSubmissions:
         if self.history_ranges:
             return self.history_ranges
         return tuple(SecHistoryChunk(name) for name in self.history_files)
+
+
+def _history_filing_cutoff(
+    submissions: SecSubmissions,
+    *,
+    fiscal_year: int,
+    period: str,
+) -> date:
+    normalized_period = str(period).strip().upper()
+    if normalized_period == "FY":
+        # FY discovery is defined by report-period year.  A filing for the
+        # requested annual report cannot belong to a filing-date range before
+        # the start of that report-period year.
+        return date(int(fiscal_year), 1, 1)
+    if normalized_period not in {"Q1", "Q2", "Q3"}:
+        raise SecError(
+            P11Reason.P11_FORM_POLICY_MISMATCH,
+            f"unsupported US period for history selection: {period}",
+        )
+    if submissions.fiscal_year_end:
+        try:
+            month = int(str(submissions.fiscal_year_end)[:2])
+            day = int(str(submissions.fiscal_year_end)[2:])
+            prior_annual_end = date(int(fiscal_year) - 1, month, day)
+        except (TypeError, ValueError) as exc:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                "SEC fiscalYearEnd metadata is invalid for history selection",
+            ) from exc
+        return prior_annual_end + timedelta(days=1)
+    # Missing fiscal-year-end metadata cannot prove an earlier range is
+    # irrelevant.  This lower bound covers all supported quarterly slots
+    # without inventing an upper filing-date limit.
+    return date(int(fiscal_year) - 1, 1, 1)
+
+
+def select_history_chunks(
+    submissions: SecSubmissions,
+    fiscal_year: int,
+    *,
+    period: str = "FY",
+) -> tuple[SecHistoryChunk, ...]:
+    """Select the complete but minimal official history source set.
+
+    A valid filingTo before the slot's earliest possible filing date proves a
+    chunk irrelevant.  Every chunk reaching that boundary, and every chunk
+    without enough range metadata to prove irrelevance, remains eligible so a
+    delayed amendment cannot be missed.
+    """
+
+    chunks = submissions.history_chunks
+    if not chunks:
+        return ()
+    cutoff = _history_filing_cutoff(
+        submissions,
+        fiscal_year=int(fiscal_year),
+        period=period,
+    )
+    selected: list[SecHistoryChunk] = []
+    seen_names: set[str] = set()
+    for chunk in chunks:
+        name = str(chunk.name)
+        if name in seen_names:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                f"SEC history chunk is duplicated: {name}",
+            )
+        seen_names.add(name)
+        parsed_from: date | None = None
+        parsed_to: date | None = None
+        if chunk.filing_from:
+            try:
+                parsed_from = date.fromisoformat(str(chunk.filing_from)[:10])
+            except ValueError as exc:
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    f"SEC history chunk range is invalid: {name}",
+                ) from exc
+        if chunk.filing_to:
+            try:
+                parsed_to = date.fromisoformat(str(chunk.filing_to)[:10])
+            except ValueError as exc:
+                raise SecError(
+                    P11Reason.P11_SEC_DISCOVERY_FAILED,
+                    f"SEC history chunk range is invalid: {name}",
+                ) from exc
+        if parsed_from is not None and parsed_to is not None and parsed_from > parsed_to:
+            raise SecError(
+                P11Reason.P11_SEC_DISCOVERY_FAILED,
+                f"SEC history chunk range is reversed: {name}",
+            )
+        if parsed_to is None or parsed_to >= cutoff:
+            selected.append(chunk)
+    if len(selected) > SEC_MAX_HISTORY_CHUNKS:
+        raise SecError(
+            P11Reason.P11_SEC_DISCOVERY_FAILED,
+            f"SEC submissions history file count exceeds deterministic bound {SEC_MAX_HISTORY_CHUNKS}",
+        )
+    return tuple(sorted(selected, key=lambda item: item.name))
 
 
 def _array(recent: dict[str, Any], key: str, index: int, *, required: bool = True) -> Any:
@@ -1019,6 +1117,7 @@ __all__ = [
     "discover_filings",
     "merge_filing_candidates",
     "parse_submissions",
+    "select_history_chunks",
     "select_filing",
     "verify_sec_discovery_observation",
 ]

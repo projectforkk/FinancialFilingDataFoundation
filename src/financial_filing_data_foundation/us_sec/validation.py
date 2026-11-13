@@ -11,7 +11,22 @@ from typing import Any
 from .errors import P11Reason, SecError
 from .compatibility import sec_artifact_compatibility
 from .discovery import verify_sec_discovery_observation
-from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, verify_sec_evidence
+from .parser import (
+    SEC_ARTIFACT_SCHEMA,
+    XBRL_INSTANCE_NAMESPACE,
+    SecParseResult,
+    _DomParser,
+    _descendants,
+    _is_inline_fact,
+    _is_valid_xbrl_instance_root,
+    _parse_xml_root,
+    _resolve_dom_locator,
+    _resolve_xml_locator,
+    _xml_attr_local,
+    _xml_local,
+    _xml_namespace,
+    verify_sec_evidence,
+)
 
 
 SEC_VALIDATION_SCHEMA = "p11-sec-validation-v2"
@@ -111,6 +126,164 @@ def _status(issues: list[dict[str, Any]]) -> tuple[str, int, int, int, int]:
     return status, blocking, failures, review, warning
 
 
+def _fact_source_semantic_issues(
+    parsed: SecParseResult,
+    package: Any | None,
+    fact_source_mode: str,
+) -> list[dict[str, Any]]:
+    """Independently verify that logical facts match their declared source mode."""
+
+    if fact_source_mode == "NO_STRUCTURED_FACTS":
+        if parsed.facts or parsed.evidence:
+            return [
+                _issue(
+                    P11Reason.P11_FACT_SOURCE_MODE_INVALID.value,
+                    "BLOCKING",
+                    "SEC NO_STRUCTURED_FACTS mode cannot contain facts or fact evidence",
+                )
+            ]
+        return []
+    if package is None:
+        return []
+
+    issues: list[dict[str, Any]] = []
+
+    def invalid(message: str, **extra: Any) -> None:
+        issues.append(
+            _issue(
+                P11Reason.P11_FACT_SOURCE_MODE_INVALID.value,
+                "BLOCKING",
+                message,
+                **extra,
+            )
+        )
+
+    primary_members = [member for member in package.members if member.role.value == "PRIMARY_DOCUMENT"]
+    evidence_by_fact = {
+        str(evidence.get("raw_fact_id") or ""): evidence
+        for evidence in parsed.evidence
+        if str(evidence.get("raw_fact_id") or "")
+    }
+
+    def row_member_mismatch(row: dict[str, Any], expected_sha: str) -> bool:
+        return (
+            str(row.get("member_sha256") or "") != expected_sha
+            or str(row.get("source_member_sha256") or "") != expected_sha
+        )
+
+    def fragment_member_mismatch(row: dict[str, Any], expected_sha: str) -> bool:
+        fragments = row.get("source_fragments") or ()
+        return any(
+            not isinstance(fragment, dict)
+            or str(fragment.get("source_member_sha256") or "") != expected_sha
+            for fragment in fragments
+        )
+
+    if fact_source_mode == "INLINE_XBRL_PRIMARY":
+        if len(primary_members) != 1:
+            invalid("SEC INLINE_XBRL_PRIMARY mode requires exactly one primary member")
+            return issues
+        primary = primary_members[0]
+        primary_sha = str(primary.member_sha256)
+        try:
+            html = primary.body.decode("utf-8-sig")
+            dom_parser = _DomParser()
+            dom_parser.feed(html)
+            dom_parser.close()
+        except (UnicodeDecodeError, AssertionError, ValueError) as exc:
+            invalid("SEC INLINE_XBRL_PRIMARY primary member cannot be independently parsed", error=str(exc))
+            return issues
+        dom_root = dom_parser.root
+        if not any(_is_inline_fact(node) for node in _descendants(dom_root)):
+            invalid("SEC INLINE_XBRL_PRIMARY mode has no authentic Inline XBRL fact in the primary member")
+        for fact in parsed.facts:
+            raw_fact_id = str(fact.get("raw_fact_id") or "")
+            if row_member_mismatch(fact, primary_sha) or fragment_member_mismatch(fact, primary_sha):
+                invalid("SEC Inline logical fact is not sourced from the primary member", raw_fact_id=raw_fact_id)
+            if fact.get("xml_locator"):
+                invalid("SEC Inline logical fact carries an XML locator", raw_fact_id=raw_fact_id)
+            locator = str(fact.get("dom_locator") or "")
+            node = _resolve_dom_locator(dom_root, locator) if locator else None
+            if node is None or not _is_inline_fact(node):
+                invalid("SEC Inline logical fact locator does not resolve to an authentic primary Inline fact", raw_fact_id=raw_fact_id)
+            for field_name in ("context", "unit"):
+                value = fact.get(field_name)
+                if isinstance(value, dict) and value.get("source_member_sha256") not in {None, "", primary_sha}:
+                    invalid("SEC Inline fact context/unit was sourced from a non-primary member", raw_fact_id=raw_fact_id, field=field_name)
+            evidence = evidence_by_fact.get(raw_fact_id)
+            if evidence is not None:
+                if row_member_mismatch(evidence, primary_sha) or fragment_member_mismatch(evidence, primary_sha):
+                    invalid("SEC Inline evidence is not sourced from the primary member", raw_fact_id=raw_fact_id)
+                if str(evidence.get("locator_kind") or "").upper() not in {"DOM_PATH", "DOM_HIDDEN_FACT"}:
+                    invalid("SEC Inline evidence does not use the DOM locator model", raw_fact_id=raw_fact_id)
+                if evidence.get("xml_locator"):
+                    invalid("SEC Inline evidence carries an XML locator", raw_fact_id=raw_fact_id)
+        for evidence in parsed.evidence:
+            if row_member_mismatch(evidence, primary_sha) or fragment_member_mismatch(evidence, primary_sha):
+                invalid("SEC Inline evidence row is not sourced from the primary member", evidence_id=evidence.get("evidence_id"))
+        return issues
+
+    if fact_source_mode != "XBRL_INSTANCE_PRIMARY":
+        return issues
+
+    instance_members = [member for member in package.members if member.role.value == "XBRL_INSTANCE"]
+    authentic_instances = []
+    parsed_roots: dict[str, Any] = {}
+    for member in instance_members:
+        root = _parse_xml_root(member.body)
+        if _is_valid_xbrl_instance_root(root):
+            authentic_instances.append(member)
+            parsed_roots[str(member.member_sha256)] = root
+    if len(authentic_instances) != 1:
+        invalid("SEC XBRL_INSTANCE_PRIMARY mode requires exactly one authentic XBRL instance member")
+        return issues
+    instance = authentic_instances[0]
+    instance_sha = str(instance.member_sha256)
+    instance_root = parsed_roots[instance_sha]
+    if len(primary_members) == 1:
+        try:
+            html = primary_members[0].body.decode("utf-8-sig")
+            dom_parser = _DomParser()
+            dom_parser.feed(html)
+            dom_parser.close()
+            if any(_is_inline_fact(node) for node in _descendants(dom_parser.root)):
+                invalid("SEC XBRL_INSTANCE_PRIMARY mode contains primary Inline XBRL facts")
+        except (UnicodeDecodeError, AssertionError, ValueError) as exc:
+            invalid("SEC XBRL_INSTANCE_PRIMARY primary member cannot be independently parsed", error=str(exc))
+    for fact in parsed.facts:
+        raw_fact_id = str(fact.get("raw_fact_id") or "")
+        if row_member_mismatch(fact, instance_sha) or fragment_member_mismatch(fact, instance_sha):
+            invalid("SEC XML logical fact is not sourced from the selected XBRL instance", raw_fact_id=raw_fact_id)
+        if str(fact.get("locator_kind") or "").upper() != "XML_PATH":
+            invalid("SEC XML logical fact does not use the XML locator model", raw_fact_id=raw_fact_id)
+        locator = str(fact.get("xml_locator") or "")
+        node = _resolve_xml_locator(instance_root, locator) if locator else None
+        if node is None or _xml_namespace(str(node.tag)) == XBRL_INSTANCE_NAMESPACE or not _xml_attr_local(node, "contextref"):
+            invalid("SEC XML logical fact locator does not resolve to an instance fact", raw_fact_id=raw_fact_id)
+        if fact.get("dom_locator"):
+            invalid("SEC XML logical fact carries a DOM locator", raw_fact_id=raw_fact_id)
+        for field_name in ("context", "unit"):
+            if field_name == "context" and not fact.get("context_ref"):
+                continue
+            if field_name == "unit" and not fact.get("unit_ref"):
+                continue
+            value = fact.get(field_name)
+            if not isinstance(value, dict) or str(value.get("source_member_sha256") or "") != instance_sha:
+                invalid("SEC XML fact context/unit is not bound to the selected XBRL instance", raw_fact_id=raw_fact_id, field=field_name)
+        evidence = evidence_by_fact.get(raw_fact_id)
+        if evidence is not None:
+            if row_member_mismatch(evidence, instance_sha) or fragment_member_mismatch(evidence, instance_sha):
+                invalid("SEC XML evidence is not sourced from the selected XBRL instance", raw_fact_id=raw_fact_id)
+            if str(evidence.get("locator_kind") or "").upper() != "XML_PATH":
+                invalid("SEC XML evidence does not use the XML locator model", raw_fact_id=raw_fact_id)
+            if evidence.get("dom_locator"):
+                invalid("SEC XML evidence carries a DOM locator", raw_fact_id=raw_fact_id)
+    for evidence in parsed.evidence:
+        if row_member_mismatch(evidence, instance_sha) or fragment_member_mismatch(evidence, instance_sha):
+            invalid("SEC XML evidence row is not sourced from the selected XBRL instance", evidence_id=evidence.get("evidence_id"))
+    return issues
+
+
 def validate_sec_artifacts(
     parsed: SecParseResult,
     validation_root: str | Path,
@@ -198,6 +371,8 @@ def validate_sec_artifacts(
                 f"SEC {fact_source_mode} mode has no persisted Raw Facts",
             )
         )
+    if fact_source_mode in _VALID_FACT_SOURCE_MODES:
+        issues.extend(_fact_source_semantic_issues(parsed, package, fact_source_mode))
     observation = discovery_observation
     observation_sha = getattr(observation, "observation_sha256", None) or parsed.discovery_observation_sha256
     discovery_checked_at = getattr(observation, "retrieved_at", None) or parsed.discovery_checked_at

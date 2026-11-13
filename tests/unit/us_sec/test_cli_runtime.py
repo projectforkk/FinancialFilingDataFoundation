@@ -520,7 +520,7 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
         registry=registry,
     )
     registry.register_sec_parsed_data(
-        parse_run_id="current-v5",
+        parse_run_id="current-v6",
         package_sha256=package.package_sha256,
         company_id="US:CIK0000320193",
         fiscal_year=2025,

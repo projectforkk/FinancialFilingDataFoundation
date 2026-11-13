@@ -133,7 +133,7 @@ def _inline_html(*, continuation: str = "", extra: str = "") -> bytes:
 
 def test_corrected_target_versions_and_observation_are_deterministic(tmp_path: Path) -> None:
     assert SEC_DISCOVERY_SCHEMA == "p11-sec-discovery-v1"
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V5"
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V6"
     assert SEC_ARTIFACT_SCHEMA == "p11-sec-artifacts-v2"
     company = SecCompanyRef(cik=CIK, ticker="AAPL", company_id=f"US:CIK{CIK}")
     observation = SecDiscoveryObservation.create(

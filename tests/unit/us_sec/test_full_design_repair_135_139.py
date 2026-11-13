@@ -352,7 +352,6 @@ def test_t136_02_history_enumeration_is_deterministic_and_includes_missing_range
     acquirer._discover_with_candidates(_company(), fiscal_year=2025, period="FY")
 
     assert client.calls[1:] == [
-        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
         "https://data.sec.gov/submissions/CIK0000320193-submissions-002.json",
     ]
 

@@ -228,7 +228,7 @@ def test_supported_filing_primary_document_path_traversal_is_rejected(unsafe: st
     assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
 
 
-def test_history_chunk_ranges_are_preserved_and_all_chunks_are_retained_for_replay() -> None:
+def test_history_chunk_ranges_are_preserved_and_ancient_chunks_are_excluded() -> None:
     payload = _submissions()
     payload["filings"]["files"] = [  # type: ignore[index]
         {"name": "CIK123456789-2018.json", "filingFrom": "2018-01-01", "filingTo": "2018-12-31"},
@@ -240,8 +240,6 @@ def test_history_chunk_ranges_are_preserved_and_all_chunks_are_retained_for_repl
     assert submissions.history_ranges[1].filing_from == "2024-01-01"
     selected = _history_chunks_for_year(submissions, 2025)
     assert [chunk.name for chunk in selected] == [
-        "CIK123456789-2018.json",
-        "CIK123456789-2024.json",
         "CIK123456789-2026.json",
     ]
 

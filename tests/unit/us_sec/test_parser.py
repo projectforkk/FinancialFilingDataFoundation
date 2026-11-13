@@ -258,7 +258,7 @@ def test_parser_does_not_reuse_artifact_from_previous_normalizer_version(tmp_pat
 
     result = parse_sec_package(package, tmp_path / "p11")
 
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V5"
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V6"
     assert result.artifact_dir != legacy_dir
     assert result.artifact_dir.is_dir()
     assert legacy_manifest.read_bytes() == before
@@ -277,8 +277,8 @@ def test_v3_parsed_artifact_is_invalidated_by_v4_normalizer(tmp_path: Path) -> N
 
     result = parse_sec_package(package, tmp_path / "p11")
 
-    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V5"
-    assert result.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V5"
+    assert VIRTUAL_HTML_NORMALIZER_VERSION == "VIRTUAL_HTML_V6"
+    assert result.artifact_dir.name == f"{package.package_sha256}.VIRTUAL_HTML_V6"
     assert result.artifact_dir.is_dir()
     assert legacy_manifest.read_bytes() == before
 
