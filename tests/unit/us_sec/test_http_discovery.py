@@ -10,8 +10,8 @@ from financial_filing_data_foundation.us_sec.discovery import (
     discover_filings,
     parse_submissions,
     select_filing,
+    select_history_chunks_for_slot,
 )
-from financial_filing_data_foundation.us_sec.acquisition import _history_chunks_for_year
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import (
     _AllowlistedRedirectHandler,
@@ -228,7 +228,7 @@ def test_supported_filing_primary_document_path_traversal_is_rejected(unsafe: st
     assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
 
 
-def test_history_chunk_ranges_are_preserved_and_all_chunks_are_retained_for_replay() -> None:
+def test_history_chunk_ranges_are_preserved_and_only_complete_minimal_chunks_are_selected() -> None:
     payload = _submissions()
     payload["filings"]["files"] = [  # type: ignore[index]
         {"name": "CIK123456789-2018.json", "filingFrom": "2018-01-01", "filingTo": "2018-12-31"},
@@ -238,12 +238,48 @@ def test_history_chunk_ranges_are_preserved_and_all_chunks_are_retained_for_repl
     company = sec_company(cik="123456789", ticker="EXM", allow_development=True)
     submissions = parse_submissions(payload, company=company)
     assert submissions.history_ranges[1].filing_from == "2024-01-01"
-    selected = _history_chunks_for_year(submissions, 2025)
+    selected = select_history_chunks_for_slot(submissions, 2025)
     assert [chunk.name for chunk in selected] == [
-        "CIK123456789-2018.json",
         "CIK123456789-2024.json",
         "CIK123456789-2026.json",
     ]
+
+
+def test_history_selector_includes_missing_range_conservatively() -> None:
+    payload = _submissions()
+    payload["filings"]["files"] = [  # type: ignore[index]
+        {"name": "CIK123456789-2018.json", "filingFrom": "2018-01-01", "filingTo": "2018-12-31"},
+        {"name": "CIK123456789-unknown.json"},
+        {"name": "CIK123456789-2026.json", "filingFrom": "2026-01-01", "filingTo": "2026-12-31"},
+    ]
+    company = sec_company(cik="123456789", ticker="EXM", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    selected = select_history_chunks_for_slot(submissions, 2025)
+
+    assert [chunk.name for chunk in selected] == [
+        "CIK123456789-2026.json",
+        "CIK123456789-unknown.json",
+    ]
+
+
+@pytest.mark.parametrize(
+    "files",
+    [
+        [{"name": "bad.json", "filingFrom": "not-a-date", "filingTo": "2025-12-31"}],
+        [{"name": "bad.json", "filingFrom": "2026-01-01", "filingTo": "2025-12-31"}],
+    ],
+)
+def test_history_selector_rejects_malformed_or_reversed_ranges(files: list[dict[str, str]]) -> None:
+    payload = _submissions()
+    payload["filings"]["files"] = files  # type: ignore[index]
+    company = sec_company(cik="123456789", ticker="EXM", allow_development=True)
+    submissions = parse_submissions(payload, company=company)
+
+    with pytest.raises(SecError) as exc_info:
+        select_history_chunks_for_slot(submissions, 2025)
+
+    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
 
 
 def test_discovery_uses_fiscal_year_end_and_chronology_for_non_calendar_issuers() -> None:
