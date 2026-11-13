@@ -542,7 +542,7 @@ class SecAcquirer:
                     body=member_response.body,
                 )
                 members_by_name[name] = member
-                if member.role in _XBRL_MEMBER_ROLES:
+                if member.role in _XBRL_MEMBER_ROLES or member.role is SecMemberRole.OTHER:
                     accepted_xbrl_bodies[name] = (member.role, member.body)
         members = [members_by_name[name] for name in selected]
         package = build_package(
@@ -602,7 +602,7 @@ def _select_archive_members(
         (accepted_member_bodies or {}).items(),
         key=lambda row: row[0].casefold(),
     ):
-        if role in _XBRL_MEMBER_ROLES:
+        if role in _XBRL_MEMBER_ROLES or role is SecMemberRole.OTHER:
             semantic_sources.append((body, False))
     for body, primary_html in semantic_sources:
         for reference in _extract_semantic_xbrl_references(body, primary_html=primary_html):
