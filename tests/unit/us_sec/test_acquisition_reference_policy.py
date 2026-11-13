@@ -93,7 +93,8 @@ def test_primary_browser_assets_are_not_fetched_but_semantic_reference_support_i
     schema_name = "aapl-20250927.xsd"
     summary_name = "FilingSummary.xml"
     primary_body = (
-        "<html><head>"
+        "<html xmlns:link='http://www.xbrl.org/2003/linkbase' "
+        "xmlns:xlink='http://www.w3.org/1999/xlink'><head>"
         "<link:schemaRef xlink:href='aapl-20250927-instance.xml'>"
         "</head><body>"
         "<img src='aapl-20250927_g1.jpg'>"
