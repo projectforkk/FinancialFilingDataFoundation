@@ -1,6 +1,6 @@
 # 27 — P11 US SEC Provider Implementation Plan
 
-Status: **DESIGN 37 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
+Status: **DESIGN 38 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
 
 Detailed design:
 `design/26-p11-sec-provider-design.md`
@@ -78,25 +78,23 @@ PC Agent must:
 
 PC Agent must not alter the corrected design contract without a STOP/design issue.
 
-The current Review 5 development cycle is limited to:
+The current Review 6 development cycle is limited to:
 
 ```text
-ISSUE-142 residual implementation
-ISSUE-143 residual implementation
-ISSUE-145 implementation
+ISSUE-146 implementation
 ```
 
-The same current cycle includes the validation-v3 persistence/migration
-implementation frozen by Design 37 and the validation-only planner state frozen
-by Design 38. The current correction adds `REVALIDATE_LOCAL` so a compatible
-V6/v2 parsed artifact can be revalidated under v3 without parser rerun. This
-does not create a new parser, artifact, discovery, validation, or Registry
-schema version.
+ISSUE-146 is the validation-v3 revalidation-planner correction frozen by Design
+38. The implementation adds `REVALIDATE_LOCAL` so a compatible V6/v2 parsed
+artifact can be revalidated under v3 without parser rerun.
 
-`ISSUE-140` and `ISSUE-141` are already fixed and require regression
-preservation only. `ISSUE-144` is a governance correction and has no production
-implementation scope. Historical ISSUE-123..139 records remain historical and
-must not be erased or silently reopened as the current scope.
+`ISSUE-140`, `ISSUE-141`, `ISSUE-142`, `ISSUE-143`, and `ISSUE-145` are
+already fixed and require regression preservation only. `ISSUE-144` is a
+governance correction and has no production implementation scope. Historical
+ISSUE-123..139 remain historical and must not be erased or silently reopened.
+
+This Review 6 correction does not create a new parser, artifact, discovery,
+validation, or Registry schema version.
 
 ### 2.2 ChatGPT
 
@@ -126,13 +124,14 @@ Before repair code changes, freeze the exact commit containing:
 - `design/34-p11-explicit-6k-scope-correction.md`;
 - `design/35-p11-repair-140-143-design-correction.md`;
 - `design/36-p11-review5-trust-boundary-correction.md`;
-- `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md`.
+- `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md`;
+- `design/38-p11-review6-revalidation-planner-correction.md`.
 
 Record:
 
 ```text
 corrected_design_baseline_sha = exact final design-freeze commit returned by this task
-previous_production_candidate_sha = a65723c3cf17bbccf10748e2c671671a2c7dfb1b
+previous_production_candidate_sha = 35e2b70c78b6cff931c8484dc38f2eb7349735f5
 starting_branch
 starting_head
 ```

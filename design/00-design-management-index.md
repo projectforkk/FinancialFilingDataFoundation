@@ -117,7 +117,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
 | 26-p11-sec-provider-design.md | P11 US SEC Provider | ACTIVE / DESIGN READY |
-| 27-p11-implementation-plan.md | P11 implementation plan | ACTIVE / DESIGN 37 DEVELOPMENT GATE |
+| 27-p11-implementation-plan.md | P11 implementation plan | ACTIVE / DESIGN 38 DEVELOPMENT GATE |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-project-final-cn-hk-scope.md | 2026-11-05 closeout scope | ACCEPTED HISTORICAL SCOPE |
