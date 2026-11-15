@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_REVIEW_6_CHANGES_REQUIRED / DESIGN_38_FROZEN / DEVELOPMENT_AWAITING_AUTHORIZATION**
+**P11_REVIEW_6_ISSUE_146_DEVELOPMENT_AUTHORIZED / DESIGN_BASELINE_92AF6205**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = REVIEW 6 CHANGES_REQUIRED / DESIGN 38 FROZEN / DEVELOPMENT NOT YET REAUTHORIZED`
+`P11 = REVIEW 6 CHANGES_REQUIRED / ISSUE-146 DEVELOPMENT AUTHORIZED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -27,8 +27,8 @@ Current P11 design:
 - prior development authorization: `development/196-p11-review5-development-authorization.md`;
 - Review 6: `development/198-p11-fresh-full-exact-candidate-review-6.md = CHANGES_REQUIRED`;
 - ISSUE-140/141 = `FIXED`; ISSUE-142 = `FIXED`; ISSUE-143 = `FIXED`; ISSUE-144 = `GOVERNANCE CORRECTED`; ISSUE-145 = `FIXED`; ISSUE-146 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
-- exact Design 38 freeze cleanup: `PENDING THIS COMMIT`;
-- development reauthorization for Design 38: `NOT YET ISSUED`.
+- exact Design 38 freeze: `92af6205eb8e090994dcece68850eddcd4232392 = DESIGN_FREEZE_PASS`;
+- development reauthorization: `development/199-p11-review6-development-reauthorization.md`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -723,7 +723,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `REVIEW 6 CHANGES_REQUIRED / DESIGN 38 FROZEN / DEVELOPMENT AWAITING AUTHORIZATION`
+- P11 — US SEC Provider: `REVIEW 6 ISSUE-146 DEVELOPMENT AUTHORIZED / DESIGN BASELINE 92af6205`
 
 
 ## P11 short execution workflow
