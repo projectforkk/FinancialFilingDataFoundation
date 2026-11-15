@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_REVIEW_6_ISSUE_146_DEVELOPMENT_AUTHORIZED / DESIGN_BASELINE_92AF6205**
+**P11_REVIEW_7_REVIEW_PASS / FORMAL_TEST_PLAN_PENDING**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = REVIEW 6 CHANGES_REQUIRED / ISSUE-146 DEVELOPMENT AUTHORIZED`
+`P11 = FRESH FULL EXACT-CANDIDATE REVIEW PASS / FORMAL TEST PLAN PENDING`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -28,7 +28,10 @@ Current P11 design:
 - Review 6: `development/198-p11-fresh-full-exact-candidate-review-6.md = CHANGES_REQUIRED`;
 - ISSUE-140/141 = `FIXED`; ISSUE-142 = `FIXED`; ISSUE-143 = `FIXED`; ISSUE-144 = `GOVERNANCE CORRECTED`; ISSUE-145 = `FIXED`; ISSUE-146 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
 - exact Design 38 freeze: `92af6205eb8e090994dcece68850eddcd4232392 = DESIGN_FREEZE_PASS`;
-- development reauthorization: `development/199-p11-review6-development-reauthorization.md`.
+- development reauthorization: `development/199-p11-review6-development-reauthorization.md`;
+- Review 7 exact-candidate result: `development/201-p11-fresh-full-exact-candidate-review-7.md = REVIEW_PASS`;
+- exact production candidate: `6eaace08c9ba5fb26809a7e02de5835123fb667a`;
+- development evidence: `5ce97e18456c9e877c223df7abf01eec53e1f3ad`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -723,7 +726,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `REVIEW 6 ISSUE-146 DEVELOPMENT AUTHORIZED / DESIGN BASELINE 92af6205`
+- P11 — US SEC Provider: `REVIEW PASS / FORMAL TEST PLAN PENDING / candidate 6eaace08`
 
 
 ## P11 short execution workflow
