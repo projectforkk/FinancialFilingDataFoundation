@@ -23,6 +23,9 @@ Review 5 trust-boundary correction:
 Review 5 freeze consistency and Raw Fact binding correction:
 `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md`
 
+Review 6 revalidation planner correction:
+`design/38-p11-review6-revalidation-planner-correction.md`
+
 Review 5 exact-candidate result:
 `development/192-p11-fresh-full-exact-candidate-review-5.md = CHANGES_REQUIRED`
 
@@ -83,10 +86,12 @@ ISSUE-143 residual implementation
 ISSUE-145 implementation
 ```
 
-The same current cycle also includes the validation-v3 persistence/migration
-implementation frozen by Design 37. This is part of the ISSUE-143/145
-validation hardening and does not create a new parser, artifact, discovery, or
-Registry schema version.
+The same current cycle includes the validation-v3 persistence/migration
+implementation frozen by Design 37 and the validation-only planner state frozen
+by Design 38. The current correction adds `REVALIDATE_LOCAL` so a compatible
+V6/v2 parsed artifact can be revalidated under v3 without parser rerun. This
+does not create a new parser, artifact, discovery, validation, or Registry
+schema version.
 
 `ISSUE-140` and `ISSUE-141` are already fixed and require regression
 preservation only. `ISSUE-144` is a governance correction and has no production
@@ -441,6 +446,37 @@ fresh discovery refresh
 
 The implementation must include a regression proving that current production
 call sites do not independently hard-code the legacy flat validation path.
+
+## 4.12 Review 6 — validation-only planner correction
+
+Design 38 is the latest/current authority for validation-v3 migration planning.
+
+After fresh current discovery:
+
+```text
+compatible parsed + current reusable v3
+→ REUSE_DATA
+
+compatible parsed + v3 absent
+→ REVALIDATE_LOCAL
+
+compatible parsed + valid current v3 not reuse_eligible
+→ REVALIDATE_LOCAL
+
+no compatible parsed + local package
+→ PARSE_LOCAL
+
+no local package
+→ DISCOVER_AND_ACQUIRE
+```
+
+A present but corrupt current v3 fails closed and must not fall back to legacy
+v2 or be silently overwritten as migration.
+
+`REVALIDATE_LOCAL` must execute P7 v3 against the existing parsed artifact
+without invoking the parser and must refresh current Registry validation fields.
+
+Required development tests are frozen by Design 38.
 
 ## 6. Candidate commit rules
 
