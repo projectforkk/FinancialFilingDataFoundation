@@ -56,6 +56,34 @@ def _relative(root: Path, path: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
+def _register_current_parsed_run(
+    registry: SQLiteRegistry,
+    *,
+    package: SecFilingPackage,
+    parsed: SecParseResult,
+    validation: SecValidationResult,
+    period: str,
+    company_id: str | None = None,
+) -> None:
+    """Refresh the Registry row for the immutable parse run after validation."""
+
+    parse_run_id = hashlib.sha256(f"{package.package_sha256}|{parsed.parser_version}".encode()).hexdigest()
+    register_sec_parsed_run(
+        registry,
+        parse_run_id=parse_run_id,
+        package_sha256=package.package_sha256,
+        company_id=company_id or f"US:CIK{package.cik}",
+        fiscal_year=package.fiscal_year,
+        period=period,
+        parser_version=parsed.parser_version,
+        schema_version=SEC_ARTIFACT_SCHEMA,
+        validation_status=validation.validation_status,
+        compatibility_status=validation.compatibility_status,
+        blocking_issue_count=validation.blocking_issue_count,
+        artifact_path=str(parsed.artifact_dir),
+    )
+
+
 def _upsert_catalog(
     root: Path,
     package: SecFilingPackage,
@@ -199,20 +227,13 @@ def ingest_sec_package(
         else "REVIEW_REQUIRED"
     )
     register_sec_slot(registry, package, fiscal_year=package.fiscal_year, period=period, artifact_path=str(parsed.artifact_dir), binding_status=binding_status)
-    parse_run_id = hashlib.sha256(f"{package.package_sha256}|{parsed.parser_version}".encode()).hexdigest()
-    register_sec_parsed_run(
+    _register_current_parsed_run(
         registry,
-        parse_run_id=parse_run_id,
-        package_sha256=package.package_sha256,
-        company_id=f"US:CIK{package.cik}",
-        fiscal_year=package.fiscal_year,
+        package=package,
+        parsed=parsed,
+        validation=validation,
         period=period,
-        parser_version=parsed.parser_version,
-        schema_version=SEC_ARTIFACT_SCHEMA,
-        validation_status=validation.validation_status,
-        compatibility_status=validation.compatibility_status,
-        blocking_issue_count=validation.blocking_issue_count,
-        artifact_path=str(parsed.artifact_dir),
+        company_id=company_id,
     )
     ready = _research_ready(
         validation,
@@ -277,6 +298,14 @@ def reuse_sec_package(
         artifact_path=str(parsed.artifact_dir),
         binding_status=binding_status,
     )
+    _register_current_parsed_run(
+        registry,
+        package=package,
+        parsed=parsed,
+        validation=validation,
+        period=period,
+        company_id=company_id,
+    )
     ready = _research_ready(
         validation,
         package,
@@ -302,4 +331,83 @@ def reuse_sec_package(
     return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
 
 
-__all__ = ["SecIngestResult", "ingest_sec_package", "reuse_sec_package"]
+def revalidate_sec_package(
+    package: SecFilingPackage,
+    *,
+    root: str | Path,
+    ticker: str,
+    period: str,
+    parsed_artifact_dir: str | Path,
+    amendment_conflict: bool = False,
+    company_id: str | None = None,
+    ticker_source_url: str | None = None,
+    ticker_source_sha256: str | None = None,
+    ticker_retrieved_at: str | None = None,
+    discovery_observation: SecDiscoveryObservation | None = None,
+) -> SecIngestResult:
+    """Revalidate compatible parsed artifacts without invoking the parser."""
+
+    project_root = Path(root).expanduser().resolve()
+    parsed = load_sec_artifacts(parsed_artifact_dir)
+    if parsed.package_sha256.lower() != package.package_sha256.lower():
+        raise ValueError("SEC revalidation artifact identity differs from source package")
+    registry_path = project_root / "workspace" / "ingest" / "registry.sqlite"
+    registry = SQLiteRegistry(registry_path)
+    if discovery_observation is not None:
+        registry.register_sec_discovery_observation(discovery_observation)
+    register_sec_package(registry, package)
+    validation = validate_sec_artifacts(
+        parsed,
+        project_root / "workspace" / "ingest" / "us" / "p7",
+        amendment_conflict=amendment_conflict,
+        package=package,
+        discovery_observation=discovery_observation,
+        registry=registry,
+    )
+    binding_status = (
+        "SOURCE_CONFIRMED"
+        if not amendment_conflict and discovery_observation is not None and validation.validation_status == "PASS"
+        else "REVIEW_REQUIRED"
+    )
+    register_sec_slot(
+        registry,
+        package,
+        fiscal_year=package.fiscal_year,
+        period=period,
+        artifact_path=str(parsed.artifact_dir),
+        binding_status=binding_status,
+    )
+    _register_current_parsed_run(
+        registry,
+        package=package,
+        parsed=parsed,
+        validation=validation,
+        period=period,
+        company_id=company_id,
+    )
+    ready = _research_ready(
+        validation,
+        package,
+        amendment_conflict=amendment_conflict,
+        discovery_observation=discovery_observation,
+    )
+    catalog_path = project_root / "workspace" / "mcp" / "p8-live-catalog.json"
+    catalog_status = _upsert_catalog(
+        root=project_root,
+        package=package,
+        ticker=ticker,
+        parsed=parsed,
+        validation=validation,
+        catalog_path=catalog_path,
+        period=period,
+        publish=ready,
+        company_id=company_id,
+        ticker_source_url=ticker_source_url,
+        ticker_source_sha256=ticker_source_sha256,
+        ticker_retrieved_at=ticker_retrieved_at,
+        discovery_observation=discovery_observation,
+    )
+    return SecIngestResult(package, parsed, validation, catalog_status, ready, registry_path, catalog_path)
+
+
+__all__ = ["SecIngestResult", "ingest_sec_package", "revalidate_sec_package", "reuse_sec_package"]

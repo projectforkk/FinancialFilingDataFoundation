@@ -981,10 +981,27 @@ def test_sec_parsed_data_none_compatibility_defaults_to_incompatible(tmp_path: P
 
 
 def test_incremental_planner_is_reuse_first_and_conflict_safe() -> None:
-    assert plan_sec_slot(parsed_available=True, package_available=True).action is SecPlanAction.REUSE_DATA
-    assert plan_sec_slot(parsed_available=False, package_available=True).action is SecPlanAction.PARSE_LOCAL
-    assert plan_sec_slot(parsed_available=False, package_available=False).action is SecPlanAction.DISCOVER_AND_ACQUIRE
-    conflict = plan_sec_slot(parsed_available=True, package_available=True, amendment_conflict=True)
+    assert plan_sec_slot(
+        parsed_available=True,
+        package_available=True,
+        validation_reuse_eligible=True,
+    ).action is SecPlanAction.REUSE_DATA
+    assert plan_sec_slot(
+        parsed_available=False,
+        package_available=True,
+        validation_reuse_eligible=False,
+    ).action is SecPlanAction.PARSE_LOCAL
+    assert plan_sec_slot(
+        parsed_available=False,
+        package_available=False,
+        validation_reuse_eligible=False,
+    ).action is SecPlanAction.DISCOVER_AND_ACQUIRE
+    conflict = plan_sec_slot(
+        parsed_available=True,
+        package_available=True,
+        validation_reuse_eligible=True,
+        amendment_conflict=True,
+    )
     assert conflict.action is SecPlanAction.REVIEW_REQUIRED
 
 

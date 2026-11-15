@@ -40,7 +40,7 @@ from financial_filing_data_foundation.us_sec.acquisition import SecAcquirer, can
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpConfig
 from financial_filing_data_foundation.us_sec.identity import normalize_cik, sec_company
-from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package, reuse_sec_package
+from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package, revalidate_sec_package, reuse_sec_package
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
 from financial_filing_data_foundation.us_sec.parser import (
     SEC_ARTIFACT_SCHEMA,
@@ -51,7 +51,7 @@ from financial_filing_data_foundation.us_sec.planner import SecPlan, SecPlanActi
 from financial_filing_data_foundation.us_sec.registry import register_sec_package, register_sec_slot
 from financial_filing_data_foundation.us_sec.runtime import SecRuntimeDescriptor, SecSubprocessTransport
 from financial_filing_data_foundation.us_sec.ticker_map import parse_ticker_map, snapshot_ticker_map
-from financial_filing_data_foundation.us_sec.validation import load_sec_validation
+from financial_filing_data_foundation.us_sec.validation import load_sec_validation, sec_validation_artifact_dir
 
 
 _PERIODS = ("Q1", "Q2", "H1", "Q3", "FY")
@@ -553,18 +553,22 @@ def _us_plan_slot(
     )
     package_values = list(packages.values())
     package = package_values[0] if len(package_values) == 1 else None
-    parsed_available = (
-        package is not None
-        and _current_reusable_sec_artifacts(
-            package=package,
-            parsed_rows=parsed_rows,
-            paths=paths,
-        )
-        is not None
+    current_validation = _current_sec_validation(package=package, paths=paths) if package is not None else None
+    compatible_parsed = (
+        _compatible_sec_artifacts(package=package, parsed_rows=parsed_rows, paths=paths)
+        if package is not None
+        else None
     )
     plan = plan_sec_slot(
-        parsed_available=parsed_available,
+        parsed_available=compatible_parsed is not None,
         package_available=bool(packages),
+        validation_reuse_eligible=bool(
+            current_validation is not None
+            and current_validation.validation_status == "PASS"
+            and current_validation.compatibility_status == "COMPATIBLE"
+            and current_validation.blocking_issue_count == 0
+            and current_validation.reuse_eligible
+        ),
         amendment_conflict=amendment_conflict,
     )
     return plan, package
@@ -575,6 +579,48 @@ def _registry_path(root: Path, value: str) -> Path:
     if candidate.is_absolute():
         return candidate.resolve()
     return (root / candidate).resolve()
+
+
+def _compatible_sec_artifacts(
+    *,
+    package: Any,
+    parsed_rows: tuple[Any, ...],
+    paths: RuntimePaths,
+) -> Any | None:
+    """Return compatible parsed artifacts independently of validation-v3 state."""
+
+    for row in parsed_rows:
+        if str(row["package_sha256"]).lower() != str(package.package_sha256).lower():
+            continue
+        if str(row["parser_version"]) != VIRTUAL_HTML_NORMALIZER_VERSION:
+            continue
+        if str(row["schema_version"]) != SEC_ARTIFACT_SCHEMA:
+            continue
+        raw_artifact_path = str(row["artifact_path"] or "").strip()
+        if not raw_artifact_path:
+            continue
+        try:
+            parsed = load_sec_artifacts(_registry_path(paths.root, raw_artifact_path))
+        except Exception:
+            continue
+        if parsed.package_sha256.lower() == package.package_sha256.lower():
+            return parsed
+    return None
+
+
+def _current_sec_validation(*, package: Any, paths: RuntimePaths) -> Any | None:
+    """Load current validation-v3, distinguishing absence from corruption."""
+
+    current_dir = sec_validation_artifact_dir(
+        paths.ingest_root / "us" / "p7",
+        str(package.package_sha256),
+    )
+    if not current_dir.exists():
+        return None
+    validation = load_sec_validation(current_dir)
+    if validation.package_sha256.lower() != package.package_sha256.lower():
+        raise SecError("P11_PACKAGE_INVALID", "SEC validation package identity differs from source package")
+    return validation
 
 
 def _current_reusable_sec_artifacts(
@@ -590,29 +636,19 @@ def _current_reusable_sec_artifacts(
             continue
         if str(row["schema_version"]) != SEC_ARTIFACT_SCHEMA:
             continue
-        if str(row["validation_status"]).upper() != "PASS":
+        parsed = _compatible_sec_artifacts(package=package, parsed_rows=(row,), paths=paths)
+        if parsed is None:
             continue
-        if str(row["compatibility_status"]).upper() != "COMPATIBLE":
-            continue
-        if int(row["blocking_issue_count"] or 0) != 0:
-            continue
-        raw_artifact_path = str(row["artifact_path"] or "").strip()
-        if not raw_artifact_path:
-            continue
-        try:
-            parsed = load_sec_artifacts(_registry_path(paths.root, raw_artifact_path))
-            validation = load_sec_validation(
-                paths.ingest_root / "us" / "p7" / str(package.package_sha256)
-            )
-        except Exception:
-            continue
-        if parsed.package_sha256.lower() != package.package_sha256.lower():
-            continue
-        if validation.package_sha256.lower() != package.package_sha256.lower():
-            continue
-        if not validation.reuse_eligible:
-            continue
-        return parsed, validation
+        validation = _current_sec_validation(package=package, paths=paths)
+        if validation is None:
+            return None
+        if (
+            validation.validation_status == "PASS"
+            and validation.compatibility_status == "COMPATIBLE"
+            and validation.blocking_issue_count == 0
+            and validation.reuse_eligible
+        ):
+            return parsed, validation
     return None
 
 
@@ -649,7 +685,11 @@ def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths
     )
     if plan.action is SecPlanAction.REVIEW_REQUIRED:
         raise SecError(plan.reason_code or "P11_AMENDED_VARIANT_PRESENT", "SEC slot has an amended variant conflict")
-    if local_package is not None and plan.action in {SecPlanAction.REUSE_DATA, SecPlanAction.PARSE_LOCAL}:
+    if local_package is not None and plan.action in {
+        SecPlanAction.REUSE_DATA,
+        SecPlanAction.REVALIDATE_LOCAL,
+        SecPlanAction.PARSE_LOCAL,
+    }:
         from financial_filing_data_foundation.us_sec.acquisition import SecAcquisitionResult
 
         result = SecAcquisitionResult(
@@ -743,6 +783,35 @@ def _us_ingest(args: argparse.Namespace) -> int:
             ticker=result.candidate.ticker,
             period=args.period,
             parsed_artifact_dir=reusable[0].artifact_dir,
+            company_id=company.company_id,
+            ticker_source_url=getattr(company, "ticker_source_url", None),
+            ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
+            ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
+            discovery_observation=result.observation,
+        )
+    elif result.plan_action == SecPlanAction.REVALIDATE_LOCAL.value:
+        registry = SQLiteRegistry(paths.registry)
+        parsed_rows = registry.list_sec_parsed_data(
+            company_id=company.company_id,
+            fiscal_year=args.year,
+            period=args.period,
+        )
+        parsed = _compatible_sec_artifacts(
+            package=result.package,
+            parsed_rows=parsed_rows,
+            paths=paths,
+        )
+        if parsed is None:
+            raise SecError(
+                "P11_REUSE_ARTIFACT_INVALID",
+                "SEC planner selected REVALIDATE_LOCAL but no compatible parsed artifact could be loaded",
+            )
+        ingested = revalidate_sec_package(
+            result.package,
+            root=paths.root,
+            ticker=result.candidate.ticker,
+            period=args.period,
+            parsed_artifact_dir=parsed.artifact_dir,
             company_id=company.company_id,
             ticker_source_url=getattr(company, "ticker_source_url", None),
             ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
