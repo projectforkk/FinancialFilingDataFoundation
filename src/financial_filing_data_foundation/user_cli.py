@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import hashlib
 import json
 import os
 import sys
 import tempfile
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +48,13 @@ from financial_filing_data_foundation.us_sec.parser import (
 from financial_filing_data_foundation.us_sec.planner import SecPlan, SecPlanAction, plan_sec_slot
 from financial_filing_data_foundation.us_sec.registry import register_sec_package, register_sec_slot
 from financial_filing_data_foundation.us_sec.runtime import SecRuntimeDescriptor, SecSubprocessTransport
-from financial_filing_data_foundation.us_sec.ticker_map import parse_ticker_map, snapshot_ticker_map
+from financial_filing_data_foundation.us_sec.ticker_map import (
+    SEC_TICKER_MAP_URL,
+    TickerMapSnapshot,
+    normalize_retrieved_at,
+    parse_ticker_map,
+    snapshot_ticker_map,
+)
 from financial_filing_data_foundation.us_sec.validation import load_sec_validation, sec_validation_artifact_dir
 
 
@@ -367,6 +371,8 @@ def _common_payload(request: AcquisitionRequest) -> dict[str, Any]:
 
 
 def _persist_ticker_map_snapshot(root: Path, snapshot: Any) -> Path:
+    """Persist a legacy source-SHA snapshot for read-only compatibility tests."""
+
     directory = root / "workspace" / "ingest" / "us" / "ticker-map"
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{snapshot.source_sha256}.json"
@@ -383,71 +389,90 @@ def _persist_ticker_map_snapshot(root: Path, snapshot: Any) -> Path:
     return path
 
 
+def _persist_ticker_map_observation(root: Path, snapshot: TickerMapSnapshot) -> Path:
+    """Persist one immutable current ticker-map retrieval observation."""
+
+    snapshot.verify()
+    snapshot_id = snapshot.snapshot_id or snapshot.to_dict()["snapshot_id"]
+    if snapshot.snapshot_id is None:
+        snapshot = replace(snapshot, snapshot_id=str(snapshot_id))
+    directory = root / "workspace" / "ingest" / "us" / "ticker-map" / "observations"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{snapshot_id}.json"
+    payload = snapshot.to_dict()
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SecError(P11Reason.P11_SOURCE_DRIFT, f"SEC ticker observation is unreadable: {path.name}") from exc
+        if existing != payload:
+            raise SecError(P11Reason.P11_SOURCE_DRIFT, f"SEC ticker observation is immutable and differs: {path.name}")
+    else:
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+    return path
+
+
+def _load_cached_ticker_snapshot(path: Path, *, current: bool) -> TickerMapSnapshot:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, f"ticker snapshot is unreadable: {path.name}") from exc
+    try:
+        snapshot = TickerMapSnapshot.from_dict(payload)
+        if current:
+            if snapshot.snapshot_id is None or path.stem.lower() != snapshot.snapshot_id.lower():
+                raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, f"ticker observation path identity mismatch: {path.name}")
+        elif path.stem.lower() != snapshot.source_sha256.lower():
+            raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, f"legacy ticker snapshot filename mismatch: {path.name}")
+        snapshot.verify()
+    except SecError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise SecError(P11Reason.P11_TICKER_SNAPSHOT_INVALID, f"ticker snapshot is invalid: {path.name}") from exc
+    return snapshot
+
+
 def _cached_ticker_resolution(root: Path, ticker: str) -> tuple[str, dict[str, str | None]] | None:
     """Resolve a ticker from a previously persisted, byte-provenanced map."""
 
     normalized = ticker.strip().upper()
     directory = root / "workspace" / "ingest" / "us" / "ticker-map"
-    matches: list[tuple[str, dict[str, str | None]]] = []
     if not directory.is_dir():
         return None
+    candidates: list[TickerMapSnapshot] = []
+    observations = directory / "observations"
+    for path in sorted(observations.glob("*.json")) if observations.is_dir() else ():
+        candidates.append(_load_cached_ticker_snapshot(path, current=True))
     for path in sorted(directory.glob("*.json")):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            continue
-        source_sha256 = str(payload.get("source_sha256") or "").strip().lower()
-        source_bytes_b64 = payload.get("source_bytes_b64")
-        if not source_sha256 or not isinstance(source_bytes_b64, str):
-            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot metadata is incomplete: {path.name}")
-        try:
-            source_bytes = base64.b64decode(source_bytes_b64, validate=True)
-        except (ValueError, TypeError) as exc:
-            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot source bytes are invalid: {path.name}") from exc
-        if hashlib.sha256(source_bytes).hexdigest() != source_sha256:
-            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot source bytes hash mismatch: {path.name}")
-        try:
-            reparsed = parse_ticker_map(source_bytes)
-        except SecError as exc:
-            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot source bytes cannot be parsed: {path.name}") from exc
-        mapping = payload.get("mapping") if isinstance(payload, dict) else None
-        if not isinstance(reparsed, dict) or not isinstance(mapping, dict):
-            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot mapping is invalid: {path.name}")
-        persisted_mapping: dict[str, tuple[str, ...]] = {}
-        try:
-            for key, raw_values in mapping.items():
-                values = [raw_values] if isinstance(raw_values, str) else raw_values
-                if not isinstance(values, list):
-                    raise ValueError(key)
-                persisted_mapping[str(key).upper()] = tuple(sorted({normalize_cik(str(value)) for value in values}))
-        except (SecError, ValueError, TypeError) as exc:
-            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot derivative is invalid: {path.name}") from exc
-        if persisted_mapping != reparsed:
-            raise SecError("P11_TICKER_SNAPSHOT_INVALID", f"ticker snapshot derivative mismatch: {path.name}")
-        values = reparsed.get(normalized)
-        if values is None:
-            continue
-        ciks = sorted(set(values))
-        if len(ciks) > 1:
-            raise SecError("P11_TICKER_CIK_AMBIGUOUS", f"cached ticker maps to multiple CIKs: {normalized}")
-        if not ciks:
-            continue
-        matches.append(
-            (
-                ciks[0],
-                {
-                    "source_url": str(payload.get("source_url") or "").strip() or None,
-                    "source_sha256": source_sha256,
-                    "retrieved_at": str(payload.get("retrieved_at") or "").strip() or None,
-                },
-            )
-        )
-    if not matches:
+        candidates.append(_load_cached_ticker_snapshot(path, current=False))
+    if not candidates:
         return None
-    ciks = {cik for cik, _ in matches}
-    if len(ciks) != 1:
-        raise SecError("P11_TICKER_CIK_AMBIGUOUS", f"cached ticker maps to multiple CIKs: {normalized}")
-    return max(matches, key=lambda item: (item[1].get("retrieved_at") or "", item[1].get("source_sha256") or ""))
+    selected = max(
+        candidates,
+        key=lambda snapshot: (
+            datetime.fromisoformat(normalize_retrieved_at(snapshot.retrieved_at)),
+            (snapshot.snapshot_id or snapshot.source_sha256).lower(),
+        ),
+    )
+    values = selected.mapping.get(normalized)
+    if values is None:
+        return None
+    ciks = sorted(set(values))
+    if len(ciks) > 1:
+        raise SecError(P11Reason.P11_TICKER_CIK_AMBIGUOUS, f"cached ticker maps to multiple CIKs: {normalized}")
+    if not ciks:
+        return None
+    return (
+        ciks[0],
+        {
+            "source_url": selected.source_url,
+            "source_sha256": selected.source_sha256,
+            "retrieved_at": selected.retrieved_at,
+        },
+    )
 
 
 def _us_company_and_client(
@@ -484,16 +509,16 @@ def _us_company_and_client(
         transport=SecSubprocessTransport(runtime),
     )
     mapping_response = client.fetch(
-        "https://www.sec.gov/files/company_tickers.json",
+        SEC_TICKER_MAP_URL,
         expected_content_types=("application/json",),
         max_bytes=client.config.submissions_max_bytes,
     )
     cik = parse_ticker_map(mapping_response.body, ticker)
     snapshot = snapshot_ticker_map(
         mapping_response.body,
-        source_url="https://www.sec.gov/files/company_tickers.json",
+        source_url=SEC_TICKER_MAP_URL,
     )
-    _persist_ticker_map_snapshot(_project_root(), snapshot)
+    _persist_ticker_map_observation(_project_root(), snapshot)
     return sec_company(
         cik=cik,
         ticker=ticker,
