@@ -310,7 +310,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_ISSUE_147_REVIEW_PASS / FORMAL_TEST_PLAN_5_PENDING / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_FORMAL_ACCEPTANCE_REVIEW_5_NOT_PASSED / ISSUE_148_OPEN / DESIGN_CORRECTION_REQUIRED / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -330,7 +330,11 @@ P11 current design:
 - ISSUE-147 production candidate = `f1cc76889718e06fdbdc46926e2b207b740a96e3`;
 - ISSUE-147 evidence = `f859dc342060d8c534491639d85e7256c4e11a57`;
 - Review 8 = `development/207-p11-fresh-full-exact-candidate-review-8.md = REVIEW_PASS`;
-- next action = create and exact-review Formal Test Plan 5; formal execution remains unauthorized until that plan is frozen and separately authorized.
+- Formal Test Plan 5 = `development/208-p11-formal-test-plan-5.md`, SHA `4e20ca77889b9e2f35b470c99ee90c45c7853994`;
+- Formal Test 5 evidence = `development/210-p11-formal-test-evidence-5.md`, executor result `EXECUTION_PASS`;
+- Formal Acceptance Review 5 = `development/211-p11-formal-acceptance-review-5.md = NOT_PASSED`;
+- ISSUE-148 = `OPEN / BLOCKING / SEC ARCHIVE MEMBER DELIVERY-BYTE INSTABILITY`;
+- next action = design correction for ISSUE-148 plus correction of the Formal Test FT-02 evidence gap; development is unauthorized until a new exact design freeze and authorization.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；

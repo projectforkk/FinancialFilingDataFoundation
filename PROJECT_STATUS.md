@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_FORMAL_TEST_5_AUTHORIZED / CANDIDATE_F1CC7688 / PLAN_4E20CA77**
+**P11_FORMAL_ACCEPTANCE_REVIEW_5_NOT_PASSED / ISSUE_148_OPEN / DESIGN_CORRECTION_REQUIRED**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = ISSUE-147 REVIEW_PASS / FORMAL TEST PLAN 5 PASS / FORMAL EXECUTION AUTHORIZED`
+`P11 = FORMAL TEST 5 EXECUTION EVIDENCE PASS / FORMAL ACCEPTANCE NOT PASSED / ISSUE-148 OPEN`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -42,7 +42,11 @@ Current P11 design:
 - ISSUE-147 development evidence: `f859dc342060d8c534491639d85e7256c4e11a57`;
 - Review 8 exact-candidate result: `development/207-p11-fresh-full-exact-candidate-review-8.md = REVIEW_PASS`;
 - Formal Test Plan 5: `development/208-p11-formal-test-plan-5.md`, SHA `4e20ca77889b9e2f35b470c99ee90c45c7853994`, exact-plan review `PASS`;
-- Formal Test Execution 5 authorization: `development/209-p11-formal-test-execution-authorization-5.md`.
+- Formal Test Execution 5 authorization: `development/209-p11-formal-test-execution-authorization-5.md`;
+- Formal Test Execution 5 evidence: `development/210-p11-formal-test-evidence-5.md`, commit `134b09e51fc5194e5ec42768f0ac8de7c1e5aebe`, executor result `EXECUTION_PASS`;
+- Independent Formal Acceptance Review 5: `development/211-p11-formal-acceptance-review-5.md = NOT_PASSED`;
+- ISSUE-148 = `OPEN / BLOCKING / SEC ARCHIVE MEMBER DELIVERY-BYTE INSTABILITY`;
+- Formal evidence gap = `FT-02 DID NOT EXECUTE ALL PLAN-208 ISSUE-147 ACCEPTANCE-ONLY ASSERTIONS`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -737,7 +741,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `FORMAL TEST 5 AUTHORIZED / candidate f1cc7688 / plan 4e20ca77`
+- P11 — US SEC Provider: `FORMAL ACCEPTANCE 5 NOT PASSED / ISSUE-148 OPEN / candidate f1cc7688 historical pending redesign`
 
 
 ## P11 short execution workflow
