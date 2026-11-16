@@ -34,7 +34,7 @@ Current P11 design:
 - Formal Test Plan 4: `development/202-p11-formal-test-plan-4.md`, SHA `4d2ca9abd9ed60d5b4bee8f2f76a2568baa67030`, exact-plan review `PASS`;
 - Formal Test Execution 4 authorization: `development/203-p11-formal-test-execution-authorization-4.md`;
 - Formal Test Execution 4 result: `development/204-p11-formal-test-failure-review-4.md = EXECUTION_FAIL`;
-- ISSUE-147 = `OPEN / BLOCKING / TICKER SNAPSHOT OBSERVATION IDENTITY`;
+- ISSUE-147 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED / TICKER SNAPSHOT OBSERVATION IDENTITY`;
 - exact production candidate: `6eaace08c9ba5fb26809a7e02de5835123fb667a`;
 - development evidence: `5ce97e18456c9e877c223df7abf01eec53e1f3ad`.
 

@@ -310,7 +310,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_REVIEW_6_CHANGES_REQUIRED / DESIGN_38_FROZEN / DEVELOPMENT_AWAITING_AUTHORIZATION / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_FORMAL_TEST_4_EXECUTION_FAIL / DESIGN_39_FROZEN / DEVELOPMENT_AWAITING_AUTHORIZATION / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -321,7 +321,7 @@ P11 current design:
 - Design 36 review = `development/193-p11-design-freeze-review-result.md` / `DESIGN_FREEZE_CHANGES_REQUIRED`;
 - Design 37 final-freeze review = `development/194-p11-design37-final-freeze-review-result.md` / `CHANGES_REQUIRED`;
 - validation-v3 persistence review = `development/195-p11-validation-v3-persistence-design-review.md` / `CHANGES_REQUIRED`;
-- ISSUE-140 = `FIXED`; ISSUE-141 = `FIXED`; ISSUE-142 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`; ISSUE-143 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`; ISSUE-144 = `GOVERNANCE CORRECTED`; ISSUE-145 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
+- Review-5 historical repair scope = `ISSUE-140..145`; later candidates supersede that intermediate implementation state;
 - validation-v3 persistence storage = `FIXED IN CANDIDATE 35e2b70`;
 - Review 6 = `development/198-p11-fresh-full-exact-candidate-review-6.md` / `CHANGES_REQUIRED`;
 - ISSUE-140..146 = `FIXED / REGRESSION PRESERVATION`;
