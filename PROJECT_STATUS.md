@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_FORMAL_ACCEPTANCE_REVIEW_6_NOT_PASSED / EVIDENCE_REMEDIATION_REQUIRED / CANDIDATE_FROZEN**
+**P11_FORMAL_TEST_6A_PLAN_FROZEN / EVIDENCE_REMEDIATION / CANDIDATE_7AAC34E7_FROZEN**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = FORMAL TEST 6 EXECUTOR PASS / INDEPENDENT FORMAL ACCEPTANCE 6 NOT PASSED / EVIDENCE REMEDIATION REQUIRED`
+`P11 = FORMAL ACCEPTANCE 6 NOT PASSED / TARGETED FORMAL TEST 6A PLAN FROZEN / EXECUTION NOT YET AUTHORIZED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -56,7 +56,8 @@ Current P11 design:
 - Formal Test Execution 6 authorization: `development/217-p11-formal-test-execution-authorization-6.md`;
 - Formal Test Execution 6 evidence: `development/218-p11-formal-test-evidence-6.md`, commit `01f60a3568c703a988962badbb1f3c74dd84f112`, executor result `EXECUTION_PASS`;
 - Independent Formal Acceptance Review 6: `development/219-p11-formal-acceptance-review-6.md = NOT_PASSED / EVIDENCE_REMEDIATION_REQUIRED`;
-- candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen `REVIEW_PASS`; no new production defect established.
+- Formal Test 6A Plan: `development/220-p11-formal-test-plan-6a-evidence-remediation.md = FROZEN / AWAITING EXACT-PLAN REVIEW`;
+- candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen `REVIEW_PASS`; no production/test change is authorized.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -751,7 +752,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `FORMAL ACCEPTANCE 6 NOT PASSED / evidence remediation required / candidate 7aac34e7 remains frozen`
+- P11 — US SEC Provider: `FORMAL TEST 6A evidence-remediation plan frozen / candidate 7aac34e7 remains frozen`
 
 
 ## P11 short execution workflow
