@@ -314,7 +314,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_FORMAL_ACCEPTANCE_REVIEW_6_NOT_PASSED / EVIDENCE_REMEDIATION_REQUIRED / CANDIDATE_7AAC34E7_FROZEN / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_FORMAL_TEST_6A_AUTHORIZED / EVIDENCE_REMEDIATION / CANDIDATE_7AAC34E7_FROZEN / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -349,7 +349,9 @@ P11 current design:
 - Formal Test 6 evidence = `development/218-p11-formal-test-evidence-6.md`, commit `01f60a3568c703a988962badbb1f3c74dd84f112`, executor result `EXECUTION_PASS`;
 - Formal Acceptance Review 6 = `development/219-p11-formal-acceptance-review-6.md = NOT_PASSED / EVIDENCE_REMEDIATION_REQUIRED`;
 - candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen; no production/test repair is authorized;
-- next action = targeted Formal Test 6A evidence remediation for authority-SHA correctness and FT-19/FT-20 URL-level request classification.
+- Formal Test 6A Plan = `development/220-p11-formal-test-plan-6a-evidence-remediation.md`, SHA `abccc6618614e7f18be93d56eba952c4f28e30ca`, exact-plan review `PASS`;
+- Formal Test 6A Execution Authorization = `development/221-p11-formal-test-execution-authorization-6a.md`;
+- next action = Acceptance/Test Agent executes targeted 6A only, creates `development/222-p11-formal-test-evidence-6a.md`, then stops for ChatGPT Formal Acceptance Review 6 continuation.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
