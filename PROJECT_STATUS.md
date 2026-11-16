@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_FORMAL_TEST_6_AUTHORIZED / CANDIDATE_7AAC34E7 / PLAN_31CF1F04**
+**P11_FORMAL_ACCEPTANCE_REVIEW_6_NOT_PASSED / EVIDENCE_REMEDIATION_REQUIRED / CANDIDATE_FROZEN**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = ISSUE-148 REVIEW_PASS / FORMAL TEST PLAN 6 PASS / FORMAL EXECUTION AUTHORIZED`
+`P11 = FORMAL TEST 6 EXECUTOR PASS / INDEPENDENT FORMAL ACCEPTANCE 6 NOT PASSED / EVIDENCE REMEDIATION REQUIRED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -54,7 +54,9 @@ Current P11 design:
 - Review 9 exact-candidate result: `development/215-p11-fresh-full-exact-candidate-review-9.md = REVIEW_PASS`;
 - Formal Test Plan 6: `development/216-p11-formal-test-plan-6.md`, SHA `31cf1f04bb5ea56409e1e44230460d9b98060833`, exact-plan review `PASS`;
 - Formal Test Execution 6 authorization: `development/217-p11-formal-test-execution-authorization-6.md`;
-- prior Formal-Test-5 evidence gap remains a mandatory Formal Test 6 gate: `ISSUE-147 ACCEPTANCE-ONLY MATRIX`.
+- Formal Test Execution 6 evidence: `development/218-p11-formal-test-evidence-6.md`, commit `01f60a3568c703a988962badbb1f3c74dd84f112`, executor result `EXECUTION_PASS`;
+- Independent Formal Acceptance Review 6: `development/219-p11-formal-acceptance-review-6.md = NOT_PASSED / EVIDENCE_REMEDIATION_REQUIRED`;
+- candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen `REVIEW_PASS`; no new production defect established.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -749,7 +751,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `FORMAL TEST 6 AUTHORIZED / candidate 7aac34e7 / plan 31cf1f04`
+- P11 — US SEC Provider: `FORMAL ACCEPTANCE 6 NOT PASSED / evidence remediation required / candidate 7aac34e7 remains frozen`
 
 
 ## P11 short execution workflow
