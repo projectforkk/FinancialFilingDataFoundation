@@ -330,16 +330,17 @@ P11 current design:
 - Review 6 = `development/198-p11-fresh-full-exact-candidate-review-6.md` / `CHANGES_REQUIRED`;
 - ISSUE-140..146 = `FIXED / REGRESSION PRESERVATION`;
 - Formal Test 4 = `EXECUTION_FAIL`;
-- ISSUE-147 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
+- ISSUE-147 = `FIXED / REGRESSION PRESERVATION`;
 - ISSUE-147 production candidate = `f1cc76889718e06fdbdc46926e2b207b740a96e3`;
 - ISSUE-147 evidence = `f859dc342060d8c534491639d85e7256c4e11a57`;
 - Review 8 = `development/207-p11-fresh-full-exact-candidate-review-8.md = REVIEW_PASS`;
 - Formal Test Plan 5 = `development/208-p11-formal-test-plan-5.md`, SHA `4e20ca77889b9e2f35b470c99ee90c45c7853994`;
 - Formal Test 5 evidence = `development/210-p11-formal-test-evidence-5.md`, executor result `EXECUTION_PASS`;
 - Formal Acceptance Review 5 = `development/211-p11-formal-acceptance-review-5.md = NOT_PASSED`;
-- ISSUE-148 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED / COMPLETE-SUBMISSION AUTHORITATIVE SOURCE`;
-- exact Design 40 freeze = current design-freeze commit;
-- next action = ChatGPT exact review of Design 40 freeze; development remains unauthorized until explicit authorization.
+- ISSUE-148 = `DESIGN_FREEZE_PASS / IMPLEMENTATION REQUIRED / COMPLETE-SUBMISSION AUTHORITATIVE SOURCE`;
+- exact Design 40 freeze = `db8edabb2630549e2d75a5becaccb15cb1c53749`;
+- Design 40 freeze review = `development/212-p11-design40-freeze-review-result.md = DESIGN_FREEZE_PASS`;
+- next action = explicit ISSUE-148 development authorization; development remains unauthorized in this review commit.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；

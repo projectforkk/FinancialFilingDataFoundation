@@ -27,7 +27,7 @@ Current P11 design:
 - prior development authorization: `development/196-p11-review5-development-authorization.md`;
 - Review 6: `development/198-p11-fresh-full-exact-candidate-review-6.md = CHANGES_REQUIRED`;
 - ISSUE-140..146 = `FIXED / REGRESSION PRESERVATION`;
-- ISSUE-147 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
+- ISSUE-147 = `FIXED / REGRESSION PRESERVATION`;
 - exact Design 38 freeze: `92af6205eb8e090994dcece68850eddcd4232392 = DESIGN_FREEZE_PASS`;
 - development reauthorization: `development/199-p11-review6-development-reauthorization.md`;
 - Review 7 exact-candidate result: `development/201-p11-fresh-full-exact-candidate-review-7.md = REVIEW_PASS`;
@@ -45,7 +45,9 @@ Current P11 design:
 - Formal Test Execution 5 authorization: `development/209-p11-formal-test-execution-authorization-5.md`;
 - Formal Test Execution 5 evidence: `development/210-p11-formal-test-evidence-5.md`, commit `134b09e51fc5194e5ec42768f0ac8de7c1e5aebe`, executor result `EXECUTION_PASS`;
 - Independent Formal Acceptance Review 5: `development/211-p11-formal-acceptance-review-5.md = NOT_PASSED`;
-- ISSUE-148 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED / COMPLETE-SUBMISSION AUTHORITATIVE SOURCE`;
+- ISSUE-148 = `DESIGN_FREEZE_PASS / IMPLEMENTATION REQUIRED / COMPLETE-SUBMISSION AUTHORITATIVE SOURCE`;
+- exact Design 40 freeze: `db8edabb2630549e2d75a5becaccb15cb1c53749 = DESIGN_FREEZE_PASS`;
+- Design 40 freeze review: `development/212-p11-design40-freeze-review-result.md = DESIGN_FREEZE_PASS`;
 - Formal evidence gap = `FT-02 DID NOT EXECUTE ALL PLAN-208 ISSUE-147 ACCEPTANCE-ONLY ASSERTIONS`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
@@ -741,7 +743,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `FORMAL ACCEPTANCE 5 NOT PASSED / DESIGN 40 FROZEN / development awaiting authorization`
+- P11 — US SEC Provider: `FORMAL ACCEPTANCE 5 NOT PASSED / DESIGN 40 FREEZE PASS / development awaiting authorization`
 
 
 ## P11 short execution workflow
