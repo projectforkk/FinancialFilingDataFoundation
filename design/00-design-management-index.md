@@ -314,7 +314,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_ISSUE_148_REVIEW_PASS / FORMAL_TEST_PLAN_6_PENDING / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_FORMAL_TEST_6_AUTHORIZED / CANDIDATE_7AAC34E7 / PLAN_31CF1F04 / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -344,7 +344,9 @@ P11 current design:
 - ISSUE-148 production candidate = `7aac34e763b4c9caac24489eb049aa3dc6efb026`;
 - ISSUE-148 evidence = `2c68f85199e6e77dc30c37e5e6eb5515b5bd6fe2`;
 - Review 9 = `development/215-p11-fresh-full-exact-candidate-review-9.md = REVIEW_PASS`;
-- next action = create and exact-review Formal Test Plan 6; formal execution remains unauthorized until a separate execution authorization.
+- Formal Test Plan 6 = `development/216-p11-formal-test-plan-6.md`, SHA `31cf1f04bb5ea56409e1e44230460d9b98060833`, exact-plan review `PASS`;
+- Formal Test Execution 6 authorization = `development/217-p11-formal-test-execution-authorization-6.md`;
+- next action = Acceptance/Test Agent executes Formal Test Plan 6 and creates only `development/218-p11-formal-test-evidence-6.md`, then stops for ChatGPT Independent Formal Acceptance Review 6.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
