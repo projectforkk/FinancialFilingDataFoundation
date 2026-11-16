@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_FORMAL_TEST_4_AUTHORIZED / CANDIDATE_6EAACE08 / PLAN_4D2CA9AB**
+**P11_FORMAL_TEST_4_EXECUTION_FAIL / ISSUE_147_OPEN / NEW DESIGN REQUIRED**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = REVIEW_PASS / FORMAL TEST PLAN 4 PASS / FORMAL EXECUTION AUTHORIZED`
+`P11 = FORMAL TEST 4 EXECUTION_FAIL / ACCEPTANCE NOT PASSED / ISSUE-147 OPEN`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -32,6 +32,8 @@ Current P11 design:
 - Review 7 exact-candidate result: `development/201-p11-fresh-full-exact-candidate-review-7.md = REVIEW_PASS`;
 - Formal Test Plan 4: `development/202-p11-formal-test-plan-4.md`, SHA `4d2ca9abd9ed60d5b4bee8f2f76a2568baa67030`, exact-plan review `PASS`;
 - Formal Test Execution 4 authorization: `development/203-p11-formal-test-execution-authorization-4.md`;
+- Formal Test Execution 4 result: `development/204-p11-formal-test-failure-review-4.md = EXECUTION_FAIL`;
+- ISSUE-147 = `OPEN / BLOCKING / TICKER SNAPSHOT OBSERVATION IDENTITY`;
 - exact production candidate: `6eaace08c9ba5fb26809a7e02de5835123fb667a`;
 - development evidence: `5ce97e18456c9e877c223df7abf01eec53e1f3ad`.
 
@@ -728,7 +730,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `FORMAL TEST 4 AUTHORIZED / candidate 6eaace08 / plan 4d2ca9ab`
+- P11 — US SEC Provider: `FORMAL TEST 4 EXECUTION_FAIL / ISSUE-147 OPEN / candidate 6eaace08 historical`
 
 
 ## P11 short execution workflow
