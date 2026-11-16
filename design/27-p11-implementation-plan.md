@@ -263,9 +263,11 @@ Required behavior:
 ## 4.10 Review 5 — Design 37 final design freeze
 
 Design 36 is the Review 5 trust-boundary correction that established the
-ISSUE-142/143 residual contract. Design 37 is the latest/current design
-authority and supersedes Design 36 where Design 37 adds or corrects Review 5
-freeze semantics. The current implementation must follow Design 37.
+ISSUE-142/143 residual contract. Within the Review-5 ISSUE-142/143/145 scope,
+Design 37 remains the controlling correction and supersedes Design 36 where
+Design 37 adds or corrects those freeze semantics. Current implementation must
+preserve Design 37 except where a later design explicitly adds a stronger
+cross-cutting requirement.
 
 The exact-candidate Review 5 result is `CHANGES_REQUIRED`. The Design 37
 final-freeze review is recorded in
@@ -460,7 +462,7 @@ call sites do not independently hard-code the legacy flat validation path.
 
 ## 4.12 Review 6 — validation-only planner correction
 
-Design 38 is the latest/current authority for validation-v3 migration planning.
+Within the ISSUE-146 validation-revalidation scope, Design 38 remains the controlling historical correction. Design 40 supersedes current reuse eligibility only where source provenance and validation-v4 are now required.
 
 After fresh current discovery:
 
@@ -491,7 +493,7 @@ Required development tests are frozen by Design 38.
 
 ## 4.13 Formal-Test-4 correction — ticker snapshot observation identity
 
-Design 39 is the latest/current authority for ticker-map persistence.
+Within the ISSUE-147 ticker-map persistence scope, Design 39 remains the controlling correction. Design 40 does not change ticker snapshot identity.
 
 The implementation must distinguish:
 
