@@ -314,7 +314,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_FORMAL_TEST_6A_AUTHORIZED / EVIDENCE_REMEDIATION / CANDIDATE_7AAC34E7_FROZEN / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_FORMAL_ACCEPTANCE_PASS / CANDIDATE_7AAC34E7 / MAIN_MERGE_PENDING / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -351,7 +351,9 @@ P11 current design:
 - candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen; no production/test repair is authorized;
 - Formal Test 6A Plan = `development/220-p11-formal-test-plan-6a-evidence-remediation.md`, SHA `abccc6618614e7f18be93d56eba952c4f28e30ca`, exact-plan review `PASS`;
 - Formal Test 6A Execution Authorization = `development/221-p11-formal-test-execution-authorization-6a.md`;
-- next action = Acceptance/Test Agent executes targeted 6A only, creates `development/222-p11-formal-test-evidence-6a.md`, then stops for ChatGPT Formal Acceptance Review 6 continuation.
+- Formal Test 6A Evidence = `development/222-p11-formal-test-evidence-6a.md`, commit `12700179754ffa9aa6d9c88d72d8bf3e56274ee6`, result `EXECUTION_PASS`;
+- Formal Acceptance Review 6 continuation = `development/223-p11-formal-acceptance-review-6-continuation.md = ACCEPTANCE_PASS`;
+- next action = separate exact main-merge readiness review and authorization; P11 is not DONE until the authorized main merge and closeout are independently recorded.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
