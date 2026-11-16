@@ -314,7 +314,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_ISSUE_148_DEVELOPMENT_AUTHORIZED / DESIGN_40_DB8EDABB / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_ISSUE_148_REVIEW_PASS / FORMAL_TEST_PLAN_6_PENDING / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -341,7 +341,10 @@ P11 current design:
 - exact Design 40 freeze = `db8edabb2630549e2d75a5becaccb15cb1c53749`;
 - Design 40 freeze review = `development/212-p11-design40-freeze-review-result.md = DESIGN_FREEZE_PASS`;
 - development authorization = `development/213-p11-issue148-development-authorization.md`;
-- next action = Development Agent implements Design 40, creates one exact candidate plus separate evidence, then stops for ChatGPT Fresh Full Exact-Candidate Review.
+- ISSUE-148 production candidate = `7aac34e763b4c9caac24489eb049aa3dc6efb026`;
+- ISSUE-148 evidence = `2c68f85199e6e77dc30c37e5e6eb5515b5bd6fe2`;
+- Review 9 = `development/215-p11-fresh-full-exact-candidate-review-9.md = REVIEW_PASS`;
+- next action = create and exact-review Formal Test Plan 6; formal execution remains unauthorized until a separate execution authorization.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；

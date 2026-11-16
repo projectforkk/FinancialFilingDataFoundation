@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_ISSUE_148_DEVELOPMENT_AUTHORIZED / DESIGN40_DB8EDABB**
+**P11_ISSUE_148_REVIEW_PASS / FORMAL_TEST_PLAN_6_PENDING**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = FORMAL ACCEPTANCE 5 NOT PASSED / ISSUE-148 DEVELOPMENT AUTHORIZED`
+`P11 = ISSUE-148 FRESH FULL EXACT-CANDIDATE REVIEW PASS / FORMAL TEST PLAN 6 PENDING`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -34,7 +34,7 @@ Current P11 design:
 - Formal Test Plan 4: `development/202-p11-formal-test-plan-4.md`, SHA `4d2ca9abd9ed60d5b4bee8f2f76a2568baa67030`, exact-plan review `PASS`;
 - Formal Test Execution 4 authorization: `development/203-p11-formal-test-execution-authorization-4.md`;
 - Formal Test Execution 4 result: `development/204-p11-formal-test-failure-review-4.md = EXECUTION_FAIL`;
-- ISSUE-147 = `DEVELOPMENT AUTHORIZED / TICKER SNAPSHOT OBSERVATION IDENTITY`;
+- ISSUE-147 historical repair cycle = `CLOSED / FIXED / REGRESSION PRESERVATION`;
 - exact Design 39 freeze: `fad6ee7512ec1f2f3da0c9a24c646959b2f45541 = DESIGN_FREEZE_PASS`;
 - development authorization: `development/205-p11-issue147-development-authorization.md`;
 - prior failed-formal production candidate: `6eaace08c9ba5fb26809a7e02de5835123fb667a`;
@@ -49,7 +49,10 @@ Current P11 design:
 - exact Design 40 freeze: `db8edabb2630549e2d75a5becaccb15cb1c53749 = DESIGN_FREEZE_PASS`;
 - Design 40 freeze review: `development/212-p11-design40-freeze-review-result.md = DESIGN_FREEZE_PASS`;
 - ISSUE-148 development authorization: `development/213-p11-issue148-development-authorization.md`;
-- Formal evidence gap = `FT-02 DID NOT EXECUTE ALL PLAN-208 ISSUE-147 ACCEPTANCE-ONLY ASSERTIONS`.
+- ISSUE-148 production candidate: `7aac34e763b4c9caac24489eb049aa3dc6efb026`;
+- ISSUE-148 development evidence: `2c68f85199e6e77dc30c37e5e6eb5515b5bd6fe2`;
+- Review 9 exact-candidate result: `development/215-p11-fresh-full-exact-candidate-review-9.md = REVIEW_PASS`;
+- prior Formal-Test-5 evidence gap remains a mandatory Formal Test 6 gate: `ISSUE-147 ACCEPTANCE-ONLY MATRIX`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -744,7 +747,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-148 DEVELOPMENT AUTHORIZED / Design 40 db8edabb`
+- P11 — US SEC Provider: `ISSUE-148 REVIEW_PASS / Formal Test Plan 6 pending / candidate 7aac34e7`
 
 
 ## P11 short execution workflow
