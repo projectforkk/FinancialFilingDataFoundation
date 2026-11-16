@@ -6,17 +6,17 @@
 
 ## Current state
 
-**P11_FORMAL_TEST_4_EXECUTION_FAIL / ISSUE_147_OPEN / NEW DESIGN REQUIRED**
+**P11_FORMAL_TEST_4_EXECUTION_FAIL / DESIGN_39_FROZEN / DEVELOPMENT_AWAITING_AUTHORIZATION**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = FORMAL TEST 4 EXECUTION_FAIL / ACCEPTANCE NOT PASSED / ISSUE-147 OPEN`
+`P11 = FORMAL TEST 4 EXECUTION_FAIL / ISSUE-147 DESIGN FROZEN / DEVELOPMENT NOT YET AUTHORIZED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
-- detailed design authority chain: `design/26-p11-sec-provider-design.md` + `design/32-p11-us-scope-reopening.md` + `design/33-p11-post-acceptance-design-correction.md` + `design/34-p11-explicit-6k-scope-correction.md` + `design/35-p11-repair-140-143-design-correction.md` + `design/36-p11-review5-trust-boundary-correction.md` + `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md` + `design/38-p11-review6-revalidation-planner-correction.md`;
+- detailed design authority chain: `design/26-p11-sec-provider-design.md` + `design/32-p11-us-scope-reopening.md` + `design/33-p11-post-acceptance-design-correction.md` + `design/34-p11-explicit-6k-scope-correction.md` + `design/35-p11-repair-140-143-design-correction.md` + `design/36-p11-review5-trust-boundary-correction.md` + `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md` + `design/38-p11-review6-revalidation-planner-correction.md` + `design/39-p11-ticker-snapshot-observation-identity.md`;
 - implementation plan: `design/27-p11-implementation-plan.md`;
 - authorization: `development/147-p11-us-scope-reopening-authorization.md`.
 - Review 5: `development/192-p11-fresh-full-exact-candidate-review-5.md = CHANGES_REQUIRED`;
@@ -26,7 +26,8 @@ Current P11 design:
 - prior Design 37 freeze: `70353788d0b6188e757e24b10b0883b0a9a057dd`;
 - prior development authorization: `development/196-p11-review5-development-authorization.md`;
 - Review 6: `development/198-p11-fresh-full-exact-candidate-review-6.md = CHANGES_REQUIRED`;
-- ISSUE-140/141 = `FIXED`; ISSUE-142 = `FIXED`; ISSUE-143 = `FIXED`; ISSUE-144 = `GOVERNANCE CORRECTED`; ISSUE-145 = `FIXED`; ISSUE-146 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
+- ISSUE-140..146 = `FIXED / REGRESSION PRESERVATION`;
+- ISSUE-147 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
 - exact Design 38 freeze: `92af6205eb8e090994dcece68850eddcd4232392 = DESIGN_FREEZE_PASS`;
 - development reauthorization: `development/199-p11-review6-development-reauthorization.md`;
 - Review 7 exact-candidate result: `development/201-p11-fresh-full-exact-candidate-review-7.md = REVIEW_PASS`;
@@ -730,7 +731,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `FORMAL TEST 4 EXECUTION_FAIL / ISSUE-147 OPEN / candidate 6eaace08 historical`
+- P11 — US SEC Provider: `FORMAL TEST 4 EXECUTION_FAIL / DESIGN 39 FROZEN / development awaiting authorization`
 
 
 ## P11 short execution workflow

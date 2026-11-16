@@ -1,6 +1,6 @@
 # 27 — P11 US SEC Provider Implementation Plan
 
-Status: **DESIGN 38 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
+Status: **DESIGN 39 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
 
 Detailed design:
 `design/26-p11-sec-provider-design.md`
@@ -25,6 +25,9 @@ Review 5 freeze consistency and Raw Fact binding correction:
 
 Review 6 revalidation planner correction:
 `design/38-p11-review6-revalidation-planner-correction.md`
+
+Formal-Test-4 ticker snapshot observation identity correction:
+`design/39-p11-ticker-snapshot-observation-identity.md`
 
 Review 5 exact-candidate result:
 `development/192-p11-fresh-full-exact-candidate-review-5.md = CHANGES_REQUIRED`
@@ -78,23 +81,21 @@ PC Agent must:
 
 PC Agent must not alter the corrected design contract without a STOP/design issue.
 
-The current Review 6 development cycle is limited to:
+The current post-Formal-Test-4 development cycle is limited to:
 
 ```text
-ISSUE-146 implementation
+ISSUE-147 implementation
 ```
 
-ISSUE-146 is the validation-v3 revalidation-planner correction frozen by Design
-38. The implementation adds `REVALIDATE_LOCAL` so a compatible V6/v2 parsed
-artifact can be revalidated under v3 without parser rerun.
+ISSUE-147 is the ticker-map source/observation identity correction frozen by
+Design 39.
 
-`ISSUE-140`, `ISSUE-141`, `ISSUE-142`, `ISSUE-143`, and `ISSUE-145` are
-already fixed and require regression preservation only. `ISSUE-144` is a
-governance correction and has no production implementation scope. Historical
-ISSUE-123..139 remain historical and must not be erased or silently reopened.
+`ISSUE-140` through `ISSUE-146` are fixed and require regression
+preservation only. Historical ISSUE-123..139 remain historical and must not be
+erased or silently reopened.
 
-This Review 6 correction does not create a new parser, artifact, discovery,
-validation, or Registry schema version.
+This correction does not create a new package, parser, artifact, discovery,
+validation, or Registry schema version and does not add a new reason code.
 
 ### 2.2 ChatGPT
 
@@ -125,13 +126,14 @@ Before repair code changes, freeze the exact commit containing:
 - `design/35-p11-repair-140-143-design-correction.md`;
 - `design/36-p11-review5-trust-boundary-correction.md`;
 - `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md`;
-- `design/38-p11-review6-revalidation-planner-correction.md`.
+- `design/38-p11-review6-revalidation-planner-correction.md`;
+- `design/39-p11-ticker-snapshot-observation-identity.md`.
 
 Record:
 
 ```text
 corrected_design_baseline_sha = exact final design-freeze commit returned by this task
-previous_production_candidate_sha = 35e2b70c78b6cff931c8484dc38f2eb7349735f5
+previous_production_candidate_sha = 6eaace08c9ba5fb26809a7e02de5835123fb667a
 starting_branch
 starting_head
 ```
@@ -476,6 +478,30 @@ v2 or be silently overwritten as migration.
 without invoking the parser and must refresh current Registry validation fields.
 
 Required development tests are frozen by Design 38.
+
+## 4.13 Formal-Test-4 correction — ticker snapshot observation identity
+
+Design 39 is the latest/current authority for ticker-map persistence.
+
+The implementation must distinguish:
+
+```text
+source identity
+!=
+retrieval observation identity
+```
+
+New online snapshots use
+`ticker-map/observations/<ticker_snapshot_id>.json`; legacy
+`ticker-map/<source_sha>.json` files remain read-only compatibility evidence.
+
+Repeated identical source bytes at different retrieval times are valid separate
+observations and must not raise `P11_SOURCE_DRIFT`.
+
+Local-only cached ticker resolution must use the newest verified snapshot only,
+not combine mappings across historical snapshots.
+
+Required development tests are frozen by Design 39.
 
 ## 6. Candidate commit rules
 
