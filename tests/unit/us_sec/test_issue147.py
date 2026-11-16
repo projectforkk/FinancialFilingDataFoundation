@@ -8,7 +8,7 @@ import pytest
 
 from financial_filing_data_foundation.us_sec.errors import P11Reason, SecError
 from financial_filing_data_foundation.us_sec.http import SecHttpConfig, SecResponse
-from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url, complete_submission_url
 from financial_filing_data_foundation.us_sec.ticker_map import (
     TickerMapSnapshot,
     snapshot_ticker_map,
@@ -29,6 +29,7 @@ ACCESSION = "0000320193-25-000079"
 SUBMISSIONS_URL = f"https://data.sec.gov/submissions/CIK{CIK}.json"
 INDEX_URL = archive_member_url(CIK, ACCESSION, "index.json")
 PRIMARY_URL = archive_member_url(CIK, ACCESSION, "annual.htm")
+COMPLETE_URL = complete_submission_url(CIK, ACCESSION)
 
 
 def _ticker_map(*rows: tuple[str, int]) -> bytes:
@@ -73,8 +74,17 @@ def _primary_html() -> bytes:
         "<xbrli:unit id='USD'><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
         "</ix:header><h1>Annual</h1><p>Revenue: "
         "<ix:nonfraction name='us-gaap:Revenues' contextRef='c1' unitRef='USD' decimals='0'>100</ix:nonfraction>"
-        "</p></body></html>"
+        "</p></body></html>\r\n"
     ).encode("utf-8")
+
+
+def _complete_submission() -> bytes:
+    return (
+        f"<SEC-DOCUMENT>{ACCESSION}.txt : 20251101\r\n"
+        "<DOCUMENT>\r\n<TYPE>10-K\r\n<SEQUENCE>1\r\n<FILENAME>annual.htm\r\n<TEXT>\r\n".encode()
+        + _primary_html()
+        + b"</TEXT>\r\n</DOCUMENT>\r\n</SEC-DOCUMENT>\r\n"
+    )
 
 
 def _args(command: str = "acquire", *, ticker: str = "AAPL") -> object:
@@ -160,15 +170,8 @@ def test_t147_02_repeat_online_discovery_continues_after_ticker_persistence(
                 return SecResponse(200, {"Content-Type": "application/json"}, body, url)
             if url == SUBMISSIONS_URL:
                 return SecResponse(200, {"Content-Type": "application/json"}, _submissions(), url)
-            if url == INDEX_URL:
-                return SecResponse(
-                    200,
-                    {"Content-Type": "application/json"},
-                    json.dumps({"directory": {"item": [{"name": "annual.htm"}]}}).encode(),
-                    url,
-                )
-            if url == PRIMARY_URL:
-                return SecResponse(200, {"Content-Type": "text/html"}, _primary_html(), url)
+            if url == COMPLETE_URL:
+                return SecResponse(200, {"Content-Type": "text/plain"}, _complete_submission(), url)
             raise AssertionError(url)
 
     monkeypatch.setattr(

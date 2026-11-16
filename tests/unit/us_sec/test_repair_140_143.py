@@ -35,7 +35,15 @@ from financial_filing_data_foundation.us_sec.parser import (
     VIRTUAL_HTML_NORMALIZER_VERSION,
     parse_sec_package,
 )
-from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url, complete_submission_url
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
 from financial_filing_data_foundation.registry import SQLiteRegistry
 from financial_filing_data_foundation.us_sec.registry import register_sec_package, register_sec_parsed_run
@@ -136,7 +144,7 @@ def _inline_html(*, value: str = "100", fact_name: str = "us-gaap:Revenues") -> 
         "<xbrli:unit id='USD'><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
         "</ix:header><h1>Annual</h1><p>Revenue: "
         f"<ix:nonfraction name='{fact_name}' contextRef='c1' unitRef='USD'>{value}</ix:nonfraction>"
-        "</p></body></html>"
+        "</p></body></html>\r\n"
     ).encode("utf-8")
 
 
@@ -145,7 +153,7 @@ def _instance_xml(*, value: str = "42", namespace: str = "http://www.xbrl.org/20
         return (
             f"<xbrl xmlns='{namespace}'><context id='c1'/><ex:Revenue "
             "xmlns:ex='http://example.test/ex' contextRef='c1'>1</ex:Revenue></xbrl>"
-        ).encode("utf-8")
+        ).encode("utf-8") + b"\r\n"
     return (
         b"<xbrli:xbrl xmlns:xbrli='http://www.xbrl.org/2003/instance' "
         b"xmlns:ex='http://example.test/ex'>"
@@ -154,7 +162,7 @@ def _instance_xml(*, value: str = "42", namespace: str = "http://www.xbrl.org/20
         b"</xbrli:period></xbrli:context>"
         b"<xbrli:unit id='USD'><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
         + f"<ex:Revenue contextRef='c1' unitRef='USD'>{value}</ex:Revenue>".encode()
-        + b"</xbrli:xbrl>"
+        + b"</xbrli:xbrl>\r\n"
     )
 
 
@@ -179,7 +187,13 @@ def _package(
         period="FY",
         filing_date="2025-11-01",
         report_period="2025-09-27",
-        members=(primary, *extra_members),
+        members=tuple(
+            replace(
+                member,
+                body=member.body if member.body.endswith((b"\r\n", b"\n")) else member.body + b"\r\n",
+            )
+            for member in (primary, *extra_members)
+        ),
     )
 
 
@@ -189,14 +203,60 @@ def _other_html(accession: str, name: str = "other.htm") -> SecPackageMember:
         role=SecMemberRole.OTHER,
         content_type="text/html",
         source_url=archive_member_url(CIK, accession, name),
-        body=b"<html><body><p>other</p></body></html>",
+        body=b"<html><body><p>other</p></body></html>\r\n",
+    )
+
+
+def _source_attestation(package: object) -> tuple[SecSourceContainer, SecPackageSourceProvenance]:
+    rows = [f"<SEC-DOCUMENT>{package.accession}.txt : 20251101\r\n".encode()]
+    for index, member in enumerate(package.canonical_members(), start=1):
+        if member.role is SecMemberRole.PRIMARY_DOCUMENT:
+            document_type = package.form
+        elif member.role is SecMemberRole.XBRL_INSTANCE:
+            document_type = "EX-101.INS"
+        elif member.role is SecMemberRole.XBRL_SCHEMA:
+            document_type = "EX-101.SCH"
+        else:
+            document_type = "EX-99"
+        if member.content_type == "application/xml":
+            payload = b"<XML>\r\n" + member.body + b"</XML>\r\n"
+        else:
+            payload = member.body
+        rows.extend(
+            [
+                b"<DOCUMENT>\r\n",
+                f"<TYPE>{document_type}\r\n".encode(),
+                f"<SEQUENCE>{index}\r\n".encode(),
+                f"<FILENAME>{member.relative_name}\r\n".encode(),
+                b"<TEXT>\r\n",
+                payload,
+                b"</TEXT>\r\n</DOCUMENT>\r\n",
+            ]
+        )
+    rows.append(b"</SEC-DOCUMENT>\r\n")
+    body = b"".join(rows)
+    container = SecSourceContainer.from_bytes(
+        body,
+        cik=package.cik,
+        accession=package.accession,
+        source_url=complete_submission_url(package.cik, package.accession),
+    )
+    return container, build_package_source_provenance(
+        package,
+        container,
+        parse_sec_submission(body, cik=package.cik, accession=package.accession),
     )
 
 
 def _validate(parsed: object, package: object, observation: SecDiscoveryObservation, root: Path):
+    validation_root = root.parent / "workspace" / "ingest" / "us" / "p7"
+    raw_store = root.parent / "workspace" / "ingest" / "raw-store"
+    container, provenance = _source_attestation(package)
+    SecSourceContainerStore(raw_store).put(container)
+    SecPackageSourceProvenanceStore(raw_store).put(provenance)
     return validate_sec_artifacts(
         parsed,
-        root,
+        validation_root,
         package=package,
         discovery_observation=observation,
     )
@@ -250,12 +310,19 @@ def test_t140_01_v5_v2_is_incompatible_and_v6_reparses_without_mutating_legacy(
 
     store = SecPackageStore(tmp_path / "raw")
     store.put(package)
-    client = _DiscoveryClient({MAIN_URL: _payload([_row(primary_document="primary.htm")])})
+    source_container, _ = _source_attestation(package)
+    complete_url = complete_submission_url(CIK, ACCESSION)
+    client = _DiscoveryClient(
+        {
+            MAIN_URL: _payload([_row(primary_document="primary.htm")]),
+            complete_url: source_container.body,
+        }
+    )
     acquired = SecAcquirer(client, store, discovery_root=tmp_path / "discovery")
     reused = acquired.acquire(_company(), fiscal_year=2025, period="FY")
     assert reused.reused is True
-    assert reused.plan_action == "PARSE_LOCAL"
-    assert client.calls == [MAIN_URL]
+    assert reused.plan_action == "DISCOVER_AND_ACQUIRE"
+    assert client.calls == [MAIN_URL, complete_url]
 
 
 def test_t140_02_legacy_v5_v2_registry_row_cannot_select_reuse_data(tmp_path: Path) -> None:
@@ -490,7 +557,8 @@ class _DiscoveryClient:
 
     def fetch(self, url: str, **_: object) -> SecResponse:
         self.calls.append(url)
-        return SecResponse(200, {"Content-Type": "application/json"}, self.bodies[url], url)
+        content_type = "application/json" if url.startswith("https://data.sec.gov/") else "text/plain"
+        return SecResponse(200, {"Content-Type": content_type}, self.bodies[url], url)
 
 
 def test_t142_03_to_05_and_t142_10_online_source_set_matches_verifier(tmp_path: Path) -> None:

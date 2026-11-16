@@ -53,15 +53,15 @@ def _acquirer_for_error_path(
 ) -> tuple[SecAcquirer, object]:
     submissions_url = "https://data.sec.gov/submissions/CIK0000320193.json"
     history_url = "https://data.sec.gov/submissions/CIK0000320193-2024.json"
-    index_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/index.json"
+    complete_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/0000320193-25-000001.txt"
 
     def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
         if url == submissions_url:
             return SecResponse(200, {"Content-Type": "application/json"}, submissions_body, url)
         if url == history_url and history_body is not None:
             return SecResponse(200, {"Content-Type": "application/json"}, history_body, url)
-        if url == index_url:
-            return SecResponse(200, {"Content-Type": "application/json"}, archive_body, url)
+        if url == complete_url:
+            return SecResponse(200, {"Content-Type": "text/plain"}, archive_body, url)
         raise AssertionError(url)
 
     client = SecHttpClient(
@@ -90,7 +90,7 @@ def _acquirer_for_error_path(
         pytest.param(b"not-json", id="archive-json-invalid"),
     ],
 )
-def test_sec_acquirer_malformed_archive_index_raises_discovery_error(
+def test_sec_acquirer_malformed_complete_submission_fails_closed(
     tmp_path: Path, archive_body: bytes
 ) -> None:
     acquirer, company = _acquirer_for_error_path(
@@ -102,7 +102,7 @@ def test_sec_acquirer_malformed_archive_index_raises_discovery_error(
     with pytest.raises(SecError) as exc_info:
         acquirer.acquire(company, fiscal_year=2025, period="Q2")
 
-    assert exc_info.value.reason_code == P11Reason.P11_SEC_DISCOVERY_FAILED.value
+    assert exc_info.value.reason_code == P11Reason.P11_PACKAGE_INVALID.value
 
 
 def test_sec_acquirer_invalid_main_submissions_json_raises_discovery_error(
@@ -157,9 +157,7 @@ def test_sec_acquirer_invalid_historical_submissions_json_raises_discovery_error
 
 def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path: Path) -> None:
     submissions_url = "https://data.sec.gov/submissions/CIK0000320193.json"
-    index_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/index.json"
-    primary_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/example.htm"
-    schema_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/example.xsd"
+    complete_url = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/0000320193-25-000001.txt"
     calls: list[str] = []
     submissions = {
         "cik": "0000320193",
@@ -178,18 +176,22 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
             }
         },
     }
-    index = {"directory": {"item": [{"name": "example.htm"}, {"name": "example.xsd", "type": "EX-101.SCH"}, {"name": "unrelated.xml", "type": "XML"}, {"name": "unrelated.pdf"}]}}
+    complete_body = (
+        b"<SEC-DOCUMENT>0000320193-25-000001.txt : 20250801\r\n"
+        b"<DOCUMENT>\r\n<TYPE>10-Q\r\n<SEQUENCE>1\r\n<FILENAME>example.htm\r\n<TEXT>\r\n"
+        b"<html><body>filing</body></html>\r\n</TEXT>\r\n</DOCUMENT>\r\n"
+        b"<DOCUMENT>\r\n<TYPE>EX-101.SCH\r\n<SEQUENCE>2\r\n<FILENAME>example.xsd\r\n<TEXT>\r\n<XML>\r\n"
+        b"<schema/>\r\n</XML>\r\n</TEXT>\r\n</DOCUMENT>\r\n"
+        b"<DOCUMENT>\r\n<TYPE>XML\r\n<SEQUENCE>3\r\n<FILENAME>unrelated.xml\r\n<TEXT>\r\n<XML>\r\n<attachment/>\r\n</XML>\r\n</TEXT>\r\n</DOCUMENT>\r\n"
+        b"</SEC-DOCUMENT>\r\n"
+    )
 
     def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
         calls.append(url)
         if url == submissions_url:
             return SecResponse(200, {"Content-Type": "application/json"}, json.dumps(submissions).encode(), url)
-        if url == index_url:
-            return SecResponse(200, {"Content-Type": "application/json"}, json.dumps(index).encode(), url)
-        if url == primary_url:
-            return SecResponse(200, {"Content-Type": "text/html"}, b"<html><body>filing</body></html>", url)
-        if url == schema_url:
-            return SecResponse(200, {"Content-Type": "application/xml"}, b"<schema/>", url)
+        if url == complete_url:
+            return SecResponse(200, {"Content-Type": "text/plain"}, complete_body, url)
         raise AssertionError(url)
 
     client = SecHttpClient(SecHttpConfig(contact_email="ops@example.org"), transport=transport, sleep=lambda _: None)
@@ -201,8 +203,8 @@ def test_sec_acquirer_downloads_primary_and_xbrl_members_incrementally(tmp_path:
     assert first.reused is False
     assert second.reused is True
     assert next(member for member in first.package.members if member.relative_name == "example.htm").content_type == "text/html"
-    assert calls.count(primary_url) == 1
-    assert calls.count(schema_url) == 1
+    assert calls.count(complete_url) == 2
+    assert calls.count("https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/index.json") == 0
 
 
 def test_sec_acquirer_requires_fresh_discovery_before_local_package(tmp_path: Path) -> None:
@@ -265,8 +267,7 @@ def test_sec_acquirer_fetches_required_history_chunks_for_independent_discovery(
     submissions_url = "https://data.sec.gov/submissions/CIK0000123456.json"
     relevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2024.json"
     irrelevant_history_url = "https://data.sec.gov/submissions/CIK0000123456-2018.json"
-    index_url = "https://www.sec.gov/Archives/edgar/data/123456/000012345624000001/index.json"
-    primary_url = "https://www.sec.gov/Archives/edgar/data/123456/000012345624000001/annual.htm"
+    complete_url = "https://www.sec.gov/Archives/edgar/data/123456/000012345624000001/0000123456-24-000001.txt"
     calls: list[str] = []
     submissions = {
         "cik": "0000123456",
@@ -292,7 +293,11 @@ def test_sec_acquirer_fetches_required_history_chunks_for_independent_discovery(
         "form": ["10-K"],
         "primaryDocument": ["annual.htm"],
     }
-    index = {"directory": {"item": [{"name": "annual.htm"}]}}
+    complete_body = (
+        b"<SEC-DOCUMENT>0000123456-24-000001.txt : 20250201\r\n"
+        b"<DOCUMENT>\r\n<TYPE>10-K\r\n<SEQUENCE>1\r\n<FILENAME>annual.htm\r\n<TEXT>\r\n"
+        b"<html><body>annual</body></html>\r\n</TEXT>\r\n</DOCUMENT>\r\n</SEC-DOCUMENT>\r\n"
+    )
 
     def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
         calls.append(url)
@@ -317,10 +322,8 @@ def test_sec_acquirer_fetches_required_history_chunks_for_independent_discovery(
                 ).encode(),
                 url,
             )
-        if url == index_url:
-            return SecResponse(200, {"Content-Type": "application/json"}, json.dumps(index).encode(), url)
-        if url == primary_url:
-            return SecResponse(200, {"Content-Type": "text/html"}, b"<html><body>annual</body></html>", url)
+        if url == complete_url:
+            return SecResponse(200, {"Content-Type": "text/plain"}, complete_body, url)
         raise AssertionError(url)
 
     client = SecHttpClient(SecHttpConfig(contact_email="ops@example.org"), transport=transport, sleep=lambda _: None)

@@ -20,6 +20,11 @@ from financial_filing_data_foundation.us_sec.discovery import (
     verify_sec_discovery_observation,
 )
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenanceStore,
+    SecSourceContainerStore,
+    replay_package_source_provenance,
+)
 from financial_filing_data_foundation.us_sec.validation import load_sec_validation
 from financial_filing_data_foundation.registry import SQLiteRegistry
 
@@ -821,7 +826,17 @@ def _verify_sec_source_chain(
         )
     try:
         package = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store").load(document.package_sha256)
-        SQLiteRegistry(project_root / "workspace" / "ingest" / "registry.sqlite").verify_sec_package_provenance(package)
+        raw_store = project_root / "workspace" / "ingest" / "raw-store"
+        registry = SQLiteRegistry(project_root / "workspace" / "ingest" / "registry.sqlite")
+        registry.verify_sec_package_provenance(package)
+        provenance = replay_package_source_provenance(
+            package,
+            SecSourceContainerStore(raw_store),
+            SecPackageSourceProvenanceStore(raw_store),
+        )
+        registry.verify_sec_package_source_provenance(package, provenance)
+        if document.package_source_provenance_sha256 and document.package_source_provenance_sha256 != provenance.provenance_sha256:
+            raise ValueError("SEC catalog provenance identity differs from raw package")
         if document.selected_accession and str(document.selected_accession) != str(package.accession):
             raise ValueError("SEC catalog discovery accession differs from raw package")
         member_hashes = {member.member_sha256 for member in package.members}
@@ -922,6 +937,11 @@ def _load_sec_bundle(document: CatalogDocument, project_root: Path | None = None
         raise McpServiceError(
             "P8_UPSTREAM_ARTIFACT_INVALID",
             "SEC validation/package identity mismatch",
+        )
+    if validation.package_source_provenance_sha256 != document.package_source_provenance_sha256:
+        raise McpServiceError(
+            "P8_UPSTREAM_ARTIFACT_INVALID",
+            "SEC catalog provenance identity differs from validation artifact",
         )
     if document.fact_source_mode and document.fact_source_mode != parsed.fact_source_mode:
         raise McpServiceError(

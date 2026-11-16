@@ -126,7 +126,7 @@ def test_registry_adds_sec_tables_without_rewriting_legacy_rows(tmp_path: Path) 
         artifact_path="workspace/ingest/us/sec/p7/demo",
     )
 
-    assert SEC_REGISTRY_SCHEMA_VERSION == 4
+    assert SEC_REGISTRY_SCHEMA_VERSION == 5
     with sqlite3.connect(db) as conn:
         tables = {
             row[0]
@@ -715,14 +715,14 @@ def test_sec_registry_migrates_real_v2_to_v3_without_rewriting_rows(
     registry = SQLiteRegistry(db)
 
     assert registry.schema_version() == 1
-    assert registry.sec_schema_version() == 4
+    assert registry.sec_schema_version() == 5
     assert migration_calls == [True]
     with sqlite3.connect(db) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
         metadata = conn.execute(
             "SELECT value FROM sec_schema_metadata WHERE key = 'schema_version'"
         ).fetchone()
-        assert metadata == ("4",)
+        assert metadata == ("5",)
         columns = {
             row[1] for row in conn.execute("PRAGMA table_info('sec_parsed_data')")
         }
@@ -731,7 +731,7 @@ def test_sec_registry_migrates_real_v2_to_v3_without_rewriting_rows(
             "SELECT compatibility_status FROM sec_parsed_data WHERE parse_run_id = 'old-run'"
         ).fetchone() == ("INCOMPATIBLE",)
     after = _snapshot_registry(db)
-    assert set(after["tables"]) == set(before["tables"]) | {"sec_schema_metadata", "sec_discovery_observations"}
+    assert set(after["tables"]) == set(before["tables"]) | {"sec_schema_metadata", "sec_discovery_observations", "sec_source_containers", "sec_package_source_provenance", "sec_package_member_locators"}
     for table in (
         "documents",
         "document_locations",
@@ -749,7 +749,7 @@ def test_sec_registry_migrates_real_v2_to_v3_without_rewriting_rows(
     ) == before["rows"]["sec_parsed_data"]
     assert set(before["indexes"]).issubset(set(after["indexes"]))
     assert after["user_version"] == before["user_version"] == 1
-    assert after["rows"]["sec_schema_metadata"] == (("schema_version", "4"),)
+    assert after["rows"]["sec_schema_metadata"] == (("schema_version", "5"),)
 
 
 def test_sec_registry_v3_reopen_after_real_v2_migration_is_idempotent(
@@ -762,7 +762,7 @@ def test_sec_registry_v3_reopen_after_real_v2_migration_is_idempotent(
 
     reopened = SQLiteRegistry(db)
 
-    assert reopened.sec_schema_version() == 4
+    assert reopened.sec_schema_version() == 5
     after = _snapshot_registry(db)
     assert after == before
 
@@ -781,11 +781,11 @@ def test_sec_registry_migrates_explicit_v2_metadata_variant(tmp_path: Path) -> N
 
     registry = SQLiteRegistry(db)
 
-    assert registry.sec_schema_version() == 4
+    assert registry.sec_schema_version() == 5
     with sqlite3.connect(db) as conn:
         assert conn.execute(
             "SELECT value FROM sec_schema_metadata WHERE key = 'schema_version'"
-        ).fetchone() == ("4",)
+        ).fetchone() == ("5",)
         assert conn.execute(
             "SELECT compatibility_status FROM sec_parsed_data WHERE parse_run_id = 'old-run'"
         ).fetchone() == ("INCOMPATIBLE",)
@@ -824,10 +824,10 @@ def test_sec_registry_migrates_late_v2_with_compatibility_column_to_v3(
     registry = SQLiteRegistry(db)
 
     assert registry.schema_version() == 1
-    assert registry.sec_schema_version() == 4
+    assert registry.sec_schema_version() == 5
     assert migration_calls == [True]
     after = _snapshot_registry(db)
-    assert set(after["tables"]) == set(before["tables"]) | {"sec_schema_metadata", "sec_discovery_observations"}
+    assert set(after["tables"]) == set(before["tables"]) | {"sec_schema_metadata", "sec_discovery_observations", "sec_source_containers", "sec_package_source_provenance", "sec_package_member_locators"}
     for table in (
         "documents",
         "document_locations",
@@ -864,7 +864,7 @@ def test_sec_registry_migrates_late_v2_with_compatibility_column_to_v3(
         assert after_table_sql[table] == before_table_sql[table]
     assert set(before["indexes"]).issubset(set(after["indexes"]))
     assert after["user_version"] == before["user_version"] == 1
-    assert after["rows"]["sec_schema_metadata"] == (("schema_version", "4"),)
+    assert after["rows"]["sec_schema_metadata"] == (("schema_version", "5"),)
 
     snapshot1 = _snapshot_registry(db)
     SQLiteRegistry(db)
@@ -931,12 +931,12 @@ def test_fresh_registry_uses_legacy_v1_and_sec_extension_v3(tmp_path: Path) -> N
     registry = SQLiteRegistry(db)
 
     assert registry.schema_version() == 1
-    assert registry.sec_schema_version() == 4
+    assert registry.sec_schema_version() == 5
     with sqlite3.connect(db) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
         assert conn.execute(
             "SELECT value FROM sec_schema_metadata WHERE key = 'schema_version'"
-        ).fetchone() == ("4",)
+        ).fetchone() == ("5",)
 
 
 def test_unknown_sec_extension_version_fails_closed(tmp_path: Path) -> None:

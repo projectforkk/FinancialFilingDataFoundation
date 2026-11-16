@@ -14,7 +14,14 @@ from financial_filing_data_foundation.us_sec.http import SecHttpConfig, SecRespo
 from financial_filing_data_foundation.us_sec.models import SecCompanyRef
 from financial_filing_data_foundation.us_sec.package import SecMemberRole, SecPackageMember, build_package
 from financial_filing_data_foundation.us_sec.parser import VIRTUAL_HTML_NORMALIZER_VERSION
+from financial_filing_data_foundation.us_sec.path_policy import complete_submission_url
 from financial_filing_data_foundation.us_sec.registry import register_sec_parsed_run
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenance,
+    SecSourceContainer,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 from financial_filing_data_foundation.us_sec.validation import load_sec_validation
 from financial_filing_data_foundation.us_sec.planner import SecPlanAction, plan_sec_slot
 from financial_filing_data_foundation.user_cli import _parser, _runtime_paths, _us_ingest
@@ -38,7 +45,7 @@ def _package() -> object:
         "<xbrli:unit id='USD'><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
         "</ix:header><h1>Annual</h1><p>Revenue: "
         "<ix:nonfraction name='us-gaap:Revenues' contextRef='c1' unitRef='USD' decimals='0'>100</ix:nonfraction>"
-        "</p></body></html>"
+        "</p></body></html>\r\n"
     ).encode("utf-8")
     return build_package(
         cik=CIK,
@@ -150,11 +157,31 @@ def _tree_hashes(root: Path) -> dict[str, str]:
     }
 
 
-def _move_current_v3_to_legacy_v2(result: object) -> dict[str, bytes]:
+def _source_attestation(package: object) -> tuple[SecSourceContainer, SecPackageSourceProvenance]:
+    member = next(item for item in package.members if item.role is SecMemberRole.PRIMARY_DOCUMENT)
+    body = (
+        f"<SEC-DOCUMENT>{package.accession}.txt : 20251101\r\n"
+        f"<DOCUMENT>\r\n<TYPE>{package.form}\r\n<SEQUENCE>1\r\n"
+        f"<FILENAME>{member.relative_name}\r\n<TEXT>\r\n".encode()
+        + member.body
+        + b"</TEXT>\r\n</DOCUMENT>\r\n</SEC-DOCUMENT>\r\n"
+    )
+    container = SecSourceContainer.from_bytes(
+        body,
+        cik=package.cik,
+        accession=package.accession,
+        source_url=complete_submission_url(package.cik, package.accession),
+    )
+    inventory = parse_sec_submission(body, cik=package.cik, accession=package.accession)
+    return container, build_package_source_provenance(package, container, inventory)
+
+
+def _move_current_v4_to_legacy_v3(result: object) -> dict[str, bytes]:
     current_dir = result.validation.artifact_dir
-    legacy_dir = current_dir.parent
+    legacy_dir = current_dir.parent / "p11-sec-validation-v3"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
     report = json.loads((current_dir / "validation.json").read_text(encoding="utf-8"))
-    report["schema_version"] = "p11-sec-validation-v2"
+    report["schema_version"] = "p11-sec-validation-v3"
     (legacy_dir / "validation.json").write_text(
         json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
@@ -199,17 +226,20 @@ def test_t146_migration_revalidates_without_parser_and_preserves_legacy_bytes(
     initial_observation = _observation(package, retrieved_at="2026-11-13T00:00:00+00:00")
     from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 
+    source_container, source_provenance = _source_attestation(package)
     initial = ingest_sec_package(
         package,
         root=tmp_path,
         ticker="AAPL",
         period="FY",
         discovery_observation=initial_observation,
+        source_container=source_container,
+        source_provenance=source_provenance,
     )
     paths = _runtime_paths(tmp_path)
     raw_hashes = _tree_hashes(paths.raw_store / "packages")
     parsed_hashes = _tree_hashes(initial.parsed.artifact_dir)
-    legacy_hashes = _move_current_v3_to_legacy_v2(initial)
+    legacy_hashes = _move_current_v4_to_legacy_v3(initial)
     _stale_registry_row(tmp_path, initial)
     parser_calls = 0
 
@@ -223,7 +253,7 @@ def test_t146_migration_revalidates_without_parser_and_preserves_legacy_bytes(
 
     assert _us_ingest(_args()) == 0
     output = json.loads(capsys.readouterr().out)
-    current_dir = paths.ingest_root / "us" / "p7" / package.package_sha256 / "p11-sec-validation-v3"
+    current_dir = paths.ingest_root / "us" / "p7" / package.package_sha256 / "p11-sec-validation-v4"
     loaded = load_sec_validation(current_dir)
     registry = SQLiteRegistry(paths.registry)
     latest_observation = registry.latest_sec_discovery_observation(
@@ -247,7 +277,8 @@ def test_t146_migration_revalidates_without_parser_and_preserves_legacy_bytes(
     assert calls == [SUBMISSIONS_URL]
     assert _tree_hashes(paths.raw_store / "packages") == raw_hashes
     assert _tree_hashes(initial.parsed.artifact_dir) == parsed_hashes
-    assert {name: (current_dir.parent / name).read_bytes() for name in legacy_hashes} == legacy_hashes
+    legacy_dir = current_dir.parent / "p11-sec-validation-v3"
+    assert {name: (legacy_dir / name).read_bytes() for name in legacy_hashes} == legacy_hashes
     assert latest_observation is not None
     assert loaded.discovery_observation_sha256 == latest_observation["observation_sha256"]
     assert loaded.reuse_eligible is True
@@ -271,16 +302,19 @@ def test_t146_corrupt_current_v3_fails_closed_without_v2_fallback(
     package = _package()
     from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 
+    source_container, source_provenance = _source_attestation(package)
     initial = ingest_sec_package(
         package,
         root=tmp_path,
         ticker="AAPL",
         period="FY",
         discovery_observation=_observation(package, retrieved_at="2026-11-13T00:00:00+00:00"),
+        source_container=source_container,
+        source_provenance=source_provenance,
     )
     paths = _runtime_paths(tmp_path)
-    legacy_hashes = _move_current_v3_to_legacy_v2(initial)
-    current_dir = paths.ingest_root / "us" / "p7" / package.package_sha256 / "p11-sec-validation-v3"
+    legacy_hashes = _move_current_v4_to_legacy_v3(initial)
+    current_dir = paths.ingest_root / "us" / "p7" / package.package_sha256 / "p11-sec-validation-v4"
     current_dir.mkdir(parents=True)
     corrupt_report = current_dir / "validation.json"
     corrupt_report.write_bytes(b"not-json")
@@ -301,7 +335,8 @@ def test_t146_corrupt_current_v3_fails_closed_without_v2_fallback(
     assert exc_info.value.reason_code == "P11_PACKAGE_INVALID"
     assert parser_calls == 0
     assert corrupt_report.read_bytes() == before
-    assert {name: (current_dir.parent / name).read_bytes() for name in legacy_hashes} == legacy_hashes
+    legacy_dir = current_dir.parent / "p11-sec-validation-v3"
+    assert {name: (legacy_dir / name).read_bytes() for name in legacy_hashes} == legacy_hashes
 
 
 def test_t146_reuse_data_refreshes_registry_from_fresh_v3_without_parser(
@@ -314,12 +349,15 @@ def test_t146_reuse_data_refreshes_registry_from_fresh_v3_without_parser(
     package = _package()
     from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 
+    source_container, source_provenance = _source_attestation(package)
     initial = ingest_sec_package(
         package,
         root=tmp_path,
         ticker="AAPL",
         period="FY",
         discovery_observation=_observation(package, retrieved_at="2026-11-13T00:00:00+00:00"),
+        source_container=source_container,
+        source_provenance=source_provenance,
     )
     parsed_hashes = _tree_hashes(initial.parsed.artifact_dir)
     _stale_registry_row(tmp_path, initial)

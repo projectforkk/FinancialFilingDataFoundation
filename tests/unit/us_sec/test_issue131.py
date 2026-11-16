@@ -25,6 +25,14 @@ from financial_filing_data_foundation.us_sec.package import (
 )
 from financial_filing_data_foundation.us_sec.parser import parse_sec_package
 from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
 
 
@@ -54,10 +62,42 @@ def _package(*, accession: str = ACCESSION):
                     b"<xbrli:unit id='USD'><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
                     b"</ix:header><h1>Revenue</h1><p><ix:nonfraction name='us-gaap:Revenues' "
                     b"contextRef='c1' unitRef='USD' decimals='0'>100</ix:nonfraction></p>"
-                    b"</body></html>"
+                    b"</body></html>\r\n"
                 ),
             ),
         ),
+    )
+
+
+def _source_attestation(package) -> tuple[SecSourceContainer, SecPackageSourceProvenance]:
+    member = next(item for item in package.members if item.role is SecMemberRole.PRIMARY_DOCUMENT)
+    body = (
+        f"<SEC-DOCUMENT>{package.accession}.txt : 20250730\r\n"
+        f"<DOCUMENT>\r\n<TYPE>{package.form}\r\n<SEQUENCE>1\r\n<FILENAME>{member.relative_name}\r\n<TEXT>\r\n".encode()
+        + member.body
+        + b"</TEXT>\r\n</DOCUMENT>\r\n</SEC-DOCUMENT>\r\n"
+    )
+    container = SecSourceContainer.from_bytes(
+        body,
+        cik=package.cik,
+        accession=package.accession,
+        source_url=f"https://www.sec.gov/Archives/edgar/data/{int(package.cik)}/{package.accession.replace('-', '')}/{package.accession}.txt",
+    )
+    provenance = build_package_source_provenance(
+        package,
+        container,
+        parse_sec_submission(body, cik=package.cik, accession=package.accession),
+    )
+    return container, provenance
+
+
+def _ingest_with_source(package, **kwargs):
+    container, provenance = _source_attestation(package)
+    return ingest_sec_package(
+        package,
+        source_container=container,
+        source_provenance=provenance,
+        **kwargs,
     )
 
 
@@ -126,6 +166,11 @@ def _validated(tmp_path: Path):
     observation = _observation()
     registry = SQLiteRegistry(tmp_path / "workspace" / "ingest" / "registry.sqlite")
     registry.register_sec_package(package)
+    container, provenance = _source_attestation(package)
+    SecSourceContainerStore(tmp_path / "workspace" / "ingest" / "raw-store").put(container)
+    SecPackageSourceProvenanceStore(tmp_path / "workspace" / "ingest" / "raw-store").put(provenance)
+    registry.register_sec_source_container(container)
+    registry.register_sec_package_source_provenance(provenance)
     registry.register_sec_discovery_observation(observation)
     parsed = parse_sec_package(package, tmp_path / "workspace" / "ingest" / "us" / "p11", discovery_observation=observation)
     validation = validate_sec_artifacts(
@@ -156,7 +201,7 @@ def test_t131_02_ingest_without_observation_is_not_research_ready(tmp_path: Path
 
 def test_t131_03_reuse_without_observation_is_not_research_ready(tmp_path: Path) -> None:
     observation = _observation()
-    first = ingest_sec_package(
+    first = _ingest_with_source(
         _package(),
         root=tmp_path,
         ticker="AAPL",
@@ -177,7 +222,7 @@ def test_t131_03_reuse_without_observation_is_not_research_ready(tmp_path: Path)
 
 
 def test_t131_04_catalog_missing_discovery_fields_fails_closed(tmp_path: Path) -> None:
-    result = ingest_sec_package(
+    result = _ingest_with_source(
         _package(),
         root=tmp_path,
         ticker="AAPL",
@@ -307,7 +352,7 @@ def test_t131_11_non_unambiguous_state_is_not_research_ready(tmp_path: Path) -> 
 
 
 def test_t131_12_ticker_only_company_identity_is_rejected_from_p8(tmp_path: Path) -> None:
-    result = ingest_sec_package(
+    result = _ingest_with_source(
         _package(),
         root=tmp_path,
         ticker="AAPL",
@@ -323,7 +368,7 @@ def test_t131_12_ticker_only_company_identity_is_rejected_from_p8(tmp_path: Path
 
 
 def test_t131_13_valid_observation_registry_package_and_catalog_serve(tmp_path: Path) -> None:
-    result = ingest_sec_package(
+    result = _ingest_with_source(
         _package(),
         root=tmp_path,
         ticker="AAPL",
@@ -341,7 +386,7 @@ def test_t131_13_valid_observation_registry_package_and_catalog_serve(tmp_path: 
 
 
 def test_t131_p8_missing_registry_observation_fails_closed(tmp_path: Path) -> None:
-    result = ingest_sec_package(
+    result = _ingest_with_source(
         _package(),
         root=tmp_path,
         ticker="AAPL",
@@ -358,7 +403,7 @@ def test_t131_p8_missing_registry_observation_fails_closed(tmp_path: Path) -> No
 
 
 def test_t131_p8_registry_source_bytes_tamper_fails_closed(tmp_path: Path) -> None:
-    result = ingest_sec_package(
+    result = _ingest_with_source(
         _package(),
         root=tmp_path,
         ticker="AAPL",

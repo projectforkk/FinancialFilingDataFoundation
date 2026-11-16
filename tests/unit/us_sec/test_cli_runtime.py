@@ -19,14 +19,89 @@ from financial_filing_data_foundation.us_sec.parser import (
     VIRTUAL_HTML_NORMALIZER_VERSION,
     parse_sec_package,
 )
+from financial_filing_data_foundation.us_sec.package import SecPackageMember, build_package
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
-from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url, complete_submission_url
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 from financial_filing_data_foundation.user_cli import _parser
 
 
 def _sec_url(cik: str, accession: str, name: str) -> str:
     return archive_member_url(cik, accession, name)
+
+
+def _make_attestable(package: object) -> object:
+    members = tuple(
+        SecPackageMember(
+            relative_name=member.relative_name,
+            role=member.role,
+            content_type=member.content_type,
+            source_url=member.source_url,
+            body=member.body if member.body.endswith((b"\r\n", b"\n")) else member.body + b"\r\n",
+        )
+        for member in package.members
+    )
+    return build_package(
+        cik=package.cik,
+        accession=package.accession,
+        form=package.form,
+        fiscal_year=package.fiscal_year,
+        period=package.period,
+        members=members,
+        filing_date=package.filing_date,
+        accepted_at=package.accepted_at,
+        report_period=package.report_period,
+        primary_document=package.primary_document,
+    )
+
+
+def _source_attestation(package: object) -> tuple[SecSourceContainer, SecPackageSourceProvenance]:
+    rows = [f"<SEC-DOCUMENT>{package.accession}.txt : 20251101\r\n".encode()]
+    for index, member in enumerate(package.canonical_members(), start=1):
+        document_type = "10-K" if member.role.value == "PRIMARY_DOCUMENT" else "EX-101.SCH"
+        name = member.relative_name
+        if name.casefold().endswith((".xml", ".xsd", ".xbrl")):
+            payload = b"<XML>\r\n" + member.body + b"</XML>\r\n"
+        else:
+            payload = member.body
+        rows.extend(
+            [
+                b"<DOCUMENT>\r\n",
+                f"<TYPE>{document_type}\r\n".encode(),
+                f"<SEQUENCE>{index}\r\n".encode(),
+                f"<FILENAME>{name}\r\n".encode(),
+                b"<TEXT>\r\n",
+                payload,
+                b"</TEXT>\r\n</DOCUMENT>\r\n",
+            ]
+        )
+    rows.append(b"</SEC-DOCUMENT>\r\n")
+    body = b"".join(rows)
+    container = SecSourceContainer.from_bytes(
+        body,
+        cik=package.cik,
+        accession=package.accession,
+        source_url=complete_submission_url(package.cik, package.accession),
+    )
+    inventory = parse_sec_submission(body, cik=package.cik, accession=package.accession)
+    return container, build_package_source_provenance(package, container, inventory)
+
+
+def _attest_package(package: object, paths: object, registry: object) -> tuple[SecSourceContainer, SecPackageSourceProvenance]:
+    container, provenance = _source_attestation(package)
+    SecSourceContainerStore(paths.raw_store).put(container)
+    SecPackageSourceProvenanceStore(paths.raw_store).put(provenance)
+    registry.register_sec_source_container(container)
+    registry.register_sec_package_source_provenance(provenance)
+    return container, provenance
 
 
 def _observation(package: object) -> SecDiscoveryObservation:
@@ -237,11 +312,13 @@ def test_us_cli_planner_uses_current_local_package_and_parsed_data(monkeypatch: 
         cik="0000320193", accession="0000320193-25-000079", form="10-K", fiscal_year=2025, period="FY",
         members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", "0000320193-25-000079", "annual.htm"), body=b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body><ix:header><xbrli:context id="c1"><xbrli:entity><xbrli:identifier>0000320193</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-09-27</xbrli:instant></xbrli:period></xbrli:context><xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></ix:header><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p></body></html>'),),
     )
+    package = _make_attestable(package)
     paths = _runtime_paths(tmp_path)
     store = SecPackageStore(paths.raw_store)
     store.put(package)
     registry = SQLiteRegistry(paths.registry)
     register_sec_package(registry, package)
+    _attest_package(package, paths, registry)
     register_sec_slot(registry, package, fiscal_year=2025, period="FY")
     observation = _observation(package)
     registry.register_sec_discovery_observation(observation)
@@ -294,13 +371,14 @@ def test_us_cli_planner_rejects_parsed_row_for_wrong_package(monkeypatch: pytest
         )
 
     html = b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:us-gaap="http://fasb.org/us-gaap/2025"><body><h1>Annual</h1><p><ix:nonfraction name="us-gaap:Revenues" contextRef="c1" unitRef="USD">100</ix:nonfraction></p></body></html>'
-    local_package = make_package("0000320193-25-000079", html)
+    local_package = _make_attestable(make_package("0000320193-25-000079", html))
     wrong_package = make_package("0000320193-25-000080", html + b"<p>wrong identity</p>")
     paths = _runtime_paths(tmp_path)
     store = SecPackageStore(paths.raw_store)
     store.put(local_package)
     registry = SQLiteRegistry(paths.registry)
     register_sec_package(registry, local_package)
+    _attest_package(local_package, paths, registry)
     register_sec_slot(registry, local_package, fiscal_year=2025, period="FY")
     register_sec_package(registry, wrong_package)
     parsed = parse_sec_package(local_package, paths.ingest_root / "us" / "p11")
@@ -329,8 +407,8 @@ def test_us_cli_planner_marks_multiple_local_packages_for_review(monkeypatch: py
             members=(SecPackageMember(relative_name="annual.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000320193", accession, "annual.htm"), body=f"<html><body>{accession}</body></html>".encode()),),
         )
 
-    first = make_package("0000320193-25-000079")
-    second = make_package("0000320193-25-000080")
+    first = _make_attestable(make_package("0000320193-25-000079"))
+    second = _make_attestable(make_package("0000320193-25-000080"))
     paths = _runtime_paths(tmp_path)
     store = SecPackageStore(paths.raw_store)
     store.put(first)
@@ -338,6 +416,7 @@ def test_us_cli_planner_marks_multiple_local_packages_for_review(monkeypatch: py
     registry = SQLiteRegistry(paths.registry)
     for package in (first, second):
         register_sec_package(registry, package)
+        _attest_package(package, paths, registry)
         register_sec_slot(registry, package, fiscal_year=2025, period="FY")
     args = _parser().parse_args(["acquire", "--market", "US", "--cik", "320193", "--year", "2025", "--period", "FY"])
 
@@ -374,12 +453,16 @@ def test_us_cli_reuse_data_refreshes_discovery_without_reparsing_or_redownloadin
             ),
         ),
     )
+    package = _make_attestable(package)
+    source_container, source_provenance = _source_attestation(package)
     initial = ingest_sec_package(
         package,
         root=tmp_path,
         ticker="AAPL",
         period="FY",
         discovery_observation=_observation(package),
+        source_container=source_container,
+        source_provenance=source_provenance,
     )
     assert initial.research_ready is True
     paths = _runtime_paths(tmp_path)
@@ -471,10 +554,12 @@ def test_us_cli_local_old_artifact_is_incompatible_and_raw_package_is_reparsed(
             ),
         ),
     )
+    package = _make_attestable(package)
     paths = _runtime_paths(tmp_path)
     SecPackageStore(paths.raw_store).put(package)
     registry = SQLiteRegistry(paths.registry)
     register_sec_package(registry, package)
+    _attest_package(package, paths, registry)
     register_sec_slot(registry, package, fiscal_year=2025, period="FY")
     observation = _observation(package)
     registry.register_sec_discovery_observation(observation)

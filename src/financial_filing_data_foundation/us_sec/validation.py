@@ -14,6 +14,12 @@ from typing import Any
 from .errors import P11Reason, SecError
 from .compatibility import sec_artifact_compatibility
 from .discovery import verify_sec_discovery_observation
+from .source import (
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSourceContainerStore,
+    replay_package_source_provenance,
+)
 from .parser import (
     SEC_ARTIFACT_SCHEMA,
     XBRL_INSTANCE_NAMESPACE,
@@ -44,7 +50,7 @@ from .parser import (
 )
 
 
-SEC_VALIDATION_SCHEMA = "p11-sec-validation-v3"
+SEC_VALIDATION_SCHEMA = "p11-sec-validation-v4"
 _VALID_FACT_SOURCE_MODES = frozenset(
     {"INLINE_XBRL_PRIMARY", "XBRL_INSTANCE_PRIMARY", "NO_STRUCTURED_FACTS"}
 )
@@ -66,6 +72,7 @@ class SecValidationResult:
     report_path: Path
     issues_path: Path
     fact_source_mode: str = "NO_STRUCTURED_FACTS"
+    package_source_provenance_sha256: str | None = None
     discovery_observation_sha256: str | None = None
     discovery_checked_at: str | None = None
     selected_accession: str | None = None
@@ -89,6 +96,7 @@ class SecValidationResult:
             "warning_issue_count": self.warning_issue_count,
             "issue_count": self.issue_count,
             "fact_source_mode": self.fact_source_mode,
+            "package_source_provenance_sha256": self.package_source_provenance_sha256,
             "discovery_observation_sha256": self.discovery_observation_sha256,
             "discovery_checked_at": self.discovery_checked_at,
             "selected_accession": self.selected_accession,
@@ -577,7 +585,39 @@ def validate_sec_artifacts(
     registry: Any | None = None,
 ) -> SecValidationResult:
     issues = [dict(row) for row in parsed.issues]
+    package_provenance: SecPackageSourceProvenance | None = None
     if package is not None:
+        try:
+            raw_store_root = Path(validation_root).expanduser().resolve().parent.parent / "raw-store"
+            provenance_store = SecPackageSourceProvenanceStore(raw_store_root)
+            source_store = SecSourceContainerStore(raw_store_root)
+            candidates = provenance_store.list_for_package(str(package.package_sha256))
+            if not candidates:
+                raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC package has no current source provenance")
+            replay_error: Exception | None = None
+            for candidate in candidates:
+                try:
+                    package_provenance = replay_package_source_provenance(
+                        package,
+                        source_store,
+                        provenance_store,
+                        candidate.provenance_sha256,
+                    )
+                    break
+                except Exception as exc:  # pragma: no cover - candidate loop is audited below
+                    replay_error = exc
+            if package_provenance is None:
+                raise replay_error or SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC package source provenance replay failed")
+            if registry is not None:
+                registry.verify_sec_package_source_provenance(package, package_provenance)
+        except Exception as exc:
+            issues.append(
+                _issue(
+                    P11Reason.P11_PROVENANCE_MISMATCH.value,
+                    "BLOCKING",
+                    f"SEC current source provenance verification failed: {exc}",
+                )
+            )
         if registry is not None:
             try:
                 registry.verify_sec_package_provenance(package)
@@ -834,6 +874,9 @@ def validate_sec_artifacts(
         report_path=directory / "validation.json",
         issues_path=directory / "issues.jsonl",
         fact_source_mode=parsed.fact_source_mode,
+        package_source_provenance_sha256=(
+            None if package_provenance is None else package_provenance.provenance_sha256
+        ),
         discovery_observation_sha256=observation_sha,
         discovery_checked_at=discovery_checked_at,
         selected_accession=selected_accession,
@@ -867,7 +910,7 @@ def load_sec_validation(
     A legacy flat ``<package_sha>/validation.json`` directory is deliberately
     not considered a fallback.  Callers may pass either the current directory
     itself or the P7 root/package directory and this resolver will map it to
-    ``<package_sha>/p11-sec-validation-v3``.
+    ``<package_sha>/p11-sec-validation-v4``.
     """
 
     directory = _resolve_sec_validation_dir(artifact_dir, package_sha256)
@@ -903,6 +946,7 @@ def load_sec_validation(
         report_path=report_path,
         issues_path=issues_path,
         fact_source_mode=str(report.get("fact_source_mode") or "NO_STRUCTURED_FACTS"),
+        package_source_provenance_sha256=str(report.get("package_source_provenance_sha256") or "") or None,
         discovery_observation_sha256=str(report.get("discovery_observation_sha256") or "") or None,
         discovery_checked_at=str(report.get("discovery_checked_at") or "") or None,
         selected_accession=str(report.get("selected_accession") or "") or None,

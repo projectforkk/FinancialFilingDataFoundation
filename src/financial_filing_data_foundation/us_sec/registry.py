@@ -7,6 +7,7 @@ from financial_filing_data_foundation.registry import SQLiteRegistry
 from financial_filing_data_foundation.registry.sqlite_registry import SEC_REGISTRY_SCHEMA_VERSION
 
 from .package import SecFilingPackage, SecPackageStore
+from .source import SecPackageSourceProvenance, SecSourceContainer
 
 
 def register_sec_package(registry: SQLiteRegistry, package: SecFilingPackage) -> None:
@@ -62,9 +63,22 @@ def register_sec_parsed_run(
     )
 
 
+def register_sec_source_container(registry: SQLiteRegistry, container: SecSourceContainer) -> None:
+    registry.register_sec_source_container(container)
+
+
+def register_sec_package_source_provenance(
+    registry: SQLiteRegistry,
+    provenance: SecPackageSourceProvenance,
+) -> None:
+    registry.register_sec_package_source_provenance(provenance)
+
+
 __all__ = [
     "SEC_REGISTRY_SCHEMA_VERSION",
     "register_sec_package",
     "register_sec_parsed_run",
     "register_sec_slot",
+    "register_sec_source_container",
+    "register_sec_package_source_provenance",
 ]

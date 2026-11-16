@@ -17,6 +17,12 @@ from .discovery import SecDiscoveryObservation
 from .package import SecFilingPackage, SecPackageStore
 from .parser import SEC_ARTIFACT_SCHEMA, SecParseResult, load_sec_artifacts, parse_sec_package
 from .registry import register_sec_package, register_sec_parsed_run, register_sec_slot
+from .source import (
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+)
 from .validation import SecValidationResult, load_sec_validation, validate_sec_artifacts
 
 
@@ -49,6 +55,7 @@ def _research_ready(
         and not amendment_conflict
         and validation.discovery_observation_sha256 == discovery_observation.observation_sha256
         and validation.selected_accession == package.accession
+        and bool(validation.package_source_provenance_sha256)
     )
 
 
@@ -141,6 +148,7 @@ def _upsert_catalog(
             else validation.discovery_state or parsed.discovery_state
         ),
         "fact_source_mode": parsed.fact_source_mode,
+        "package_source_provenance_sha256": validation.package_source_provenance_sha256,
         "fiscal_year": package.fiscal_year,
         "filing_type": period.upper(),
         "raw_fiscal_period": period.upper(),
@@ -202,16 +210,24 @@ def ingest_sec_package(
     ticker_source_sha256: str | None = None,
     ticker_retrieved_at: str | None = None,
     discovery_observation: SecDiscoveryObservation | None = None,
+    source_container: SecSourceContainer | None = None,
+    source_provenance: SecPackageSourceProvenance | None = None,
 ) -> SecIngestResult:
     project_root = Path(root).expanduser().resolve()
     base = project_root / "workspace" / "ingest" / "us"
     store = SecPackageStore(project_root / "workspace" / "ingest" / "raw-store")
-    store.put(package)
+    store.put(package, allow_accession_coexistence=source_provenance is not None)
     registry_path = project_root / "workspace" / "ingest" / "registry.sqlite"
     registry = SQLiteRegistry(registry_path)
     if discovery_observation is not None:
         registry.register_sec_discovery_observation(discovery_observation)
     register_sec_package(registry, package)
+    if source_container is not None:
+        SecSourceContainerStore(store.root).put(source_container)
+        registry.register_sec_source_container(source_container)
+    if source_provenance is not None:
+        SecPackageSourceProvenanceStore(store.root).put(source_provenance)
+        registry.register_sec_package_source_provenance(source_provenance)
     parsed = parse_sec_package(package, base / "p11", discovery_observation=discovery_observation)
     validation = validate_sec_artifacts(
         parsed,
@@ -259,6 +275,8 @@ def reuse_sec_package(
     ticker_source_sha256: str | None = None,
     ticker_retrieved_at: str | None = None,
     discovery_observation: SecDiscoveryObservation | None = None,
+    source_container: SecSourceContainer | None = None,
+    source_provenance: SecPackageSourceProvenance | None = None,
 ) -> SecIngestResult:
     """Reuse a verified current SEC artifact without parsing or downloading."""
 
@@ -274,6 +292,12 @@ def reuse_sec_package(
     if discovery_observation is not None:
         registry.register_sec_discovery_observation(discovery_observation)
     register_sec_package(registry, package)
+    if source_container is not None:
+        SecSourceContainerStore(project_root / "workspace" / "ingest" / "raw-store").put(source_container)
+        registry.register_sec_source_container(source_container)
+    if source_provenance is not None:
+        SecPackageSourceProvenanceStore(project_root / "workspace" / "ingest" / "raw-store").put(source_provenance)
+        registry.register_sec_package_source_provenance(source_provenance)
     if discovery_observation is not None:
         # A fresh online discovery is a new P7 binding even when the raw
         # package and parsed files are reusable.  Refresh only validation
@@ -344,6 +368,8 @@ def revalidate_sec_package(
     ticker_source_sha256: str | None = None,
     ticker_retrieved_at: str | None = None,
     discovery_observation: SecDiscoveryObservation | None = None,
+    source_container: SecSourceContainer | None = None,
+    source_provenance: SecPackageSourceProvenance | None = None,
 ) -> SecIngestResult:
     """Revalidate compatible parsed artifacts without invoking the parser."""
 
@@ -356,6 +382,12 @@ def revalidate_sec_package(
     if discovery_observation is not None:
         registry.register_sec_discovery_observation(discovery_observation)
     register_sec_package(registry, package)
+    if source_container is not None:
+        SecSourceContainerStore(project_root / "workspace" / "ingest" / "raw-store").put(source_container)
+        registry.register_sec_source_container(source_container)
+    if source_provenance is not None:
+        SecPackageSourceProvenanceStore(project_root / "workspace" / "ingest" / "raw-store").put(source_provenance)
+        registry.register_sec_package_source_provenance(source_provenance)
     validation = validate_sec_artifacts(
         parsed,
         project_root / "workspace" / "ingest" / "us" / "p7",

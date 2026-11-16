@@ -43,6 +43,7 @@ class CatalogDocument:
     selected_accession: str | None = None
     discovery_state: str | None = None
     fact_source_mode: str | None = None
+    package_source_provenance_sha256: str | None = None
 
     @property
     def filing_identity(self) -> tuple[str, str, int, str]:
@@ -79,6 +80,7 @@ class CatalogDocument:
                     "selected_accession": self.selected_accession,
                     "discovery_state": self.discovery_state,
                     "fact_source_mode": self.fact_source_mode,
+                    "package_source_provenance_sha256": self.package_source_provenance_sha256,
                 }
             )
         return result
@@ -334,6 +336,9 @@ def _parse_document(
                 "P8_CATALOG_INVALID",
                 f"documents[{index}].fact_source_mode is invalid",
             )
+        package_source_provenance_sha256 = normalize_sha256(
+            _required_text(raw, "package_source_provenance_sha256", index)
+        )
         return CatalogDocument(
             document_sha256=document_sha256,
             market=market,
@@ -354,6 +359,7 @@ def _parse_document(
             selected_accession=selected_accession,
             discovery_state=discovery_state,
             fact_source_mode=fact_source_mode,
+            package_source_provenance_sha256=package_source_provenance_sha256,
         )
 
     return CatalogDocument(

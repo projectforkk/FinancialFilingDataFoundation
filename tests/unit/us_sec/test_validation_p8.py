@@ -23,7 +23,15 @@ from financial_filing_data_foundation.us_sec.validation import (
     load_sec_validation,
     validate_sec_artifacts,
 )
-from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url, complete_submission_url
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 
 
 def _package() -> object:
@@ -47,7 +55,7 @@ def _package() -> object:
                     b'<xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>'
                     b'</ix:header><h1>Revenue</h1><p><ix:nonfraction name="us-gaap:Revenues" '
                     b'contextRef="c1" unitRef="USD" decimals="0">100</ix:nonfraction></p>'
-                    b'<table><tr><th>Metric</th><th>Value</th></tr><tr><td>Revenue</td><td>100</td></tr></table></body></html>'
+                    b'<table><tr><th>Metric</th><th>Value</th></tr><tr><td>Revenue</td><td>100</td></tr></table></body></html>\r\n'
                 ),
             ),
         ),
@@ -73,7 +81,7 @@ def _empty_periodic_package() -> object:
                     "0000320193-25-000099",
                     member.relative_name,
                 ),
-                body=b"<html><body><h1>Revenue</h1><p>Revenue was 100.</p></body></html>",
+                body=b"<html><body><h1>Revenue</h1><p>Revenue was 100.</p></body></html>\r\n",
             ),
         ),
     )
@@ -137,15 +145,57 @@ def _observation(package: object) -> SecDiscoveryObservation:
     )
 
 
+def _source_attestation(package: object, tmp_path: Path) -> tuple[SecSourceContainer, SecPackageSourceProvenance]:
+    rows = [f"<SEC-DOCUMENT>{package.accession}.txt : 20250730\r\n".encode()]
+    for index, member in enumerate(package.canonical_members(), start=1):
+        payload = member.body
+        if member.content_type == "application/xml":
+            payload = b"<XML>\r\n" + member.body + b"</XML>\r\n"
+        rows.extend(
+            [
+                b"<DOCUMENT>\r\n",
+                f"<TYPE>{package.form if index == 1 else 'EX-101.INS'}\r\n".encode(),
+                f"<SEQUENCE>{index}\r\n".encode(),
+                f"<FILENAME>{member.relative_name}\r\n<TEXT>\r\n".encode(),
+                payload,
+                b"</TEXT>\r\n</DOCUMENT>\r\n",
+            ]
+        )
+    rows.append(b"</SEC-DOCUMENT>\r\n")
+    body = b"".join(rows)
+    container = SecSourceContainer.from_bytes(
+        body,
+        cik=package.cik,
+        accession=package.accession,
+        source_url=complete_submission_url(package.cik, package.accession),
+    )
+    provenance = build_package_source_provenance(
+        package,
+        container,
+        parse_sec_submission(body, cik=package.cik, accession=package.accession),
+    )
+    raw_store = tmp_path / "workspace" / "ingest" / "raw-store"
+    SecSourceContainerStore(raw_store).put(container)
+    SecPackageSourceProvenanceStore(raw_store).put(provenance)
+    return container, provenance
+
+
 def _parse_and_validate(package: object, tmp_path: Path):
     observation = _observation(package)
+    source_container, source_provenance = _source_attestation(package, tmp_path)
     registry = SQLiteRegistry(tmp_path / "workspace" / "ingest" / "registry.sqlite")
     registry.register_sec_package(package)
+    registry.register_sec_source_container(source_container)
+    registry.register_sec_package_source_provenance(source_provenance)
     registry.register_sec_discovery_observation(observation)
-    parsed = parse_sec_package(package, tmp_path / "p11", discovery_observation=observation)
+    parsed = parse_sec_package(
+        package,
+        tmp_path / "workspace" / "ingest" / "us" / "p11",
+        discovery_observation=observation,
+    )
     validation = validate_sec_artifacts(
         parsed,
-        tmp_path / "p7",
+        tmp_path / "workspace" / "ingest" / "us" / "p7",
         package=package,
         discovery_observation=observation,
         registry=registry,
@@ -159,9 +209,9 @@ def test_sec_p7_validation_is_source_aware_and_writes_report(tmp_path: Path) -> 
     assert validation.validation_status == "PASS"
     assert validation.blocking_issue_count == 0
     assert validation.reuse_eligible is True
-    assert validation.artifact_dir == tmp_path / "p7" / package.package_sha256 / SEC_VALIDATION_SCHEMA
+    assert validation.artifact_dir == tmp_path / "workspace" / "ingest" / "us" / "p7" / package.package_sha256 / SEC_VALIDATION_SCHEMA
     assert (validation.artifact_dir / "validation.json").is_file()
-    loaded = load_sec_validation(tmp_path / "p7" / package.package_sha256)
+    loaded = load_sec_validation(tmp_path / "workspace" / "ingest" / "us" / "p7" / package.package_sha256)
     assert loaded.artifact_dir == validation.artifact_dir
 
 
@@ -218,6 +268,7 @@ def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPa
                         "selected_accession": observation.selected_accession,
                         "discovery_state": observation.state,
                         "fact_source_mode": parsed.fact_source_mode,
+                        "package_source_provenance_sha256": validation.package_source_provenance_sha256,
                         "fiscal_year": 2025,
                         "filing_type": "Q2",
                         "raw_fiscal_period": "Q2",
@@ -254,12 +305,15 @@ def test_sec_p8_reads_catalog_entry_without_network(monkeypatch: pytest.MonkeyPa
 def test_sec_ingest_publishes_only_nonblocking_package(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("FFDF_P11_US_DEV", raising=False)
     package = _package()
+    source_container, source_provenance = _source_attestation(package, tmp_path)
     result = ingest_sec_package(
         package,
         root=tmp_path,
         ticker="AAPL",
         period="Q2",
         discovery_observation=_observation(package),
+        source_container=source_container,
+        source_provenance=source_provenance,
     )
     assert result.research_ready is True
     assert result.catalog_status == "ADDED"
@@ -273,6 +327,7 @@ def test_periodic_zero_facts_is_review_required_and_not_research_ready(
     monkeypatch.setenv("FFDF_P11_US_DEV", "1")
     package = _empty_periodic_package()
     observation, parsed, validation, _registry = _parse_and_validate(package, tmp_path)
+    source_container, source_provenance = _source_attestation(package, tmp_path)
 
     assert not parsed.facts
     assert validation.validation_status == "REVIEW_REQUIRED"
@@ -283,6 +338,8 @@ def test_periodic_zero_facts_is_review_required_and_not_research_ready(
         ticker="AAPL",
         period="Q2",
         discovery_observation=observation,
+        source_container=source_container,
+        source_provenance=source_provenance,
     )
     assert result.research_ready is False
     assert result.catalog_status != "ADDED"
@@ -333,6 +390,7 @@ def test_p8_revalidates_raw_sec_package_before_serving(
                         "selected_accession": observation.selected_accession,
                         "discovery_state": observation.state,
                         "fact_source_mode": parsed.fact_source_mode,
+                        "package_source_provenance_sha256": validation.package_source_provenance_sha256,
                         "fiscal_year": 2025,
                         "filing_type": "Q2",
                         "raw_fiscal_period": "Q2",

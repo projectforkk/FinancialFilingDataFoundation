@@ -33,6 +33,13 @@ from financial_filing_data_foundation.us_sec.package import (
 )
 from financial_filing_data_foundation.us_sec.parser import parse_sec_package
 from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
 from financial_filing_data_foundation.user_cli import _parser, _validate_market_period
 
@@ -428,7 +435,7 @@ def _inline_html(body: str) -> bytes:
         "xmlns:ex='http://example.test/ex'><body>"
         + body
         + "</body></html>"
-    ).encode()
+    ).encode() + b"\r\n"
 
 
 def _html_package(body: bytes, *, form: str = "10-Q", period: str = "Q2"):
@@ -450,6 +457,24 @@ def _html_package(body: bytes, *, form: str = "10-Q", period: str = "Q2"):
     )
 
 
+def _source_attestation(package):
+    member = package.members[0]
+    body = (
+        f"<SEC-DOCUMENT>{package.accession}.txt : 20250801\r\n"
+        f"<DOCUMENT>\r\n<TYPE>{package.form}\r\n<SEQUENCE>1\r\n<FILENAME>{member.relative_name}\r\n<TEXT>\r\n".encode()
+        + member.body
+        + b"</TEXT>\r\n</DOCUMENT>\r\n</SEC-DOCUMENT>\r\n"
+    )
+    container = SecSourceContainer.from_bytes(
+        body,
+        cik=package.cik,
+        accession=package.accession,
+        source_url=f"https://www.sec.gov/Archives/edgar/data/{int(package.cik)}/{package.accession.replace('-', '')}/{package.accession}.txt",
+    )
+    inventory = parse_sec_submission(body, cik=package.cik, accession=package.accession)
+    return container, build_package_source_provenance(package, container, inventory)
+
+
 def _ingested_sec_fixture(tmp_path: Path):
     body = _q2_submissions_body()
     observation = _observation_from_bytes(body, period="Q2")
@@ -459,12 +484,15 @@ def _ingested_sec_fixture(tmp_path: Path):
             "<h1>Revenue</h1><p><ix:nonfraction name='us-gaap:Revenue' contextRef='c1' unitRef='USD'>100</ix:nonfraction></p>"
         )
     )
+    source_container, source_provenance = _source_attestation(package)
     result = ingest_sec_package(
         package,
         root=tmp_path,
         ticker="AAPL",
         period="Q2",
         discovery_observation=observation,
+        source_container=source_container,
+        source_provenance=source_provenance,
     )
     return result
 

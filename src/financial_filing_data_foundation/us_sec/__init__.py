@@ -5,6 +5,20 @@ from .models import SecCompanyRef, SecFilingCandidate, SecFilingSlot, SecIssuerK
 from .policy import SecFormPolicy
 from .acquisition import SecAcquirer, SecAcquisitionResult
 from .package import SecFilingPackage, SecMemberRole, SecPackageMember, SecPackageStore, build_package
+from .source import (
+    SEC_PACKAGE_SOURCE_PROVENANCE_SCHEMA,
+    SEC_SOURCE_CONTAINER_KIND,
+    SEC_SOURCE_CONTAINER_SCHEMA,
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSgmlDocument,
+    SecSgmlInventory,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+    replay_package_source_provenance,
+)
 from .parser import SecParseResult, VIRTUAL_HTML_NORMALIZER_VERSION, load_sec_artifacts, parse_sec_package
 from .validation import SEC_VALIDATION_SCHEMA, SecValidationResult, load_sec_validation, sec_validation_artifact_dir, validate_sec_artifacts
 from .runtime import SEC_RUNTIME_VERSION, SecRuntimeDescriptor, SecSubprocessTransport, run_sec_runner
@@ -34,6 +48,18 @@ __all__ = [
     "SEC_VALIDATION_SCHEMA",
     "VIRTUAL_HTML_NORMALIZER_VERSION",
     "build_package",
+    "SEC_PACKAGE_SOURCE_PROVENANCE_SCHEMA",
+    "SEC_SOURCE_CONTAINER_KIND",
+    "SEC_SOURCE_CONTAINER_SCHEMA",
+    "SecPackageSourceProvenance",
+    "SecPackageSourceProvenanceStore",
+    "SecSgmlDocument",
+    "SecSgmlInventory",
+    "SecSourceContainer",
+    "SecSourceContainerStore",
+    "build_package_source_provenance",
+    "parse_sec_submission",
+    "replay_package_source_provenance",
     "SEC_RUNTIME_VERSION",
     "SecRuntimeDescriptor",
     "SecSubprocessTransport",

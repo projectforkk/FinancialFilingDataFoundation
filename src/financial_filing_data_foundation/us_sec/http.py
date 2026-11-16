@@ -81,6 +81,7 @@ class SecHttpConfig:
     max_redirects: int = 3
     submissions_max_bytes: int = SUBMISSIONS_MAX_BYTES
     member_max_bytes: int = MEMBER_MAX_BYTES
+    package_max_bytes: int = PACKAGE_MAX_BYTES
 
     @classmethod
     def from_env(cls) -> "SecHttpConfig":

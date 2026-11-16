@@ -24,8 +24,16 @@ from .errors import P11Reason, SecError
 from .http import SecHttpClient
 from .models import SecCompanyRef, SecFilingCandidate, SecIssuerKind
 from .package import SecFilingPackage, SecMemberRole, SecPackageMember, SecPackageStore, build_package
-from .path_policy import archive_member_url, archive_url_is_exact, normalize_archive_relative_name
+from .path_policy import archive_member_url, normalize_archive_relative_name, complete_submission_url
 from .policy import SecFormPolicy
+from .source import (
+    SecPackageSourceProvenance,
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +43,8 @@ class SecAcquisitionResult:
     reused: bool
     plan_action: str = "DISCOVER_AND_ACQUIRE"
     observation: SecDiscoveryObservation | None = None
+    source_container: SecSourceContainer | None = None
+    provenance: SecPackageSourceProvenance | None = None
 
 
 def _content_types(relative_name: str) -> tuple[str, ...]:
@@ -464,63 +474,61 @@ class SecAcquirer:
             }.get(observation.state, P11Reason.P11_DISCOVERY_FRESHNESS_UNKNOWN)
             raise SecError(reason, f"SEC discovery state is {observation.state}")
         candidate = select_filing(candidates)
-        local_matches = self.package_store.find_all_by_slot(
+        source_url = complete_submission_url(company.cik, candidate.accession)
+        package_max_bytes = getattr(self.client.config, "package_max_bytes", 512 * 1024 * 1024)
+        source_response = self.client.fetch(
+            source_url,
+            expected_content_types=("text/plain", "text/html", "application/octet-stream"),
+            max_bytes=package_max_bytes,
+        )
+        source_container = SecSourceContainer.from_bytes(
+            source_response.body,
             cik=company.cik,
-            fiscal_year=fiscal_year,
-            period=period,
+            accession=candidate.accession,
+            source_url=source_url,
         )
-        local = next(
-            (item for item in local_matches if item.accession == candidate.accession),
-            None,
+        source_store = SecSourceContainerStore(self.package_store.root, max_bytes=package_max_bytes)
+        provenance_store = SecPackageSourceProvenanceStore(self.package_store.root)
+        existing_attestations: list[SecPackageSourceProvenance] = []
+        if self.registry is None:
+            for existing_package in self.package_store.find_all_by_accession(candidate.accession):
+                existing_attestations.extend(provenance_store.list_for_package(existing_package.package_sha256))
+            if any(
+                attestation.source_container_sha256 != source_container.source_container_sha256
+                for attestation in existing_attestations
+            ):
+                raise SecError(
+                    P11Reason.P11_SOURCE_DRIFT,
+                    f"SEC accession already has a different current source container: {candidate.accession}",
+                )
+        inventory = parse_sec_submission(
+            source_container.body,
+            cik=company.cik,
+            accession=candidate.accession,
         )
-        if local is not None:
-            return SecAcquisitionResult(
-                package=local,
-                candidate=candidate,
-                reused=True,
-                plan_action="PARSE_LOCAL",
-                observation=observation,
-            )
-        index_url = archive_member_url(company.cik, candidate.accession, "index.json")
-        index_response = self.client.fetch(index_url, expected_content_types=("application/json",), max_bytes=self.client.config.submissions_max_bytes)
-        try:
-            index_payload = json.loads(index_response.body.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC archive index is invalid JSON") from exc
-        if not isinstance(index_payload, dict) or not isinstance(index_payload.get("directory"), dict):
-            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC archive index directory is invalid")
-        raw_items = index_payload["directory"].get("item")
-        if not isinstance(raw_items, list):
-            raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC archive index item list is invalid")
-        items_by_name: dict[str, dict[str, Any]] = {}
-        for item in raw_items:
-            if not isinstance(item, dict) or not isinstance(item.get("name"), str):
-                raise SecError(P11Reason.P11_SEC_DISCOVERY_FAILED, "SEC archive index item is invalid")
-            name = normalize_archive_relative_name(item["name"])
-            items_by_name[name] = item
+        items_by_name = {
+            document.filename: {
+                "name": document.filename,
+                "type": document.document_type,
+                "documentType": document.document_type,
+                "sequence": document.document_sequence,
+                "_document": document,
+            }
+            for document in inventory.documents
+        }
         primary_name = normalize_archive_relative_name(candidate.primary_document)
+        primary_document = inventory.by_filename(primary_name)
+        primary_body = primary_document.payload(source_container.body)
+        primary_document.validate_payload(source_container.body, primary=True)
         primary_url = archive_member_url(company.cik, candidate.accession, primary_name)
-        primary_response = self.client.fetch(
-            primary_url,
-            expected_content_types=_content_types(primary_name),
-            max_bytes=self.client.config.member_max_bytes,
-        )
-        _validate_source_bytes(primary_name, primary_response.body, "text/html", primary=True)
-        primary_content_type = next(
-            (
-                str(value).split(";", 1)[0].strip().lower()
-                for key, value in primary_response.headers.items()
-                if str(key).casefold() == "content-type"
-            ),
-            _content_types(primary_name)[0],
-        )
+        primary_content_type = _content_types(primary_name)[0]
         members_by_name: dict[str, SecPackageMember] = {
             primary_name: SecPackageMember(
                 relative_name=primary_name,
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type=primary_content_type,
                 source_url=primary_url,
-                body=primary_response.body,
+                body=primary_body,
             )
         }
         accepted_xbrl_bodies: dict[str, tuple[SecMemberRole, bytes]] = {}
@@ -528,41 +536,24 @@ class SecAcquirer:
             selected = _select_archive_members(
                 items_by_name,
                 primary_name=primary_name,
-                primary_body=primary_response.body,
+                primary_body=primary_body,
                 accepted_member_bodies=accepted_xbrl_bodies,
             )
             pending = [name for name in selected if name not in members_by_name]
             if not pending:
                 break
             for name in pending:
+                document = inventory.by_filename(name)
+                member_body = document.payload(source_container.body)
+                document.validate_payload(source_container.body, primary=False)
                 member_url = archive_member_url(company.cik, candidate.accession, name)
-                if not archive_url_is_exact(
-                    member_url,
-                    cik=company.cik,
-                    accession=candidate.accession,
-                    relative_name=name,
-                ):
-                    raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC archive member escaped exact accession root")
-                member_response = self.client.fetch(
-                    member_url,
-                    expected_content_types=_content_types(name),
-                    max_bytes=self.client.config.member_max_bytes,
-                )
-                content_type = next(
-                    (
-                        str(value).split(";", 1)[0].strip().lower()
-                        for key, value in member_response.headers.items()
-                        if str(key).casefold() == "content-type"
-                    ),
-                    _content_types(name)[0],
-                )
-                _validate_source_bytes(name, member_response.body, content_type, primary=False)
+                content_type = _content_types(name)[0]
                 member = SecPackageMember(
                     relative_name=name,
-                    role=_member_role(name, primary_name, member_response.body),
+                    role=_member_role(name, primary_name, member_body),
                     content_type=content_type,
                     source_url=member_url,
-                    body=member_response.body,
+                    body=member_body,
                 )
                 members_by_name[name] = member
                 if member.role in _XBRL_MEMBER_ROLES:
@@ -579,13 +570,62 @@ class SecAcquirer:
             report_period=candidate.report_period,
             primary_document=candidate.primary_document,
         )
+        # A same-byte re-attestation may reproduce an existing immutable
+        # package SHA even when discovery metadata has changed.  Preserve the
+        # package directory and use its exact manifest/member representation.
         existed = self.package_store.package_dir(package.package_sha256).exists()
-        self.package_store.put(package)
+        if existed:
+            existing_package = self.package_store.load(package.package_sha256)
+            if existing_package.canonical_records() != package.canonical_records():
+                raise SecError(
+                    P11Reason.P11_SOURCE_DRIFT,
+                    f"existing SEC package differs in member bytes: {candidate.accession}",
+                )
+            package = existing_package
+        provenance = build_package_source_provenance(package, source_container, inventory)
+        if self.registry is not None:
+            current_containers = self.registry.list_sec_source_containers_for_accession(
+                cik=company.cik,
+                accession=candidate.accession,
+            )
+            if any(str(row["source_container_sha256"]).lower() != source_container.source_container_sha256 for row in current_containers):
+                raise SecError(
+                    P11Reason.P11_SOURCE_DRIFT,
+                    f"SEC accession already has a different current source container: {candidate.accession}",
+                )
+            for row in self.registry.list_sec_package_provenance_for_container(source_container.source_container_sha256):
+                if str(row["package_sha256"]).lower() != package.package_sha256:
+                    raise SecError(
+                        P11Reason.P11_PROVENANCE_MISMATCH,
+                        f"SEC source container deterministically maps to a different package: {candidate.accession}",
+                    )
+        elif any(
+            attestation.package_sha256 != package.package_sha256
+            for attestation in existing_attestations
+            if attestation.source_container_sha256 == source_container.source_container_sha256
+        ):
+            raise SecError(
+                P11Reason.P11_PROVENANCE_MISMATCH,
+                f"SEC source container deterministically maps to a different package: {candidate.accession}",
+            )
+        # The package store remains immutable.  Migration coexistence is
+        # allowed here only because the current source-container/provenance
+        # boundary is checked before the package is registered.
+        source_store.put(source_container)
+        if not existed:
+            self.package_store.put(package, allow_accession_coexistence=True)
+        provenance_store.put(provenance)
+        if self.registry is not None:
+            self.registry.register_sec_package(package)
+            self.registry.register_sec_source_container(source_container)
+            self.registry.register_sec_package_source_provenance(provenance)
         return SecAcquisitionResult(
             package=package,
             candidate=candidate,
             reused=existed,
             observation=observation,
+            source_container=source_container,
+            provenance=provenance,
         )
 
 

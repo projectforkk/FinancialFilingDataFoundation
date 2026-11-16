@@ -13,6 +13,32 @@ from financial_filing_data_foundation.us_sec.path_policy import archive_member_u
 CIK = "0000320193"
 ACCESSION = "0000320193-25-000001"
 PRIMARY = "aapl-20250927.htm"
+COMPLETE_URL = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/0000320193-25-000001.txt"
+
+
+def _complete_submission(items: list[dict[str, object]], bodies: dict[str, bytes]) -> bytes:
+    rows = [b"<SEC-DOCUMENT>0000320193-25-000001.txt : 20251031\r\n"]
+    for index, item in enumerate(items, start=1):
+        name = str(item["name"])
+        document_type = str(item.get("type") or ("10-K" if name == PRIMARY else "EXHIBIT"))
+        body = bodies.get(name, b"")
+        if name.casefold().endswith((".xml", ".xsd", ".xbrl")):
+            payload = b"<XML>\r\n" + body + b"\r\n</XML>\r\n"
+        else:
+            payload = body + (b"\r\n" if not body.endswith((b"\r\n", b"\n")) else b"")
+        rows.extend(
+            [
+                b"<DOCUMENT>\r\n",
+                f"<TYPE>{document_type}\r\n".encode(),
+                f"<SEQUENCE>{index}\r\n".encode(),
+                f"<FILENAME>{name}\r\n".encode(),
+                b"<TEXT>\r\n",
+                payload,
+                b"</TEXT>\r\n</DOCUMENT>\r\n",
+            ]
+        )
+    rows.append(b"</SEC-DOCUMENT>\r\n")
+    return b"".join(rows)
 
 
 def _submissions() -> dict[str, object]:
@@ -39,7 +65,8 @@ def _build_acquirer(
     forbidden_names: set[str],
 ) -> tuple[SecAcquirer, list[str]]:
     submissions_url = f"https://data.sec.gov/submissions/CIK{CIK}.json"
-    index_url = archive_member_url(CIK, ACCESSION, "index.json")
+    complete_url = COMPLETE_URL
+    complete_body = _complete_submission(items, bodies)
     calls: list[str] = []
 
     def transport(url: str, headers: dict[str, str], timeout: float) -> SecResponse:
@@ -51,20 +78,8 @@ def _build_acquirer(
                 json.dumps(_submissions()).encode("utf-8"),
                 url,
             )
-        if url == index_url:
-            return SecResponse(
-                200,
-                {"Content-Type": "application/json"},
-                json.dumps({"directory": {"item": items}}).encode("utf-8"),
-                url,
-            )
-        for name, body in bodies.items():
-            member_url = archive_member_url(CIK, ACCESSION, name)
-            if url == member_url:
-                if name in forbidden_names:
-                    raise AssertionError(f"forbidden browser/static member fetched: {name}")
-                content_type = "text/html" if name == PRIMARY else "application/xml"
-                return SecResponse(200, {"Content-Type": content_type}, body, url)
+        if url == complete_url:
+            return SecResponse(200, {"Content-Type": "text/plain"}, complete_body, url)
         raise AssertionError(f"unexpected SEC URL: {url}")
 
     client = SecHttpClient(
@@ -99,7 +114,6 @@ def test_primary_browser_assets_are_not_fetched_but_semantic_reference_support_i
         "</head><body>"
         "<img src='aapl-20250927_g1.jpg'>"
         "<link href='style.css'>"
-        "<script src='script.js'></script>"
         "<img src='graphic.png'><img src='graphic.gif'>"
         "<link href='font.woff2'>"
         "</body></html>"
@@ -139,7 +153,8 @@ def test_primary_browser_assets_are_not_fetched_but_semantic_reference_support_i
     assert names.isdisjoint(static_names)
     for name in static_names:
         assert calls.count(archive_member_url(CIK, ACCESSION, name)) == 0
-    assert calls.count(archive_member_url(CIK, ACCESSION, support_name)) == 1
+    assert calls.count(COMPLETE_URL) == 1
+    assert calls.count(archive_member_url(CIK, ACCESSION, "index.json")) == 0
     assert next(member for member in result.package.members if member.relative_name == support_name).role is SecMemberRole.XBRL_INSTANCE
 
 
@@ -163,6 +178,7 @@ def test_generic_xml_reference_is_not_selected_without_semantic_metadata(tmp_pat
 
     assert generic_name not in {member.relative_name for member in result.package.members}
     assert calls.count(archive_member_url(CIK, ACCESSION, generic_name)) == 0
+    assert calls.count(COMPLETE_URL) == 1
 
 
 def test_unsafe_primary_references_are_ignored_without_archive_fetch() -> None:

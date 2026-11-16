@@ -20,11 +20,55 @@ from financial_filing_data_foundation.us_sec.parser import (
     load_sec_artifacts,
     parse_sec_package,
 )
-from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.path_policy import archive_member_url, complete_submission_url
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenance,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    SecPackageSourceProvenanceStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 
 
 def _sec_url(cik: str, accession: str, name: str) -> str:
     return archive_member_url(cik, accession, name)
+
+
+def _attest(package: object, tmp_path: Path) -> Path:
+    rows = [f"<SEC-DOCUMENT>{package.accession}.txt : 20250730\r\n".encode()]
+    for index, member in enumerate(package.canonical_members(), start=1):
+        payload = member.body
+        if member.content_type == "application/xml":
+            payload = b"<XML>\r\n" + payload + b"</XML>\r\n"
+        rows.extend(
+            [
+                b"<DOCUMENT>\r\n",
+                f"<TYPE>{package.form if index == 1 else 'EX-101.INS'}\r\n".encode(),
+                f"<SEQUENCE>{index}\r\n".encode(),
+                f"<FILENAME>{member.relative_name}\r\n<TEXT>\r\n".encode(),
+                payload,
+                b"</TEXT>\r\n</DOCUMENT>\r\n",
+            ]
+        )
+    rows.append(b"</SEC-DOCUMENT>\r\n")
+    body = b"".join(rows)
+    container = SecSourceContainer.from_bytes(
+        body,
+        cik=package.cik,
+        accession=package.accession,
+        source_url=complete_submission_url(package.cik, package.accession),
+    )
+    provenance = build_package_source_provenance(
+        package,
+        container,
+        parse_sec_submission(body, cik=package.cik, accession=package.accession),
+    )
+    validation_root = tmp_path / "workspace" / "ingest" / "us" / "p7"
+    raw_store = tmp_path / "workspace" / "ingest" / "raw-store"
+    SecSourceContainerStore(raw_store).put(container)
+    SecPackageSourceProvenanceStore(raw_store).put(provenance)
+    return validation_root
 
 
 def _observation(package: object) -> SecDiscoveryObservation:
@@ -105,7 +149,7 @@ def _package() -> object:
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
                 source_url=_sec_url("0000320193", "0000320193-25-000001", "example.htm"),
-                body=html,
+                body=html.rstrip() + b"\r\n",
             ),
         ),
     )
@@ -173,7 +217,7 @@ def _hidden_fact_package() -> object:
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
                 source_url=_sec_url("0000320193", "0000320193-25-000003", "hidden.htm"),
-                body=html,
+                body=html.rstrip() + b"\r\n",
             ),
         ),
     )
@@ -197,7 +241,7 @@ def test_hidden_inline_numeric_and_nonnumeric_facts_are_valid_source_evidence(tm
 
     validation = validate_sec_artifacts(
         result,
-        tmp_path / "p7",
+        _attest(package, tmp_path),
         package=package,
         discovery_observation=observation,
     )
@@ -429,7 +473,7 @@ def test_namespaced_nil_and_explicit_typed_dimensions_are_preserved(tmp_path: Pa
     xml = b'''<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ex="http://example.test/ex" xmlns:dim="http://example.test/dim">
       <xbrli:context id="c1"><xbrli:entity><xbrli:identifier>1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2025-06-30</xbrli:instant></xbrli:period><xbrli:scenario><xbrldi:explicitMember xmlns:xbrldi="http://xbrl.org/2006/xbrldi" dimension="dim:RegionAxis">ex:North</xbrldi:explicitMember><xbrldi:typedMember xmlns:xbrldi="http://xbrl.org/2006/xbrldi" dimension="dim:CustomAxis"><ex:MemberText>North</ex:MemberText></xbrldi:typedMember></xbrli:scenario></xbrli:context>
       <ex:Amount contextRef="c1" xsi:nil="true"/>
-    </xbrli:xbrl>'''
+    </xbrli:xbrl>\r\n'''
     package = build_package(cik="0000000001", accession="0000000001-25-000002", form="10-Q", fiscal_year=2025, period="Q2", members=(
         SecPackageMember(relative_name="nil.htm", role=SecMemberRole.PRIMARY_DOCUMENT, content_type="text/html", source_url=_sec_url("0000000001", "0000000001-25-000002", "nil.htm"), body=b"<html><body><p>source</p></body></html>"),
         SecPackageMember(relative_name="nil.xbrl", role=SecMemberRole.XBRL_INSTANCE, content_type="application/xml", source_url=_sec_url("0000000001", "0000000001-25-000002", "nil.xbrl"), body=xml),
@@ -459,7 +503,7 @@ def _xml_package() -> object:
       <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
       <us-gaap:Revenues contextRef="c1" unitRef="USD" decimals="0">100</us-gaap:Revenues>
       <ex:Comment contextRef="c1">hello</ex:Comment>
-    </xbrli:xbrl>'''
+    </xbrli:xbrl>\r\n'''
     return build_package(
         cik="0000320193",
         accession="0000320193-25-000002",
@@ -472,7 +516,7 @@ def _xml_package() -> object:
                 role=SecMemberRole.PRIMARY_DOCUMENT,
                 content_type="text/html",
                 source_url=_sec_url("0000320193", "0000320193-25-000002", "example.htm"),
-                body=b"<html><body><p>XML instance source</p></body></html>",
+                body=b"<html><body><p>XML instance source</p></body></html>\r\n",
             ),
             SecPackageMember(
                 relative_name="example.xml",
@@ -500,7 +544,7 @@ def test_xml_instance_facts_preserve_source_qname_and_locator(tmp_path: Path) ->
 
     validation = validate_sec_artifacts(
         result,
-        tmp_path / "p7",
+        _attest(package, tmp_path),
         package=package,
         discovery_observation=observation,
     )

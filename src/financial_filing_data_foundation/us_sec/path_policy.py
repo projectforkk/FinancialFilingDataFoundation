@@ -63,6 +63,47 @@ def archive_member_url(cik: str, accession: str, relative_name: str) -> str:
     return archive_root_url(cik, accession) + safe_name
 
 
+def complete_submission_url(cik: str, accession: str) -> str:
+    """Return the exact SEC complete-submission text URL for an accession."""
+
+    return archive_root_url(cik, accession) + f"{accession}.txt"
+
+
+def validate_complete_submission_url(url: str) -> str:
+    """Validate a complete-submission URL without accepting a member URL."""
+
+    parsed = urlsplit(str(url).strip())
+    if (
+        parsed.scheme.casefold() != "https"
+        or (parsed.hostname or "").casefold() != "www.sec.gov"
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or not parsed.path.startswith("/Archives/edgar/data/")
+        or not parsed.path.casefold().endswith(".txt")
+    ):
+        raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC complete-submission URL is not an archive URL")
+    archive_path = parsed.path[len("/Archives/edgar/data/") :]
+    parts = archive_path.split("/")
+    if len(parts) != 3 or any(part in {"", ".", ".."} for part in parts):
+        raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC complete-submission URL contains traversal")
+    cik_part, normalized_accession, filename = parts
+    if not cik_part.isdigit() or not _NORMALIZED_ACCESSION_RE.fullmatch(normalized_accession):
+        raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC complete-submission URL identity is invalid")
+    if _DRIVE_RE.match(archive_path) or "\\" in archive_path or unquote(archive_path) != archive_path:
+        raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC complete-submission URL is not canonical")
+    if not _ACCESSION_RE.fullmatch(filename[:-4]):
+        raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC complete-submission filename is invalid")
+    if filename[:-4].replace("-", "") != normalized_accession or int(cik_part) <= 0:
+        raise SecError(P11Reason.P11_ARCHIVE_HOST_REJECTED, "SEC complete-submission URL identity does not match")
+    return str(url).strip()
+
+
+def complete_submission_url_is_exact(url: str, *, cik: str, accession: str) -> bool:
+    return validate_complete_submission_url(url) == complete_submission_url(cik, accession)
+
+
 def validate_archive_member_url(url: str) -> str:
     """Validate a package member URL without requiring package identity."""
 
@@ -94,6 +135,9 @@ __all__ = [
     "archive_member_url",
     "archive_root_url",
     "archive_url_is_exact",
+    "complete_submission_url",
+    "complete_submission_url_is_exact",
     "normalize_archive_relative_name",
     "validate_archive_member_url",
+    "validate_complete_submission_url",
 ]

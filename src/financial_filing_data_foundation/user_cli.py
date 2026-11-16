@@ -40,6 +40,11 @@ from financial_filing_data_foundation.us_sec.http import SecHttpClient, SecHttpC
 from financial_filing_data_foundation.us_sec.identity import normalize_cik, sec_company
 from financial_filing_data_foundation.us_sec.ingest import ingest_sec_package, revalidate_sec_package, reuse_sec_package
 from financial_filing_data_foundation.us_sec.package import SecPackageStore
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenanceStore,
+    SecSourceContainerStore,
+    replay_package_source_provenance,
+)
 from financial_filing_data_foundation.us_sec.parser import (
     SEC_ARTIFACT_SCHEMA,
     VIRTUAL_HTML_NORMALIZER_VERSION,
@@ -565,6 +570,19 @@ def _us_plan_slot(
         if len(local_packages) == 1:
             local = local_packages[0]
             packages[local.package_sha256] = local
+    # A package without a replayable Design-40 provenance artifact remains
+    # auditable but cannot drive any local planner action.
+    current_packages: dict[str, Any] = {}
+    source_store = SecSourceContainerStore(paths.raw_store)
+    provenance_store = SecPackageSourceProvenanceStore(paths.raw_store)
+    for package in packages.values():
+        try:
+            provenance = replay_package_source_provenance(package, source_store, provenance_store)
+            registry.verify_sec_package_source_provenance(package, provenance)
+        except Exception:
+            continue
+        current_packages[package.package_sha256] = package
+    packages = current_packages
     if discovery_state and discovery_state != "UNAMBIGUOUS":
         return SecPlan(SecPlanAction.REVIEW_REQUIRED, "P11_DISCOVERY_FRESHNESS_UNKNOWN"), None
     if amendment_conflict:
@@ -579,6 +597,16 @@ def _us_plan_slot(
     package_values = list(packages.values())
     package = package_values[0] if len(package_values) == 1 else None
     current_validation = _current_sec_validation(package=package, paths=paths) if package is not None else None
+    current_source = _current_sec_provenance(package=package, paths=paths, registry=registry) if package is not None else None
+    if (
+        current_validation is not None
+        and (
+            current_source is None
+            or not current_validation.package_source_provenance_sha256
+            or current_validation.package_source_provenance_sha256 != current_source[1].provenance_sha256
+        )
+    ):
+        current_validation = None
     compatible_parsed = (
         _compatible_sec_artifacts(package=package, parsed_rows=parsed_rows, paths=paths)
         if package is not None
@@ -634,7 +662,7 @@ def _compatible_sec_artifacts(
 
 
 def _current_sec_validation(*, package: Any, paths: RuntimePaths) -> Any | None:
-    """Load current validation-v3, distinguishing absence from corruption."""
+    """Load current validation-v4, distinguishing absence from corruption."""
 
     current_dir = sec_validation_artifact_dir(
         paths.ingest_root / "us" / "p7",
@@ -646,6 +674,24 @@ def _current_sec_validation(*, package: Any, paths: RuntimePaths) -> Any | None:
     if validation.package_sha256.lower() != package.package_sha256.lower():
         raise SecError("P11_PACKAGE_INVALID", "SEC validation package identity differs from source package")
     return validation
+
+
+def _current_sec_provenance(
+    *,
+    package: Any,
+    paths: RuntimePaths,
+    registry: SQLiteRegistry | None = None,
+) -> tuple[Any, Any] | None:
+    source_store = SecSourceContainerStore(paths.raw_store)
+    provenance_store = SecPackageSourceProvenanceStore(paths.raw_store)
+    try:
+        provenance = replay_package_source_provenance(package, source_store, provenance_store)
+        container = source_store.load(provenance.source_container_sha256)
+        if registry is not None:
+            registry.verify_sec_package_source_provenance(package, provenance)
+    except Exception:
+        return None
+    return container, provenance
 
 
 def _current_reusable_sec_artifacts(
@@ -717,12 +763,17 @@ def _us_acquire_result(args: argparse.Namespace) -> tuple[Any, Any, RuntimePaths
     }:
         from financial_filing_data_foundation.us_sec.acquisition import SecAcquisitionResult
 
+        current_source = _current_sec_provenance(package=local_package, paths=paths, registry=registry)
+        if current_source is None:
+            raise SecError(P11Reason.P11_PROVENANCE_MISMATCH, "SEC local package is not currently source-attested")
         result = SecAcquisitionResult(
             package=local_package,
             candidate=candidate_from_package(local_package, company),
             reused=True,
             plan_action=plan.action.value,
             observation=observation,
+            source_container=current_source[0],
+            provenance=current_source[1],
         )
         register_sec_package(registry, local_package)
         registry.register_sec_discovery_observation(observation)
@@ -813,6 +864,8 @@ def _us_ingest(args: argparse.Namespace) -> int:
             ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
             ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
             discovery_observation=result.observation,
+            source_container=result.source_container,
+            source_provenance=result.provenance,
         )
     elif result.plan_action == SecPlanAction.REVALIDATE_LOCAL.value:
         registry = SQLiteRegistry(paths.registry)
@@ -842,6 +895,8 @@ def _us_ingest(args: argparse.Namespace) -> int:
             ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
             ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
             discovery_observation=result.observation,
+            source_container=result.source_container,
+            source_provenance=result.provenance,
         )
     else:
         ingested = ingest_sec_package(
@@ -854,6 +909,8 @@ def _us_ingest(args: argparse.Namespace) -> int:
             ticker_source_sha256=getattr(company, "ticker_source_sha256", None),
             ticker_retrieved_at=getattr(company, "ticker_retrieved_at", None),
             discovery_observation=result.observation,
+            source_container=result.source_container,
+            source_provenance=result.provenance,
         )
     _print(
         {

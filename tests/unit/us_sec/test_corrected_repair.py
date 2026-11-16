@@ -29,6 +29,13 @@ from financial_filing_data_foundation.us_sec.parser import (
 )
 from financial_filing_data_foundation.us_sec.ticker_map import snapshot_ticker_map
 from financial_filing_data_foundation.us_sec.path_policy import archive_member_url
+from financial_filing_data_foundation.us_sec.source import (
+    SecPackageSourceProvenanceStore,
+    SecSourceContainer,
+    SecSourceContainerStore,
+    build_package_source_provenance,
+    parse_sec_submission,
+)
 from financial_filing_data_foundation.us_sec.validation import validate_sec_artifacts
 
 
@@ -127,7 +134,7 @@ def _inline_html(*, continuation: str = "", extra: str = "") -> bytes:
         "</ix:header><h1>Revenue</h1><p>"
         f"<ix:nonfraction name='us-gaap:Revenues' contextRef='c1' unitRef='USD' decimals='0'{continuation}>10"
         "</ix:nonfraction>"
-        f"{extra}</p></body></html>"
+        f"{extra}</p></body></html>\r\n"
     ).encode()
 
 
@@ -239,9 +246,30 @@ def test_continuation_chain_exclude_and_fragment_evidence_round_trip(tmp_path: P
     assert len(fragments) == 3
     assert "ignored" not in parsed.facts[0]["raw_value"]
     verify_sec_evidence(package, parsed.pages, parsed.evidence[0])
+    source_body = (
+        b"<SEC-DOCUMENT>0000320193-25-000001.txt : 20250730\r\n"
+        b"<DOCUMENT>\r\n<TYPE>10-Q\r\n<SEQUENCE>1\r\n<FILENAME>example.htm\r\n<TEXT>\r\n"
+        + html
+        + b"</TEXT>\r\n</DOCUMENT>\r\n</SEC-DOCUMENT>\r\n"
+    )
+    container = SecSourceContainer.from_bytes(
+        source_body,
+        cik=CIK,
+        accession=ACCESSION,
+        source_url="https://www.sec.gov/Archives/edgar/data/320193/000032019325000001/0000320193-25-000001.txt",
+    )
+    provenance = build_package_source_provenance(
+        package,
+        container,
+        parse_sec_submission(source_body, cik=CIK, accession=ACCESSION),
+    )
+    validation_root = tmp_path / "workspace" / "ingest" / "us" / "p7"
+    raw_store = tmp_path / "workspace" / "ingest" / "raw-store"
+    SecSourceContainerStore(raw_store).put(container)
+    SecPackageSourceProvenanceStore(raw_store).put(provenance)
     assert validate_sec_artifacts(
         parsed,
-        tmp_path / "p7",
+        validation_root,
         package=package,
         discovery_observation=observation,
     ).validation_status == "PASS"
@@ -278,10 +306,10 @@ def test_sec_table_uses_occupied_grid_and_real_th_cells(tmp_path: Path) -> None:
 def test_registry_fresh_sec_schema_is_v4_and_legacy_user_version_is_one(tmp_path: Path) -> None:
     registry = SQLiteRegistry(tmp_path / "registry.sqlite")
     assert registry.schema_version() == 1
-    assert registry.sec_schema_version() == 4
+    assert registry.sec_schema_version() == 5
     with sqlite3.connect(tmp_path / "registry.sqlite") as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
-        assert conn.execute("SELECT value FROM sec_schema_metadata WHERE key='schema_version'").fetchone()[0] == "4"
+        assert conn.execute("SELECT value FROM sec_schema_metadata WHERE key='schema_version'").fetchone()[0] == "5"
 
 
 def test_registry_v3_to_v4_migration_is_additive_and_idempotent(tmp_path: Path) -> None:
@@ -298,10 +326,10 @@ def test_registry_v3_to_v4_migration_is_additive_and_idempotent(tmp_path: Path) 
         ).fetchall()
     assert not any(row[0] == "sec_discovery_observations" for row in before_source_tables)
 
-    assert SQLiteRegistry(db).sec_schema_version() == 4
+    assert SQLiteRegistry(db).sec_schema_version() == 5
     with sqlite3.connect(db) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
-        assert conn.execute("SELECT value FROM sec_schema_metadata WHERE key='schema_version'").fetchone()[0] == "4"
+        assert conn.execute("SELECT value FROM sec_schema_metadata WHERE key='schema_version'").fetchone()[0] == "5"
         assert conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='sec_discovery_observations'"
         ).fetchone() == ("sec_discovery_observations",)

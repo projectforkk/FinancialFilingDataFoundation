@@ -30,7 +30,7 @@ from financial_filing_data_foundation.registry.models import (
 # additive SEC extension has its own versioned table contract so opening an old
 # registry never rewrites the legacy rows or changes their semantics.
 REGISTRY_SCHEMA_VERSION = 1
-SEC_REGISTRY_SCHEMA_VERSION = 4
+SEC_REGISTRY_SCHEMA_VERSION = 5
 
 _REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
     "documents": frozenset(
@@ -176,11 +176,55 @@ _SEC_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
         }
     ),
+    "sec_source_containers": frozenset(
+        {
+            "source_container_sha256",
+            "schema_version",
+            "kind",
+            "source_url",
+            "byte_length",
+            "cik",
+            "accession",
+            "first_seen_at",
+        }
+    ),
+    "sec_package_source_provenance": frozenset(
+        {
+            "provenance_sha256",
+            "package_sha256",
+            "source_container_sha256",
+            "schema_version",
+            "created_at",
+        }
+    ),
+    "sec_package_member_locators": frozenset(
+        {
+            "provenance_sha256",
+            "package_sha256",
+            "relative_name",
+            "document_index",
+            "document_type",
+            "document_sequence",
+            "filename",
+            "payload_start",
+            "payload_end",
+            "payload_envelope",
+            "public_source_url",
+            "member_sha256",
+            "byte_length",
+        }
+    ),
+}
+
+_SEC_V4_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
+    key: value
+    for key, value in _SEC_REQUIRED_SCHEMA_COLUMNS.items()
+    if key not in {"sec_source_containers", "sec_package_source_provenance", "sec_package_member_locators"}
 }
 
 _SEC_V3_REQUIRED_SCHEMA_COLUMNS: dict[str, frozenset[str]] = {
     key: value
-    for key, value in _SEC_REQUIRED_SCHEMA_COLUMNS.items()
+    for key, value in _SEC_V4_REQUIRED_SCHEMA_COLUMNS.items()
     if key != "sec_discovery_observations"
 }
 
@@ -223,6 +267,9 @@ _SEC_CORE_TABLES = frozenset(
     {"source_packages", "package_members", "sec_filing_bindings", "sec_parsed_data"}
 )
 _SEC_V4_TABLES = _SEC_CORE_TABLES | frozenset({"sec_discovery_observations"})
+_SEC_V5_TABLES = _SEC_V4_TABLES | frozenset(
+    {"sec_source_containers", "sec_package_source_provenance", "sec_package_member_locators"}
+)
 _SEC_SCHEMA_VERSION_KEY = "schema_version"
 
 
@@ -242,6 +289,14 @@ def _binding_id(document_sha256: str, identity: FilingIdentity) -> str:
     amended = "UNKNOWN" if identity.amended is None else ("1" if identity.amended else "0")
     raw = f"{document_sha256}|{identity.slot.serialize()}|{amended}".encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+class _SourceContainerMetadata:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._payload = dict(payload)
+
+    def metadata(self) -> dict[str, Any]:
+        return self._payload
 
 
 class SQLiteRegistry:
@@ -329,7 +384,11 @@ class SQLiteRegistry:
             )
 
     @staticmethod
-    def _validate_sec_schema(conn: sqlite3.Connection) -> None:
+    def _validate_sec_columns(
+        conn: sqlite3.Connection,
+        required_schema_columns: dict[str, frozenset[str]],
+        label: str,
+    ) -> None:
         rows = conn.execute(
             """
             SELECT name FROM sqlite_master
@@ -337,14 +396,14 @@ class SQLiteRegistry:
             """
         ).fetchall()
         existing_tables = {str(row["name"]) for row in rows}
-        missing_tables = sorted(set(_SEC_REQUIRED_SCHEMA_COLUMNS) - existing_tables)
+        missing_tables = sorted(set(required_schema_columns) - existing_tables)
         if missing_tables:
             raise RegistrySchemaUnsupported(
-                "SEC registry extension is incomplete; missing tables: "
+                f"{label} registry extension is incomplete; missing tables: "
                 + ", ".join(missing_tables)
             )
         missing_columns: list[str] = []
-        for table, required_columns in _SEC_REQUIRED_SCHEMA_COLUMNS.items():
+        for table, required_columns in required_schema_columns.items():
             columns = {
                 str(row["name"])
                 for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
@@ -353,9 +412,17 @@ class SQLiteRegistry:
                 missing_columns.append(f"{table}.{column}")
         if missing_columns:
             raise RegistrySchemaUnsupported(
-                "SEC registry extension is incomplete; missing columns: "
+                f"{label} registry extension is incomplete; missing columns: "
                 + ", ".join(missing_columns)
             )
+
+    @staticmethod
+    def _validate_sec_schema(conn: sqlite3.Connection) -> None:
+        SQLiteRegistry._validate_sec_columns(conn, _SEC_REQUIRED_SCHEMA_COLUMNS, "SEC")
+
+    @staticmethod
+    def _validate_sec_v4_schema(conn: sqlite3.Connection) -> None:
+        SQLiteRegistry._validate_sec_columns(conn, _SEC_V4_REQUIRED_SCHEMA_COLUMNS, "SEC v4")
 
     @staticmethod
     def _validate_sec_v3_schema(conn: sqlite3.Connection) -> None:
@@ -552,7 +619,69 @@ class SQLiteRegistry:
                 ON sec_discovery_observations(company_id, fiscal_year, raw_fiscal_period, retrieved_at)
                 """
             )
-            cls._write_sec_schema_version(conn, SEC_REGISTRY_SCHEMA_VERSION)
+            cls._write_sec_schema_version(conn, 4)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    @classmethod
+    def _migrate_sec_v4_to_v5(cls, conn: sqlite3.Connection) -> None:
+        """Add complete-submission source/provenance rows without rewriting v4."""
+
+        cls._validate_sec_v4_schema(conn)
+        if not conn.in_transaction:
+            conn.execute("BEGIN")
+        try:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS sec_source_containers (
+                    source_container_sha256 TEXT PRIMARY KEY,
+                    schema_version TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    source_url TEXT NOT NULL,
+                    byte_length INTEGER NOT NULL,
+                    cik TEXT NOT NULL,
+                    accession TEXT NOT NULL,
+                    first_seen_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS sec_package_source_provenance (
+                    provenance_sha256 TEXT PRIMARY KEY,
+                    package_sha256 TEXT NOT NULL,
+                    source_container_sha256 TEXT NOT NULL,
+                    schema_version TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256),
+                    FOREIGN KEY(source_container_sha256) REFERENCES sec_source_containers(source_container_sha256)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_sec_package_provenance_package
+                ON sec_package_source_provenance(package_sha256, created_at);
+
+                CREATE TABLE IF NOT EXISTS sec_package_member_locators (
+                    provenance_sha256 TEXT NOT NULL,
+                    package_sha256 TEXT NOT NULL,
+                    relative_name TEXT NOT NULL,
+                    document_index INTEGER NOT NULL,
+                    document_type TEXT NOT NULL,
+                    document_sequence TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    payload_start INTEGER NOT NULL,
+                    payload_end INTEGER NOT NULL,
+                    payload_envelope TEXT NOT NULL,
+                    public_source_url TEXT NOT NULL,
+                    member_sha256 TEXT NOT NULL,
+                    byte_length INTEGER NOT NULL,
+                    PRIMARY KEY(provenance_sha256, relative_name),
+                    FOREIGN KEY(provenance_sha256) REFERENCES sec_package_source_provenance(provenance_sha256)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_sec_member_locators_package
+                ON sec_package_member_locators(package_sha256, relative_name);
+                """
+            )
+            cls._write_sec_schema_version(conn, 5)
             conn.commit()
         except Exception:
             conn.rollback()
@@ -587,10 +716,16 @@ class SQLiteRegistry:
                 cls._validate_sec_v2_schema(conn)
                 cls._migrate_sec_v2_to_v3(conn)
                 cls._migrate_sec_v3_to_v4(conn)
+                cls._migrate_sec_v4_to_v5(conn)
                 return
             if stored_version == 3:
                 cls._validate_sec_v3_schema(conn)
                 cls._migrate_sec_v3_to_v4(conn)
+                cls._migrate_sec_v4_to_v5(conn)
+                return
+            if stored_version == 4:
+                cls._validate_sec_v4_schema(conn)
+                cls._migrate_sec_v4_to_v5(conn)
                 return
             if stored_version == SEC_REGISTRY_SCHEMA_VERSION:
                 cls._validate_sec_schema(conn)
@@ -618,6 +753,7 @@ class SQLiteRegistry:
         cls._validate_sec_v2_schema(conn)
         cls._migrate_sec_v2_to_v3(conn)
         cls._migrate_sec_v3_to_v4(conn)
+        cls._migrate_sec_v4_to_v5(conn)
 
     @staticmethod
     def _create_schema(conn: sqlite3.Connection) -> None:
@@ -807,6 +943,51 @@ class SQLiteRegistry:
 
             CREATE INDEX IF NOT EXISTS idx_sec_discovery_slot
             ON sec_discovery_observations(company_id, fiscal_year, raw_fiscal_period, retrieved_at);
+
+            CREATE TABLE IF NOT EXISTS sec_source_containers (
+                source_container_sha256 TEXT PRIMARY KEY,
+                schema_version TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                source_url TEXT NOT NULL,
+                byte_length INTEGER NOT NULL,
+                cik TEXT NOT NULL,
+                accession TEXT NOT NULL,
+                first_seen_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sec_package_source_provenance (
+                provenance_sha256 TEXT PRIMARY KEY,
+                package_sha256 TEXT NOT NULL,
+                source_container_sha256 TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(package_sha256) REFERENCES source_packages(package_sha256),
+                FOREIGN KEY(source_container_sha256) REFERENCES sec_source_containers(source_container_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sec_package_provenance_package
+            ON sec_package_source_provenance(package_sha256, created_at);
+
+            CREATE TABLE IF NOT EXISTS sec_package_member_locators (
+                provenance_sha256 TEXT NOT NULL,
+                package_sha256 TEXT NOT NULL,
+                relative_name TEXT NOT NULL,
+                document_index INTEGER NOT NULL,
+                document_type TEXT NOT NULL,
+                document_sequence TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                payload_start INTEGER NOT NULL,
+                payload_end INTEGER NOT NULL,
+                payload_envelope TEXT NOT NULL,
+                public_source_url TEXT NOT NULL,
+                member_sha256 TEXT NOT NULL,
+                byte_length INTEGER NOT NULL,
+                PRIMARY KEY(provenance_sha256, relative_name),
+                FOREIGN KEY(provenance_sha256) REFERENCES sec_package_source_provenance(provenance_sha256)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sec_member_locators_package
+            ON sec_package_member_locators(package_sha256, relative_name);
             """
         )
 
@@ -925,6 +1106,272 @@ class SQLiteRegistry:
             period=period,
         )
         return rows[0] if rows else None
+
+    def register_sec_source_container(self, container: object) -> None:
+        metadata = container.metadata()
+        values = (
+            str(metadata["source_container_sha256"]).lower(),
+            str(metadata["schema_version"]),
+            str(metadata["kind"]),
+            str(metadata["source_url"]),
+            int(metadata["byte_length"]),
+            str(metadata["cik"]),
+            str(metadata["accession"]),
+        )
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT source_container_sha256, schema_version, kind, source_url, byte_length, cik, accession FROM sec_source_containers WHERE source_container_sha256 = ?",
+                (values[0],),
+            ).fetchone()
+            if existing is not None and tuple(existing) != values:
+                raise ValueError("P11 SEC source-container identity drift")
+            if existing is None:
+                conn.execute(
+                    """
+                    INSERT INTO sec_source_containers(
+                        source_container_sha256, schema_version, kind, source_url,
+                        byte_length, cik, accession, first_seen_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (*values, _utc_now()),
+                )
+            conn.commit()
+
+    def register_sec_package_source_provenance(self, provenance: object) -> None:
+        payload = provenance.to_dict()
+        package_sha = str(payload["package_sha256"]).lower()
+        provenance_sha = str(payload["provenance_sha256"]).lower()
+        source = payload["source_container"]
+        source_sha = str(source["source_container_sha256"]).lower()
+        values = (provenance_sha, package_sha, source_sha, str(payload["schema_version"]))
+        source_values = (
+            source_sha,
+            str(source["schema_version"]),
+            str(source["kind"]),
+            str(source["source_url"]),
+            int(source["byte_length"]),
+            str(source["cik"]),
+            str(source["accession"]),
+        )
+        with self._connect() as conn:
+            source_existing = conn.execute(
+                """
+                SELECT source_container_sha256, schema_version, kind, source_url,
+                       byte_length, cik, accession
+                FROM sec_source_containers
+                WHERE source_container_sha256 = ?
+                """,
+                (source_sha,),
+            ).fetchone()
+            if source_existing is not None and tuple(source_existing) != source_values:
+                raise ValueError("P11 SEC source-container identity drift")
+            accession = str(payload["accession"])
+            cik = str(payload["cik"]).zfill(10)
+            current_rows = conn.execute(
+                """
+                SELECT p.provenance_sha256, p.package_sha256, p.source_container_sha256
+                FROM sec_package_source_provenance p
+                JOIN source_packages s ON s.package_sha256 = p.package_sha256
+                WHERE s.cik = ? AND s.accession = ?
+                """,
+                (cik, accession),
+            ).fetchall()
+            for current in current_rows:
+                if str(current["source_container_sha256"]).lower() != source_sha:
+                    raise ValueError("P11_SOURCE_DRIFT: SEC accession has multiple current source containers")
+                if str(current["package_sha256"]).lower() != package_sha:
+                    raise ValueError("P11_PROVENANCE_MISMATCH: SEC source container maps to multiple packages")
+                if str(current["provenance_sha256"]).lower() != provenance_sha:
+                    raise ValueError("P11_PROVENANCE_MISMATCH: SEC package has multiple extractions for one source container")
+            existing = conn.execute(
+                "SELECT provenance_sha256, package_sha256, source_container_sha256, schema_version FROM sec_package_source_provenance WHERE provenance_sha256 = ?",
+                (provenance_sha,),
+            ).fetchone()
+            if existing is not None and tuple(existing) != values:
+                raise ValueError("P11 SEC package-source provenance identity drift")
+            if source_existing is None:
+                conn.execute(
+                    """
+                    INSERT INTO sec_source_containers(
+                        source_container_sha256, schema_version, kind, source_url,
+                        byte_length, cik, accession, first_seen_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (*source_values, _utc_now()),
+                )
+            if existing is None:
+                conn.execute(
+                    """
+                    INSERT INTO sec_package_source_provenance(
+                        provenance_sha256, package_sha256, source_container_sha256,
+                        schema_version, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (*values, _utc_now()),
+                )
+            for row in sorted(payload.get("members", []), key=lambda item: str(item.get("relative_name", ""))):
+                locator_values = (
+                    provenance_sha,
+                    package_sha,
+                    str(row["relative_name"]),
+                    int(row["document_index"]),
+                    str(row["document_type"]),
+                    str(row["document_sequence"]),
+                    str(row["filename"]),
+                    int(row["payload_start"]),
+                    int(row["payload_end"]),
+                    str(row["payload_envelope"]),
+                    str(row["public_source_url"]),
+                    str(row["member_sha256"]).lower(),
+                    int(row["byte_length"]),
+                )
+                prior = conn.execute(
+                    """
+                    SELECT provenance_sha256, package_sha256, relative_name,
+                           document_index, document_type, document_sequence,
+                           filename, payload_start, payload_end, payload_envelope,
+                           public_source_url, member_sha256, byte_length
+                    FROM sec_package_member_locators
+                    WHERE provenance_sha256 = ? AND relative_name = ?
+                    """,
+                    (provenance_sha, locator_values[2]),
+                ).fetchone()
+                if prior is not None and tuple(prior) != locator_values:
+                    raise ValueError("P11 SEC package member locator drift")
+                if prior is None:
+                    conn.execute(
+                        """
+                        INSERT INTO sec_package_member_locators(
+                            provenance_sha256, package_sha256, relative_name,
+                            document_index, document_type, document_sequence,
+                            filename, payload_start, payload_end, payload_envelope,
+                            public_source_url, member_sha256, byte_length
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        locator_values,
+                    )
+            conn.commit()
+
+    def list_sec_package_source_provenance(self, package_sha256: str) -> tuple[sqlite3.Row, ...]:
+        with self._connect() as conn:
+            return tuple(
+                conn.execute(
+                    """
+                    SELECT * FROM sec_package_source_provenance
+                    WHERE package_sha256 = ?
+                    ORDER BY created_at ASC, provenance_sha256 ASC
+                    """,
+                    (str(package_sha256).lower(),),
+                ).fetchall()
+            )
+
+    def list_sec_source_containers_for_accession(
+        self,
+        *,
+        cik: str,
+        accession: str,
+    ) -> tuple[sqlite3.Row, ...]:
+        with self._connect() as conn:
+            return tuple(
+                conn.execute(
+                    """
+                    SELECT DISTINCT c.*
+                    FROM sec_source_containers c
+                    JOIN sec_package_source_provenance p
+                      ON p.source_container_sha256 = c.source_container_sha256
+                    JOIN source_packages s ON s.package_sha256 = p.package_sha256
+                    WHERE c.cik = ? AND c.accession = ?
+                    ORDER BY c.source_container_sha256 ASC
+                    """,
+                    (str(cik).zfill(10), str(accession)),
+                ).fetchall()
+            )
+
+    def list_sec_package_provenance_for_container(
+        self,
+        source_container_sha256: str,
+    ) -> tuple[sqlite3.Row, ...]:
+        with self._connect() as conn:
+            return tuple(
+                conn.execute(
+                    """
+                    SELECT * FROM sec_package_source_provenance
+                    WHERE source_container_sha256 = ?
+                    ORDER BY package_sha256 ASC, provenance_sha256 ASC
+                    """,
+                    (str(source_container_sha256).lower(),),
+                ).fetchall()
+            )
+
+    def verify_sec_package_source_provenance(self, package: object, provenance: object) -> None:
+        self.verify_sec_package_provenance(package)
+        payload = provenance.to_dict()
+        package_sha = str(payload["package_sha256"]).lower()
+        provenance_sha = str(payload["provenance_sha256"]).lower()
+        source_sha = str(payload["source_container"]["source_container_sha256"]).lower()
+        with self._connect() as conn:
+            current_rows = conn.execute(
+                """
+                SELECT p.provenance_sha256, p.package_sha256, p.source_container_sha256
+                FROM sec_package_source_provenance p
+                JOIN source_packages s ON s.package_sha256 = p.package_sha256
+                WHERE s.cik = ? AND s.accession = ?
+                """,
+                (str(payload["cik"]).zfill(10), str(payload["accession"])),
+            ).fetchall()
+        if any(str(row["source_container_sha256"]).lower() != source_sha for row in current_rows):
+            raise ValueError("P11_SOURCE_DRIFT: SEC accession has multiple current source containers")
+        if any(
+            str(row["package_sha256"]).lower() != package_sha
+            or str(row["provenance_sha256"]).lower() != provenance_sha
+            for row in current_rows
+        ):
+            raise ValueError("P11_PROVENANCE_MISMATCH: SEC current provenance identity conflict")
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT provenance_sha256, package_sha256, source_container_sha256, schema_version FROM sec_package_source_provenance WHERE provenance_sha256 = ?",
+                (provenance_sha,),
+            ).fetchone()
+            if row is None or tuple(row) != (
+                provenance_sha,
+                package_sha,
+                source_sha,
+                str(payload["schema_version"]),
+            ):
+                raise ValueError("P11 SEC package-source provenance row mismatch")
+            rows = conn.execute(
+                """
+                SELECT provenance_sha256, package_sha256, relative_name,
+                       document_index, document_type, document_sequence,
+                       filename, payload_start, payload_end, payload_envelope,
+                       public_source_url, member_sha256, byte_length
+                FROM sec_package_member_locators
+                WHERE provenance_sha256 = ?
+                ORDER BY relative_name ASC
+                """,
+                (provenance_sha,),
+            ).fetchall()
+        expected = []
+        for member in sorted(payload.get("members", []), key=lambda item: str(item["relative_name"])):
+            expected.append(
+                (
+                    provenance_sha,
+                    package_sha,
+                    str(member["relative_name"]),
+                    int(member["document_index"]),
+                    str(member["document_type"]),
+                    str(member["document_sequence"]),
+                    str(member["filename"]),
+                    int(member["payload_start"]),
+                    int(member["payload_end"]),
+                    str(member["payload_envelope"]),
+                    str(member["public_source_url"]),
+                    str(member["member_sha256"]).lower(),
+                    int(member["byte_length"]),
+                )
+            )
+        if tuple(tuple(row) for row in rows) != tuple(expected):
+            raise ValueError("P11 SEC package member locator rows mismatch")
 
     def verify_sec_package_provenance(self, package: object) -> None:
         manifest = package.manifest()

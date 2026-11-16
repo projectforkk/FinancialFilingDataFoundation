@@ -221,13 +221,16 @@ class SecPackageStore:
             raise SecError(P11Reason.P11_PACKAGE_INVALID, "invalid package SHA")
         return self.root / "packages" / "sha256" / normalized[:2] / normalized
 
-    def put(self, package: SecFilingPackage) -> Path:
+    def put(self, package: SecFilingPackage, *, allow_accession_coexistence: bool = False) -> Path:
         package_sha = package.identity_package_sha256
         total = sum(len(member.body) for member in package.members)
         if total > self.package_max_bytes:
             raise SecError(P11Reason.P11_SIZE_LIMIT_EXCEEDED, "SEC package exceeds package size limit")
-        existing_accession = self.find_by_accession(package.accession)
-        if existing_accession is not None and existing_accession.package_sha256 != package_sha:
+        existing_accessions = self.find_all_by_accession(package.accession)
+        if (
+            any(existing.package_sha256 != package_sha for existing in existing_accessions)
+            and not allow_accession_coexistence
+        ):
             raise SecError(
                 P11Reason.P11_SOURCE_DRIFT,
                 f"SEC source drift: accession already exists with different package bytes: {package.accession}",
@@ -331,9 +334,14 @@ class SecPackageStore:
         return package
 
     def find_by_accession(self, accession: str) -> SecFilingPackage | None:
+        matches = self.find_all_by_accession(accession)
+        return matches[0] if matches else None
+
+    def find_all_by_accession(self, accession: str) -> tuple[SecFilingPackage, ...]:
         manifests_root = self.root / "packages" / "sha256"
         if not manifests_root.is_dir():
-            return None
+            return ()
+        matches: list[SecFilingPackage] = []
         for manifest_path in sorted(manifests_root.glob("*" + "/*/manifest.json")):
             try:
                 raw = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -341,8 +349,12 @@ class SecPackageStore:
                 continue
             if str(raw.get("accession", "")) != accession:
                 continue
-            return self.load(str(raw.get("package_sha256", "")))
-        return None
+            try:
+                matches.append(self.load(str(raw.get("package_sha256", ""))))
+            except SecError:
+                continue
+        unique = {package.package_sha256: package for package in matches}
+        return tuple(unique[key] for key in sorted(unique))
 
     def find_by_slot(self, *, cik: str, fiscal_year: int, period: str) -> SecFilingPackage | None:
         """Return a unique local package for a SEC slot without network access."""
