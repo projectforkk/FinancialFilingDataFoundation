@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_ISSUE_147_REVIEW_PASS / FORMAL_TEST_PLAN_5_FROZEN / EXECUTION_NOT_YET_AUTHORIZED**
+**P11_FORMAL_TEST_5_AUTHORIZED / CANDIDATE_F1CC7688 / PLAN_4E20CA77**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = ISSUE-147 REVIEW_PASS / FORMAL TEST PLAN 5 FROZEN / EXECUTION NOT YET AUTHORIZED`
+`P11 = ISSUE-147 REVIEW_PASS / FORMAL TEST PLAN 5 PASS / FORMAL EXECUTION AUTHORIZED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -41,7 +41,8 @@ Current P11 design:
 - ISSUE-147 production candidate: `f1cc76889718e06fdbdc46926e2b207b740a96e3`;
 - ISSUE-147 development evidence: `f859dc342060d8c534491639d85e7256c4e11a57`;
 - Review 8 exact-candidate result: `development/207-p11-fresh-full-exact-candidate-review-8.md = REVIEW_PASS`;
-- Formal Test Plan 5: `development/208-p11-formal-test-plan-5.md = FROZEN / AWAITING EXACT-PLAN REVIEW`.
+- Formal Test Plan 5: `development/208-p11-formal-test-plan-5.md`, SHA `4e20ca77889b9e2f35b470c99ee90c45c7853994`, exact-plan review `PASS`;
+- Formal Test Execution 5 authorization: `development/209-p11-formal-test-execution-authorization-5.md`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -736,7 +737,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-147 REVIEW_PASS / Formal Test Plan 5 frozen / execution not yet authorized`
+- P11 — US SEC Provider: `FORMAL TEST 5 AUTHORIZED / candidate f1cc7688 / plan 4e20ca77`
 
 
 ## P11 short execution workflow
