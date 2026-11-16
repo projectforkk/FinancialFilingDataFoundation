@@ -310,7 +310,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_FORMAL_TEST_4_EXECUTION_FAIL / DESIGN_39_FROZEN / DEVELOPMENT_AWAITING_AUTHORIZATION / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_ISSUE_147_REVIEW_PASS / FORMAL_TEST_PLAN_5_PENDING / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -327,7 +327,10 @@ P11 current design:
 - ISSUE-140..146 = `FIXED / REGRESSION PRESERVATION`;
 - Formal Test 4 = `EXECUTION_FAIL`;
 - ISSUE-147 = `DESIGN FROZEN / IMPLEMENTATION REQUIRED`;
-- next action = ChatGPT exact review of Design 39 freeze; development remains unauthorized until explicit authorization.
+- ISSUE-147 production candidate = `f1cc76889718e06fdbdc46926e2b207b740a96e3`;
+- ISSUE-147 evidence = `f859dc342060d8c534491639d85e7256c4e11a57`;
+- Review 8 = `development/207-p11-fresh-full-exact-candidate-review-8.md = REVIEW_PASS`;
+- next action = create and exact-review Formal Test Plan 5; formal execution remains unauthorized until that plan is frozen and separately authorized.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；

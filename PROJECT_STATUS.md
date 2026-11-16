@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_ISSUE_147_DEVELOPMENT_AUTHORIZED / DESIGN_BASELINE_FAD6EE75**
+**P11_ISSUE_147_REVIEW_PASS / FORMAL_TEST_PLAN_5_PENDING**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = FORMAL TEST 4 EXECUTION_FAIL / ISSUE-147 DEVELOPMENT AUTHORIZED`
+`P11 = ISSUE-147 FRESH FULL EXACT-CANDIDATE REVIEW PASS / FORMAL TEST PLAN 5 PENDING`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -37,8 +37,10 @@ Current P11 design:
 - ISSUE-147 = `DEVELOPMENT AUTHORIZED / TICKER SNAPSHOT OBSERVATION IDENTITY`;
 - exact Design 39 freeze: `fad6ee7512ec1f2f3da0c9a24c646959b2f45541 = DESIGN_FREEZE_PASS`;
 - development authorization: `development/205-p11-issue147-development-authorization.md`;
-- exact production candidate: `6eaace08c9ba5fb26809a7e02de5835123fb667a`;
-- development evidence: `5ce97e18456c9e877c223df7abf01eec53e1f3ad`.
+- prior failed-formal production candidate: `6eaace08c9ba5fb26809a7e02de5835123fb667a`;
+- ISSUE-147 production candidate: `f1cc76889718e06fdbdc46926e2b207b740a96e3`;
+- ISSUE-147 development evidence: `f859dc342060d8c534491639d85e7256c4e11a57`;
+- Review 8 exact-candidate result: `development/207-p11-fresh-full-exact-candidate-review-8.md = REVIEW_PASS`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
@@ -733,7 +735,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-147 DEVELOPMENT AUTHORIZED / Design 39 fad6ee75`
+- P11 — US SEC Provider: `ISSUE-147 REVIEW_PASS / Formal Test Plan 5 pending / candidate f1cc7688`
 
 
 ## P11 short execution workflow
