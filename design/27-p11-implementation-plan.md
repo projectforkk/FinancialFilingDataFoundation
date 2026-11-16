@@ -307,6 +307,7 @@ must not invent or rename reason codes.
 Historical Design 37 version contract (superseded for current execution by §5 and Design 40):
 
 ```text
+HISTORICAL ONLY — NOT CURRENT
 SEC_DISCOVERY_SCHEMA = p11-sec-discovery-v1
 VIRTUAL_HTML_NORMALIZER_VERSION = VIRTUAL_HTML_V6
 SEC_ARTIFACT_SCHEMA = p11-sec-artifacts-v2
