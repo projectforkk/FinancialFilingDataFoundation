@@ -302,7 +302,7 @@ The Raw Fact semantic mismatch reason is frozen by Design 37 §4.6 as
 `P11_RAW_FACT_SOURCE_MISMATCH` with `BLOCKING` severity. The implementation
 must not invent or rename reason codes.
 
-Next-cycle version contract:
+Historical Design 37 version contract (superseded for current execution by §5 and Design 40):
 
 ```text
 SEC_DISCOVERY_SCHEMA = p11-sec-discovery-v1
@@ -408,7 +408,7 @@ same raw package + same V6 parsed artifact
 
 Old validation-v2 artifact bytes remain immutable.
 
-### Validation-v3 persistence and migration
+### Historical validation-v3 persistence and migration regression
 
 The development suite must also prove:
 
@@ -434,7 +434,11 @@ v3 validation.json schema_version =
 p11-sec-validation-v3
 
 v3 PASS
-→ current reuse eligibility restored
+→ historical Design-37 reuse eligibility restored
+
+under Design 40 current runtime:
+→ v3 alone is NOT current-reuse-eligible
+→ current provenance + validation-v4 are required
 
 v3 missing + valid v2 present
 → CLI/reuse/P8 must not accept v2 as current
@@ -633,21 +637,35 @@ Also test:
 - discovery network failure with cached data;
 - status performs no network and reports last discovery_checked_at.
 
-### T4 — acquisition/package/provenance
+### T4 — acquisition/package/source-container provenance
 
-- primary + only required XBRL members;
-- unrelated XML exhibit is not downloaded by default;
-- member/package hashes;
-- exact source URL path binding;
-- Registry/manifest provenance tamper;
-- source drift;
-- host/path/content-type/size negatives.
+- exact complete-submission URL/path binding;
+- complete-submission source-container atomic store;
+- strict byte-oriented DOCUMENT/TYPE/SEQUENCE/FILENAME/TEXT inventory;
+- deterministic TEXT/XML/XBRL payload offsets and replay;
+- primary + only required XBRL members selected from the container;
+- unrelated exhibits/browser/static assets are not fetched by default;
+- archive index fetch count = 0 for current package construction;
+- individual package-member fetch count = 0 for current package construction;
+- member/package hashes remain the Design-26 byte-set identity;
+- immutable package-source provenance hash/artifact;
+- legacy unattested package remains audit-only;
+- same-package re-attestation does not mutate package bytes/manifest;
+- different legacy/current package SHAs may coexist during migration;
+- current provenance conflict/source drift fails closed;
+- host/path/content-type/size/container-structure negatives.
 
-### T5 — Registry v4
+### T5 — Registry v5 / validation-v4
 
-- true v3 fixture → v4;
-- discovery observation rows preserved/reopened;
-- idempotent reopen;
+- true v4 SEC Registry fixture → v5;
+- v5 migration idempotent;
+- source-container/provenance/member-locator rows round-trip;
+- discovery observation rows preserved;
+- legacy package/binding/parsed rows preserved for audit;
+- current reuse requires source provenance;
+- validation-v4 binds package SHA + provenance SHA;
+- no validation-v4 → v3 fallback;
+- same-byte re-attestation may revalidate V6/v2 without parser rerun;
 - legacy user_version=1 unchanged;
 - future schema no-mutation failure;
 - CN/HK rows untouched.
