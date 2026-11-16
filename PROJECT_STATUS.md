@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_ISSUE_148_REVIEW_PASS / FORMAL_TEST_PLAN_6_PENDING**
+**P11_ISSUE_148_REVIEW_PASS / FORMAL_TEST_PLAN_6_FROZEN / EXECUTION_NOT_YET_AUTHORIZED**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = ISSUE-148 FRESH FULL EXACT-CANDIDATE REVIEW PASS / FORMAL TEST PLAN 6 PENDING`
+`P11 = ISSUE-148 REVIEW_PASS / FORMAL TEST PLAN 6 FROZEN / EXECUTION NOT YET AUTHORIZED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -52,6 +52,7 @@ Current P11 design:
 - ISSUE-148 production candidate: `7aac34e763b4c9caac24489eb049aa3dc6efb026`;
 - ISSUE-148 development evidence: `2c68f85199e6e77dc30c37e5e6eb5515b5bd6fe2`;
 - Review 9 exact-candidate result: `development/215-p11-fresh-full-exact-candidate-review-9.md = REVIEW_PASS`;
+- Formal Test Plan 6: `development/216-p11-formal-test-plan-6.md = FROZEN / AWAITING EXACT-PLAN REVIEW`;
 - prior Formal-Test-5 evidence gap remains a mandatory Formal Test 6 gate: `ISSUE-147 ACCEPTANCE-ONLY MATRIX`.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
@@ -747,7 +748,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `ISSUE-148 REVIEW_PASS / Formal Test Plan 6 pending / candidate 7aac34e7`
+- P11 — US SEC Provider: `ISSUE-148 REVIEW_PASS / Formal Test Plan 6 frozen / execution not yet authorized`
 
 
 ## P11 short execution workflow
