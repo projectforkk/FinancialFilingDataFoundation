@@ -1,6 +1,6 @@
 # 27 — P11 US SEC Provider Implementation Plan
 
-Status: **DESIGN 39 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
+Status: **DESIGN 40 FROZEN — DEVELOPMENT AWAITING CHATGPT AUTHORIZATION**
 
 Detailed design:
 `design/26-p11-sec-provider-design.md`
@@ -28,6 +28,9 @@ Review 6 revalidation planner correction:
 
 Formal-Test-4 ticker snapshot observation identity correction:
 `design/39-p11-ticker-snapshot-observation-identity.md`
+
+Formal-Acceptance-5 SEC complete-submission source provenance correction:
+`design/40-p11-sec-complete-submission-source-provenance.md`
 
 Review 5 exact-candidate result:
 `development/192-p11-fresh-full-exact-candidate-review-5.md = CHANGES_REQUIRED`
@@ -81,21 +84,22 @@ PC Agent must:
 
 PC Agent must not alter the corrected design contract without a STOP/design issue.
 
-The current post-Formal-Test-4 development cycle is limited to:
+The current post-Formal-Acceptance-5 development cycle is limited to:
 
 ```text
-ISSUE-147 implementation
+ISSUE-148 implementation
 ```
 
-ISSUE-147 is the ticker-map source/observation identity correction frozen by
-Design 39.
+ISSUE-148 is the complete-submission authoritative-source and provenance
+correction frozen by Design 40.
 
-`ISSUE-140` through `ISSUE-146` are fixed and require regression
+`ISSUE-140` through `ISSUE-147` are fixed and require regression
 preservation only. Historical ISSUE-123..139 remain historical and must not be
 erased or silently reopened.
 
-This correction does not create a new package, parser, artifact, discovery,
-validation, or Registry schema version and does not add a new reason code.
+Design 40 keeps package manifest v1, parser V6, parsed artifact v2, discovery
+v1, and existing P11 reason codes. It introduces source-container/provenance
+schemas, upgrades SEC Registry to v5, and upgrades validation to v4.
 
 ### 2.2 ChatGPT
 
@@ -127,13 +131,14 @@ Before repair code changes, freeze the exact commit containing:
 - `design/36-p11-review5-trust-boundary-correction.md`;
 - `design/37-p11-review5-freeze-consistency-and-raw-fact-binding.md`;
 - `design/38-p11-review6-revalidation-planner-correction.md`;
-- `design/39-p11-ticker-snapshot-observation-identity.md`.
+- `design/39-p11-ticker-snapshot-observation-identity.md`;
+- `design/40-p11-sec-complete-submission-source-provenance.md`.
 
 Record:
 
 ```text
 corrected_design_baseline_sha = exact final design-freeze commit returned by this task
-previous_production_candidate_sha = 6eaace08c9ba5fb26809a7e02de5835123fb667a
+previous_production_candidate_sha = f1cc76889718e06fdbdc46926e2b207b740a96e3
 starting_branch
 starting_head
 ```
@@ -225,34 +230,35 @@ Target constants:
 
 ```text
 REGISTRY_SCHEMA_VERSION = 1
-SEC_REGISTRY_SCHEMA_VERSION = 4
+SEC_REGISTRY_SCHEMA_VERSION = 5
+
+PACKAGE_MANIFEST_SCHEMA = p11-sec-package-v1
+SEC_SOURCE_CONTAINER_SCHEMA = p11-sec-source-container-v1
+SEC_PACKAGE_SOURCE_PROVENANCE_SCHEMA = p11-sec-package-source-v1
+
 SEC_DISCOVERY_SCHEMA = p11-sec-discovery-v1
 VIRTUAL_HTML_NORMALIZER_VERSION = VIRTUAL_HTML_V6
 SEC_ARTIFACT_SCHEMA = p11-sec-artifacts-v2
-SEC_VALIDATION_SCHEMA = p11-sec-validation-v3
+SEC_VALIDATION_SCHEMA = p11-sec-validation-v4
 ```
 
 Required behavior:
 
-- SEC Registry v3 → v4 additive migration;
-- v4 migration idempotent;
+- SEC Registry v4 → v5 additive/idempotent migration;
 - unknown future SEC schema fails closed before mutation;
-- CN/HK `user_version=1` and accepted rows unchanged;
-- V4/v1 US parsed artifacts not reusable as corrected current artifacts;
-- pre-V6 parsed artifacts are incompatible with the current parser contract;
-- the current parser is VIRTUAL_HTML_V6 and current parsed artifacts use
-  p11-sec-artifacts-v2;
-- immutable raw SEC packages remain reusable as local parse input;
-- existing V6/v2 parsed artifacts may be loaded locally, but validation-v2
-  results cannot qualify for REUSE_DATA under the stronger contract;
-- validation-v3 must execute before REUSE_DATA becomes eligible;
-- current validation-v3 artifacts live under the schema-versioned directory
-  `p7/<package_sha256>/p11-sec-validation-v3/`;
-- legacy flat validation-v2 files remain read-only and cannot be used as a
-  current-runtime fallback;
-- US ingest, reuse, CLI and P8 resolve the current validation artifact through
-  one shared deterministic versioned-path rule;
-- no destructive raw-store migration.
+- CN/HK `user_version=1` and accepted rows remain unchanged;
+- package manifest v1 and package SHA formula remain unchanged;
+- direct archive-member responses no longer supply package member bytes;
+- complete-submission text is the current authoritative source container;
+- new container/provenance artifacts are immutable and replayable;
+- legacy packages remain audit-readable but are current-reuse-ineligible until
+  fresh complete-submission provenance attestation succeeds;
+- same-byte re-attestation may reuse V6/v2 parsed data as local input;
+- validation-v3 cannot qualify for current reuse;
+- validation-v4 binds package SHA plus package-source provenance SHA;
+- no validation-v4 → v3 fallback;
+- current validation-v4 artifacts use a deterministic schema-versioned path;
+- no destructive raw-store/package migration.
 
 ## 4.10 Review 5 — Design 37 final design freeze
 
@@ -502,6 +508,44 @@ Local-only cached ticker resolution must use the newest verified snapshot only,
 not combine mappings across historical snapshots.
 
 Required development tests are frozen by Design 39.
+
+## 4.14 Formal-Acceptance-5 correction — authoritative complete-submission source
+
+Design 40 is the latest/current authority for SEC package byte provenance.
+
+Normal current package acquisition must:
+
+```text
+current discovery
+→ exact complete-submission .txt fetch
+→ strict byte-oriented SGML document inventory
+→ deterministic document payload slices
+→ package member bytes
+→ immutable package
+→ immutable package-source provenance
+```
+
+Direct individual member responses and index.json are not package byte sources.
+
+New storage/provenance contract:
+
+```text
+PACKAGE_MANIFEST_SCHEMA = p11-sec-package-v1
+SEC_SOURCE_CONTAINER_SCHEMA = p11-sec-source-container-v1
+SEC_PACKAGE_SOURCE_PROVENANCE_SCHEMA = p11-sec-package-source-v1
+SEC_REGISTRY_SCHEMA_VERSION = 5
+SEC_VALIDATION_SCHEMA = p11-sec-validation-v4
+```
+
+Legacy unattested packages remain audit-only until fresh provenance attestation.
+
+The old same-accession package conflict rule is migration-aware: an unattested
+legacy package may coexist with exactly one current-source-attested package.
+
+The next Formal Test must also restore the complete Plan-208 ISSUE-147
+acceptance-only observation matrix.
+
+Required development and live-smoke tests are frozen by Design 40.
 
 ## 6. Candidate commit rules
 
