@@ -64,6 +64,7 @@ Current P11 design:
 - Main merge authorization: `development/225-p11-main-merge-authorization.md = AUTHORIZED / FAST_FORWARD_ONLY`;
 - Main integration verification: `development/226-p11-main-integration-verification.md = INTEGRATION_PASS`;
 - P11 closeout: `development/227-p11-closeout.md = DONE / PASS`;
+- final closeout verification: `development/228-p11-final-closeout-verification.md = PASS`;
 - candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen `REVIEW_PASS`; no production/test change is authorized.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.

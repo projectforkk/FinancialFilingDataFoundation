@@ -357,6 +357,7 @@ P11 current design:
 - main merge authorization = `development/225-p11-main-merge-authorization.md = AUTHORIZED / FAST_FORWARD_ONLY`;
 - main integration verification = `development/226-p11-main-integration-verification.md = INTEGRATION_PASS`;
 - P11 closeout = `development/227-p11-closeout.md = DONE / PASS`;
+- final closeout verification = `development/228-p11-final-closeout-verification.md = PASS`;
 - next action = none for P11. Future provider/Research MCP/Semantic Resolver work requires a new explicit lifecycle.
 
 P10 design candidate：
@@ -494,7 +495,7 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 119. P10 = DONE / PASS；
 120. historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains INELIGIBLE；
 121. P11 design authorization = `development/143-p11-design-authorization.md`；
-122. P11 = DESIGN AUTHORIZED / PRODUCTION CLOSED；
+122. historical 2026-11-05 P11 state = DESIGN AUTHORIZED / PRODUCTION CLOSED; superseded by the 2026-11-09 reopening lifecycle and final P11 closeout.
 123. Research MCP production / Semantic Resolver production remain closed / not authorized。
 
 124. final scope contract = `design/30-project-final-cn-hk-scope.md`.
