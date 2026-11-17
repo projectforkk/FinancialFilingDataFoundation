@@ -116,21 +116,21 @@ Phase DONE 后保留，不重写当时的执行事实。
 | 23-p9-implementation-plan.md | P9 | ACCEPTED HISTORY |
 | 24-p10-codex-dynamic-research-integration-design.md | P10 | ACCEPTED HISTORY |
 | 25-p10-implementation-plan.md | P10 | ACCEPTED HISTORY |
-| 26-p11-sec-provider-design.md | P11 US SEC Provider | ACTIVE / DESIGN READY |
-| 27-p11-implementation-plan.md | P11 implementation plan | ACTIVE / DESIGN 40 DEVELOPMENT GATE |
+| 26-p11-sec-provider-design.md | P11 US SEC Provider | ACCEPTED HISTORY / P11 DONE |
+| 27-p11-implementation-plan.md | P11 implementation plan | ACCEPTED HISTORY / P11 DONE |
 | 28-ffdf-research-consumption-semantic-architecture.md | future semantic architecture | ACTIVE REFERENCE / IMPLEMENTATION NOT AUTHORIZED |
 | 29-research-mcp-visual-resolved-query-detailed-design.md | future Research MCP | ACTIVE REFERENCE / PRODUCTION NOT AUTHORIZED |
 | 30-project-final-cn-hk-scope.md | 2026-11-05 closeout scope | ACCEPTED HISTORICAL SCOPE |
 | 31-user-cli-design.md | CN/HK operational CLI | ACCEPTED POST-CLOSEOUT |
-| 32-p11-us-scope-reopening.md | 2026-11-09 P11 scope reopening | ACTIVE CURRENT SCOPE |
-| 33-p11-post-acceptance-design-correction.md | P11 post-acceptance correction | ACTIVE CURRENT CORRECTION |
-| 34-p11-explicit-6k-scope-correction.md | P11 explicit 6-K scope correction | ACTIVE CURRENT CORRECTION |
-| 35-p11-repair-140-143-design-correction.md | P11 Review 4 repair correction | ACTIVE CURRENT CORRECTION |
+| 32-p11-us-scope-reopening.md | 2026-11-09 P11 scope reopening | ACCEPTED HISTORY / P11 DONE |
+| 33-p11-post-acceptance-design-correction.md | P11 post-acceptance correction | ACCEPTED CORRECTION / P11 DONE |
+| 34-p11-explicit-6k-scope-correction.md | P11 explicit 6-K scope correction | ACCEPTED CORRECTION / P11 DONE |
+| 35-p11-repair-140-143-design-correction.md | P11 Review 4 repair correction | ACCEPTED CORRECTION / P11 DONE |
 | 36-p11-review5-trust-boundary-correction.md | P11 Review 5 trust-boundary correction | HISTORICAL DESIGN FREEZE ATTEMPT / SUPERSEDED BY DESIGN 37 |
-| 37-p11-review5-freeze-consistency-and-raw-fact-binding.md | P11 Review 5 freeze consistency, Raw Fact binding, and validation-v3 persistence | ACTIVE CURRENT CORRECTION |
-| 38-p11-review6-revalidation-planner-correction.md | P11 Review 6 validation-only planner correction | ACTIVE CORRECTION / FIXED |
-| 39-p11-ticker-snapshot-observation-identity.md | P11 Formal-Test-4 ticker snapshot observation identity correction | ACTIVE CORRECTION / FIXED |
-| 40-p11-sec-complete-submission-source-provenance.md | P11 Formal-Acceptance-5 complete-submission authoritative source/provenance correction | ACTIVE DESIGN FREEZE / DEVELOPMENT AWAITING AUTHORIZATION |
+| 37-p11-review5-freeze-consistency-and-raw-fact-binding.md | P11 Review 5 freeze consistency, Raw Fact binding, and validation-v3 persistence | ACCEPTED CORRECTION / P11 DONE |
+| 38-p11-review6-revalidation-planner-correction.md | P11 Review 6 validation-only planner correction | ACCEPTED CORRECTION / P11 DONE |
+| 39-p11-ticker-snapshot-observation-identity.md | P11 Formal-Test-4 ticker snapshot observation identity correction | ACCEPTED CORRECTION / P11 DONE |
+| 40-p11-sec-complete-submission-source-provenance.md | P11 Formal-Acceptance-5 complete-submission authoritative source/provenance correction | ACCEPTED FINAL CORRECTION / P11 DONE |
 
 历史上 P3/P4 出现 10/11 重号。为保持 accepted references 不改名。
 
@@ -183,7 +183,7 @@ Phase DONE 后保留，不重写当时的执行事实。
 | P8 | 20 | 21 | acceptance/33 | DONE |
 | P9 | 22 | 23 | acceptance/37 | DONE |
 | P10 | 24 | 25 | acceptance/40 | DONE |
-| P11 | 26 + 32 + 33 + 34 + 35 + 36 + 37 + 38 + 39 + 40 | 27 | TBD | FORMAL ACCEPTANCE 5 NOT PASSED / ISSUE-148 DESIGN 40 FROZEN / DEVELOPMENT AWAITING AUTHORIZATION |
+| P11 | 26 + 32 + 33 + 34 + 35 + 36 + 37 + 38 + 39 + 40 | 27 | development/223 | DONE / PASS / MAIN INTEGRATED |
 
 ---
 
@@ -314,7 +314,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_MAIN_INTEGRATION_VERIFIED / CLOSEOUT_PENDING / CANDIDATE_7AAC34E7 / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_DONE / PASS / MAIN_INTEGRATED / CANDIDATE_7AAC34E7 / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -356,7 +356,8 @@ P11 current design:
 - main merge readiness review = `development/224-p11-main-merge-readiness-review.md = READINESS_PASS`;
 - main merge authorization = `development/225-p11-main-merge-authorization.md = AUTHORIZED / FAST_FORWARD_ONLY`;
 - main integration verification = `development/226-p11-main-integration-verification.md = INTEGRATION_PASS`;
-- next action = P11 closeout record and final project-status transition to DONE.
+- P11 closeout = `development/227-p11-closeout.md = DONE / PASS`;
+- next action = none for P11. Future provider/Research MCP/Semantic Resolver work requires a new explicit lifecycle.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
@@ -497,11 +498,13 @@ P10-B first probe发现并关闭 `P10-ISSUE-001`：exact-candidate `PYTHONPATH=<
 123. Research MCP production / Semantic Resolver production remain closed / not authorized。
 
 124. final scope contract = `design/30-project-final-cn-hk-scope.md`.
-125. final production markets = `CN`, `HK` only.
-126. P11 US SEC Provider = `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`; historical P11 artifacts remain audit-only.
-127. closeout decision = `development/144-final-cn-hk-project-scope-closeout.md`.
-128. P0-P10 accepted behavior remains frozen; future market expansion requires a new explicit scope lifecycle.
-129. final full repository design/code consistency review = `development/145-final-full-repository-consistency-review.md` = PASS.
+125. historical 2026-11-05 production markets = `CN`, `HK` only.
+126. historical 2026-11-05 P11 decision = `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED`.
+127. historical closeout decision = `development/144-final-cn-hk-project-scope-closeout.md`.
+128. P11 was explicitly reopened on 2026-11-09 and completed through Design 40, candidate `7aac34e7`, Formal Acceptance 6, and fast-forward main integration.
+129. current accepted production markets = `CN`, `HK`, `US`.
+130. P11 closeout = `development/227-p11-closeout.md = DONE / PASS`.
+131. Research MCP production / Semantic Resolver production remain closed / not authorized.
 
 
 ## 14. P11 Reopening Note — 2026-11-09

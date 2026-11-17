@@ -1,6 +1,6 @@
 # 01 — Development Roadmap
 
-状态：**P11 REOPENED / DESIGN READY / P0-P10 DONE PASS**
+状态：**P0-P11 DONE / PASS / CN-HK-US ACCEPTED PRODUCTION**
 
 ## 总原则
 
@@ -91,7 +91,7 @@
 
 ## P11 — US SEC Provider
 
-状态：`REOPENED / DESIGN READY / ONE-PASS DEVELOPMENT NEXT`
+状态：`DONE / PASS / FORMAL_ACCEPTANCE_PASS / MAIN_INTEGRATED`
 
 当前真源：
 
@@ -106,7 +106,7 @@
 - 历史 P11 branch/probe 仅可作为参考证据，不能直接继承为 production candidate；
 - 采用 SEC filing package + HTML/Inline XBRL first；
 - P0-P10 CN/HK accepted behavior 必须保持回归兼容；
-- US 只有在 independent acceptance PASS 后才进入 public supported markets。
+- US 已在 independent Formal Acceptance PASS 与 main integration 后进入 accepted production markets。
 
 ## 最终执行顺序
 
@@ -136,12 +136,14 @@ P10
 CN/HK accepted baseline
 ↓
 P11 US SEC redesign/development/review/acceptance
+↓
+CN/HK/US accepted production
 ```
 
 
 ### P11 简化执行流程
 
-P11 不再拆成大量独立开发子阶段。默认执行链：
+P11 已完成。历史执行链：
 
 ```text
 设计冻结
@@ -153,4 +155,4 @@ P11 不再拆成大量独立开发子阶段。默认执行链：
 → PASS 后合并 / closeout
 ```
 
-只有发现真实 defect 时才进入一次 repair loop；不得为了流程形式人为拆分多个开发阶段。
+该 lifecycle 已完成 Formal Acceptance 与 main integration。未来新增 provider 或扩大 Research MCP/Semantic Resolver production scope 时必须开启新的显式 lifecycle。

@@ -2,29 +2,27 @@
 
 Financial Filing Data Foundation (FFDF) is a local, deterministic financial-filing data foundation.
 
-Accepted production currently supports **CN and HK**. **P11 US SEC Provider has been reopened for a new design/development lifecycle and is not yet production-available.**
+Accepted production supports **CN, HK, and US**. The P11 US SEC Provider has completed independent acceptance and main integration.
 
 ## Final project status
 
-**P0-P10 ACCEPTED / CN-HK PRODUCTION / P11 US SEC REOPENED — DESIGN READY**
+**P0-P11 DONE / PASS / CN-HK-US ACCEPTED PRODUCTION**
 
-The accepted production baseline remains P0-P10 plus the accepted CN/HK user CLI. The 2026-11-05 CN/HK closeout remains historical evidence, but the user reopened P11 on 2026-11-09. Current P11 design uses official SEC submissions/Archives and an HTML/Inline-XBRL-first filing-package model. Production US support remains unavailable until independent P11 acceptance.
+The accepted production baseline now includes P0-P11. The 2026-11-05 CN/HK closeout remains historical evidence; P11 was explicitly reopened on 2026-11-09 and later completed independent acceptance and fast-forward main integration. US production uses official SEC submissions/Archives, complete-submission source provenance, and HTML/Inline-XBRL-first filing packages.
 
 ## Supported markets
 
 Accepted production:
 - CN — mainland China official filings, acquired through the accepted CNINFO/Dayu path.
 - HK — Hong Kong official filings, acquired through the accepted HKEX/Dayu path.
+- US — SEC/EDGAR filing packages, accepted through P11.
 
-Active development target:
-- US — SEC/EDGAR filing packages (P11), **not yet accepted production**.
-
-Until P11 acceptance, the production identity contract continues to expose `SUPPORTED_MARKETS = ("CN", "HK")`.
+The production identity contract exposes `SUPPORTED_MARKETS = ("CN", "HK", "US")`.
 
 ## What FFDF provides
 
 1. deterministic filing identity, registry and incremental planning;
-2. CN/HK official filing acquisition with provenance and content-addressed raw storage;
+2. CN/HK official filing acquisition plus accepted US SEC filing-package acquisition with immutable provenance and content-addressed raw storage;
 3. native PDF page/section extraction and FTS;
 4. table candidate detection and cross-page table reconstruction;
 5. raw facts with first-class evidence links;
@@ -44,7 +42,7 @@ Until P11 acceptance, the production identity contract continues to expose `SUPP
 - silent guessing of filing identity, periods, facts or evidence;
 - production Semantic Resolver or Research MCP beyond the accepted P8/P9/P10 boundary.
 
-The P10 capability manifest correctly continues to report `P11_SEC_PROVIDER = UNAVAILABLE` until P11 passes independent acceptance and main integration.
+P11 has passed independent acceptance and main integration. The legacy `FFDF_P11_US_DEV` helper remains only as a low-level compatibility/testing surface; the accepted production CLI does not depend on that development bypass.
 
 ## Project root
 
@@ -59,15 +57,15 @@ All FFDF-owned code, runtimes, worktrees, workspace data and temporary test path
 - User CLI: [`docs/FFDF_User_CLI.md`](docs/FFDF_User_CLI.md)
 - MCP 部署与使用（中文注释）: [`docs/FFDF_MCP_部署与使用.md`](docs/FFDF_MCP_部署与使用.md)
 
-The manual covers local runtimes, deployment health checks, CN/HK data preparation, P8 MCP, P9 Review Overlay, P10 Research Integration, testing, troubleshooting, backup boundaries, and day-to-day operating workflows.
+The manuals cover local runtimes, deployment health checks, CN/HK data preparation, the user CLI, P8 MCP, P9 Review Overlay, P10 Research Integration, testing, troubleshooting, backup boundaries, and day-to-day operating workflows. P11 adds accepted US SEC acquisition/ingest/status through the same user CLI surface.
 
-The user CLI provides `ffdf acquire`, `ffdf ingest`, and `ffdf status` for self-service filing download, parsing, Registry persistence, and non-blocking P8 catalog publication.
+The user CLI provides `ffdf acquire`, `ffdf ingest`, and `ffdf status` for CN/HK/US self-service filing acquisition, parsing, Registry persistence, and non-blocking P8 catalog publication.
 
 ## Accepted phase baseline
 
-P0 through P10 are `DONE / PASS`. The final planned development sequence ends at P10.
+P0 through P11 are `DONE / PASS`. P11 is formally accepted and integrated into `main`.
 
-Historical P11 design documents and branches are retained as audit history only. They are not production scope and must not be merged into the final CN/HK baseline without a new, explicit scope reopening.
+Historical P11 repair/test artifacts remain audit history. Future market/provider expansion or Research MCP/Semantic Resolver production work requires a new explicit lifecycle.
 
 ## Verification
 
@@ -82,4 +80,4 @@ $env:PYTHONPATH="$root\src"
 & "$root\.venv\Scripts\python.exe" -m pytest -q --basetemp "$tmp\b" tests/unit
 ```
 
-See `PROJECT_STATUS.md`, `design/30-project-final-cn-hk-scope.md`, and the final closeout/review records under `development/`.
+See `PROJECT_STATUS.md`, the historical `design/30-project-final-cn-hk-scope.md`, the P11 reopening/design chain, and the final closeout/review records under `development/`.

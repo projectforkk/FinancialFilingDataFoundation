@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_MAIN_INTEGRATION_VERIFIED / CLOSEOUT_PENDING / CANDIDATE_7AAC34E7**
+**P11_DONE / PASS / MAIN_INTEGRATED / CANDIDATE_7AAC34E7**
 
-Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
+Accepted production markets are now `CN`, `HK`, and `US`.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = FORMAL ACCEPTANCE PASS / MAIN INTEGRATION VERIFIED / CLOSEOUT PENDING`
+`P11 = DONE / PASS / FORMAL ACCEPTANCE PASS / MAIN INTEGRATED`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -63,15 +63,21 @@ Current P11 design:
 - Main merge readiness review: `development/224-p11-main-merge-readiness-review.md = READINESS_PASS`;
 - Main merge authorization: `development/225-p11-main-merge-authorization.md = AUTHORIZED / FAST_FORWARD_ONLY`;
 - Main integration verification: `development/226-p11-main-integration-verification.md = INTEGRATION_PASS`;
+- P11 closeout: `development/227-p11-closeout.md = DONE / PASS`;
 - candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen `REVIEW_PASS`; no production/test change is authorized.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
 
-Post-closeout operational user CLI (2026-11-05): `ffdf acquire`, `ffdf ingest`, and `ffdf status` are available for CN/HK self-service operation. This is an orchestration surface over the accepted P0-P10 components and does not reopen market/provider scope. CLI focused tests: `5 passed`; current full unit regression: `450 passed / 0 failed`; design: `design/31-user-cli-design.md`; implementation record: `development/146-user-cli-implementation.md`.
+Historical post-closeout operational user CLI (2026-11-05): `ffdf acquire`, `ffdf ingest`, and `ffdf status` were accepted for CN/HK self-service operation under P0-P10. P11 later extended the same production CLI surface to accepted US SEC filings. Historical CLI evidence remains `design/31-user-cli-design.md` and `development/146-user-cli-implementation.md`.
 
 ## Accepted baseline
 
-- phase: `P10_DONE`
+- phase: `P11_DONE`
+- accepted production markets: `CN`, `HK`, `US`
+- P11 production candidate: `7aac34e763b4c9caac24489eb049aa3dc6efb026`
+- P11 Formal Acceptance: `development/223-p11-formal-acceptance-review-6-continuation.md = ACCEPTANCE_PASS`
+- P11 main integration verification: `development/226-p11-main-integration-verification.md = INTEGRATION_PASS`
+- P11 closeout: `development/227-p11-closeout.md = DONE / PASS`
 - frozen acceptance candidate: `183ca5dc89a606715a3e352bf92a235f7aa31fad`
 - reviewed production candidate: `d8e7d81b4bb5a4f06cead9eba0e2d09884094676`
 - final formal production review: `development/119-p10-l-formal-code-review-result.md = PASS`
@@ -218,7 +224,7 @@ Post-closeout operational user CLI (2026-11-05): `ffdf acquire`, `ffdf ingest`, 
 
 ## Current project scope
 
-**CN/HK ACCEPTED PRODUCTION + P11 US SEC REOPENED FOR NEW LIFECYCLE**
+**CN/HK/US ACCEPTED PRODUCTION / P0-P11 DONE / PASS**
 
 Historical closeout scope contract:
 
@@ -228,13 +234,17 @@ Historical closeout decision:
 
 `development/144-final-cn-hk-project-scope-closeout.md`
 
-Both remain valid historical records for the 2026-11-05 closeout, but are superseded for current P11 execution by:
+Both remain valid historical records for the 2026-11-05 CN/HK closeout. They were superseded for the completed P11 lifecycle by:
 
 `design/32-p11-us-scope-reopening.md`
 
-Current authorization:
+P11 reopening authorization:
 
 `development/147-p11-us-scope-reopening-authorization.md`
+
+Final P11 closeout:
+
+`development/227-p11-closeout.md = DONE / PASS`
 
 The older `development/143-p11-design-authorization.md` is retained as audit history and is not the new development baseline.
 
@@ -646,13 +656,12 @@ Final main verification:
 
 Historical `integration/p10-closeout @ b560f49a78316fa59a4183de326d2dee0a80ebb6` remains ineligible and historical only.
 
-P10 is DONE / PASS. US SEC Provider is outside the final project scope; Research MCP production and Semantic Resolver production remain unauthorized.
+P10 remains DONE / PASS as historical accepted baseline. P11 later reopened and accepted the US SEC Provider into production. Research MCP production and Semantic Resolver production remain unauthorized.
 
 Still not authorized:
 
 - Research MCP production;
 - Semantic Resolver production;
-- US SEC Provider production (final project scope: out of scope);
 - any weakening of P8 read-only or P9 durable-review boundaries.
 
 ## Project directory consolidation
@@ -758,12 +767,12 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `MAIN_INTEGRATION_VERIFIED / closeout pending / candidate 7aac34e7`
+- P11 — US SEC Provider: `DONE / PASS / FORMAL_ACCEPTANCE_PASS / MAIN_INTEGRATED / candidate 7aac34e7`
 
 
 ## P11 short execution workflow
 
-Current P11 execution model:
+Historical P11 execution model (completed):
 
 ```text
 DESIGN-ONLY COMMIT/FREEZE
