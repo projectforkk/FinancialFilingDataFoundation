@@ -314,7 +314,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_MAIN_MERGE_READINESS_PASS / CANDIDATE_7AAC34E7 / AUTHORIZATION_PENDING / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_MAIN_MERGE_AUTHORIZED / FAST_FORWARD_ONLY / CANDIDATE_7AAC34E7 / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -354,7 +354,8 @@ P11 current design:
 - Formal Test 6A Evidence = `development/222-p11-formal-test-evidence-6a.md`, commit `12700179754ffa9aa6d9c88d72d8bf3e56274ee6`, result `EXECUTION_PASS`;
 - Formal Acceptance Review 6 continuation = `development/223-p11-formal-acceptance-review-6-continuation.md = ACCEPTANCE_PASS`;
 - main merge readiness review = `development/224-p11-main-merge-readiness-review.md = READINESS_PASS`;
-- next action = separate main-merge authorization, then protected fast-forward integration; P11 is not DONE until post-merge verification and closeout are recorded.
+- main merge authorization = `development/225-p11-main-merge-authorization.md = AUTHORIZED / FAST_FORWARD_ONLY`;
+- next action = protected non-force fast-forward of `main`, followed by independent main-integration verification and P11 closeout.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
