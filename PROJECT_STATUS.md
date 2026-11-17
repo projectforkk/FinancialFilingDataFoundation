@@ -6,13 +6,13 @@
 
 ## Current state
 
-**P11_MAIN_MERGE_AUTHORIZED / FAST_FORWARD_ONLY / CANDIDATE_7AAC34E7**
+**P11_MAIN_INTEGRATION_VERIFIED / CLOSEOUT_PENDING / CANDIDATE_7AAC34E7**
 
 Accepted production markets remain `CN`, `HK` until P11 independent acceptance.
 
 P11 US SEC Provider was previously closed as `OUT_OF_SCOPE / NOT_REQUIRED_NOT_EXECUTED` on 2026-11-05. The user explicitly reopened P11 on 2026-11-09. Historical closeout records remain audit history; current P11 truth is:
 
-`P11 = FORMAL ACCEPTANCE PASS / MAIN MERGE AUTHORIZED / FAST_FORWARD ONLY`
+`P11 = FORMAL ACCEPTANCE PASS / MAIN INTEGRATION VERIFIED / CLOSEOUT PENDING`
 
 Current P11 design:
 - scope reopening: `design/32-p11-us-scope-reopening.md`;
@@ -62,6 +62,7 @@ Current P11 design:
 - Independent Formal Acceptance Review 6 continuation: `development/223-p11-formal-acceptance-review-6-continuation.md = ACCEPTANCE_PASS`;
 - Main merge readiness review: `development/224-p11-main-merge-readiness-review.md = READINESS_PASS`;
 - Main merge authorization: `development/225-p11-main-merge-authorization.md = AUTHORIZED / FAST_FORWARD_ONLY`;
+- Main integration verification: `development/226-p11-main-integration-verification.md = INTEGRATION_PASS`;
 - candidate `7aac34e763b4c9caac24489eb049aa3dc6efb026` remains frozen `REVIEW_PASS`; no production/test change is authorized.
 
 Final repository design/code consistency review: `development/145-final-full-repository-consistency-review.md = PASS`.
@@ -757,7 +758,7 @@ The P8 MCP runtime is isolated from the FFDF main runtime. MCP AI API calls rema
 - P8 — Local MCP: `DONE`
 - P9 — Codex Review Overlay: `DONE`
 - P10 — Codex Dynamic Research Integration: `DONE / PASS`
-- P11 — US SEC Provider: `MAIN_MERGE_AUTHORIZED / FAST_FORWARD_ONLY / candidate 7aac34e7`
+- P11 — US SEC Provider: `MAIN_INTEGRATION_VERIFIED / closeout pending / candidate 7aac34e7`
 
 
 ## P11 short execution workflow

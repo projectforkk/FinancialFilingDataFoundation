@@ -314,7 +314,7 @@ Implementation plan 至少覆盖：
 ## 13. Current Next Action
 
 当前：
-`P11_MAIN_MERGE_AUTHORIZED / FAST_FORWARD_ONLY / CANDIDATE_7AAC34E7 / P0_P10_ACCEPTED_BASELINE_PRESERVED`
+`P11_MAIN_INTEGRATION_VERIFIED / CLOSEOUT_PENDING / CANDIDATE_7AAC34E7 / P0_P10_ACCEPTED_BASELINE_PRESERVED`
 
 P11 current design:
 - scope reopening = `design/32-p11-us-scope-reopening.md`;
@@ -355,7 +355,8 @@ P11 current design:
 - Formal Acceptance Review 6 continuation = `development/223-p11-formal-acceptance-review-6-continuation.md = ACCEPTANCE_PASS`;
 - main merge readiness review = `development/224-p11-main-merge-readiness-review.md = READINESS_PASS`;
 - main merge authorization = `development/225-p11-main-merge-authorization.md = AUTHORIZED / FAST_FORWARD_ONLY`;
-- next action = protected non-force fast-forward of `main`, followed by independent main-integration verification and P11 closeout.
+- main integration verification = `development/226-p11-main-integration-verification.md = INTEGRATION_PASS`;
+- next action = P11 closeout record and final project-status transition to DONE.
 
 P10 design candidate：
 - detailed design = `design/24-p10-codex-dynamic-research-integration-design.md`；
